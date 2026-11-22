@@ -1,17 +1,17 @@
 import { resolveMx, resolveTxt } from 'node:dns/promises';
 import {
-  getDomain,
+  fetchResendDomain,
   type ResendDnsRecord,
   type ResendDomain,
   upsertDomain,
   verifyDomain,
 } from '../api/resend';
 import { updateConfigField } from '../utils/configHelpers';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import { markComplete } from '../utils/progressTracking';
-import { getSecretAsync, setSecretAsync } from './infisicalSetup';
+import { fetchSecretOrThrow, setSecretAsync } from './infisicalSetup';
 
-const getDomainName = (fromAddress: string): string => {
+const domainNameOfAddressOrThrow = (fromAddress: string): string => {
   const domainName = fromAddress.split('@')[1];
   if (!domainName) {
     throw new Error(`Could not extract domain from "${fromAddress}"`);
@@ -20,12 +20,12 @@ const getDomainName = (fromAddress: string): string => {
 };
 
 const syncResendProjectName = async (): Promise<void> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   await updateConfigField('resend', 'configProjectName', config.project.name);
 };
 
-export const getStoredResendApiKey = async (projectId: string): Promise<string> => {
-  return getSecretAsync('RESEND_API_KEY', {
+export const fetchStoredResendApiKeyOrThrow = async (projectId: string): Promise<string> => {
+  return fetchSecretOrThrow('RESEND_API_KEY', {
     projectId,
     environment: 'root',
     path: '/api/',
@@ -65,8 +65,8 @@ export const ensureResendDomain = async (
   apiKey?: string,
 ): Promise<ResendDomain> => {
   const result = await upsertDomain(
-    apiKey ?? (await getStoredResendApiKey(projectId)),
-    getDomainName(fromAddress),
+    apiKey ?? (await fetchStoredResendApiKeyOrThrow(projectId)),
+    domainNameOfAddressOrThrow(fromAddress),
   );
 
   await updateConfigField('resend', 'fromAddress', fromAddress);
@@ -135,7 +135,7 @@ export const confirmResendDnsSetup = async (
   fromAddress: string,
   onProgress?: (message: string) => void,
 ): Promise<DnsVerificationResult> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   const domainId = config.resend.domainId;
   const infisicalProjectId = config.infisical.projectId;
 
@@ -143,7 +143,7 @@ export const confirmResendDnsSetup = async (
     throw new Error('No domain ID found. Register the domain first.');
   }
 
-  const apiKey = await getSecretAsync('RESEND_API_KEY', {
+  const apiKey = await fetchSecretOrThrow('RESEND_API_KEY', {
     projectId: infisicalProjectId,
     environment: 'root',
     path: '/api/',
@@ -151,8 +151,8 @@ export const confirmResendDnsSetup = async (
 
   // Step 1: Check DNS locally (instant, no API call)
   onProgress?.('Checking DNS records locally...');
-  const currentDomain = await getDomain(apiKey, domainId);
-  const domainName = getDomainName(fromAddress);
+  const currentDomain = await fetchResendDomain(apiKey, domainId);
+  const domainName = domainNameOfAddressOrThrow(fromAddress);
   const dnsCheck = await checkDnsLocally(currentDomain.records ?? [], domainName);
   const allFoundLocally = dnsCheck.every((r) => r.found);
 
@@ -185,7 +185,7 @@ export const confirmResendDnsSetup = async (
     await verifyDomain(apiKey, domainId);
     // Wait for Resend to process the check
     await new Promise((resolve) => setTimeout(resolve, 3000));
-    domain = await getDomain(apiKey, domainId);
+    domain = await fetchResendDomain(apiKey, domainId);
   }
 
   const failedRecords = (domain.records ?? [])
@@ -208,8 +208,8 @@ export const confirmResendDnsSetup = async (
  * Get the current Infisical project ID from config.
  * Throws if Infisical hasn't been set up yet.
  */
-export const getInfisicalProjectId = async (): Promise<string> => {
-  const config = await getProjectConfig();
+export const fetchInfisicalProjectIdOrThrow = async (): Promise<string> => {
+  const config = await fetchProjectConfig();
   const { projectId } = config.infisical;
   if (!projectId) {
     throw new Error('Infisical project not configured. Complete "2. Infisical Setup" first.');

@@ -1,7 +1,8 @@
 model File {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   artifactId String   @unique @db.VarChar(36)
   artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
@@ -16,9 +17,10 @@ model File {
 }
 
 model FileVersion {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   fileId String @db.VarChar(36)
   file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
@@ -36,36 +38,37 @@ model FileVersion {
 }
 
 model ResourceBinding {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  sourceModel ResourceBindingSourceModel
-  artifactId  String?                    @db.VarChar(36)
-  artifact    Artifact?                  @relation(fields: [artifactId], references: [id])
-  url         String?
+  sourceModel      ResourceBindingSourceModel
+  sourceArtifactId String?                    @db.VarChar(36)
+  sourceArtifact   Artifact?                  @relation(fields: [sourceArtifactId], references: [id])
+  url              String?
 
-  resourceModel  ResourceBindingResourceModel
-  organizationId String?                      @db.VarChar(36)
-  spaceId        String?                      @db.VarChar(36)
-  userId         String?                      @db.VarChar(36)
-  customerRefId  String?                      @db.VarChar(36)
+  resourceModel                  ResourceBindingResourceModel
+  resourceOrganizationId         String?                      @db.VarChar(36)
+  resourceSpaceId                String?                      @db.VarChar(36)
+  resourceUserId                 String?                      @db.VarChar(36)
+  resourceCustomerRelationshipId String?                      @db.VarChar(36)
 
-  organization Organization? @relation("ResourceBindingOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
-  space        Space?        @relation("ResourceBindingSpace", fields: [spaceId], references: [id], onDelete: Cascade)
-  user         User?         @relation("ResourceBindingUser", fields: [userId], references: [id], onDelete: Cascade)
-  customerRef  CustomerRef?  @relation("ResourceBindingCustomerRef", fields: [customerRefId], references: [id], onDelete: Cascade)
+  resourceOrganization         Organization?         @relation("ResourceBindingOrganization", fields: [resourceOrganizationId], references: [id], onDelete: Cascade)
+  resourceSpace                Space?                @relation("ResourceBindingSpace", fields: [resourceSpaceId], references: [id], onDelete: Cascade)
+  resourceUser                 User?                 @relation("ResourceBindingUser", fields: [resourceUserId], references: [id], onDelete: Cascade)
+  resourceCustomerRelationship CustomerRelationship? @relation("ResourceBindingCustomerRelationship", fields: [resourceCustomerRelationshipId], references: [id], onDelete: Cascade)
 
   bindingType String
   order       Int    @default(0)
   media       Json?
   conditions  Json?
 
-  @@index([resourceModel, organizationId, bindingType])
-  @@index([resourceModel, spaceId, bindingType])
-  @@index([resourceModel, userId, bindingType])
-  @@index([resourceModel, customerRefId, bindingType])
-  @@index([artifactId])
+  @@index([resourceModel, resourceOrganizationId, bindingType])
+  @@index([resourceModel, resourceSpaceId, bindingType])
+  @@index([resourceModel, resourceUserId, bindingType])
+  @@index([resourceModel, resourceCustomerRelationshipId, bindingType])
+  @@index([sourceArtifactId])
 }
 
 enum FileVersionStatus {
@@ -85,5 +88,5 @@ enum ResourceBindingResourceModel {
   Organization
   Space
   User
-  CustomerRef
+  CustomerRelationship
 }

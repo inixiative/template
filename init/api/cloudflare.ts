@@ -70,7 +70,7 @@ export const cloudflareApi = {
     return cfFetch<{ id: string; status: string }>('/user/tokens/verify');
   },
 
-  async getProject(accountId: string, projectName: string): Promise<CFPagesProject | null> {
+  async fetchProject(accountId: string, projectName: string): Promise<CFPagesProject | null> {
     try {
       return await cfFetch<CFPagesProject>(`/accounts/${accountId}/pages/projects/${projectName}`);
     } catch (e) {

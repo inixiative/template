@@ -1,7 +1,7 @@
 import {
-  type CommunicationSettledPayload,
-  communicationSettled,
-} from '#/appEvents/handlers/communication/communicationSettled';
+  type CommunicationOutcomeRecordedPayload,
+  communicationOutcomeRecorded,
+} from '#/appEvents/handlers/communication/communicationOutcomeRecorded';
 import {
   type ContactCreatedPayload,
   contactCreated,
@@ -15,17 +15,17 @@ import {
   contactUpdated,
 } from '#/appEvents/handlers/contact/contactUpdated';
 import {
-  type CustomerRefCreatedPayload,
-  customerRefCreated,
-} from '#/appEvents/handlers/customerRef/customerRefCreated';
+  type CustomerRelationshipCreatedPayload,
+  customerRelationshipCreated,
+} from '#/appEvents/handlers/customerRelationship/customerRelationshipCreated';
 import {
-  type CustomerRefSegmentsAddedPayload,
-  customerRefSegmentsAdded,
-} from '#/appEvents/handlers/customerRef/customerRefSegmentsAdded';
+  type CustomerRelationshipSegmentsAddedPayload,
+  customerRelationshipSegmentsAdded,
+} from '#/appEvents/handlers/customerRelationship/customerRelationshipSegmentsAdded';
 import {
-  type CustomerRefSegmentsRemovedPayload,
-  customerRefSegmentsRemoved,
-} from '#/appEvents/handlers/customerRef/customerRefSegmentsRemoved';
+  type CustomerRelationshipSegmentsRemovedPayload,
+  customerRelationshipSegmentsRemoved,
+} from '#/appEvents/handlers/customerRelationship/customerRelationshipSegmentsRemoved';
 import {
   type InquiryResolvedPayload,
   inquiryResolved,
@@ -88,13 +88,13 @@ import {
 import type { AppEventHandlerFn } from '#/appEvents/makeAppEvent';
 
 export type AppEventPayloads = {
-  'communication.settled': CommunicationSettledPayload;
+  'communication.outcomeRecorded': CommunicationOutcomeRecordedPayload;
   'contact.created': ContactCreatedPayload;
   'contact.updated': ContactUpdatedPayload;
   'contact.deleted': ContactDeletedPayload;
-  'customerRef.created': CustomerRefCreatedPayload;
-  'customerRef.segmentsAdded': CustomerRefSegmentsAddedPayload;
-  'customerRef.segmentsRemoved': CustomerRefSegmentsRemovedPayload;
+  'customerRelationship.created': CustomerRelationshipCreatedPayload;
+  'customerRelationship.segmentsAdded': CustomerRelationshipSegmentsAddedPayload;
+  'customerRelationship.segmentsRemoved': CustomerRelationshipSegmentsRemovedPayload;
   'inquiry.sent': InquirySentPayload;
   'inquiry.resolved': InquiryResolvedPayload;
   'organization.updated': OrganizationUpdatedPayload;
@@ -118,13 +118,13 @@ export type AppEventPayloads = {
 };
 
 export const AppEventName = {
-  communicationSettled: 'communication.settled',
+  communicationOutcomeRecorded: 'communication.outcomeRecorded',
   contactCreated: 'contact.created',
   contactUpdated: 'contact.updated',
   contactDeleted: 'contact.deleted',
-  customerRefCreated: 'customerRef.created',
-  customerRefSegmentsAdded: 'customerRef.segmentsAdded',
-  customerRefSegmentsRemoved: 'customerRef.segmentsRemoved',
+  customerRelationshipCreated: 'customerRelationship.created',
+  customerRelationshipSegmentsAdded: 'customerRelationship.segmentsAdded',
+  customerRelationshipSegmentsRemoved: 'customerRelationship.segmentsRemoved',
   inquirySent: 'inquiry.sent',
   inquiryResolved: 'inquiry.resolved',
   organizationUpdated: 'organization.updated',
@@ -150,13 +150,13 @@ export const AppEventName = {
 export type AppEventName = (typeof AppEventName)[keyof typeof AppEventName];
 
 export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
-  'communication.settled': communicationSettled,
+  'communication.outcomeRecorded': communicationOutcomeRecorded,
   'contact.created': contactCreated,
   'contact.updated': contactUpdated,
   'contact.deleted': contactDeleted,
-  'customerRef.created': customerRefCreated,
-  'customerRef.segmentsAdded': customerRefSegmentsAdded,
-  'customerRef.segmentsRemoved': customerRefSegmentsRemoved,
+  'customerRelationship.created': customerRelationshipCreated,
+  'customerRelationship.segmentsAdded': customerRelationshipSegmentsAdded,
+  'customerRelationship.segmentsRemoved': customerRelationshipSegmentsRemoved,
   'inquiry.sent': inquirySent,
   'inquiry.resolved': inquiryResolved,
   'organization.updated': organizationUpdated,

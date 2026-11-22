@@ -9,7 +9,7 @@ export type BroadcastRegistry<A> = {
   register: (name: string, adapter: A) => void;
   unregister: (name: string) => void;
   get: (name: string) => A;
-  getOrDefault: (name: string | undefined, fallback: string) => A;
+  resolveOrThrow: (name: string | undefined, fallback: string) => A;
   broadcast: <R>(fn: (adapter: A) => Promise<R>) => Promise<R[]>;
   has: (name: string) => boolean;
   names: () => string[];
@@ -29,7 +29,7 @@ export const makeBroadcastRegistry = <A>(): BroadcastRegistry<A> => {
       if (!adapter) throw new Error(`Adapter not found: ${name}`);
       return adapter;
     },
-    getOrDefault: (name, fallback) => {
+    resolveOrThrow: (name, fallback) => {
       const adapter = name !== undefined ? map.get(name) : undefined;
       if (adapter) return adapter;
       const defaultAdapter = map.get(fallback);

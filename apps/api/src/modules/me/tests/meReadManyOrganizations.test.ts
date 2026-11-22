@@ -11,7 +11,7 @@ import {
 import { meRouter } from '#/modules/me';
 import type { meReadManyOrganizationsRoute } from '#/modules/me/routes/meReadManyOrganizations';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type ReadManyOrgsResponse = z.infer<typeof meReadManyOrganizationsRoute.responseSchema>[];
 
@@ -38,7 +38,7 @@ describe('GET /me/organizations', () => {
 
   it('returns empty array when user has no organizations', async () => {
     const response = await fetch(get('/api/v1/me/organizations'));
-    const { data, pagination } = await json<ReadManyOrgsResponse>(response);
+    const { data, pagination } = await parseSuccessBody<ReadManyOrgsResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data).toEqual([]);
@@ -56,7 +56,7 @@ describe('GET /me/organizations', () => {
     );
 
     const response = await fetch(get('/api/v1/me/organizations'));
-    const { data } = await json<ReadManyOrgsResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyOrgsResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(1);
@@ -74,7 +74,7 @@ describe('GET /me/organizations', () => {
     await createOrganizationUser({ role: Role.member }, { user, organization: org2 });
 
     const response = await fetch(get('/api/v1/me/organizations'));
-    const { data, pagination } = await json<ReadManyOrgsResponse>(response);
+    const { data, pagination } = await parseSuccessBody<ReadManyOrgsResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(2);
@@ -87,7 +87,7 @@ describe('GET /me/organizations', () => {
     await db.organization.update({ where: { id: org.id }, data: { deletedAt: new Date() } });
 
     const response = await fetch(get('/api/v1/me/organizations'));
-    const { data } = await json<ReadManyOrgsResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyOrgsResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.find((m) => m.id === org.id)).toBeUndefined();
@@ -105,7 +105,7 @@ describe('GET /me/organizations', () => {
     });
 
     const response = await fetch(get('/api/v1/me/organizations'));
-    const { data } = await json<ReadManyOrgsResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyOrgsResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.find((m) => m.id === org.id)).toBeUndefined();

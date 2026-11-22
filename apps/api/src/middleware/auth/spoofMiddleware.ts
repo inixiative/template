@@ -6,9 +6,9 @@
  */
 import { isSuperadmin as isSuperadminUser } from '@template/permissions';
 import type { Context, Next } from 'hono';
-
+import { actingUser } from '#/lib/context/actingUser';
+import { isBatchSubRequest } from '#/lib/context/isBatchSubRequest';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
-import { me } from '#/lib/context/me';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
 import { findUserByEmail, findUserWithRelations } from '#/modules/user/services/find';
@@ -16,7 +16,9 @@ import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import type { AppEnv } from '#/types/appEnv';
 
 export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  const spoofer = me(c);
+  // why: batch sub-requests inherit the parent batch's already-resolved identity and cannot re-spoof
+  if (isBatchSubRequest(c)) return next();
+  const spoofer = actingUser(c);
   if (!spoofer || !isSuperadmin(c)) return next();
 
   const rawEmail = c.req.header('x-spoof-user-email');

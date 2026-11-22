@@ -24,8 +24,8 @@ Sign-in, sign-up, OAuth callback, guards and the auth slice in `@template/ui`. B
 ## Architecture
 
 - **BetterAuth client** (`better-auth/client`) talks to the API's `/api/auth/*` routes.
-- **User JWT in localStorage.** Email sign-in, sign-up without verification and the OAuth callback all answer with `{ token, expiresAt, user }`; `storeJwtHandoff` (`packages/ui/src/lib/auth/storeJwtHandoff.ts`) checks that shape and calls `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). The stored JWT is read only through `packages/ui/src/lib/auth/token.ts`: `getToken` (the raw value), `isTokenValid` (present and unexpired), `getTokenExpiry` and `clearToken`; never read `localStorage` or compare the expiry by hand. Every API call and the websocket `authenticate` frame send `Authorization: Bearer <jwt>`. The client never holds a session.
-- **`/me` hydrates the store.** `fetchAndHydrateMe` loads the user, organizations, spaces and space memberships, then runs `permissions.setup(me)`.
+- **User JWT in localStorage.** Email sign-in, sign-up without verification and the OAuth callback all answer with `{ token, expiresAt, user }`; `storeJwtHandoff` (`packages/ui/src/lib/auth/storeJwtHandoff.ts`) checks that shape and calls `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). The stored JWT is read only through `packages/ui/src/lib/auth/token.ts`: `fetchStoredTokenAndClearIfExpired` (the raw value), `isTokenValid` (present and unexpired), `storedTokenExpiry` and `clearToken`; never read `localStorage` or compare the expiry by hand. Every API call and the websocket `authenticate` frame send `Authorization: Bearer <jwt>`. The client never holds a session.
+- **`/me` hydrates the store.** `fetchAndHydrateMe` loads the user, organizations, spaces and space memberships, then runs `permissions.installPermissionsForUser(me)`.
 
 **Email/password:**
 ```
@@ -33,9 +33,9 @@ signIn({ type: 'email', email, password })
   ↓
 client.signIn.email → { token: jwt, expiresAt } → storeJwtHandoff()
   ↓
-fetchAndHydrateMe() → permissions.setup()
+fetchAndHydrateMe() → permissions.installPermissionsForUser()
   ↓
-navigatePreserving(redirectTo || '/dashboard', 'context')
+navigateKeepingSearchParams(redirectTo || '/dashboard', 'context')
 ```
 
 **OAuth:**
@@ -74,7 +74,7 @@ type SignUpResult =
   | { status: 'redirecting' };
 ```
 
-- `signIn` / `signUp` live in `packages/ui/src/lib/auth/{signin,signup}.ts`; the store wraps them (`auth.signIn`, `auth.signUp`).
+- `signIn` / `signUp` live in `packages/ui/src/lib/auth/{signIn,signUp}.ts`; the store wraps them (`auth.signIn`, `auth.signUp`).
 - `signUp` with email requires `name`. The API requires email verification, so a new account usually returns `verification-pending` and stays logged out.
 - `saml` throws `SAML authentication not yet implemented` (see [AUTH-003](../../../tickets/AUTH-003-saml-sso.md)).
 - OAuth defaults: `callbackURL` = `${origin}/auth/callback`, `errorCallbackURL` = `${origin}/login`.
@@ -87,33 +87,33 @@ Pages are thin; the forms own their state and read the store directly (no prop d
 
 | File | Role |
 |------|------|
-| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignup? })` renders `LoginForm`, links to signup with `navigateToSignup(getStore, true)` |
-| `packages/ui/src/pages/SignupPage.tsx` | `SignupPage` renders `SignupForm`, links to login with `navigateToLogin(getStore, true)` |
+| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignUp? })` renders `LoginForm`, links to signup with `navigateToSignUp(currentAppStore, true)` |
+| `packages/ui/src/pages/SignUpPage.tsx` | `SignUpPage` renders `SignUpForm`, links to login with `navigateToLogin(currentAppStore, true)` |
 | `packages/ui/src/pages/AuthCallbackPage.tsx` | OAuth callback (`/auth/callback` in all three apps) |
-| `packages/ui/src/components/auth/LoginForm.tsx` | `LoginFormProps = { hideSignup?, onSignupClick? }` |
-| `packages/ui/src/components/auth/SignupForm.tsx` | `SignupFormProps = { onLoginClick? }` |
+| `packages/ui/src/components/auth/LoginForm.tsx` | `LoginFormProps = { hideSignUp?, onSignUpClick? }` |
+| `packages/ui/src/components/auth/SignUpForm.tsx` | `SignUpFormProps = { onLoginClick? }` |
 
 App routes only mount them:
 
 ```typescript
 // apps/web/app/routes/_public/login.tsx
 export const Route = createFileRoute('/_public/login')({
-  beforeLoad: (ctx) => requirePublic(ctx),
+  beforeLoad: (ctx) => redirectAuthenticatedUserAwayFromPublicPage(ctx),
   component: () => <LoginPage />,
 });
 ```
 
-**LoginForm / SignupForm behavior:**
+**LoginForm / SignUpForm behavior:**
 - Fetch providers with `useAuthProviders()`; render a "Continue with {name}" button per enabled provider, then the email form.
 - Provider icons are Iconify slugs (`simple-icons:google`, `simple-icons:github`, `lucide:shield`, fallback `lucide:key`).
 - Sign-in errors go through `describeError` and show inline and as a toast; provider-load errors show inline only.
 - A provider-load failure shows "Unable to load authentication providers. You can still log in with email and password." and keeps the email form.
 - `LoginForm` reads `?error=` (set by the callback page on failure) into its initial error.
-- On success: `navigatePreserving(search.redirectTo || '/dashboard', 'context')`.
+- On success: `navigateKeepingSearchParams(search.redirectTo || '/dashboard', 'context')`.
 - OAuth click stores `redirectTo` in `localStorage.authRedirectTo` before leaving the page.
-- `SignupForm` shows "Open the verification link sent to {email}" on `verification-pending`.
+- `SignUpForm` shows "Open the verification link sent to {email}" on `verification-pending`.
 
-Also exported from `@template/ui/components/auth` but not used by the forms: `AuthDivider`, `SocialAuthButton`. `LoginCredentials` / `SignupCredentials` live in `packages/ui/src/types/auth.ts`.
+Also exported from `@template/ui/components/auth` but not used by the forms: `AuthDivider`, `SocialAuthButton`. `SignInCredentials` / `SignUpCredentials` live in `packages/ui/src/types/auth.ts`.
 
 ---
 
@@ -151,18 +151,18 @@ A `useRef` guard runs the exchange once; the token is single-use and StrictMode 
 **Location:** `packages/ui/src/guards/authGuard.ts` (`createAuthGuards`), instances in `packages/ui/src/guards/appGuards.ts`.
 
 ```typescript
-import { requireAuth, requirePublic } from '@template/ui/guards';
+import { redirectToLoginUnlessAuthenticated, redirectAuthenticatedUserAwayFromPublicPage } from '@template/ui/guards';
 
 export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: (ctx) => requireAuth(ctx),
+  beforeLoad: (ctx) => redirectToLoginUnlessAuthenticated(ctx),
   component: AuthenticatedLayout,
 });
 ```
 
 | Guard | Behavior |
 |-------|----------|
-| `requireAuth` | `auth.initialize()`; if not authenticated, redirect to `/login?redirectTo=<path+search+hash>` and carry `org`, `space`, `spoof` as login params |
-| `requirePublic` | `auth.initialize()`; if authenticated, redirect to `?redirectTo` or `/dashboard` |
+| `redirectToLoginUnlessAuthenticated` | `auth.initialize()`; if not authenticated, redirect to `/login?redirectTo=<path+search+hash>` and carry `org`, `space`, `spoof` as login params |
+| `redirectAuthenticatedUserAwayFromPublicPage` | `auth.initialize()`; if authenticated, redirect to `?redirectTo` or `/dashboard` |
 
 Initialization errors are swallowed; the redirect handles the unauthenticated case.
 
@@ -178,7 +178,7 @@ Initialization errors are swallowed; the redirect handles the unauthenticated ca
 | `signIn(method)` | Calls `lib/auth/signIn`; for non-OAuth methods hydrates `/me` and authenticates the websocket |
 | `signUp(method)` | Calls `lib/auth/signUp`; hydrates on `authenticated`, clears local auth on `verification-pending`; returns the result |
 | `refreshMe()` | Re-hydrate `/me` |
-| `changePassword({ currentPassword, newPassword })` | Calls `lib/auth/changePassword` (`POST /api/v1/me/changePassword` through `apiFetchInternal`, with the current JWT as bearer), stores the new JWT the response carries (`storeJwtHandoff`) and re-authenticates the websocket with it; while spoofing it stores nothing and the superadmin's JWT stays. Every older JWT, including other tabs' and devices', is a 401 from then on ([AUTH.md → Change password](../AUTH.md#change-password)). Throws the API's error on a wrong current password; the stored JWT stays |
+| `changePassword({ currentPassword, newPassword })` | Calls `lib/auth/changePassword` (`POST /api/v1/me/changePassword` through `makeAuthenticatedApiFetch`, with the current JWT as bearer), stores the new JWT the response carries (`storeJwtHandoff`) and re-authenticates the websocket with it; while spoofing it stores nothing and the superadmin's JWT stays. Every older JWT, including other tabs' and devices', is a 401 from then on ([AUTH.md → Change password](../AUTH.md#change-password)). Throws the API's error on a wrong current password; the stored JWT stays |
 | `setSpoof(email \| null)` | Sets `spoofUserEmail`, re-hydrates `/me` (sent as `x-spoof-user-email`), spoofs/unspoofs the websocket |
 | `logout()` | Signs out of this browser: clears the JWT, user, permissions, websocket identity and tenant (→ public) and navigates to `/login`. No server call: the API keeps no session to end. Ending every JWT on every device is `POST /api/v1/me/rotateJwts` ([AUTH.md → Revocation and sign-out](../AUTH.md#revocation-and-sign-out)) |
 | `setStrategy(strategy)` | `{ type: 'login' }` or `{ type: 'embed', parentOrigin? }`; sets `isEmbedded` |
@@ -202,19 +202,19 @@ await logout();
 
 ## Navigation Helpers
 
-**Location:** `packages/ui/src/lib/routeRedirect.ts`, store `navigation.navigatePreserving`.
+**Location:** `packages/ui/src/lib/routeRedirect.ts`, store `navigation.navigateKeepingSearchParams`.
 
 ```typescript
-navigatePreserving(to, 'context');  // keep org/space (+ spoof, flow)
-navigatePreserving(to, 'spoof');    // keep spoof (+ flow) only
-navigatePreserving(to, 'all');      // keep every current search param
+navigateKeepingSearchParams(to, 'context');  // keep org/space (+ spoof, flow)
+navigateKeepingSearchParams(to, 'spoof');    // keep spoof (+ flow) only
+navigateKeepingSearchParams(to, 'all');      // keep every current search param
 
-navigateToLogin(getStore, preserveSearch?);
-navigateToSignup(getStore, preserveSearch?);
+navigateToLogin(currentAppStore, preserveSearch?);
+navigateToSignUp(currentAppStore, preserveSearch?);
 redirectPreservingContext(beforeLoadCtx, to);  // throw a redirect keeping org/space/spoof
 ```
 
-`navigateToLogin` / `navigateToSignup` either carry the current search + hash (`preserveSearch`) or set `?redirectTo=<current path>`. Login ↔ signup links pass `preserveSearch: true`, so `redirectTo` survives the switch:
+`navigateToLogin` / `navigateToSignUp` either carry the current search + hash (`preserveSearch`) or set `?redirectTo=<current path>`. Login ↔ signup links pass `preserveSearch: true`, so `redirectTo` survives the switch:
 
 1. `/settings` while logged out → guard redirects to `/login?redirectTo=/settings`.
 2. "Sign Up" → `/signup?redirectTo=/settings`.
@@ -224,7 +224,7 @@ redirectPreservingContext(beforeLoadCtx, to);  // throw a redirect keeping org/s
 
 ## Security
 
-- **CSRF / OAuth state:** BetterAuth validates state and nonce; trusted origins come from the API's CORS allow-list (`getAllowedOrigins`).
+- **CSRF / OAuth state:** BetterAuth validates state and nonce; trusted origins come from the API's CORS allow-list (`allowedCorsOrigins`).
 - **Spoofing** is superadmin-only on the API; the UserMenu hides spoof controls unless the user is superadmin or already spoofing, and the superadmin app hides them entirely.
 - **Token storage** is localStorage (readable by any script on the origin), not an HTTP-only cookie.
 
@@ -256,11 +256,11 @@ cd packages/ui && bun run test
 
 ## Key Files
 
-- `packages/ui/src/lib/auth/` — `signin.ts`, `signup.ts`, `token.ts`, `fetchAndHydrateMe.ts`, `types.ts`
+- `packages/ui/src/lib/auth/` — `signIn.ts`, `signUp.ts`, `token.ts`, `fetchAndHydrateMe.ts`, `types.ts`
 - `packages/ui/src/hooks/useAuthProviders.ts`
 - `packages/ui/src/hooks/useAuthStrategy/` — embed strategy context (`AuthStrategyProvider`, `useAuthStrategy`)
-- `packages/ui/src/pages/{LoginPage,SignupPage,AuthCallbackPage}.tsx`
-- `packages/ui/src/components/auth/` — `LoginForm`, `SignupForm`, `AuthDivider`, `SocialAuthButton`
+- `packages/ui/src/pages/{LoginPage,SignUpPage,AuthCallbackPage}.tsx`
+- `packages/ui/src/components/auth/` — `LoginForm`, `SignUpForm`, `AuthDivider`, `SocialAuthButton`
 - `packages/ui/src/guards/{authGuard,appGuards}.ts`
 - `packages/ui/src/store/slices/auth.ts`, `packages/ui/src/store/types/auth.ts`
 - `packages/ui/src/lib/routeRedirect.ts`, `packages/ui/src/lib/searchParams.ts`

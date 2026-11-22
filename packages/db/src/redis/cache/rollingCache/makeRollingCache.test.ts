@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { cacheKey } from '@template/db/redis/cache/cacheKey';
 import { makeRollingCache } from '@template/db/redis/cache/rollingCache/makeRollingCache';
 import {
-  getRollingCache,
   listRollingCaches,
+  rollingCacheByNameOrThrow,
   unregisterRollingCache,
 } from '@template/db/redis/cache/rollingCache/rollingCacheRegistry';
 import {
@@ -13,7 +13,7 @@ import {
   ROLLING_CACHE_TICK_SECONDS,
   type RollingCacheComputeContext,
 } from '@template/db/redis/cache/rollingCache/rollingCacheTypes';
-import { flushRedis, getRedisClient } from '@template/db/redis/client';
+import { flushRedis, redisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 
 const registered: string[] = [];
@@ -69,8 +69,8 @@ describe('makeRollingCache', () => {
         ...single(fractional, async () => 1),
       }),
     ).toThrow('whole number of seconds');
-    expect(() => getRollingCache(short)).toThrow('is not registered');
-    expect(() => getRollingCache(fractional)).toThrow('is not registered');
+    expect(() => rollingCacheByNameOrThrow(short)).toThrow('is not registered');
+    expect(() => rollingCacheByNameOrThrow(fractional)).toThrow('is not registered');
   });
 
   it('spreads its leaves over half the interval unless told otherwise, and refuses a spread as long as the interval', () => {
@@ -145,9 +145,9 @@ describe('makeRollingCache', () => {
   });
 
   it('throws when asked for a cache nobody registered', () => {
-    expect(() => getRollingCache(`rollingCacheTest-missing-${Bun.randomUUIDv7()}`)).toThrow(
-      'is not registered',
-    );
+    expect(() =>
+      rollingCacheByNameOrThrow(`rollingCacheTest-missing-${Bun.randomUUIDv7()}`),
+    ).toThrow('is not registered');
   });
 
   it('registers the cache so the coordinator can find it by name', () => {
@@ -158,7 +158,7 @@ describe('makeRollingCache', () => {
       ...single(name, async () => 1),
     });
 
-    expect(getRollingCache(name).name).toBe(name);
+    expect(rollingCacheByNameOrThrow(name).name).toBe(name);
     expect(listRollingCaches().map((entry) => entry.name)).toContain(name);
     expect(rollingCache.timeoutSeconds).toBe(300);
   });
@@ -172,7 +172,7 @@ describe('makeRollingCache', () => {
     });
 
     await rollingCache.refresh();
-    const ttl = await getRedisClient().ttl(cacheKey(name, 'all'));
+    const ttl = await redisClient().ttl(cacheKey(name, 'all'));
 
     expect(rollingCache.ttlSeconds).toBe(600 * (2 * ROLLING_CACHE_LEAF_ATTEMPTS + 2));
     expect(ttl).toBeGreaterThan(600 * (2 * ROLLING_CACHE_LEAF_ATTEMPTS + 1));
@@ -191,12 +191,12 @@ describe('makeRollingCache', () => {
       }),
     });
 
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'empty' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'empty' });
     expect(runs).toBe(0);
 
     await rollingCache.refresh();
 
-    expect(await rollingCache.read('value', undefined)).toMatchObject({
+    expect(await rollingCache.fetchResult('value', undefined)).toMatchObject({
       state: 'fresh',
       value: { runs: 1 },
       isComputing: false,
@@ -218,7 +218,10 @@ describe('makeRollingCache', () => {
 
     await rollingCache.refresh();
     expect(await rollingCache.refresh()).toBe(true);
-    expect(await rollingCache.read('value', undefined)).toMatchObject({ state: 'fresh', value: 2 });
+    expect(await rollingCache.fetchResult('value', undefined)).toMatchObject({
+      state: 'fresh',
+      value: 2,
+    });
   });
 
   it('reports computing while a refresh is running, before any value exists', async () => {
@@ -232,11 +235,11 @@ describe('makeRollingCache', () => {
 
     const refreshing = rollingCache.refresh();
     await Bun.sleep(20);
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'computing' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'computing' });
 
     release();
     await refreshing;
-    expect(await rollingCache.read('value', undefined)).toMatchObject({
+    expect(await rollingCache.fetchResult('value', undefined)).toMatchObject({
       state: 'fresh',
       value: 'done',
       isComputing: false,
@@ -253,12 +256,12 @@ describe('makeRollingCache', () => {
     await rollingCache.refresh();
 
     const longAgo = Date.now() - 24 * 60 * 60 * 1000;
-    await getRedisClient().set(
+    await redisClient().set(
       `${redisNamespace.cacheWritten}:${cacheKey(name, 'all')}`,
       String(longAgo),
     );
 
-    expect(await rollingCache.read('value', undefined)).toMatchObject({
+    expect(await rollingCache.fetchResult('value', undefined)).toMatchObject({
       state: 'stale',
       value: 'old',
       isComputing: false,
@@ -278,7 +281,7 @@ describe('makeRollingCache', () => {
     });
 
     expect(await rollingCache.refresh(undefined, { signal: controller.signal })).toBe(false);
-    expect(await getRedisClient().exists(cacheKey(name, 'all'))).toBe(0);
+    expect(await redisClient().exists(cacheKey(name, 'all'))).toBe(0);
   });
 
   it('a cache with no target selector has the single whole-system target', async () => {
@@ -319,22 +322,22 @@ describe('makeRollingCache', () => {
 
     const refreshing = rollingCache.refresh(organization);
     await Bun.sleep(20);
-    expect(await rollingCache.read('all', organization)).toEqual({ state: 'computing' });
-    expect(await rollingCache.read('byKind', { ...organization, kind: 'a' })).toEqual({
+    expect(await rollingCache.fetchResult('all', organization)).toEqual({ state: 'computing' });
+    expect(await rollingCache.fetchResult('byKind', { ...organization, kind: 'a' })).toEqual({
       state: 'computing',
     });
 
     release();
     expect(await refreshing).toBe(true);
-    expect(await rollingCache.read('all', organization)).toMatchObject({
+    expect(await rollingCache.fetchResult('all', organization)).toMatchObject({
       state: 'fresh',
       value: { total: 3 },
     });
-    expect(await rollingCache.read('byKind', { ...organization, kind: 'b' })).toMatchObject({
+    expect(await rollingCache.fetchResult('byKind', { ...organization, kind: 'b' })).toMatchObject({
       state: 'fresh',
       value: { count: 2 },
     });
-    expect(await rollingCache.read('byKind', { ...organization, kind: 'c' })).toEqual({
+    expect(await rollingCache.fetchResult('byKind', { ...organization, kind: 'c' })).toEqual({
       state: 'empty',
     });
     expect(rollingCache.targetOf({ ...organization, kind: 'a' })).toEqual(organization);
@@ -352,7 +355,9 @@ describe('makeRollingCache', () => {
       intervalSeconds: 300,
       ...single(declared, async () => 1),
     });
-    expect(() => rollingCache.read('other' as 'value', undefined)).toThrow('has no result "other"');
+    expect(() => rollingCache.fetchResult('other' as 'value', undefined)).toThrow(
+      'has no result "other"',
+    );
   });
 
   it('hands compute the signal, so a superseded pass stops between batches, and the next refresh waits for its lock', async () => {
@@ -382,7 +387,7 @@ describe('makeRollingCache', () => {
     await expect(superseded).rejects.toThrow();
     expect(await next).toBe(true);
     expect(batches).toBeLessThan(100);
-    expect(await rollingCache.read('value', undefined)).toMatchObject({ state: 'fresh' });
+    expect(await rollingCache.fetchResult('value', undefined)).toMatchObject({ state: 'fresh' });
   });
   it('reports queued from the mark until the refresh takes the lock, and clears the mark once it writes', async () => {
     const name = uniqueName('queued');
@@ -395,15 +400,15 @@ describe('makeRollingCache', () => {
 
     expect(await rollingCache.markQueued(undefined)).toBe(true);
     expect(await rollingCache.markQueued(undefined)).toBe(false);
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'queued' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'queued' });
 
     const refreshing = rollingCache.refresh(undefined);
     await Bun.sleep(20);
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'computing' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'computing' });
 
     release();
     expect(await refreshing).toBe(true);
-    expect(await rollingCache.read('value', undefined)).toMatchObject({
+    expect(await rollingCache.fetchResult('value', undefined)).toMatchObject({
       state: 'fresh',
       value: 'done',
       isComputing: false,
@@ -426,7 +431,7 @@ describe('makeRollingCache', () => {
 
     await rollingCache.markQueued(undefined);
     expect(await rollingCache.refresh(undefined, { signal: controller.signal })).toBe(false);
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'queued' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'queued' });
   });
 
   it('an abort releases the lock at once, so the next refresh does not wait on a compute that ignores the signal', async () => {
@@ -455,7 +460,10 @@ describe('makeRollingCache', () => {
 
     finishStuck();
     expect(await stuck).toBe(false);
-    expect(await rollingCache.read('value', undefined)).toMatchObject({ state: 'fresh', value: 2 });
+    expect(await rollingCache.fetchResult('value', undefined)).toMatchObject({
+      state: 'fresh',
+      value: 2,
+    });
   });
   it('a refresh whose signal aborted while it waited for the lock releases it without computing', async () => {
     const name = uniqueName('abortWhileWaiting');
@@ -483,7 +491,7 @@ describe('makeRollingCache', () => {
     expect(await holder).toBe(true);
     expect(await waiting).toBe(false);
     expect(runs).toBe(1);
-    expect(await rollingCache.read('value', undefined)).toMatchObject({
+    expect(await rollingCache.fetchResult('value', undefined)).toMatchObject({
       state: 'fresh',
       isComputing: false,
     });

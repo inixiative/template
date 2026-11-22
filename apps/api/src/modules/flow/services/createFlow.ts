@@ -9,7 +9,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { flowRegistry } from '#/modules/flow/registry/flowRegistry';
 import type { flowCreateBodySchema } from '#/modules/flow/schemas/flowSchemas';
-import { checkFlow } from '#/modules/flow/services/checkFlow';
+import { advanceFlowAndDeleteWhenFinished } from '#/modules/flow/services/advanceFlowAndDeleteWhenFinished';
 import type { AppEnv } from '#/types/appEnv';
 
 export const createFlow = async (
@@ -29,5 +29,5 @@ export const createFlow = async (
       returnUrl: typeof bindings.returnUrl === 'string' ? bindings.returnUrl : null,
     },
   });
-  return checkFlow(c, flow);
+  return advanceFlowAndDeleteWhenFinished(c, flow);
 };

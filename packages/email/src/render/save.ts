@@ -12,13 +12,13 @@ import type {
 } from '@template/db/generated/client/client';
 import { visitTemplateBlocks } from '@template/email/render/conditionParser';
 import { decomposeNodes } from '@template/email/render/decompose';
-import { expand } from '@template/email/render/expand';
-import { lookupCascade } from '@template/email/render/lookupCascade';
+import { expandComponentTagsFromOwnerCascade } from '@template/email/render/expandComponentTags';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
 import { collectSlugsFromNodes } from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
-import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
+import { upsertEmailTemplateRowAtOwnerScope } from '@template/email/render/upsertEmailTemplateRowAtOwnerScope';
 import { validateDependents } from '@template/email/render/validateDependents';
 import type { EmailLens } from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
@@ -72,12 +72,6 @@ export const ownerScopeOf = (input: SaveTemplateInput): OwnerScope => ({
   locale: input.locale ?? 'en',
 });
 
-export const saveEmailComponents = (
-  inputs: EmailComponent[],
-  ctx: OwnerScope,
-  lens?: EmailLens,
-): Promise<EmailComponent[]> => saveComponents(inputs, ctx, lens);
-
 export const saveEmailTemplate = async (
   input: SaveTemplateInput,
   options: SaveTemplateOptions = {},
@@ -93,33 +87,33 @@ export const saveEmailTemplate = async (
 
   return db.txn(
     async () => {
-      const existing = await lookupCascade(slugs, ctx);
+      const existing = await fetchComponentsThroughOwnerCascade(slugs, ctx);
       const { mjml, refs, writes } = decomposeNodes(nodes, (slug) => existing[slug]?.mjml);
 
       const finalComponents = writes.map((write) => ({
         slug: write.slug,
         locale: ctx.locale,
         mjml: write.mjml,
-        componentRefs: [...new Set(write.refs)],
+        componentSlugs: [...new Set(write.refs)],
       })) as EmailComponent[];
 
       const finalTemplate = {
         ...input,
         mjml,
-        componentRefs: [...new Set(refs)],
+        componentSlugs: [...new Set(refs)],
         locale: ctx.locale,
       } as EmailTemplate;
 
       for (const component of finalComponents) {
-        await validateNoCycle(component.slug, component.componentRefs ?? [], ctx);
+        await validateNoCycle(component.slug, component.componentSlugs ?? [], ctx);
       }
 
       const components = finalComponents.length
-        ? await saveEmailComponents(finalComponents, ctx, options.lens)
+        ? await saveComponents(finalComponents, ctx, options.lens)
         : [];
-      const template = await saveTemplate(finalTemplate, ctx);
+      const template = await upsertEmailTemplateRowAtOwnerScope(finalTemplate, ctx);
 
-      const composed = await expand(template.mjml, ctx);
+      const composed = await expandComponentTagsFromOwnerCascade(template.mjml, ctx);
       assertValidConditions(composed, { lens: options.lens });
       assertValidTokens(composed, { lens: options.lens });
       if (template.subject)

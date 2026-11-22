@@ -10,7 +10,7 @@ import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
-import { prepareRequest } from '#/middleware/prepareRequest';
+import { prepareRequestMiddleware } from '#/middleware/prepareRequestMiddleware';
 import { apiRateLimit } from '#/middleware/rateLimit/apiRateLimit';
 import { authRateLimit } from '#/middleware/rateLimit/authRateLimit';
 import { artifactRouter } from '#/modules/artifact';
@@ -23,11 +23,14 @@ import { flowRouter } from '#/modules/flow';
 import { identifyRouter } from '#/modules/identify';
 import { inquiryRouter } from '#/modules/inquiry';
 import { integrationRouter } from '#/modules/integration';
+import { integrationResourceRouter } from '#/modules/integrationResource';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { projectRouter } from '#/modules/project';
+import { projectIntegrationRouter } from '#/modules/projectIntegration';
 import { segmentRouter } from '#/modules/segment';
+import { settingRouter } from '#/modules/setting';
 import { spaceRouter } from '#/modules/space';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { tokenRouter } from '#/modules/token';
@@ -43,7 +46,7 @@ export const apiRouter = new OpenAPIHono<AppEnv>();
 
 // Middleware (order matters)
 apiRouter.use('*', corsMiddleware);
-apiRouter.use('*', prepareRequest);
+apiRouter.use('*', prepareRequestMiddleware);
 apiRouter.route('/telemetry/browser', browserTelemetryRouter);
 
 // Internal service-to-service routes (shared-secret auth). Mounted BEFORE
@@ -90,3 +93,6 @@ apiRouter.route('/v1/user', userRouter);
 apiRouter.route('/v1/inquiry', inquiryRouter);
 apiRouter.route('/v1/webhookSubscription', webhookSubscriptionRouter);
 apiRouter.route('/v1/project', projectRouter);
+apiRouter.route('/v1/integrationResource', integrationResourceRouter);
+apiRouter.route('/v1/projectIntegration', projectIntegrationRouter);
+apiRouter.route('/v1/setting', settingRouter);

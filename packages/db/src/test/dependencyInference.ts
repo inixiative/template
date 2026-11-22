@@ -5,10 +5,10 @@
  * @uses none
  */
 import type { DependencyConfig, ModelName } from '@template/db/test/factoryTypes';
-import { getModelRelations } from '@template/db/utils/prismaMapRelations';
+import { relationsOfModel } from '@template/db/utils/prismaMapRelations';
 
 export const inferDependencies = (modelName: ModelName): Record<string, DependencyConfig> => {
-  const relations = getModelRelations(modelName);
+  const relations = relationsOfModel(modelName);
   const deps: Record<string, DependencyConfig> = {};
 
   for (const rel of relations) {
@@ -16,7 +16,7 @@ export const inferDependencies = (modelName: ModelName): Record<string, Dependen
     if (!rel.foreignKey) continue;
 
     // Include all relations - required ones auto-create, optional ones use context if provided
-    deps[rel.relationName] = {
+    deps[rel.field] = {
       modelName: rel.targetModel,
       foreignKey: rel.foreignKey,
       required: rel.isRequired,

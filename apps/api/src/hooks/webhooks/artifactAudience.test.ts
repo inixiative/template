@@ -59,7 +59,7 @@ describe('webhook hook: Artifact audience', () => {
     space = (await createSpace({}, { organization })).entity;
     grantee = (await createUser()).entity;
     const subscribe = async (owner: Record<string, string>) =>
-      (await createWebhookSubscription({ ...owner, model: WebhookModel.Artifact })).entity;
+      (await createWebhookSubscription({ ...owner, resourceModel: WebhookModel.Artifact })).entity;
     organizationSub = await subscribe({
       ownerModel: 'Organization',
       organizationId: organization.id,

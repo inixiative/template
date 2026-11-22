@@ -5,6 +5,7 @@
 ## Contents
 
 - [Running Tests](#running-tests)
+  - [Order](#order)
   - [Concurrency](#concurrency)
   - [Real Redis](#real-redis)
   - [Environment Composition](#environment-composition)
@@ -17,11 +18,13 @@
   - [Triggering Optional Dependencies](#triggering-optional-dependencies)
   - [Context Keys](#context-keys)
   - [Reusing Entities](#reusing-entities)
-  - [Unique Data with getNextSeq](#unique-data-with-getnextseq)
+  - [Unique Data with nextFactorySequenceNumber](#unique-data-with-nextfactorysequencenumber)
   - [TypedBuildResult (Type Safety)](#typedbuildresult-type-safety)
   - [FK Auto-Inference](#fk-auto-inference)
   - [Composite Foreign Keys](#composite-foreign-keys)
   - [Factory Data the Rules Expect](#factory-data-the-rules-expect)
+  - [Entitlements in Tests](#entitlements-in-tests)
+  - [Hooks in tests](#hooks-in-tests)
   - [Cleanup](#cleanup)
   - [Test Data Patterns](#test-data-patterns)
 - [VCR (external services)](#vcr-external-services)
@@ -148,7 +151,7 @@ Use it when asserting against API/SDK-shaped types (which use string timestamps)
 const { entity } = await buildOrganization({ id: 'org-1', name: 'Test Org' });
 const organization = entity.__serialize();
 
-store.getState().tenant.setPage({ organization });
+store.getState().tenant.setViewedRecords({ organization });
 ```
 
 This keeps cross-system factory usage while matching frontend/API type contracts.
@@ -230,18 +233,20 @@ const { entity: session } = await createSession({}, context);
 // Session reuses the user from context
 ```
 
-### Unique Data with getNextSeq
+### Unique Data with nextFactorySequenceNumber
 
-Use `getNextSeq()` for unique values in tests:
+Use `nextFactorySequenceNumber()` for unique values in tests:
 
 ```typescript
-import { getNextSeq } from '@template/db/test';
+import { nextFactorySequenceNumber } from '@template/db/test';
 
-const seq = getNextSeq();  // Returns incrementing number
+const seq = nextFactorySequenceNumber();  // Returns incrementing number
 const email = `user-${seq}@test.com`;  // Guaranteed unique
 
 // Factories use this internally for default values
 ```
+
+A factory default for a column in a unique key (`@unique`, `@@unique`, `@id`) carries the sequence as well as faker's randomness: `` `${faker.word.noun()}-${nextFactorySequenceNumber()}` ``. Faker alone collides by chance once a test makes enough rows, and the failure shows up as a red main, not in the PR that wrote the factory. `Math.random()` and the clock are the same risk, and the check judges them as faker randomness. A value from `crypto` (`randomBytes(24)`) is wide enough on its own: the rule is about collisions, not about values that replay under a seed. A key the factory fills with a constant, a NULL or a uuid is fine. `packages/db/src/test/everyFactory.test.ts` (every factory against the unique keys) reads every unique key from the generated map and fails on a default that changes with faker's seed but not with the sequence. While it samples the defaults, `Math.random` and the clock run from faker under the sample's seed, so only `crypto` stays outside it. It skips foreign keys, which come from the dependency, and constant keys, which fail on the second row every time instead of by chance. A part the defaults leave out is judged as a created row holds it: the column's default (a generated one, like a uuid, is distinct per row, so the key is skipped), or, for a required column with no default, the caller's value, the same in every row a test makes, so the key's other parts must carry the sequence. Only a nullable column stays NULL.
 
 ### TypedBuildResult (Type Safety)
 
@@ -318,7 +323,7 @@ Every API test runs with every production hook ([Hooks in tests](#hooks-in-tests
 
 ### Entitlements in Tests
 
-`createToken`, `createIntegration`, `createOrganizationUser` and `createSpaceUser` take an `entitlements` option: a list of `EntitlementInput` rows, written targeted at the new row (`storeEntitlements`, `packages/db/src/test/factories/entitlementFactory.ts`). Like any factory, it skips the grant check; the writer's own rules are tested through the routes. `createEntitlement` builds a single row. `entry(resource, [anchorResource, id, path?], actions)` (`apps/api/tests/utils/entitlementEntry.ts`) builds an input from the library's words. In `apps/api/tests/utils/entitlements.ts`: `heldEntitlements(target)` reads the rows a target holds as inputs (`asInput`), `entitlementIds(target, inputs)` finds the rows storing them, and `grantEntitlements` / `revokeEntitlements` / `changeEntitlements` call the `POST` / `DELETE` `…/:id/entitlements` routes.
+`createToken`, `createIntegration`, `createOrganizationUser` and `createSpaceUser` take an `entitlements` option: a list of `EntitlementInput` rows, written targeted at the new row (`storeEntitlements`, `packages/db/src/test/factories/entitlementFactory.ts`). Like any factory, it skips the grant check; the writer's own rules are tested through the routes. `createEntitlement` builds a single row. `entry(resource, [anchorResource, id, path?], actions)` (`apps/api/tests/utils/entitlementInputFor.ts`) builds an input from the library's words. In `apps/api/tests/utils/entitlements.ts`: `heldEntitlements(target)` reads the rows a target holds as inputs (`entitlementRowToInput`), `entitlementIds(target, inputs)` finds the rows storing them, and `grantEntitlements` / `revokeEntitlements` / `changeEntitlements` call the `POST` / `DELETE` `…/:id/entitlements` routes.
 
 ### Hooks in tests
 
@@ -337,7 +342,7 @@ try {
 ```
 
 - **A test that proves behaviour production's hooks forbid lifts that one hook by name**, in the test or its `describe`'s `beforeEach`, with a line saying why when the test's name does not: `unregisterDbHook('preventHardDelete')` in a test of what a hard delete leaves behind. The next test gets it back.
-- `scripts/ci/rules/test-hooks-cleared.sh` fails a test file that registers hooks and never clears them, or registers at import time.
+- `scripts/ci/rules/tests-registering-db-hooks-clear-them.sh` fails a test file that registers hooks and never clears them, or registers at import time.
 
 Outside the API (`packages/db`), there is no production set: a test file registers the hooks it needs in `beforeEach` and clears them with `clearHookRegistry()` in `afterEach`.
 
@@ -390,7 +395,7 @@ await db.authProvider.create({
 
 ```typescript
 // ✅ CORRECT - Dependencies inferred from schema
-const authProviderFactory = createFactory('AuthProvider', {
+const authProviderFactory = registerFactory('AuthProvider', {
   defaults: () => ({
     type: AuthProviderType.OAUTH,
     provider: 'google',
@@ -400,7 +405,7 @@ const authProviderFactory = createFactory('AuthProvider', {
 });
 
 // ❌ WRONG - Manually specifying inferred dependencies
-const authProviderFactory = createFactory('AuthProvider', {
+const authProviderFactory = registerFactory('AuthProvider', {
   defaults: () => ({ ... }),
   dependencies: {
     organization: {  // Unnecessary - auto-inferred from organizationId FK
@@ -414,7 +419,7 @@ const authProviderFactory = createFactory('AuthProvider', {
 
 **Adding a Factory:**
 
-1. Add `<model>Factory.ts` in `packages/db/src/test/factories/` with `createFactory`, following the pattern below.
+1. Add `<model>Factory.ts` in `packages/db/src/test/factories/` with `registerFactory`, following the pattern below.
 2. Export it from `packages/db/src/test/factories/index.ts`.
 3. Use it in tests with minimal overrides.
 
@@ -423,9 +428,9 @@ const authProviderFactory = createFactory('AuthProvider', {
 ```typescript
 // packages/db/src/test/factories/modelFactory.ts
 import { faker } from '@faker-js/faker';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const modelFactory = createFactory('Model', {
+const modelFactory = registerFactory('Model', {
   defaults: () => ({
     name: faker.company.name(),
     enabled: true,
@@ -458,7 +463,7 @@ send(options) {
 - Outside tests `capture` calls straight through.
 - In tests the test queues a cassette per call (`client.vcr.queue('send', 'accepted')`); `capture` replays it, or records a sanitized one when the file is missing or its `version` differs from the service's current version.
 - A recorded `status >= 400` replays as a thrown error.
-- Sanitizers redact keys before a cassette is written; commit only sanitized cassettes.
+- Sanitizers mask keys before a cassette is written; commit only sanitized cassettes.
 
 Used by `packages/email` (Resend, Bouncer) and the `init/api/*` clients (all but `cloudflare` and `resend`).
 

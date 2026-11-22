@@ -104,7 +104,7 @@ Bucket bootstrap mirrors the pg-init pattern: `scripts/db/minio-init.sh` lives b
 | `template-system-test` | Test isolation — system bucket |
 | `template-user-test` | Test isolation — user bucket |
 
-Worktree slots add their own buckets (`template-system-wt-<slot>`, etc.) via `scripts/worktree/create.sh`, which runs `scripts/db/minio-provision.sh` against the shared minio container right after the slot's databases are created; `scripts/worktree/destroy.sh` removes them. Both scripts resolve `docker` from PATH, `~/.docker/bin`, or `Docker.app`, and create refuses to proceed (rather than skipping databases) when the daemon or `${PROJECT_NAME}_postgres` is down — `--skip-db` is the explicit opt-out for docs-only worktrees.
+Worktree slots add their own buckets (`template-system-wt-<slot>`, etc.) via `scripts/worktree/create.sh`, which runs `scripts/db/minio-provision.sh` against the published `STORAGE_ENDPOINT` right after the slot's databases are created; `scripts/worktree/destroy.sh` removes them (emptying each first) with `scripts/db/minio-remove.sh`. Both talk S3 directly with signed `curl --aws-sigv4` calls (`scripts/db/s3.sh`), not a MinIO client image: `minio/mc` is no longer pullable from Docker Hub. Both scripts resolve `docker` from PATH, `~/.docker/bin`, or `Docker.app`, and create refuses to proceed (rather than skipping databases) when the daemon or `${PROJECT_NAME}_postgres` is down — `--skip-db` is the explicit opt-out for docs-only worktrees.
 
 Storage is **ephemeral** (no persistent volume on MinIO). `docker compose down && up` wipes all uploads and the entrypoint re-creates empty buckets on next boot. By design — file persistence in dev is rarely useful, and the reset story matters more than carrying state across restarts.
 

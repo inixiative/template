@@ -6,12 +6,12 @@
  */
 import { faker } from '@faker-js/faker';
 import { AuthProviderType } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const authProviderFactory = createFactory('AuthProvider', {
+const authProviderFactory = registerFactory('AuthProvider', {
   defaults: () => ({
     type: AuthProviderType.OAUTH,
-    provider: `${faker.company.buzzNoun()}-${faker.string.alphanumeric(6)}`,
+    provider: `${faker.company.buzzNoun()}-${faker.string.alphanumeric(6)}-${nextFactorySequenceNumber()}`,
     name: faker.company.name(),
     enabled: true,
     config: {},

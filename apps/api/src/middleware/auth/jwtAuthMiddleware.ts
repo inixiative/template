@@ -6,7 +6,7 @@
  */
 import type { Context, Next } from 'hono';
 import { errors, type JWTPayload } from 'jose';
-import { selfIssuer } from '#/lib/auth/userJwt';
+import { userJwtIssuerUrlOrThrow } from '#/lib/auth/userJwt';
 import { verifyIssuerJwt } from '#/lib/auth/verifyIssuerJwt';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
@@ -23,7 +23,7 @@ const isKeysUnavailable = (err: unknown) =>
   (err instanceof errors.JOSEError && err.code === 'ERR_JOSE_GENERIC');
 
 export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  if (c.get('user')) return next();
+  if (c.get('user') || c.get('token')) return next();
 
   const authorization = c.req.header('authorization');
   const bearer = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
@@ -37,7 +37,8 @@ export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 
   const user = await findUserWithRelations(claims.sub);
   if (!user) throw unauthorized();
-  if (claims.iss === selfIssuer() && claims.ver !== user.jwtVersion) throw unauthorized();
+  if (claims.iss === userJwtIssuerUrlOrThrow() && claims.ver !== user.jwtVersion)
+    throw unauthorized();
 
   await setUserContext(c, user);
   await next();

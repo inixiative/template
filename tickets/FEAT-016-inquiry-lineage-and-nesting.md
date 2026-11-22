@@ -68,7 +68,7 @@ If audit logs track all mutations, they may already cover "who created this and 
 
 ### 5. How does this interact with `handleApprove`?
 
-Currently `handleApprove(db, inquiry, resolvedContent)` runs side effects and returns partial resolution data. If approval should spawn a child inquiry, the handler would need:
+Currently `handleApprove(c, inquiry, content, response)` runs side effects and returns partial resolution data. If approval should spawn a child inquiry, the handler would need:
 - Access to context (userId, source org, etc.) — currently not available in `handleApprove`
 - A way to set `parentInquiryId` on the spawned inquiry
 
@@ -99,7 +99,7 @@ model Inquiry {
 
 Some inquiry types don't need manual review — they should approve immediately on create.
 
-**Proposed**: `autoApprove` on `InquiryHandler` is either a **function** or a **JSON condition object**:
+**Proposed**: `autoApprove` on `InquiryService` is either a **function** or a **JSON condition object**:
 
 ```ts
 // Option A: function — full flexibility, handler decides at runtime
@@ -121,24 +121,24 @@ When `autoApprove` evaluates to true, the create controller:
 
 ## Handler Registry: Remove `as unknown as` Cast
 
-The handler registry currently uses `as unknown as InquiryHandler` to paper over a type mismatch between each handler's concrete generics and the widened registry map type. This means the registry loses per-handler type inference — content and resolution types are erased to `Record<string, unknown>`.
+The handler registry currently uses `as unknown as InquiryService` to paper over a type mismatch between each handler's concrete generics and the widened registry map type. This means the registry loses per-handler type inference — content and resolution types are erased to `Record<string, unknown>`.
 
-**Goal**: tighten `InquiryHandler` generic constraints so the registry map entries infer correctly without the cast. Each handler should remain fully typed end-to-end from `contentSchema` through `handleApprove`.
+**Goal**: tighten `InquiryService` generic constraints so the registry map entries infer correctly without the cast. Each handler should remain fully typed end-to-end from `contentSchema` through `handleApprove`.
 
 Likely approach: a `makeInquiryHandler` helper that preserves inference at definition site — zero runtime cost, no cast needed in the registry.
 
 ```ts
 export const makeInquiryHandler = <TContent, TResolution, TResolutionInput>(
-  handler: InquiryHandler<TContent, TResolution, TResolutionInput>
+  handler: InquiryService<TContent, TResolution, TResolutionInput>
 ) => handler;
 ```
 
-Each handler wraps in `makeInquiryHandler({ ... })` — but this alone isn't enough if the registry is still `Record<InquiryType, InquiryHandler>` (that widens everything again).
+Each handler wraps in `makeInquiryHandler({ ... })` — but this alone isn't enough if the registry is still `Record<InquiryType, InquiryService>` (that widens everything again).
 
 Also need the registry typed via a mapped type + `satisfies` to keep keys exhaustive and per-key generics intact:
 
 ```ts
-const inquiryHandlers = { ... } satisfies Record<InquiryType, InquiryHandler<any, any, any>>;
+const inquiryServices = { ... } satisfies Record<InquiryType, InquiryService<any, any, any>>;
 ```
 
 With both changes, `as unknown as` can be removed and inference flows end-to-end from `contentSchema` through `handleApprove`.

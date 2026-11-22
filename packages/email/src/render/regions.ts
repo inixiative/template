@@ -1,12 +1,12 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses none
  */
 
 import { ParseBlocksError } from '@template/email/errors/ParseBlocksError';
-import { serialize } from '@template/email/render/decompose';
+import { serializeNodesToMjml } from '@template/email/render/decompose';
 import {
   type ComponentNode,
   isOverrideSlot,
@@ -117,7 +117,7 @@ export const collapseComponentBodies = (mjml: string, slug: string): string => {
       `No "${slug}" component ref left in the source — region handles are stale after any edit.`,
     );
   }
-  return serialize(roots);
+  return serializeNodesToMjml(roots);
 };
 
 export const removeSlotOverride = (
@@ -130,7 +130,7 @@ export const removeSlotOverride = (
   node.children = node.children.filter(
     (child) => !(isOverrideSlot(child) && child.name === slotName),
   );
-  return serialize(roots);
+  return serializeNodesToMjml(roots);
 };
 
 export const slotDefaultContent = (storedBody: string, slotName: string): string | undefined => {
@@ -153,5 +153,5 @@ export const slotDefaultContent = (storedBody: string, slotName: string): string
   }
 
   const slot = find(roots);
-  return slot ? serialize(slot.children) : undefined;
+  return slot ? serializeNodesToMjml(slot.children) : undefined;
 };

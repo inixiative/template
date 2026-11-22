@@ -3,7 +3,7 @@ import type { Organization, OrganizationUser, User } from '@template/db/generate
 import { cleanupTouchedTables, createOrganizationUser, createUser } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/v1/organization/:id/protected', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -35,7 +35,7 @@ describe('GET /api/v1/organization/:id/protected', () => {
     const response = await fetch(get(`/api/v1/organization/${org.id}/protected`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<Organization>(response);
+    const { data } = await parseSuccessBody<Organization>(response);
     expect(data.id).toBe(org.id);
   });
 

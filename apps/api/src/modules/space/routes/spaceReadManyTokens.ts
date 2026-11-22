@@ -8,7 +8,7 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { tokenReadResponseSchema } from '#/modules/token/schemas/tokenSchemas';
 
 export const spaceReadManyTokensRoute = readRoute({
@@ -19,5 +19,5 @@ export const spaceReadManyTokensRoute = readRoute({
   filterLens: { parent: lensFor('Token') },
   responseSchema: tokenReadResponseSchema,
   middleware: [validateSubmodelPermission('read')],
-  tags: [Tags.token],
+  tags: [OpenApiTags.token],
 });

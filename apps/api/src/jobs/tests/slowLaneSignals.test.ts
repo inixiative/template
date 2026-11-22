@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { queue } from '#/jobs/queue';
 import {
+  fetchSlowDeferredJobCount,
   pruneSlowDeferred,
-  readSlowDeferred,
-  readSlowIdleMs,
   recordSlowDeferral,
   recordSlowFinished,
+  recordSlowIdleStartAndFetchIdleMs,
   releaseSlowDeferral,
   SLOW_DEFERRED_GRACE_MS,
   slowDeferredKey,
@@ -26,7 +26,7 @@ describe('slow-lane deferral list', () => {
     await recordSlowDeferral(redis, name, 'b', now + 5_000);
     await recordSlowDeferral(redis, name, 'a', now + 9_000);
 
-    expect(await readSlowDeferred(redis, name, now)).toBe(2);
+    expect(await fetchSlowDeferredJobCount(redis, name, now)).toBe(2);
   });
 
   it('keeps a job counted after its due time until a worker picks it back up', async () => {
@@ -34,10 +34,10 @@ describe('slow-lane deferral list', () => {
     const now = Date.now();
     await recordSlowDeferral(redis, name, 'late', now - 20_000);
 
-    expect(await readSlowDeferred(redis, name, now)).toBe(1);
+    expect(await fetchSlowDeferredJobCount(redis, name, now)).toBe(1);
 
     await releaseSlowDeferral(redis, name, 'late');
-    expect(await readSlowDeferred(redis, name, now)).toBe(0);
+    expect(await fetchSlowDeferredJobCount(redis, name, now)).toBe(0);
   });
 
   it('stops counting an entry past its due time by more than the grace, and prunes it', async () => {
@@ -46,7 +46,7 @@ describe('slow-lane deferral list', () => {
     await recordSlowDeferral(redis, name, 'orphaned', now - SLOW_DEFERRED_GRACE_MS - 1);
     await recordSlowDeferral(redis, name, 'waiting', now + 1_000);
 
-    expect(await readSlowDeferred(redis, name, now)).toBe(1);
+    expect(await fetchSlowDeferredJobCount(redis, name, now)).toBe(1);
     await pruneSlowDeferred(redis, name, now);
     expect(await redis.zcard(slowDeferredKey(name))).toBe(1);
   });
@@ -55,7 +55,7 @@ describe('slow-lane deferral list', () => {
     const [first, second] = [queueName(), queueName()];
     await recordSlowDeferral(redis, first, 'x', Date.now() + 1_000);
 
-    expect(await readSlowDeferred(redis, second)).toBe(0);
+    expect(await fetchSlowDeferredJobCount(redis, second)).toBe(0);
   });
 });
 
@@ -64,23 +64,23 @@ describe('slow-lane idle clock', () => {
     const name = queueName();
     await recordSlowFinished(redis, name, 1_000);
 
-    expect(await readSlowIdleMs(redis, name, 0, 500_000)).toBe(0);
+    expect(await recordSlowIdleStartAndFetchIdleMs(redis, name, 0, 500_000)).toBe(0);
   });
 
   it('counts from the last slow finish while slow work is queued', async () => {
     const name = queueName();
-    await readSlowIdleMs(redis, name, 4, 1_000);
+    await recordSlowIdleStartAndFetchIdleMs(redis, name, 4, 1_000);
     await recordSlowFinished(redis, name, 10_000);
 
-    expect(await readSlowIdleMs(redis, name, 4, 70_000)).toBe(60_000);
+    expect(await recordSlowIdleStartAndFetchIdleMs(redis, name, 4, 70_000)).toBe(60_000);
   });
 
   it('starts its clock when slow work arrives on an idle lane, not at a finish from before', async () => {
     const name = queueName();
     await recordSlowFinished(redis, name, 1_000);
-    await readSlowIdleMs(redis, name, 0, 2_000);
+    await recordSlowIdleStartAndFetchIdleMs(redis, name, 0, 2_000);
 
-    expect(await readSlowIdleMs(redis, name, 1, 900_000)).toBe(0);
-    expect(await readSlowIdleMs(redis, name, 1, 960_000)).toBe(60_000);
+    expect(await recordSlowIdleStartAndFetchIdleMs(redis, name, 1, 900_000)).toBe(0);
+    expect(await recordSlowIdleStartAndFetchIdleMs(redis, name, 1, 960_000)).toBe(60_000);
   });
 });

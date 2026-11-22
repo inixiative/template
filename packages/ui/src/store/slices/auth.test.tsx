@@ -13,10 +13,15 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { buildUser } from '@template/db/test';
-import { SignupForm } from '@template/ui/components/auth/SignupForm';
+import { SignUpForm } from '@template/ui/components/auth/SignUpForm';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
-import { completeOAuthSignIn } from '@template/ui/lib/auth/signin';
-import { clearToken, getToken, getTokenExpiry, setToken } from '@template/ui/lib/auth/token';
+import { completeOAuthSignIn } from '@template/ui/lib/auth/signIn';
+import {
+  clearToken,
+  fetchStoredTokenAndClearIfExpired,
+  setToken,
+  storedTokenExpiry,
+} from '@template/ui/lib/auth/token';
 import type { EmailAuthMethod } from '@template/ui/lib/auth/types';
 import type { ApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
 import { useAppStore } from '@template/ui/store';
@@ -79,7 +84,7 @@ afterEach(() => {
   fetchSpy.mockRestore();
   clearToken();
   useAppStore.setState(initialState);
-  store.getState().client?.clear();
+  store.getState().queryClient?.clear();
 });
 
 test('verification-required signup succeeds without a token, hydration or websocket authentication', async () => {
@@ -89,7 +94,7 @@ test('verification-required signup succeeds without a token, hydration or websoc
     email: method.email,
   });
   expect(requests.map((r) => r.path)).toEqual(['/api/auth/sign-up/email']);
-  expect(getToken()).toBeNull();
+  expect(fetchStoredTokenAndClearIfExpired()).toBeNull();
   expect(store.getState().auth.isAuthenticated).toBe(false);
   expect(authenticate).not.toHaveBeenCalled();
 });
@@ -102,7 +107,7 @@ test('pending signup clears stale local identity without navigation or remote si
     auth: { ...state.auth, user: entity.__serialize(), isAuthenticated: true, spaceUsers: {} },
     navigation: { ...state.navigation, navigate },
   }));
-  store.getState().tenant.setUser();
+  store.getState().tenant.switchToUserContext();
   respond = () => Response.json({ token: null, user: { emailVerified: false } });
   await store.getState().auth.signUp(method);
   expect(store.getState().auth.user).toBeNull();
@@ -128,7 +133,7 @@ test.each([
       : Response.json({ token, expiresAt, user });
   const result = await store.getState().auth[action](method);
   if (action === 'signUp') expect(result).toEqual({ status: 'authenticated' });
-  expect(getToken()).toBe(token);
+  expect(fetchStoredTokenAndClearIfExpired()).toBe(token);
   expect(requests.at(-1)).toEqual({ path: '/api/v1/me', authorization: `Bearer ${token}` });
   expect(store.getState().auth.user?.id).toBe(user.id);
   expect(store.getState().auth.isAuthenticated).toBe(true);
@@ -144,7 +149,7 @@ test.each([
     'Email verification required',
   );
   expect(requests).toHaveLength(1);
-  expect(getToken()).toBeNull();
+  expect(fetchStoredTokenAndClearIfExpired()).toBeNull();
   expect(store.getState().auth.isAuthenticated).toBe(false);
   expect(authenticate).not.toHaveBeenCalled();
 });
@@ -153,21 +158,21 @@ test('a malformed tokenless signup remains an error', async () => {
   respond = () => Response.json({ user: { emailVerified: true } });
   await expect(store.getState().auth.signUp(method)).rejects.toThrow('No token');
   expect(requests).toHaveLength(1);
-  expect(getToken()).toBeNull();
+  expect(fetchStoredTokenAndClearIfExpired()).toBeNull();
 });
 
 test('the OAuth callback exchanges its one-time token for the JWT and its expiry', async () => {
   respond = () => Response.json({ token, expiresAt, user: { id: 'u1' } });
   await completeOAuthSignIn('one-time');
   expect(requests.map((r) => r.path)).toEqual(['/api/auth/one-time-token/verify']);
-  expect(getToken()).toBe(token);
-  expect(getTokenExpiry()?.toISOString()).toBe(expiresAt);
+  expect(fetchStoredTokenAndClearIfExpired()).toBe(token);
+  expect(storedTokenExpiry()?.toISOString()).toBe(expiresAt);
 });
 
 test('a sign-in answer without a JWT handoff stores nothing', async () => {
   respond = () => Response.json({ token, user: { id: 'u1' } });
   await expect(store.getState().auth.signIn(method)).rejects.toThrow('No token');
-  expect(getToken()).toBeNull();
+  expect(fetchStoredTokenAndClearIfExpired()).toBeNull();
 });
 
 test('logout drops the JWT locally and calls no server', async () => {
@@ -175,10 +180,10 @@ test('logout drops the JWT locally and calls no server', async () => {
   store.setState((state) => ({
     auth: { ...state.auth, isAuthenticated: true, organizations: {}, spaces: {}, spaceUsers: {} },
   }));
-  store.getState().tenant.setUser();
+  store.getState().tenant.switchToUserContext();
   await store.getState().auth.logout();
   expect(requests).toEqual([]);
-  expect(getToken()).toBeNull();
+  expect(fetchStoredTokenAndClearIfExpired()).toBeNull();
   expect(socketLogout).toHaveBeenCalledTimes(1);
   expect(store.getState().auth.isAuthenticated).toBe(false);
   expect(store.getState().auth.spaceUsers).toBeNull();
@@ -194,10 +199,10 @@ test('signup form displays verification success without navigating to the dashbo
     login = mock(() => {});
   useAppStore.setState({
     ...store.getState(),
-    navigation: { ...store.getState().navigation, navigatePreserving: navigate },
+    navigation: { ...store.getState().navigation, navigateKeepingSearchParams: navigate },
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const route = createRootRoute({ component: () => <SignupForm onLoginClick={login} /> });
+  const route = createRootRoute({ component: () => <SignUpForm onLoginClick={login} /> });
   const router = createRouter({
     routeTree: route,
     history: createMemoryHistory({ initialEntries: ['/'] }),
@@ -232,7 +237,7 @@ test('the logout menu signs out on this device without a server call', async () 
   fireEvent.click(view.getByRole('button'));
   await waitFor(() => expect(view.getByRole('menuitem', { name: 'Log out' })).toBeDefined());
   fireEvent.click(view.getByRole('menuitem', { name: 'Log out' }));
-  await waitFor(() => expect(getToken()).toBeNull());
+  await waitFor(() => expect(fetchStoredTokenAndClearIfExpired()).toBeNull());
   expect(socketLogout).toHaveBeenCalledTimes(1);
   expect(requests).toEqual([]);
 });

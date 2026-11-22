@@ -6,7 +6,7 @@
  */
 import { useNavigate } from '@tanstack/react-router';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
-import { completeOAuthSignIn } from '@template/ui/lib/auth/signin';
+import { completeOAuthSignIn } from '@template/ui/lib/auth/signIn';
 import { describeError } from '@template/ui/lib/describeError';
 import { log } from '@template/ui/lib/logger';
 import { useAppStore } from '@template/ui/store';

@@ -19,22 +19,22 @@ describe('tenant slice', () => {
       const { tenant } = store.getState();
 
       expect(tenant.context).toEqual({ type: 'public' });
-      expect(tenant.page).toEqual({});
+      expect(tenant.viewedRecords).toEqual({});
     });
 
     it('should have required methods', () => {
       const { tenant } = store.getState();
 
-      expect(typeof tenant.setPublic).toBe('function');
-      expect(typeof tenant.setUser).toBe('function');
-      expect(typeof tenant.setOrganization).toBe('function');
-      expect(typeof tenant.setSpace).toBe('function');
-      expect(typeof tenant.setPage).toBe('function');
-      expect(typeof tenant.clearPage).toBe('function');
+      expect(typeof tenant.switchToPublicContext).toBe('function');
+      expect(typeof tenant.switchToUserContext).toBe('function');
+      expect(typeof tenant.switchToOrganizationContext).toBe('function');
+      expect(typeof tenant.switchToSpaceContext).toBe('function');
+      expect(typeof tenant.setViewedRecords).toBe('function');
+      expect(typeof tenant.clearViewedRecords).toBe('function');
     });
   });
 
-  describe('setPublic', () => {
+  describe('switchToPublicContext', () => {
     it('should set context to public', () => {
       // Start with user context
       store.setState({
@@ -44,16 +44,16 @@ describe('tenant slice', () => {
         },
       });
 
-      store.getState().tenant.setPublic();
+      store.getState().tenant.switchToPublicContext();
 
       const { tenant } = store.getState();
       expect(tenant.context).toEqual({ type: 'public' });
     });
   });
 
-  describe('setUser', () => {
+  describe('switchToUserContext', () => {
     it('should set context to user', () => {
-      store.getState().tenant.setUser();
+      store.getState().tenant.switchToUserContext();
 
       const { tenant } = store.getState();
       expect(tenant.context).toEqual({ type: 'user' });
@@ -62,15 +62,15 @@ describe('tenant slice', () => {
     it('should switch from public to user', () => {
       expect(store.getState().tenant.context.type).toBe('public');
 
-      store.getState().tenant.setUser();
+      store.getState().tenant.switchToUserContext();
 
       expect(store.getState().tenant.context.type).toBe('user');
     });
   });
 
-  describe('setOrganization', () => {
+  describe('switchToOrganizationContext', () => {
     it('should return false when organization does not exist', () => {
-      const result = store.getState().tenant.setOrganization('nonexistent-id');
+      const result = store.getState().tenant.switchToOrganizationContext('nonexistent-id');
 
       expect(result).toBe(false);
       expect(store.getState().tenant.context).toEqual({ type: 'public' });
@@ -84,7 +84,7 @@ describe('tenant slice', () => {
         },
       });
 
-      const result = store.getState().tenant.setOrganization('org-1');
+      const result = store.getState().tenant.switchToOrganizationContext('org-1');
 
       expect(result).toBe(false);
     });
@@ -104,7 +104,7 @@ describe('tenant slice', () => {
         },
       });
 
-      const result = store.getState().tenant.setOrganization('org-1');
+      const result = store.getState().tenant.switchToOrganizationContext('org-1');
 
       expect(result).toBe(true);
       expect(store.getState().tenant.context).toEqual({
@@ -114,9 +114,9 @@ describe('tenant slice', () => {
     });
   });
 
-  describe('setSpace', () => {
+  describe('switchToSpaceContext', () => {
     it('should return false when space does not exist', () => {
-      const result = store.getState().tenant.setSpace('nonexistent-id');
+      const result = store.getState().tenant.switchToSpaceContext('nonexistent-id');
 
       expect(result).toBe(false);
       expect(store.getState().tenant.context).toEqual({ type: 'public' });
@@ -130,7 +130,7 @@ describe('tenant slice', () => {
         },
       });
 
-      const result = store.getState().tenant.setSpace('space-1');
+      const result = store.getState().tenant.switchToSpaceContext('space-1');
 
       expect(result).toBe(false);
     });
@@ -154,7 +154,7 @@ describe('tenant slice', () => {
         },
       });
 
-      const result = store.getState().tenant.setSpace('space-1');
+      const result = store.getState().tenant.switchToSpaceContext('space-1');
 
       expect(result).toBe(false);
     });
@@ -184,7 +184,7 @@ describe('tenant slice', () => {
         },
       });
 
-      const result = store.getState().tenant.setSpace('space-1');
+      const result = store.getState().tenant.switchToSpaceContext('space-1');
 
       expect(result).toBe(true);
       expect(store.getState().tenant.context).toEqual({
@@ -195,23 +195,23 @@ describe('tenant slice', () => {
     });
   });
 
-  describe('setPage and clearPage', () => {
-    it('should set page context', async () => {
+  describe('setViewedRecords and clearViewedRecords', () => {
+    it('should set viewed records', async () => {
       const { entity } = await buildOrganization({
         id: 'org-1',
         name: 'Page Org',
         deletedAt: new Date('2024-01-01T00:00:00.000Z'),
       });
       const mockOrg = entity.__serialize();
-      const pageContext = { organization: mockOrg };
+      const viewedRecords = { organization: mockOrg };
 
-      store.getState().tenant.setPage(pageContext);
+      store.getState().tenant.setViewedRecords(viewedRecords);
 
-      expect(store.getState().tenant.page).toEqual(pageContext);
+      expect(store.getState().tenant.viewedRecords).toEqual(viewedRecords);
     });
 
-    it('should clear page context', async () => {
-      // Set some page context first
+    it('should clear viewed records', async () => {
+      // Set some viewed records first
       const { entity } = await buildOrganization({
         id: 'org-1',
         name: 'Page Org',
@@ -221,16 +221,16 @@ describe('tenant slice', () => {
       store.setState({
         tenant: {
           ...store.getState().tenant,
-          page: { organization: mockOrg },
+          viewedRecords: { organization: mockOrg },
         },
       });
 
-      store.getState().tenant.clearPage();
+      store.getState().tenant.clearViewedRecords();
 
-      expect(store.getState().tenant.page).toEqual({});
+      expect(store.getState().tenant.viewedRecords).toEqual({});
     });
 
-    it('should preserve tenant context when setting page', async () => {
+    it('should preserve tenant context when setting viewed records', async () => {
       const { entity: orgEntity } = await buildOrganization({
         id: 'org-1',
         name: 'Test Org',
@@ -245,21 +245,21 @@ describe('tenant slice', () => {
         },
       });
 
-      store.getState().tenant.setOrganization('org-1');
+      store.getState().tenant.switchToOrganizationContext('org-1');
       const { entity: pageOrgEntity } = await buildOrganization({
         id: 'page-org-1',
         name: 'Page Org',
         deletedAt: new Date('2024-01-01T00:00:00.000Z'),
       });
       const pageOrg = pageOrgEntity.__serialize();
-      store.getState().tenant.setPage({ organization: pageOrg });
+      store.getState().tenant.setViewedRecords({ organization: pageOrg });
 
       const { tenant } = store.getState();
       expect(tenant.context).toEqual({
         type: 'organization',
         organization: mockOrg,
       });
-      expect(tenant.page).toEqual({ organization: pageOrg });
+      expect(tenant.viewedRecords).toEqual({ organization: pageOrg });
     });
   });
 });

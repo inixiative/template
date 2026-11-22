@@ -1,23 +1,10 @@
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import path from 'node:path';
 import { githubApi } from '../api/github';
 import { infisicalVercelApi } from '../api/infisicalVercel';
 import { vercelApi } from '../api/vercel';
 import { updateConfigField, updateConfigFields } from '../utils/configHelpers';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import { isComplete, markComplete, setError } from '../utils/progressTracking';
 import { setSecretAsync } from './infisicalSetup';
-
-/**
- * Read Vercel API token from local CLI auth config
- */
-const readVercelToken = async (): Promise<string> => {
-  const authPath = path.join(homedir(), 'Library/Application Support/com.vercel.cli/auth.json');
-  const authContent = await readFile(authPath, 'utf-8');
-  const auth = JSON.parse(authContent);
-  return auth.token;
-};
 
 const buildVercelProductionUrl = (projectName: string, teamSlug: string): string => {
   return `https://${projectName}-${teamSlug}.vercel.app`;
@@ -40,7 +27,7 @@ export const setupVercel = async (
   syncConfig: () => Promise<void>,
 ): Promise<void> => {
   try {
-    const projectConfig = await getProjectConfig();
+    const projectConfig = await fetchProjectConfig();
     const projectName = projectConfig.project.name;
     const infisicalProjectId = projectConfig.infisical.projectId;
     let webProjectId = projectConfig.vercel.webProjectId;
@@ -121,7 +108,7 @@ export const setupVercel = async (
 
     // Step 5: Store Vercel API token in Infisical
     if (!(await isComplete('vercel', 'storeVercelToken'))) {
-      vercelToken = await readVercelToken();
+      vercelToken = await vercelApi.fetchVercelToken();
       await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_API_TOKEN', vercelToken);
       await markComplete('vercel', 'storeVercelToken');
       await syncConfig();
@@ -130,7 +117,7 @@ export const setupVercel = async (
     // Step 6: Ensure Vercel connection exists in Infisical
     if (!connectionId || !(await isComplete('vercel', 'createInfisicalConnection'))) {
       if (!vercelToken) {
-        vercelToken = await readVercelToken();
+        vercelToken = await vercelApi.fetchVercelToken();
       }
 
       if (!connectionId) {
@@ -151,7 +138,7 @@ export const setupVercel = async (
     // Step 7: Create web project (idempotent — finds existing by name on retry)
     if (webEnabled && !(await isComplete('vercel', 'createWebProject'))) {
       const webProjectName = `${projectName}-web`;
-      const existing = await vercelApi.getProject(webProjectName, teamId);
+      const existing = await vercelApi.fetchProject(webProjectName, teamId);
       const webProject = existing ?? (await vercelApi.createProject(webProjectName, teamId));
 
       webProjectId = webProject.id;
@@ -297,7 +284,7 @@ export const setupVercel = async (
     // Step 15: Create admin project (idempotent — finds existing by name on retry)
     if (adminEnabled && !(await isComplete('vercel', 'createAdminProject'))) {
       const adminProjectName = `${projectName}-admin`;
-      const existing = await vercelApi.getProject(adminProjectName, teamId);
+      const existing = await vercelApi.fetchProject(adminProjectName, teamId);
       const adminProject = existing ?? (await vercelApi.createProject(adminProjectName, teamId));
 
       adminProjectId = adminProject.id;
@@ -442,7 +429,7 @@ export const setupVercel = async (
     // Step 23: Create superadmin project (idempotent — finds existing by name on retry)
     if (superadminEnabled && !(await isComplete('vercel', 'createSuperadminProject'))) {
       const superadminProjectName = `${projectName}-superadmin`;
-      const existing = await vercelApi.getProject(superadminProjectName, teamId);
+      const existing = await vercelApi.fetchProject(superadminProjectName, teamId);
       const superadminProject =
         existing ?? (await vercelApi.createProject(superadminProjectName, teamId));
 

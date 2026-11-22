@@ -5,13 +5,13 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { ConcurrencyType, getConcurrency } from '@template/shared/utils';
+import { ConcurrencyType, minimumConcurrencyLimitFor } from '@template/shared/utils';
 import {
   refreshBatchContext,
   registerBatch,
   unregisterBatch,
 } from '#/modules/batch/services/batchRegistry';
-import { interpolateRequest } from '#/modules/batch/services/interpolation';
+import { interpolateBatchableRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
 import type { RequestResult, StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
@@ -38,7 +38,7 @@ export const failOnRound: StrategyExecutor = async (
 
       const roundThunks = round.map((request) => async (): Promise<RequestResult> => {
         try {
-          const interpolatedRequest = interpolateRequest(request, {
+          const interpolatedRequest = interpolateBatchableRequest(app, request, {
             results,
             currentRound: roundIndex,
           });
@@ -66,7 +66,7 @@ export const failOnRound: StrategyExecutor = async (
       });
 
       const roundResults = await db.parallel(roundThunks, {
-        concurrency: getConcurrency([ConcurrencyType.db]),
+        concurrency: minimumConcurrencyLimitFor([ConcurrencyType.db]),
       });
       results.push(roundResults);
       completedRounds++;
@@ -82,11 +82,7 @@ export const failOnRound: StrategyExecutor = async (
     }
 
     const status =
-      failedRequests === 0
-        ? 'success'
-        : failedRequests === totalRequests
-          ? 'failed'
-          : 'partialSuccess';
+      failedRequests === 0 ? 'success' : successfulRequests === 0 ? 'failed' : 'partialSuccess';
 
     return {
       batch: results,

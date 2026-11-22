@@ -45,24 +45,24 @@ export const createRedisConnection = (
   return instrumentRedis(redis);
 };
 
-export const getRedisClient = (): Redis => {
+export const redisClient = (): Redis => {
   if (!__main) __main = createRedisConnection(LogScope.db);
   return __main;
 };
 
-export const getRedisPub = (): Redis => getRedisClient();
+export const redisPublisher = (): Redis => redisClient();
 
-export const getRedisSub = (): Redis => {
+export const redisSubscriber = (): Redis => {
   // A subscribed connection can only run subscriber commands, so the subscriber is always
   // its own connection — in tests a duplicate() of the shared mock (same broker, separate mode).
   if (!__subscriber)
     __subscriber = isTest
-      ? getRedisClient().duplicate()
+      ? redisClient().duplicate()
       : createRedisConnection(LogScope.ws, undefined, { isBlocking: true });
   return __subscriber;
 };
 
 export const flushRedis = async (): Promise<void> => {
   if (!isTest) throw new Error('flushRedis() can only be called in test environment');
-  await getRedisClient().flushall();
+  await redisClient().flushall();
 };

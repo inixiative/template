@@ -1,6 +1,5 @@
 export { AuthStrategyProvider } from './provider';
 export type {
-  AuthStrategy,
   EmbedAuthCompleteMessage,
   EmbedAuthRequiredMessage,
   EmbedAuthTokenMessage,

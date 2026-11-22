@@ -1,6 +1,6 @@
 export {
   type EntitlementAnchors,
-  loadEntitlementAnchors,
+  fetchEntitlementAnchors,
   missingAnchors,
 } from './entitlementAnchors';
 export {

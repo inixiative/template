@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { clearHookRegistry, DbAction, db, HookTiming, registerDbHook } from '@template/db';
-import { getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber } from '@template/db/test/factory';
 import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
-const nextEmail = (label: string) => `${label}-${getNextSeq()}-${Date.now()}@test.com`;
+const nextEmail = (label: string) =>
+  `${label}-${nextFactorySequenceNumber()}-${Date.now()}@test.com`;
 
 const callerStore = new AsyncLocalStorage<{ label: string }>();
 const secondCallerStore = new AsyncLocalStorage<{ label: string }>();

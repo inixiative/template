@@ -7,7 +7,7 @@
 import { createRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 import {
   webhookSubscriptionCreateBodySchema,
   webhookSubscriptionReadResponseSchema,
@@ -20,5 +20,5 @@ export const meCreateWebhookSubscriptionRoute = createRoute({
   skipId: true,
   bodySchema: webhookSubscriptionCreateBodySchema,
   responseSchema: webhookSubscriptionReadResponseSchema,
-  tags: [Tags.me, Tags.webhookSubscription],
+  tags: [OpenApiTags.me, OpenApiTags.webhookSubscription],
 });

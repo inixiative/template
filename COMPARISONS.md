@@ -161,7 +161,7 @@ RBAC, ABAC and ReBAC in one engine, [`@inixiative/permissions`](https://github.c
 | Delegates (tokens, integrations) capped at their owner | Yes | Modelled by hand | Modelled by hand | Modelled by hand | Manual | Rare |
 | Tenant hierarchy (organization, space) | Yes | Modelled in the graph | Via Polar | Via derived roles | Manual | Manual |
 | Every route enforces a declared check | Yes | No | No | No | No | `if (role !== 'admin')` |
-| Schema from Prisma metadata | Yes (prisma-map) | No | No | No | No | No |
+| Schema from Prisma metadata | Yes (field-map) | No | No | No | No | No |
 | "Which records can I read" as one query | Permissions 1.0, end of 2026 | Id lists | Yes (`list_local`) | Yes (query plans) | Yes (`accessibleBy`) | Hand-written |
 
 The library's full comparison, with a source for every cell: [COMPARISON.md](https://github.com/inixiative/permissions/blob/main/COMPARISON.md).
@@ -211,7 +211,7 @@ It's not a workaround for a missing Prisma feature — it's a pattern that's str
 
 ### Redis cache layer
 
-The template's Redis caching deserves separate mention: composite cache keys with alphabetical sorting for consistency, SCAN-based pattern clearing (non-blocking, unlike `KEYS`), thundering herd prevention (null values cached with 60s TTL to prevent repeated expensive misses), fire-and-forget cache writes (Redis outages don't crash the application), 7 namespaces (`cache:*`, `session:*`, `job:*`, `ws:*`, `otp:*`, `limit:*`, `flag:*`), and a `cacheReference` registry that auto-generates invalidation keys per model.
+The template's Redis caching deserves separate mention: composite cache keys with alphabetical sorting for consistency, SCAN-based pattern clearing (non-blocking, unlike `KEYS`), thundering herd prevention (null values cached with 60s TTL to prevent repeated expensive misses), fire-and-forget cache writes (Redis outages don't crash the application), 7 namespaces (`cache:*`, `session:*`, `job:*`, `ws:*`, `otp:*`, `limit:*`, `flag:*`), and a `cacheKeysByModel` registry that auto-generates invalidation keys per model.
 
 Most startups use Redis as a flat key-value store with `KEYS *` for clearing and no null-value caching. The template's cache layer is closer to what you'd find at a mid-to-large company that's already been burned by thundering herds and blocking `KEYS` calls in production.
 
@@ -458,7 +458,7 @@ Four-context model: Organization → Space with OrganizationUser/SpaceUser join 
 |---------|----------|-------------|-------------------|---------------------------|---------------------|
 | Tenant hierarchy (Org → Space) | **Yes** (3-tier) | Flat (tenant_id) | Flat | Flat | Flat |
 | Hierarchical token scoping | **Yes** | Via JWT claims | Custom | Custom | Custom |
-| Frontend context switching | **Yes** (ContextSelector + URL sync) | No | No | No | No |
+| Frontend context switching | **Yes** (TenantContextSelector + URL sync) | No | No | No | No |
 | Permission-aware navigation | **Yes** | Via RLS | Custom | Custom | Custom |
 | Cross-org user access | **Yes** (User-scope token) | Custom | Complex | Complex | Custom |
 | Isolation mechanism | Application-level (FK filtering) | Database-level (RLS) | Schema-level | Full DB isolation | Varies |
@@ -547,7 +547,7 @@ The middleware stack is one of the template's strongest practical features. The 
 ## 16. Shared Utilities & Cross-Cutting Concerns
 
 ### What the template provides
-`resolveAll()` concurrency limiter with 6 typed limits (DB: 10, Redis: 50, Queue: 100, Socket: 100, AppEvent: 100, Integration: 5), environment detection (5 environments with type guards), `cn()` for Tailwind class merging, URL search param utilities (parse, pick, read, build), Consola-based logger with AsyncLocalStorage scope injection (11 log scopes: api, db, worker, seed, ws, test, auth, cache, hook, job, email), frontend logger factory, false polymorphism registry (6 models with axis-based constraint generation), test tracker (automatic table cleanup via mutation tracking with TRUNCATE CASCADE), 15 test factories with auto-inferred relationships and serialization.
+`runAllWithConcurrencyLimit()` concurrency limiter with 6 typed limits (DB: 10, Redis: 50, Queue: 100, Socket: 100, AppEvent: 100, Integration: 5), environment detection (5 environments with type guards), `cn()` for Tailwind class merging, URL search param utilities (parse, pick, read, build), Consola-based logger with AsyncLocalStorage scope injection (11 log scopes: api, db, worker, seed, ws, test, auth, cache, hook, job, email), frontend logger factory, false polymorphism registry (6 models with axis-based constraint generation), test tracker (automatic table cleanup via mutation tracking with TRUNCATE CASCADE), 15 test factories with auto-inferred relationships and serialization.
 
 ### Why this matters
 
@@ -555,7 +555,7 @@ Most of these utilities seem small in isolation. Together, they eliminate entire
 
 | Utility | What it prevents |
 |---------|------------------|
-| `resolveAll()` with typed limits | Database connection exhaustion from unbounded parallel queries |
+| `runAllWithConcurrencyLimit()` with typed limits | Database connection exhaustion from unbounded parallel queries |
 | Environment type guards | `if (process.env.NODE_ENV === 'prodution')` typos (compile-time catch) |
 | Logger with ALS scope injection | Logs without context ("which request caused this?") |
 | Test tracker + TRUNCATE CASCADE | Slow test suites from truncating all tables (only cleans modified ones) |
@@ -576,7 +576,7 @@ React 19 + Vite 7 + TanStack Router (file-based, type-safe) + TanStack Query v5 
 ### In progress (not yet production-grade)
 - **Form components** — React Hook Form + Zod is wired, but the primitive set (Checkbox, Radio, Switch, DatePicker, FormField/FormError/FormLabel) is still being filled in
 - **Page-level composed pages** — the 13 shared pages exist as scaffolds; flesh-out is active work
-- **`useSpaceTheme`** — currently returns mock values; per-space CSS variables aren't yet wired to real space data
+- **`useApplySpaceThemeCssVariables`** — currently returns mock values; per-space CSS variables aren't yet wired to real space data
 - **Profile editing** — UI renders but save handler is a placeholder
 - **User settings** — notifications / preferences / appearance pages are route shells without content
 - **E2E tests** — Playwright not yet integrated
@@ -592,7 +592,7 @@ Treat the comparison table below as covering the architectural shape, not featur
 | Context switching (org/space) | **Yes** (URL-synced) | Manual | Manual | Manual |
 | Optimistic mutations with rollback | **Yes** (generic + list-specific) | Manual | Manual | Manual |
 | WebSocket-driven cache invalidation | **Yes** (`useEventRefetch`) | No | No | No |
-| Per-tenant theming (CSS vars) | **Yes** (`useSpaceTheme`) | No | No | No |
+| Per-tenant theming (CSS vars) | **Yes** (`useApplySpaceThemeCssVariables`) | No | No | No |
 | Shared pages across apps | **Yes** (13 pages in packages/ui) | N/A (single app) | N/A | No |
 | Error guidance in toasts | **Yes** (6 guidance categories) | No | No | No |
 | Auto-generated mock handlers | **Yes** (MSW from OpenAPI) | No | No | No |
@@ -615,19 +615,18 @@ Most SaaS apps use a single global store or scatter state across dozens of React
 
 | Hook | What it does | Why it matters |
 |------|-------------|----------------|
-| **useAuthenticatedRouting** | Syncs URL params ↔ tenant context ↔ permissions | The backbone of multi-tenant routing — validates access, auto-redirects on context change |
+| **useSyncTenantContextWithUrlAndAuthorizeRoute** | Syncs URL params ↔ tenant context ↔ permissions | The backbone of multi-tenant routing — validates access, auto-redirects on context change |
 | **useOptimisticMutation** | Three-phase optimistic updates (snapshot → update → rollback or settle) | Generic pattern wrapping TanStack mutations with proper cache management |
 | **useOptimisticListMutation** | Specialized list CRUD with temporary `__optimistic__` IDs | Handles create/update/delete on lists, unwraps SDK responses, merges extras |
 | **useEventRefetch** | Invalidates queries when WebSocket events match wildcard/regex rules | Real-time cache invalidation without manual subscription management |
 | **useAppEvents** | WebSocket connection with auto-reconnect, channel subscriptions, event buffer | Foundation for real-time features — handles lifecycle, reconnection, message parsing |
-| **usePermission** | Returns `{show, disable, disabledText}` for UI permission gating | Drives button/action visibility declaratively from ReBAC schema |
 | **useValidateUniqueness** | Async field uniqueness validation with debounce | Calls API with `?lookup=field`, handles 404 as "available", caches 5s |
-| **useSpaceTheme** | Applies per-space CSS custom properties (`--space-*`) | White-labeling — cleans previous vars, wraps URLs for logo/favicon |
+| **useApplySpaceThemeCssVariables** | Applies per-space CSS custom properties (`--space-*`) | White-labeling — cleans previous vars, wraps URLs for logo/favicon |
 | **useBreadcrumbs** | Generates breadcrumb trail from route match + tenant context | Context-aware labels pulling from page metadata |
-| **usePageMeta** | Sets `document.title` and meta description from routes | Supports function-based titles that resolve against tenant context |
+| **useDocumentTitleAndDescription** | Sets `document.title` and meta description from routes | Supports function-based titles that resolve against tenant context |
 | **useAuthStrategy** | Detects embed vs login mode, handles postMessage token flow | Iframe embedding support — parent window injects auth token |
 | **useAuthProviders** | Fetches platform or org-specific OAuth providers | Switches endpoints based on org context |
-| **useDarkMode** | Applies `dark` class to document root respecting system preference | Simple but correct — handles `prefers-color-scheme` media query |
+| **useApplyThemeClassToDocument** | Applies `dark` class to document root respecting system preference | Simple but correct — handles `prefers-color-scheme` media query |
 | **useThemePersistence** | Syncs theme to/from localStorage | Hydrates on mount, persists on change |
 | **useMediaQuery** / **useBreakpoint** | Responsive design queries with Tailwind breakpoint mapping | Standard pattern, well-typed |
 | **useDebounce** / **useDebouncedCallback** | Value and callback debouncing | Proper cleanup on unmount |
@@ -636,7 +635,7 @@ Most SaaS apps use a single global store or scatter state across dozens of React
 
 The template ships three frontend apps (web, admin, superadmin) that share pages from `packages/ui`:
 
-Authentication: `HomePage`, `LoginPage`, `SignupPage`. Organization management: `OrganizationsPage`, `OrganizationProfilePage`, `OrganizationUsersPage`, `OrganizationSpacesPage`, `OrganizationAuthProvidersPage`. User: `ProfilePage`, `UserProfilePage`. Tokens and webhooks: `TokensPage`, `WebhooksPage` (both context-aware — dynamically select API endpoints based on tenant context type). Space: `SpaceProfilePage`.
+Authentication: `HomePage`, `LoginPage`, `SignUpPage`. Organization management: `OrganizationsPage`, `OrganizationProfilePage`, `OrganizationUsersPage`, `OrganizationSpacesPage`, `OrganizationAuthProvidersPage`. User: `ProfilePage`, `UserProfilePage`. Tokens and webhooks: `TokensPage`, `WebhooksPage` (both context-aware — dynamically select API endpoints based on tenant context type). Space: `SpaceProfilePage`.
 
 ### Honest assessment
 The frontend architecture choices align with 2025-2026 ecosystem consensus: Vite for dashboards behind auth, Zustand for client state, TanStack Query for server state, TanStack Router for type-safe routing, shadcn for components. The template adds significant custom value on top: the guidance-based error routing in the client slice, the three-policy navigation preservation, the event-driven cache invalidation via WebSocket, the embed mode auth flow for iframe scenarios, and the shared page architecture across three apps.

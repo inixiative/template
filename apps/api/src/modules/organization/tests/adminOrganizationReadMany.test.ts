@@ -6,7 +6,7 @@ import { cleanupTouchedTables, createOrganization, createUser } from '@template/
 import { adminOrganizationRouter } from '#/modules/organization';
 import type { adminOrganizationReadManyRoute } from '#/modules/organization/routes/adminOrganizationReadMany';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, jsonError } from '#tests/utils/request';
+import { get, parseErrorBody, parseSuccessBody } from '#tests/utils/request';
 
 type ReadManyResponse = z.infer<typeof adminOrganizationReadManyRoute.responseSchema>[];
 
@@ -45,7 +45,7 @@ describe('GET /api/admin/organization', () => {
 
   it('returns paginated organizations', async () => {
     const response = await fetch(get('/api/admin/organization?page=1&pageSize=10'));
-    const { data, pagination } = await json<ReadManyResponse>(response);
+    const { data, pagination } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(Array.isArray(data)).toBe(true);
@@ -56,7 +56,7 @@ describe('GET /api/admin/organization', () => {
 
   it('sorts by name ascending', async () => {
     const response = await fetch(get('/api/admin/organization?orderBy=name:asc'));
-    const { data } = await json<ReadManyResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     const names = data.map((org) => org.name);
@@ -66,7 +66,7 @@ describe('GET /api/admin/organization', () => {
 
   it('sorts by name descending', async () => {
     const response = await fetch(get('/api/admin/organization?orderBy=name:desc'));
-    const { data } = await json<ReadManyResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     const names = data.map((org) => org.name);
@@ -78,7 +78,7 @@ describe('GET /api/admin/organization', () => {
     const response = await fetch(
       get('/api/admin/organization?orderBy=name:asc&orderBy=createdAt:desc'),
     );
-    const { data } = await json<ReadManyResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(3);
@@ -86,7 +86,7 @@ describe('GET /api/admin/organization', () => {
 
   it('filters by name field search', async () => {
     const response = await fetch(get('/api/admin/organization?searchFields[name]=Apple'));
-    const { data } = await json<ReadManyResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThan(0);
@@ -95,7 +95,7 @@ describe('GET /api/admin/organization', () => {
 
   it('field search is case-sensitive', async () => {
     const response = await fetch(get('/api/admin/organization?searchFields[name]=apple'));
-    const { data } = await json<ReadManyResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((org) => org.id === orgA.id)).toBe(false);
@@ -103,7 +103,7 @@ describe('GET /api/admin/organization', () => {
 
   it('filters by advanced search on specific field', async () => {
     const response = await fetch(get('/api/admin/organization?searchFields[name]=Banana'));
-    const { data } = await json<ReadManyResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThan(0);
@@ -114,7 +114,7 @@ describe('GET /api/admin/organization', () => {
     const response = await fetch(
       get('/api/admin/organization?searchFields[name]=Cherry&deleted=false'),
     );
-    const { data } = await json<ReadManyResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThan(0);
@@ -125,7 +125,7 @@ describe('GET /api/admin/organization', () => {
     const response = await fetch(
       get('/api/admin/organization?searchFields[name]=a&orderBy=name:asc'),
     );
-    const { data } = await json<ReadManyResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     const names = data.map((org) => org.name);
@@ -137,13 +137,13 @@ describe('GET /api/admin/organization', () => {
     const response = await fetch(get('/api/admin/organization?searchFields[invalidField]=test'));
 
     expect(response.status).toBe(400);
-    const { message } = await jsonError(response);
+    const { message } = await parseErrorBody(response);
     expect(message).toContain('Invalid query parameters');
   });
 
   it('filters by multiple valid searchFields', async () => {
     const response = await fetch(get('/api/admin/organization?searchFields[name]=Banana'));
-    const { data } = await json<ReadManyResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThan(0);

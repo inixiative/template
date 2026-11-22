@@ -5,13 +5,13 @@
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
 import { emitAppEvent } from '#/appEvents/emit';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceDeleteRoute } from '#/modules/space/routes/spaceDelete';
 
 export const spaceDeleteController = makeController(spaceDeleteRoute, async (c, respond) => {
   const db = c.get('db');
-  const space = getResource<'space'>(c);
+  const space = contextResource<'space'>(c);
 
   const deleted = await db.space.update({
     where: { id: space.id },

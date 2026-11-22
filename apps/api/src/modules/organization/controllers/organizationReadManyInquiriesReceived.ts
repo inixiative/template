@@ -3,11 +3,12 @@
  * @kind controller
  * @partOf feature:tenancy
  */
-import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';
-import { getResource } from '#/lib/context/getResource';
+import { wherePolymorphicSideIsOneOf } from '@template/db';
+import { InquiryStatus } from '@template/db/generated/client/enums';
+import { contextResource } from '#/lib/context/contextResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { organizationReadManyInquiriesReceivedRoute } from '#/modules/organization/routes/organizationReadManyInquiriesReceived';
 
 export const organizationReadManyInquiriesReceivedController = makeController(
@@ -16,13 +17,20 @@ export const organizationReadManyInquiriesReceivedController = makeController(
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        targetModel: InquiryResourceModel.Organization,
-        targetOrganizationId: getResource<'organization'>(c).id,
+        ...wherePolymorphicSideIsOneOf('Inquiry', 'targetModel', [
+          {
+            ownerKeys: {
+              Organization: contextResource<'organization'>(c).id,
+              Space: null,
+              User: null,
+            },
+          },
+        ]),
         status: { notIn: [InquiryStatus.draft, InquiryStatus.canceled] },
       },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },
-      include: includeInquiryReceived,
+      include: includeInquiryResponse,
     });
     return respond.ok(data, { pagination });
   },

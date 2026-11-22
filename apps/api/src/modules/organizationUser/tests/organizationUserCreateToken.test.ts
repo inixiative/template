@@ -5,7 +5,7 @@ import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test'
 import { organizationUserRouter } from '#/modules/organizationUser';
 import type { organizationUserCreateTokenRoute } from '#/modules/organizationUser/routes/organizationUserCreateToken';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 type CreateTokenResponse = z.infer<typeof organizationUserCreateTokenRoute.responseSchema>;
 
@@ -37,7 +37,7 @@ describe('POST /api/v1/organizationUser/:id/token', () => {
     const response = await fetch(
       post(`/api/v1/organizationUser/${orgUser.id}/tokens`, { name: 'Test Token', role: 'admin' }),
     );
-    const { data } = await json<CreateTokenResponse>(response);
+    const { data } = await parseSuccessBody<CreateTokenResponse>(response);
 
     expect(response.status).toBe(201);
     expect(data.name).toBe('Test Token');

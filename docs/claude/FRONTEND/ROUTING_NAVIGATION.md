@@ -32,13 +32,13 @@ apps/web/app/routes/
 │   ├── login.tsx
 │   ├── signup.tsx
 │   └── auth.callback.tsx   # OAuth callback
-├── _authenticated.tsx      # requireAuth + AppShell + nav-based access check
+├── _authenticated.tsx      # redirectToLoginUnlessAuthenticated + AppShell + nav-based access check
 ├── _authenticated/
 │   ├── dashboard.tsx
 │   ├── settings.tsx        # Redirects /settings → /settings/profile
 │   ├── settings/           # profile, tokens, webhooks, integrations, authProviders, update, transfer
 │   └── …
-├── _fullscreen.tsx         # requireAuth + FullscreenLayout (no AppShell)
+├── _fullscreen.tsx         # redirectToLoginUnlessAuthenticated + FullscreenLayout (no AppShell)
 └── _fullscreen/
     └── example.tsx
 ```
@@ -58,9 +58,9 @@ Admin and superadmin follow the same layout set.
 - Embedded views
 - Focused workflows (onboarding, surveys)
 
-`FullscreenLayout`'s back button calls `navigatePreserving('..', 'context')`, so org/space/spoof survive the trip back.
+`FullscreenLayout`'s back button calls `navigateKeepingSearchParams('..', 'context')`, so org/space/spoof survive the trip back.
 
-Tenant context is not in the path. It rides in search params (`?org=`, `?space=`, `?spoof=`, `?flow=`); `useAuthenticatedRouting` syncs them into the store and back.
+Tenant context is not in the path. It rides in search params (`?org=`, `?space=`, `?spoof=`, `?flow=`); `useSyncTenantContextWithUrlAndAuthorizeRoute` syncs them into the store and back.
 
 ### Routes With Children
 
@@ -91,18 +91,18 @@ component that could swallow the children. Both routes render `SegmentsPage` wit
 
 **Location:** `packages/ui/src/guards/`
 
-`createAuthGuards(getStore)` (`authGuard.ts`) returns two `beforeLoad` guards. Both run `auth.initialize()` first.
+`createAuthGuards(currentAppStore)` (`authGuard.ts`) returns two `beforeLoad` guards. Both run `auth.initialize()` first.
 
-- `requireAuth` — unauthenticated → redirect to `/login` with `redirectTo` (path + search + hash) and the `org` / `space` / `spoof` params carried over.
-- `requirePublic` — authenticated → redirect to `redirectTo` or `/dashboard`.
+- `redirectToLoginUnlessAuthenticated` — unauthenticated → redirect to `/login` with `redirectTo` (path + search + hash) and the `org` / `space` / `spoof` params carried over.
+- `redirectAuthenticatedUserAwayFromPublicPage` — authenticated → redirect to `redirectTo` or `/dashboard`.
 
 `appGuards.ts` binds them to the shared store; apps import them directly:
 
 ```typescript
-import { requireAuth } from '@template/ui/guards';
+import { redirectToLoginUnlessAuthenticated } from '@template/ui/guards';
 
 export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: (ctx) => requireAuth(ctx),
+  beforeLoad: (ctx) => redirectToLoginUnlessAuthenticated(ctx),
   component: AuthenticatedLayout,
 });
 ```
@@ -121,10 +121,10 @@ Redirects inside `beforeLoad` use `redirectPreservingContext(ctx, to)` (`@templa
 apps/web/app/config/nav/
 ├── index.ts          # navConfig: NavConfig
 ├── contexts/         # One NavItem[] per context
-│   ├── userContext.ts
-│   ├── organizationContext.ts
-│   ├── spaceContext.ts
-│   └── publicContext.ts
+│   ├── userNavigationItems.ts
+│   ├── organizationNavigationItems.ts
+│   ├── spaceNavigationItems.ts
+│   └── publicNavigationItems.ts
 └── features/         # One NavItem per feature, shared across contexts
     ├── communications.ts
     ├── dashboard.ts
@@ -150,9 +150,9 @@ type NavItem = {
   label: string;
   path?: string;                 // Relative to the parent item
   icon?: string;                 // Iconify slug, e.g. 'lucide:settings'
-  title?: string | ((context, pageContext?) => string);
-  description?: string | ((context, pageContext?) => string);
-  access?: (permissions, context, pageContext?) => boolean;
+  title?: string | ((context, viewedRecords?) => string);
+  description?: string | ((context, viewedRecords?) => string);
+  access?: (permissions, context, viewedRecords?) => boolean;
   alias?: boolean;               // Routable, hidden from the sidebar
   breadcrumbLabel?: (record) => string;
   items?: NavItem[];
@@ -166,7 +166,7 @@ export const organizationsItem: NavItem = {
   label: 'Organizations',
   path: '/organizations',
   icon: 'lucide:building-2',
-  access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  access: (permissions, context) => permissions.check(...permissionCheckTargetForTenantContext(context), 'read'),
   items: [
     { label: 'My Organizations', path: '/mine' },
     { label: 'Invitations', path: '/invitations' },
@@ -177,7 +177,7 @@ export const organizationsItem: NavItem = {
 **Context file** lists the features shown in that context:
 
 ```typescript
-export const organizationContext: NavItem[] = [
+export const organizationNavigationItems: NavItem[] = [
   dashboardItem,
   spacesItem,
   usersItem,
@@ -187,7 +187,7 @@ export const organizationContext: NavItem[] = [
 ];
 ```
 
-`getContextParams(context)` returns `[model, record]` for the current context (`organization`, `space`, or `user`), so `access` checks read `permissions.check(...getContextParams(context), action)`.
+`permissionCheckTargetForTenantContext(context)` returns `[model, record]` for the current context (`organization`, `space`, or `user`), so `access` checks read `permissions.check(...permissionCheckTargetForTenantContext(context), action)`.
 
 **Adding an item:** create or edit the feature file, then add it to each context file where it should appear.
 
@@ -196,8 +196,8 @@ export const organizationContext: NavItem[] = [
 `__root.tsx` registers the config once: `useRegisterNavigation(navConfig)` stores it (and the router's `navigate`) in the navigation slice.
 
 - **Sidebar** renders `navConfig[context.type]`, skipping items whose `access` fails and `alias` items.
-- **Page access.** `useAuthenticatedRouting` (in `_authenticated.tsx` and `_fullscreen.tsx`) matches the path with `findRoute` and runs the item's `access`. `checkContextPermission` tries the current context, then the space's organization, then `user`, then `public`, and switches to the first context that allows the page. If none does, the layout renders `Unauthorized`. The nav config is the source of truth for "can view".
-- **Page meta.** `usePageMeta` sets the document title from the matched item's `title`, else the breadcrumb chain.
+- **Page access.** `useSyncTenantContextWithUrlAndAuthorizeRoute` (in `_authenticated.tsx` and `_fullscreen.tsx`) matches the path with `findRoute` and runs the item's `access`. `findFirstTenantContextThatCanOpenPath` tries the current context, then the space's organization, then `user`, then `public`, and switches to the first context that allows the page. If none does, the layout renders `Unauthorized`. The nav config is the source of truth for "can view".
+- **Page meta.** `useDocumentTitleAndDescription` sets the document title from the matched item's `title`, else the breadcrumb chain.
 - **Breadcrumbs.** `useBreadcrumbs` builds them from the match chain, using `breadcrumbLabel` for record pages.
 - Switching context while staying on the same page navigates to `/dashboard`.
 
@@ -214,23 +214,23 @@ export const organizationContext: NavItem[] = [
 The navigation slice exposes one navigation call with a preservation policy:
 
 ```typescript
-const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
+const navigateKeepingSearchParams = useAppStore((state) => state.navigation.navigateKeepingSearchParams);
 
-navigatePreserving('/settings', 'context'); // keep org + space (+ spoof, flow)
-navigatePreserving('/users', 'spoof');      // keep spoof (+ flow) only
-navigatePreserving('/login?x=1', 'all');    // keep every current search param
+navigateKeepingSearchParams('/settings', 'context'); // keep org + space (+ spoof, flow)
+navigateKeepingSearchParams('/users', 'spoof');      // keep spoof (+ flow) only
+navigateKeepingSearchParams('/login?x=1', 'all');    // keep every current search param
 ```
 
-Search params in `to` merge over the preserved ones; the current hash is kept unless `to` has one. `navigateToLogin(getStore)` / `navigateToSignup(getStore)` (`@template/ui/lib/routeRedirect`) carry `redirectTo`.
+Search params in `to` merge over the preserved ones; the current hash is kept unless `to` has one. `navigateToLogin(currentAppStore)` / `navigateToSignUp(currentAppStore)` (`@template/ui/lib/routeRedirect`) carry `redirectTo`.
 
-Switch context through the tenant slice: `tenant.setOrganization(id)`, `tenant.setSpace(id)`, `tenant.setUser()`, `tenant.setPublic()`. See [ZUSTAND.md](../ZUSTAND.md).
+Switch context through the tenant slice: `tenant.switchToOrganizationContext(id)`, `tenant.switchToSpaceContext(id)`, `tenant.switchToUserContext()`, `tenant.switchToPublicContext()`. See [ZUSTAND.md](../ZUSTAND.md).
 
 ### Key Files
 
 - `apps/{app}/app/config/nav/` — nav config
 - `apps/{app}/app/routes/{__root,_authenticated,_fullscreen,_public}.tsx` — layouts
-- `packages/ui/src/guards/` — `requireAuth`, `requirePublic`
-- `packages/ui/src/hooks/useAuthenticatedRouting.ts` (+ `useAuthenticatedRouting/`) — URL ↔ store sync, access check
-- `packages/ui/src/lib/findRoute.ts`, `checkContextPermission.ts`, `getContextParams.ts`, `routeRedirect.ts`
-- `packages/ui/src/hooks/{useRegisterNavigation,usePageMeta,useBreadcrumbs}.ts`
+- `packages/ui/src/guards/` — `redirectToLoginUnlessAuthenticated`, `redirectAuthenticatedUserAwayFromPublicPage`
+- `packages/ui/src/hooks/useSyncTenantContextWithUrlAndAuthorizeRoute.ts` (+ `useSyncTenantContextWithUrlAndAuthorizeRoute/`) — URL ↔ store sync, access check
+- `packages/ui/src/lib/findRoute.ts`, `findFirstTenantContextThatCanOpenPath.ts`, `permissionCheckTargetForTenantContext.ts`, `routeRedirect.ts`
+- `packages/ui/src/hooks/{useRegisterNavigation,useDocumentTitleAndDescription,useBreadcrumbs}.ts`
 - `packages/ui/src/store/slices/navigation.ts`

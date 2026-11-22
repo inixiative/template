@@ -7,7 +7,7 @@
 import { type HydratedRecord, hydrate } from '@template/db';
 import { OrganizationAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';
@@ -16,7 +16,7 @@ export const organizationCreateController = makeController(
   organizationCreateRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const user = me(c)!;
+    const user = actingUser(c)!;
     const body = c.req.valid('json');
     const pseudo = await hydrate('organization', { id: '', ...body } as HydratedRecord);
     if (!check(c.get('permix'), rebacSchema, 'organization', pseudo, OrganizationAction.create))

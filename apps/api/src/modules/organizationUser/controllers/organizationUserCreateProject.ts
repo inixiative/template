@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses feature:project
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationUserCreateProjectRoute } from '#/modules/organizationUser/routes/organizationUserCreateProject';
 
@@ -12,7 +12,7 @@ export const organizationUserCreateProjectController = makeController(
   organizationUserCreateProjectRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const member = getResource<'organizationUser'>(c);
+    const member = contextResource<'organizationUser'>(c);
     const project = await db.project.create({
       data: {
         ...c.req.valid('json'),

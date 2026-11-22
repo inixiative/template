@@ -1,10 +1,11 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:ui
  * @uses none
  */
 import { createAuthGuards } from '@template/ui/guards/authGuard';
 import { useAppStore } from '@template/ui/store';
 
-export const { requireAuth, requirePublic } = createAuthGuards(() => useAppStore.getState());
+export const { redirectToLoginUnlessAuthenticated, redirectAuthenticatedUserAwayFromPublicPage } =
+  createAuthGuards(() => useAppStore.getState());

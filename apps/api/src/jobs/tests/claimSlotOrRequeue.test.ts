@@ -5,21 +5,21 @@ import { claimSlotOrRequeue } from '#/jobs/claimSlotOrRequeue';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { queue } from '#/jobs/queue';
 import {
-  readSlowDeferred,
+  fetchSlowDeferredJobCount,
   recordSlowDeferral,
   SLOW_PARK_MIN_MS,
   slowParkDelayMs,
 } from '#/jobs/slowLaneSignals';
-import { createSlowSlotPool, slowSlotCapacity } from '#/jobs/slowSlotPool';
+import { makeSlowSlotPool, slowSlotCapacity } from '#/jobs/slowSlotPool';
 import { JobLane, JobType } from '#/jobs/types';
-import { createMockJob } from '#tests/createTestWorker';
+import { mockJob } from '#tests/makeTestWorker';
 
 const jobIn = (
   lane: JobLane,
   priority = lane === JobLane.slow ? SLOW_LANE_PRIORITY : 0,
   id = `${lane}-job`,
 ) =>
-  createMockJob({
+  mockJob({
     id,
     name: 'sendWebhook',
     data: { type: JobType.adhoc, lane, payload: {} },
@@ -57,7 +57,7 @@ describe('claimSlotOrRequeue', () => {
   });
 
   it('runs a fast job without touching the slow slots or the queue', async () => {
-    const slots = createSlowSlotPool(4);
+    const slots = makeSlowSlotPool(4);
     const release = await claimSlotOrRequeue(jobIn(JobLane.fast), queue, slots);
     release();
     expect(slots.held()).toBe(0);
@@ -65,7 +65,7 @@ describe('claimSlotOrRequeue', () => {
   });
 
   it('holds a slow slot for the run and frees it on release', async () => {
-    const slots = createSlowSlotPool(4);
+    const slots = makeSlowSlotPool(4);
     const release = await claimSlotOrRequeue(jobIn(JobLane.slow), queue, slots);
     expect(slots.held()).toBe(1);
     release();
@@ -73,7 +73,7 @@ describe('claimSlotOrRequeue', () => {
   });
 
   it('parks a slow job in delayed when the slow half is full, and counts it as deferred slow work', async () => {
-    const slots = createSlowSlotPool(4);
+    const slots = makeSlowSlotPool(4);
     await claimSlotOrRequeue(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'), queue, slots);
     await claimSlotOrRequeue(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'second'), queue, slots);
     const third = jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'third');
@@ -89,11 +89,11 @@ describe('claimSlotOrRequeue', () => {
     expect(token).toBe('worker-token');
     expect(timestamp).toBeGreaterThanOrEqual(before + SLOW_PARK_MIN_MS);
     expect(timestamp).toBeLessThanOrEqual(Date.now() + process.env.JOBS_SLOW_PARK_MAX_MS);
-    expect(await readSlowDeferred(queue.redis, queue.name)).toBe(1);
+    expect(await fetchSlowDeferredJobCount(queue.redis, queue.name)).toBe(1);
   });
 
   it('a parked slow job leaves the deferred count when a worker picks it back up and gives it a slot', async () => {
-    const slots = createSlowSlotPool(2);
+    const slots = makeSlowSlotPool(2);
     const parked = jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'parked');
     const releaseFirst = await claimSlotOrRequeue(
       jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'),
@@ -101,12 +101,12 @@ describe('claimSlotOrRequeue', () => {
       slots,
     );
     await expect(claimSlotOrRequeue(parked, queue, slots)).rejects.toBeInstanceOf(DelayedError);
-    expect(await readSlowDeferred(queue.redis, queue.name)).toBe(1);
+    expect(await fetchSlowDeferredJobCount(queue.redis, queue.name)).toBe(1);
 
     releaseFirst();
     const release = await claimSlotOrRequeue(parked, queue, slots);
 
-    expect(await readSlowDeferred(queue.redis, queue.name)).toBe(0);
+    expect(await fetchSlowDeferredJobCount(queue.redis, queue.name)).toBe(0);
     release();
   });
 
@@ -118,18 +118,18 @@ describe('claimSlotOrRequeue', () => {
       claimSlotOrRequeue(
         jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'jumper'),
         queue,
-        createSlowSlotPool(4),
+        makeSlowSlotPool(4),
       ),
     ).rejects.toBeInstanceOf(WaitingError);
 
-    expect(await readSlowDeferred(queue.redis, queue.name)).toBe(0);
+    expect(await fetchSlowDeferredJobCount(queue.redis, queue.name)).toBe(0);
   });
 
   it('still parks the job when the deferral list cannot be written', async () => {
     const zadd = spyOn(queue.redis, 'zadd').mockImplementation((async () => {
       throw new Error('redis down');
     }) as never);
-    const slots = createSlowSlotPool(2);
+    const slots = makeSlowSlotPool(2);
     await claimSlotOrRequeue(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'), queue, slots);
     const refused = jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'refused');
 
@@ -143,7 +143,7 @@ describe('claimSlotOrRequeue', () => {
 
   it('moves a prioritized job that started ahead of waiting fast work back to its priority', async () => {
     waiting = 3;
-    const slots = createSlowSlotPool(4);
+    const slots = makeSlowSlotPool(4);
     const jumped = jobIn(JobLane.slow);
 
     await expect(claimSlotOrRequeue(jumped, queue, slots)).rejects.toBeInstanceOf(WaitingError);
@@ -154,7 +154,7 @@ describe('claimSlotOrRequeue', () => {
 
   it('runs a prioritized job that started with no fast work waiting', async () => {
     const between = jobIn(JobLane.fast, 5);
-    const release = await claimSlotOrRequeue(between, queue, createSlowSlotPool(4));
+    const release = await claimSlotOrRequeue(between, queue, makeSlowSlotPool(4));
     release();
     expect(between.moveToWait).not.toHaveBeenCalled();
   });

@@ -4,11 +4,12 @@
  * @uses infrastructure:prisma
  */
 import {
-  filterFields,
-  getPolymorphismConfig,
+  maskSensitiveFields,
   NOOP_FIELDS,
+  omitRegisteredFields,
   Prisma,
-  redactSensitiveFields,
+  polymorphicArmKeys,
+  polymorphicKeyColumns,
 } from '@template/db';
 import type { AuditActor } from '@template/db/lib/auditActorContext';
 import { isEqual } from 'lodash-es';
@@ -24,19 +25,6 @@ export const auditActorColumns = (actor: AuditActor | null) => ({
   userAgent: actor?.userAgent ?? null,
   sourceInquiryId: actor?.sourceInquiryId ?? null,
 });
-
-const getSubjectFieldValue = (model: string, field: string, record: Record<string, unknown>) => {
-  switch (field) {
-    case 'subjectOrganizationId':
-      return model === 'Organization' ? record.id : record.organizationId;
-    case 'subjectSpaceId':
-      return model === 'Space' ? record.id : record.spaceId;
-    case 'subjectUserId':
-      return model === 'User' ? record.id : record.userId;
-    default:
-      return record.id;
-  }
-};
 
 export const buildContextFkFields = (
   model: string,
@@ -61,33 +49,28 @@ export const buildContextFkFields = (
   };
 };
 
-export const buildSubjectFkFields = (
+/** The subject columns of an audit entry: its dual id always, its typed keys unless the subject is gone. */
+export const buildSubjectColumns = (
   model: string,
   record: Record<string, unknown>,
-): Record<string, unknown> => {
-  const subjectAxis = getPolymorphismConfig('AuditLog')?.axes.find(
-    (axis) => axis.field === 'subjectModel',
-  );
-  const fkFields = subjectAxis?.fkMap[model as keyof typeof subjectAxis.fkMap];
-  if (!fkFields?.length) return {};
+  { withKeys }: { withKeys: boolean } = { withKeys: true },
+): Record<string, unknown> => ({
+  subjectId: typeof record.id === 'string' ? record.id : null,
+  ...(withKeys && polymorphicKeyColumns('AuditLog', 'subjectModel', model).length
+    ? polymorphicArmKeys('AuditLog', 'subjectModel', model, record)
+    : {}),
+});
 
-  const subjectFields: Record<string, unknown> = {};
-  for (const field of fkFields) {
-    const value = getSubjectFieldValue(model, field, record);
-    if (value !== undefined) subjectFields[field] = value;
-  }
-  return subjectFields;
-};
-
-export const filterForAudit = (
+export const omitNoopFieldsForAudit = (
   model: string,
   data: Record<string, unknown>,
-): Record<string, unknown> => filterFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
+): Record<string, unknown> =>
+  omitRegisteredFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
 
-export const processAuditData = (
+export const maskSensitiveAndOmitNoopFieldsForAudit = (
   model: string,
   data: Record<string, unknown>,
-): Record<string, unknown> => redactSensitiveFields(model, filterForAudit(model, data));
+): Record<string, unknown> => maskSensitiveFields(model, omitNoopFieldsForAudit(model, data));
 
 export const computeDiff = (
   before: Record<string, unknown>,

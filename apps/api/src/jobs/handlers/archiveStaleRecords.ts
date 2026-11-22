@@ -7,7 +7,7 @@
 import type { ModelName } from '@template/db';
 
 // Archive target options for stale-data cold storage. Stub — none implemented
-// yet. Configuring `archive` in a cleanStaleData cron payload causes the job
+// yet. Configuring `archive` in a hardDeleteRecordsPastRetention cron payload causes the job
 // to fail with a clear error rather than silently deleting without archive.
 
 export type ArchiveTarget = 's3' | 'datalake' | 'cold';

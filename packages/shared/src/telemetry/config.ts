@@ -71,7 +71,7 @@ export const signalExportOptions = (
   };
 };
 
-export const readTelemetryConfig = (role: 'api' | 'worker') => {
+export const telemetryConfigFromEnv = (role: 'api' | 'worker') => {
   const environment = process.env.ENVIRONMENT || 'local';
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   const enabled = process.env.OTEL_ENABLED
@@ -92,4 +92,4 @@ export const readTelemetryConfig = (role: 'api' | 'worker') => {
     role,
   };
 };
-export type TelemetryConfig = NonNullable<ReturnType<typeof readTelemetryConfig>>;
+export type TelemetryConfig = NonNullable<ReturnType<typeof telemetryConfigFromEnv>>;

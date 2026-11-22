@@ -1,9 +1,11 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses none
  */
+
+import type { ScalarType } from '@inixiative/field-map';
 
 /**
  * The reserved `{{system.*}}` token surface — the one list both the resolver and any authoring picker
@@ -15,7 +17,7 @@
  */
 export type SystemToken = {
   name: string;
-  kind: string;
+  kind: ScalarType;
 };
 
 export const SYSTEM_TOKENS = [

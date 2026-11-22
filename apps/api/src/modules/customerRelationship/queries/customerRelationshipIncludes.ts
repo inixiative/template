@@ -1,0 +1,31 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf feature:customer
+ * @uses none
+ */
+import type { Prisma } from '@template/db';
+
+// Include customer side relations
+export const includeCustomer = {
+  customerUser: true,
+  customerOrganization: true,
+  customerSpace: {
+    include: { organization: true },
+  },
+} as const satisfies Prisma.CustomerRelationshipInclude;
+
+// Include provider side relations
+export const includeProvider = {
+  providerUser: true,
+  providerOrganization: true,
+  providerSpace: {
+    include: { organization: true },
+  },
+} as const satisfies Prisma.CustomerRelationshipInclude;
+
+// Include both sides (complete)
+export const includeComplete = {
+  ...includeCustomer,
+  ...includeProvider,
+} as const satisfies Prisma.CustomerRelationshipInclude;

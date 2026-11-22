@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const segmentMemberFactory = createFactory('SegmentMember', {
+const segmentMemberFactory = registerFactory('SegmentMember', {
   defaults: () => ({}),
   dependencies: {
     segment: {
@@ -14,9 +14,9 @@ const segmentMemberFactory = createFactory('SegmentMember', {
       foreignKey: { id: 'segmentId' },
       required: true,
     },
-    customerRef: {
-      modelName: 'CustomerRef',
-      foreignKey: { id: 'customerRefId' },
+    customerRelationship: {
+      modelName: 'CustomerRelationship',
+      foreignKey: { id: 'customerRelationshipId' },
       required: true,
     },
   },

@@ -5,13 +5,17 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import type { DecryptFieldInput } from '@template/db/lib/encryption/helpers';
-import { decryptField, encryptField } from '@template/db/lib/encryption/helpers';
-import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
+import type { DecryptFieldInput } from '@template/db/lib/encryption/fieldEncryption';
+import { decryptField, encryptField } from '@template/db/lib/encryption/fieldEncryption';
+import { ENCRYPTED_MODELS, encryptedColumnNamesForKey } from '@template/db/lib/encryption/registry';
 import type { EncryptedFieldConfig } from '@template/db/lib/encryption/types';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { log } from '@template/shared/logger';
-import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import {
+  ConcurrencyType,
+  minimumConcurrencyLimitFor,
+  runAllWithConcurrencyLimit,
+} from '@template/shared/utils';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import type { JobHandler } from '#/jobs/types';
 
@@ -30,7 +34,7 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async () 
           );
           const fromVersion = targetVersion - 1;
 
-          const fields = getFieldNames(String(keyName));
+          const fields = encryptedColumnNamesForKey(String(keyName));
           const staleRecords = await delegate.findMany({
             where: { [fields.versionField]: fromVersion },
           });
@@ -70,7 +74,10 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async () 
   );
 
   const allRotations = rotations.flat();
-  const results = await resolveAll(allRotations, getConcurrency([ConcurrencyType.db]));
+  const results = await runAllWithConcurrencyLimit(
+    allRotations,
+    minimumConcurrencyLimitFor([ConcurrencyType.db]),
+  );
   const successCount = results.filter(Boolean).length;
   const failedCount = allRotations.length - successCount;
 

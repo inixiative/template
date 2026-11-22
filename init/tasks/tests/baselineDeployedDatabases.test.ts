@@ -39,7 +39,7 @@ const databaseUrls: Record<string, string> = {
 };
 
 mock.module('../infisicalSetup', () => ({
-  getSecretAsync: async (_key: string, options: { environment: string }) =>
+  fetchSecretOrThrow: async (_key: string, options: { environment: string }) =>
     databaseUrls[options.environment],
 }));
 

@@ -7,7 +7,7 @@
 import type { Condition } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
+import { invalidSegmentConditionsError } from '#/modules/segment/lib/invalidSegmentConditionsError';
 import { compileSegmentWhere } from '#/modules/segment/services/evaluateSegment';
 import { assertSegmentReferencesOwned } from '#/modules/segment/validations/assertSegmentReferencesOwned';
 import { validateSegmentConditions } from '#/modules/segment/validations/validateSegmentConditions';
@@ -18,10 +18,10 @@ export const estimateSegmentReach = async (
   rawConditions: unknown,
 ): Promise<number> => {
   const validation = validateSegmentConditions(rawConditions, ownerModel);
-  if (!validation.valid) throw invalidSegmentConditions(validation.errors);
+  if (!validation.valid) throw invalidSegmentConditionsError(validation.errors);
   const conditions = validation.normalized as Condition;
   await assertSegmentReferencesOwned({ ownerModel, ownerId, conditions });
-  return db.customerRef.count({
+  return db.customerRelationship.count({
     where: await compileSegmentWhere(ownerModel, ownerId, conditions),
   });
 };

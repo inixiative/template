@@ -1,10 +1,10 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { polymorphicAxis } from '@template/db/registries/falsePolymorphism';
+import { polymorphicAxis, sideKeyColumns } from '@template/db/registries/falsePolymorphism';
 import type {
   PolymorphicAxisField,
   PolymorphicAxisValue,
@@ -34,7 +34,10 @@ export const polymorphicSchema = <
   for (const value of values) {
     if (!fkMap[value]) throw new Error(`${model}.${axisField} has no value ${value}`);
   }
-  const axisColumns = new Set([discriminator, ...Object.values(fkMap).flat()]);
+  const axisColumns = new Set([
+    discriminator,
+    ...sideKeyColumns(polymorphicAxis(model, axisField)),
+  ]);
   const collision = Object.keys(options.extend ?? {}).find((key) => axisColumns.has(key));
   if (collision) throw new Error(`${model}.${axisField}: extend cannot redefine ${collision}`);
   const omitted = new Set<string>(options.omit);

@@ -5,6 +5,7 @@
  * @uses none
  */
 
+import { cacheWrittenMarkerKeyFor } from '@template/db/redis/cache/cacheWrittenMarkerKeyFor';
 import { generationKey } from '@template/db/redis/cache/generation/generationKey';
 import {
   GENERATION_TTL_SECONDS,
@@ -14,8 +15,7 @@ import { publishAtCommit } from '@template/db/redis/cache/queries/publishAtCommi
 import { cacheAccessor } from '@template/db/redis/cache/telemetry/cacheAccessor';
 import { meterLargeWrite } from '@template/db/redis/cache/telemetry/meterLargeWrite';
 import type { CacheOverlay } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
-import { writtenKey } from '@template/db/redis/cache/writtenKey';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { incrementCounter } from '@template/shared/telemetry';
 
 export const publishKey = async (overlay: CacheOverlay, key: string): Promise<void> => {
@@ -26,8 +26,8 @@ export const publishKey = async (overlay: CacheOverlay, key: string): Promise<vo
   const payload = shouldPublish ? entry.payload : '';
 
   const published = await publishAtCommit(
-    getRedisClient(),
-    { key, generationKey: generationKey(key), writtenKey: writtenKey(key) },
+    redisClient(),
+    { key, generationKey: generationKey(key), writtenKey: cacheWrittenMarkerKeyFor(key) },
     {
       captured: entry?.generation ?? '',
       clearedGeneration: newGeneration(),

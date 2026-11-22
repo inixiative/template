@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates
  */
 
-import { memberRemoval } from '@template/permissions/rebac/schemaHelpers';
+import { memberRemoval } from '@template/permissions/rebac/rebacSchemaRules';
 import { deleteRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';

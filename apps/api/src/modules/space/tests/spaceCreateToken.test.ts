@@ -14,7 +14,7 @@ import {
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 describe('POST /api/v1/space/:id/tokens', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -59,12 +59,12 @@ describe('POST /api/v1/space/:id/tokens', () => {
     );
     expect(response.status).toBe(201);
 
-    const { data } = await json<{ id: string; name: string; key: string }>(response);
+    const { data } = await parseSuccessBody<{ id: string; name: string; key: string }>(response);
     expect(data.name).toBe('New Token');
     expect(data.key).toBeDefined();
   });
 
-  it('a member mints a member token and nothing above it', async () => {
+  it('a member below admin mints no token for the space', async () => {
     const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
       { role: 'member' },
       { organization: org },
@@ -83,7 +83,7 @@ describe('POST /api/v1/space/:id/tokens', () => {
 
     const asMember = (role: string) =>
       memberHarness.fetch(post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role }));
-    expect((await asMember('member')).status).toBe(201);
-    expect((await asMember('admin')).status).toBe(403);
+    expect((await asMember('viewer')).status).toBe(403);
+    expect((await asMember('member')).status).toBe(403);
   });
 });

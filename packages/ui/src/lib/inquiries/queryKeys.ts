@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
@@ -25,9 +25,10 @@ export const INQUIRY_TYPE_LABELS: Record<InquiryType, string> = {
   updateSpace: 'Space Update',
   transferSpace: 'Space Transfer',
   transferArtifact: 'Artifact Transfer',
+  changeEntitlements: 'Permission Request',
 };
 
-export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string> = {
+export const INQUIRY_STATUS_BADGE_CLASSES: Record<InquiryStatus | 'expired', string> = {
   draft: 'bg-gray-100 text-gray-700',
   sent: 'bg-blue-100 text-blue-700',
   changesRequested: 'bg-yellow-100 text-yellow-700',
@@ -39,7 +40,7 @@ export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string> = 
 
 export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled'];
 
-export const isTerminalInquiry = (inq: {
+export const isInquiryClosedOrExpired = (inq: {
   status: InquiryStatus;
   expiresAt?: string | null;
 }): boolean => {
@@ -76,7 +77,7 @@ const mergeIncludeExpired = (
 
 // External filters define the page bounds.
 // Internal UI controls can only narrow within those bounds, never widen past them.
-export const mergeInquiryFilters = (
+export const narrowInquiryFiltersWithinPageBounds = (
   external: InquiryFilters | undefined,
   internal: InquiryFilters,
 ): InquiryFilters => ({
@@ -119,7 +120,10 @@ export type InquiryMeta = {
 };
 
 // Query keys affected when the SOURCE side mutates (cancel/delete)
-export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]> = {
+export const queryKeysToInvalidateWhenSourceMutates: Record<
+  InquiryType,
+  (inq: InquiryMeta) => QueryKey[]
+> = {
   inviteOrganizationUser: (inq) => [
     organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId! } }),
   ],
@@ -129,16 +133,20 @@ export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   updateSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
   transferSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
   transferArtifact: (inq) => [
-    inq.sourceOrganizationId
-      ? organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId } })
-      : inq.sourceSpaceId
-        ? spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId } })
+    inq.sourceSpaceId
+      ? spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId } })
+      : inq.sourceOrganizationId
+        ? organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId } })
         : meSentManyInquiriesQueryKey(),
   ],
+  changeEntitlements: (_inq) => [meSentManyInquiriesQueryKey()],
 };
 
 // Query keys affected when the TARGET side mutates (resolve/approve/deny)
-export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]> = {
+export const queryKeysToInvalidateWhenTargetMutates: Record<
+  InquiryType,
+  (inq: InquiryMeta) => QueryKey[]
+> = {
   inviteOrganizationUser: (_inq) => [meReceivedManyInquiriesQueryKey()],
   createSpace: (_inq) => [],
   updateSpace: (_inq) => [],
@@ -146,10 +154,14 @@ export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
     organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId! } }),
   ],
   transferArtifact: (inq) => [
-    inq.targetOrganizationId
-      ? organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } })
-      : inq.targetSpaceId
-        ? spaceReceivedManyInquiriesQueryKey({ path: { id: inq.targetSpaceId } })
+    inq.targetSpaceId
+      ? spaceReceivedManyInquiriesQueryKey({ path: { id: inq.targetSpaceId } })
+      : inq.targetOrganizationId
+        ? organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } })
         : meReceivedManyInquiriesQueryKey(),
   ],
+  changeEntitlements: (inq) =>
+    inq.targetOrganizationId
+      ? [organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } })]
+      : [meReceivedManyInquiriesQueryKey()],
 };

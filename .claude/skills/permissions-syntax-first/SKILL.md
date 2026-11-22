@@ -45,7 +45,7 @@ Permissions questions tangle because one sentence mixes several parties and seve
 | 1. Access to X | who can see or reach X | `read` on it | listing tokens |
 | 2. Actions on X itself | who administers X | by its owner's kind: its user; `operate` on its member row; or `manage` at its tenant. No `own` | revoke, rename: the same split by owner kind |
 | 3. X's access to other things | what X can reach: its owner, capped at its role | its role / entitlements / full, set at or below its owner | its role / entitlements / full, checked against the minter |
-| 4. Acting with X, on its behalf | what X does as an actor | execution — out of scope (Signet) | requests made with the token (`__actor.model == Token`) |
+| 4. Acting with X, on its behalf | what X does as an actor | execution — out of scope (Signet) | requests made with the token (`actor:Acting.model == Token`) |
 
 **Step 3 — never let one bucket answer another.** Every schema action is an action on the record (bucket 1 or 2), never an action the record takes. A bucket-2 fact ("M manages their integration") must not satisfy a bucket-3 check ("M may give a token admin access") — that merge produced a real bug. A bucket-4 fact (the actor is a token) is a condition on the actor, not on the thing.
 
@@ -58,28 +58,28 @@ An action rule (`ActionRule`) is one of:
 - `null`: terminal — only a held grant passes;
 - `{ rel: 'organization', action: 'own' }`: walk a hydrated to-one relation (dotted paths walk further: `'sourceSpace.organization'`) and ask an action there;
 - `{ any: [...] }` / `{ all: [...] }`;
-- `{ rule: <json-rules condition> }`: evaluated over `{ ...record, __actor }`. A condition reads any hydrated path (`field: 'integration.userId'`), compares to another path (`path: '__actor.record.id'`), and uses positive operators only (`equals`, `in`, comparisons; "no value" is `equals null`). Negations, `isEmpty`, `notExists`, `if`/`then`/`else`, array and aggregate rules are refused (json-rules `validateRule(…, { positive: true })`).
+- `{ rule: <json-rules condition> }`: evaluated over the record and the supplied `actor:` rows (`actor:Acting.model`, `actor:User.*`, `actor:Token.*`). A condition reads any hydrated path (`field: 'integration.userId'`), compares to another path (`path: 'actor:User.id'`, with `exists` on the field beside it), and uses positive operators only (`equals`, `in`, comparisons; a null check takes an `exists` on its row's key beside it: `all: [id exists, role equals null]`). Negations, `isEmpty`, `notExists`, `if`/`then`/`else`, array and aggregate rules are refused (json-rules `validateRule(…, { positive: true })`).
 
 The actor is `{ model: 'User' | 'Token', record }` (sanitized row). Rules read it by path; there are no binds and no other actor machinery.
 
 Shared pieces already in `schema.ts` — reuse, don't re-derive:
-- `actorIsUser` (`__actor.model == User`), `actorIsDelegateOfUser` (`__actor.record.ownerModel == User`);
-- `actionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
+- `actorIsUser` (`actor:Acting.model == User`), `actorIsDelegateOfUser` (a token is acting and `actor:Token.ownerModel == User`);
+- `actorMayPerformActionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
 - `roleHeldAtOwner`: the role on the row is one the actor holds at the direct owner (owner `own`, admin `manage`, member `operate`, viewer `read`, via `roleToStandardAction`);
 - `memberRowActions(tenant)`: a member row's `operate` and `leave` (`manage` on its user: reaching another tenancy through a user needs manage; `operate` on a user stays in that user's tenancy), `manage`/`own` (the tenant), `read`, `delegateFull`;
 - `memberRoleWrite(tenant)`: manage the tenant and hold there the role being set; `memberRemoval(tenant)` = `leave` or `memberRoleWrite`; `integrationRoleWrite`: `delegateFull` on its owner, or `manage` on the integration and the role held at its owner. Rules routes and controllers check, never named actions;
-- `integrationAdministering` / `integrationAccess`, `tokenAccessIsYours` / `tokenAdministering`: integrations and tokens administered by their owner's kind (tenant: the tenant's roles; member: `operate` on the member row, the tenant owner reads and deletes; user: the user);
+- `integrationAdministering` / `integrationAccess`, `actorMayCreateTokenAtOwnerWithRole` / `tokenAdministering`: integrations and tokens administered by their owner's kind (tenant: the tenant's roles; member: `operate` on the member row, the tenant owner reads and deletes; user: the user);
 - `delegateFull`: the person-only action on a delegate's owner that lets you set `full` (`validateFullGrant` checks it);
-- `managesItsUser(at)`: `{ rel: `${at}user`, action: 'manage' }` — the user, or a delegate of the user at manage or above;
-- `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `managesItsUser(at)`;
-- `ownedBy(owners, at)` and `actionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
+- `actorManagesRecordUser(at)`: `{ rel: `${at}user`, action: 'manage' }` — the user, or a delegate of the user at manage or above;
+- `ownedByYouOrOrganizationOrSpaceYouManage(at)`: owned by an organization or space you may `manage`, or `actorManagesRecordUser(at)`;
+- `ownerModelIsOneOf(owners, at)` and `actorMayPerformActionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
 
 Other parts of the system (use them, don't parallel them):
 - `placeEntitlement` + `canGrantEntitlement` (library, over `schemaMap`) — the only check for writing entitlements, validity included; entitlements are `Entitlement` rows and change only through the holder's sub-resource (`GET …/:id/entitlements` lists rows with ids, `POST` with entries, `DELETE` with row ids) via the one writer `changeEntitlements`, every added entry and removed row through that check, never a record update;
 - `RulesRegistry` json-rules write rules, enforced by the rules hook — a row's own columns only (`full` takes no role; where `full` may be set). Nothing in a rules object reads an entitlement or its anchor. A non-full delegate with no role and no entitlements is not refused; it holds nothing. Don't call `validateRules` from controllers;
 - hydration / the lens — relations come from hydrating, never from copying keys;
-- the one `full` skip at install (`delegatedPermissions`);
-- the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement row, written after the member is created, backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `permissionsOfUser` routes it to the user and everything else to the tenant.
+- the one `full` skip at install (`narrowOwnerPermissionsToDelegate`);
+- the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement row anchored at itself with no `where`, written after the member is created, backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `permissionsOfUser` routes it to the user and everything else to the tenant. Unlensed and unconditional, it grants below the member row: a `full` delegate of M1 grants over M1's own integrations (`entitlementEntriesOfHolder` marks every row with no `where` and no lens `grantsBelow`; PERMISSIONS.md § Granting below a held row).
 
 ## 3. Pseudo records
 
@@ -101,13 +101,13 @@ An action on something that does not exist yet, or on a collection, is checked o
 |---|---|
 | `token.create` copied onto six owner models | `create` on a pseudo record `db:token` |
 | actions named after other models (`organization.create` on user) | each action on its own model (test: a dotted action is named after its model) |
-| a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpace('integration.')` |
+| a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpaceYouManage('integration.')` |
 | `leave` as an alternative that skipped the role check | the role check always runs; "yours" is an extra requirement |
-| `full` arms in the schema | `full` is inheritance: skipped at install (`delegatedPermissions`); setting it takes `delegateFull` on the owner (`validateFullGrant`). CI rule `no-full-in-rebac-schema` |
-| deciding who is related to what by comparing `__actor` ids | an action on the record: acting as a member is `operate` on the member row; actor rules only gate person-only actions |
+| `full` arms in the schema | `full` is inheritance: skipped at install (`narrowOwnerPermissionsToDelegate`); setting it takes `delegateFull` on the owner (`validateFullGrant`). CI rule `rebac-schema-never-reads-full` |
+| deciding who is related to what by comparing `actor:` ids | an action on the record: acting as a member is `operate` on the member row; actor rules only gate person-only actions |
 | a role token acting as its member by default | `operate` on the member row: held by `full`, or given by hand as an entitlement |
 | write-time "ceiling" with a trim in `validateDelegateGrant` | `roleHeldAtOwner` + `memberRoleWrite`/`integrationRoleWrite` + `canGrantEntitlement` |
-| copying delegated keys onto a pseudo record | hydrate the relation and read it |
+| copying carried owner keys onto a pseudo record | hydrate the relation and read it |
 | explicit `validateRules` in controllers | the rules hook |
 | a library clause special-casing "conditional" actions | removed in 0.8: the owner walk already re-runs the rule's conditions |
 | `greaterRole` folded into one role check | two checks: the role-write rule on the row as it is and as it will be |
@@ -135,7 +135,7 @@ An action on something that does not exist yet, or on a collection, is checked o
 ## 5. Procedure
 
 1. Name the ruling.
-2. Write the decision as a rule over the hydrated record + `__actor`, reusing section 2's pieces. Prefer a condition on a path over a new action, helper or code.
+2. Write the decision as a rule over the hydrated record + the `actor:` rows, reusing section 2's pieces. Prefer a condition on a path over a new action, helper or code.
 3. If it truly can't be written: write one paragraph — what it decides, why the syntax can't say it — show the user, and stop until they approve.
 4. Tests first, in the user's sentences, including attempts to get around the rule (another user's row, a token actor, a lower role, a different tenant). Factories only.
 5. One change at a time: an adversarial pass on the plan before building, then on the change. Behaviour changes beyond the ask are proposals, never applied.

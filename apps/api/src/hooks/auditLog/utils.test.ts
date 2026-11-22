@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'bun:test';
-import { redactChangeDiff } from '@template/db';
+import { maskSensitiveFieldsInChangeDiff } from '@template/db';
 import {
   buildContextFkFields,
-  buildSubjectFkFields,
+  buildSubjectColumns,
   computeDiff,
-  processAuditData,
+  maskSensitiveAndOmitNoopFieldsForAudit,
 } from '#/hooks/auditLog/utils';
 
 describe('auditLog/utils', () => {
-  describe('processAuditData', () => {
+  describe('maskSensitiveAndOmitNoopFieldsForAudit', () => {
     it('removes updatedAt from all models', () => {
       const data = { id: '1', name: 'test', updatedAt: new Date() };
-      const result = processAuditData('Organization', data);
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('Organization', data);
       expect(result).not.toHaveProperty('updatedAt');
       expect(result).toHaveProperty('id', '1');
     });
@@ -23,33 +23,33 @@ describe('auditLog/utils', () => {
         lastLoginAt: new Date(),
         updatedAt: new Date(),
       };
-      const result = processAuditData('User', data);
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('User', data);
       expect(result).not.toHaveProperty('lastLoginAt');
       expect(result).not.toHaveProperty('updatedAt');
       expect(result).toHaveProperty('email', 'test@example.com');
     });
 
-    it('redacts sensitive Account fields', () => {
+    it('masks sensitive Account fields', () => {
       const data = { id: '1', accountId: 'acc-1', password: 'secret', providerId: 'email' };
-      const result = processAuditData('Account', data);
-      expect(result.password).toBe('[REDACTED]');
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('Account', data);
+      expect(result.password).toBe('[MASKED]');
       expect(result.providerId).toBe('email');
     });
 
-    it('redacts keyHash on Token', () => {
+    it('masks keyHash on Token', () => {
       const data = { id: '1', name: 'tok', keyHash: 'sha256-hash' };
-      const result = processAuditData('Token', data);
-      expect(result.keyHash).toBe('[REDACTED]');
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('Token', data);
+      expect(result.keyHash).toBe('[MASKED]');
       expect(result.name).toBe('tok');
     });
 
     it('strips orderedList position field for Contact so ordering-only updates produce no diff', () => {
-      const before = processAuditData('Contact', {
+      const before = maskSensitiveAndOmitNoopFieldsForAudit('Contact', {
         id: '1',
         value: { e164: '+15551234567' },
         position: 3,
       });
-      const after = processAuditData('Contact', {
+      const after = maskSensitiveAndOmitNoopFieldsForAudit('Contact', {
         id: '1',
         value: { e164: '+15551234567' },
         position: 1,
@@ -60,49 +60,53 @@ describe('auditLog/utils', () => {
     });
   });
 
-  // The audit diff is computed on unredacted data, so a changed sensitive field IS in the diff;
-  // redactChangeDiff then masks both sides so the row records THAT it changed without the value.
+  // The audit diff is computed on unmasked data, so a changed sensitive field IS in the diff;
+  // maskSensitiveFieldsInChangeDiff then masks both sides so the row records THAT it changed without the value.
   // This is what keeps a sensitive-only change from vanishing under the empty-diff guard.
-  describe('redactChangeDiff', () => {
+  describe('maskSensitiveFieldsInChangeDiff', () => {
     it('masks both sides of a changed sensitive field, leaving other changes intact', () => {
       const changes = {
         password: { before: 'old', after: 'new' },
         providerId: { before: 'email', after: 'oauth' },
       };
-      const masked = redactChangeDiff('Account', changes);
-      expect(masked.password).toEqual({ before: '[REDACTED]', after: '[REDACTED]' });
+      const masked = maskSensitiveFieldsInChangeDiff('Account', changes);
+      expect(masked.password).toEqual({ before: '[MASKED]', after: '[MASKED]' });
       expect(masked.providerId).toEqual({ before: 'email', after: 'oauth' });
     });
 
     it('returns the diff untouched for a model with no sensitive fields', () => {
       const changes = { name: { before: 'A', after: 'B' } };
-      expect(redactChangeDiff('Organization', changes)).toBe(changes);
+      expect(maskSensitiveFieldsInChangeDiff('Organization', changes)).toBe(changes);
     });
   });
 
-  describe('buildSubjectFkFields', () => {
+  describe('buildSubjectColumns', () => {
     it('returns subjectUserId for User model', () => {
       const record = { id: 'user-123', email: 'test@example.com' };
-      const result = buildSubjectFkFields('User', record);
-      expect(result).toEqual({ subjectUserId: 'user-123' });
+      const result = buildSubjectColumns('User', record);
+      expect(result).toEqual({ subjectId: 'user-123', subjectUserId: 'user-123' });
     });
 
     it('returns subjectOrganizationId for Organization model using record.id', () => {
       const record = { id: 'org-123', name: 'Acme' };
-      const result = buildSubjectFkFields('Organization', record);
-      expect(result).toEqual({ subjectOrganizationId: 'org-123' });
+      const result = buildSubjectColumns('Organization', record);
+      expect(result).toEqual({ subjectId: 'org-123', subjectOrganizationId: 'org-123' });
     });
 
     it('returns subjectSpaceId for Space model using record.id', () => {
       const record = { id: 'space-123', name: 'My Space', organizationId: 'org-456' };
-      const result = buildSubjectFkFields('Space', record);
-      expect(result).toEqual({ subjectSpaceId: 'space-123' });
+      const result = buildSubjectColumns('Space', record);
+      expect(result).toEqual({ subjectId: 'space-123', subjectSpaceId: 'space-123' });
     });
 
     it('returns composite FK fields for OrganizationUser', () => {
       const record = { id: 'ou-123', organizationId: 'org-456', userId: 'user-789' };
-      const result = buildSubjectFkFields('OrganizationUser', record);
-      expect(result).toEqual({ subjectOrganizationId: 'org-456', subjectUserId: 'user-789' });
+      const result = buildSubjectColumns('OrganizationUser', record);
+      expect(result).toEqual({
+        subjectId: 'ou-123',
+        subjectOrganizationId: 'org-456',
+        subjectUserId: 'user-789',
+      });
     });
 
     it('returns composite FK fields for SpaceUser', () => {
@@ -112,8 +116,9 @@ describe('auditLog/utils', () => {
         spaceId: 'space-789',
         userId: 'user-321',
       };
-      const result = buildSubjectFkFields('SpaceUser', record);
+      const result = buildSubjectColumns('SpaceUser', record);
       expect(result).toEqual({
+        subjectId: 'su-123',
         subjectOrganizationId: 'org-456',
         subjectSpaceId: 'space-789',
         subjectUserId: 'user-321',
@@ -122,26 +127,32 @@ describe('auditLog/utils', () => {
 
     it('returns subjectTokenId for Token model', () => {
       const record = { id: 'tok-123', name: 'API Key' };
-      const result = buildSubjectFkFields('Token', record);
-      expect(result).toEqual({ subjectTokenId: 'tok-123' });
+      const result = buildSubjectColumns('Token', record);
+      expect(result).toEqual({ subjectId: 'tok-123', subjectTokenId: 'tok-123' });
     });
 
     it('returns subjectInquiryId for Inquiry model', () => {
       const record = { id: 'inq-123' };
-      const result = buildSubjectFkFields('Inquiry', record);
-      expect(result).toEqual({ subjectInquiryId: 'inq-123' });
+      const result = buildSubjectColumns('Inquiry', record);
+      expect(result).toEqual({ subjectId: 'inq-123', subjectInquiryId: 'inq-123' });
     });
 
     it('returns subjectAuthProviderId for AuthProvider model', () => {
       const record = { id: 'ap-123' };
-      const result = buildSubjectFkFields('AuthProvider', record);
-      expect(result).toEqual({ subjectAuthProviderId: 'ap-123' });
+      const result = buildSubjectColumns('AuthProvider', record);
+      expect(result).toEqual({ subjectId: 'ap-123', subjectAuthProviderId: 'ap-123' });
     });
 
     it('returns empty object for unknown model', () => {
       const record = { id: 'x-123' };
-      const result = buildSubjectFkFields('UnknownModel', record);
-      expect(result).toEqual({});
+      const result = buildSubjectColumns('UnknownModel', record);
+      expect(result).toEqual({ subjectId: 'x-123' });
+    });
+
+    it('a gone subject keeps its dual id and drops its typed keys', () => {
+      expect(buildSubjectColumns('Session', { id: 'sess-1' }, { withKeys: false })).toEqual({
+        subjectId: 'sess-1',
+      });
     });
   });
 
@@ -201,7 +212,7 @@ describe('auditLog/utils', () => {
       // computeDiff is a pure diff — caller should pass pre-processed (filtered) data
       const diff = computeDiff(before, after);
       expect(diff).toHaveProperty('updatedAt');
-      // the caller (buildAuditEntry) passes processAuditData output which strips updatedAt first
+      // the caller (buildAuditEntry) passes maskSensitiveAndOmitNoopFieldsForAudit output which strips updatedAt first
     });
 
     it('handles multiple changed fields', () => {

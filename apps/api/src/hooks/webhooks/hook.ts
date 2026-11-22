@@ -2,11 +2,11 @@ import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
   DbAction,
   db,
-  filterFields,
   HookTiming,
   isNoOpUpdate,
+  omitRegisteredFields,
   registerDbHook,
-  WEBHOOK_NOOP_FIELDS,
+  WEBHOOK_EXCLUDED_FIELDS,
 } from '@template/db';
 import type { WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
@@ -14,7 +14,11 @@ import { ConcurrencyType } from '@template/shared/utils';
 import { keyBy } from 'lodash-es';
 import { isManyAction } from '#/hooks/shared/hookRows';
 import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
-import { parentDeliveries, recordAudiences, type WebhookRow } from '#/hooks/webhooks/parties';
+import {
+  fetchWebhookPartiesByRow,
+  parentDeliveries,
+  type WebhookRow,
+} from '#/hooks/webhooks/parties';
 import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -33,7 +37,7 @@ export type WebhookPayload = {
   timestamp: string;
 };
 
-const getWebhookCallbacks = (subscriptions: WebhookSubscription[], payload: WebhookPayload) => {
+const webhookEnqueueCallbacks = (subscriptions: WebhookSubscription[], payload: WebhookPayload) => {
   return subscriptions.map((sub: WebhookSubscription) => async () => {
     await enqueueJob('sendWebhook', {
       subscriptionId: sub.id,
@@ -68,12 +72,12 @@ const processSingleRecord = (
 ) => {
   if (
     webhookAction === WebhookAction.update &&
-    isNoOpUpdate(model, resultData, previousData, WEBHOOK_NOOP_FIELDS)
+    isNoOpUpdate(model, resultData, previousData, WEBHOOK_EXCLUDED_FIELDS)
   ) {
     return [];
   }
 
-  const origin = auditActorContext.getScope()?.integrationId ?? null;
+  const origin = auditActorContext.currentActor()?.integrationId ?? null;
   const targets = origin
     ? subscriptions.filter((sub) => sub.integrationId !== origin)
     : subscriptions;
@@ -83,12 +87,14 @@ const processSingleRecord = (
     model: webhookModel,
     action: webhookAction,
     resourceId: resultData.id,
-    data: filterFields(model, resultData, WEBHOOK_NOOP_FIELDS),
-    previousData: previousData ? filterFields(model, previousData, WEBHOOK_NOOP_FIELDS) : undefined,
+    data: omitRegisteredFields(model, resultData, WEBHOOK_EXCLUDED_FIELDS),
+    previousData: previousData
+      ? omitRegisteredFields(model, previousData, WEBHOOK_EXCLUDED_FIELDS)
+      : undefined,
     timestamp: new Date().toISOString(),
   };
 
-  return getWebhookCallbacks(targets, payload);
+  return webhookEnqueueCallbacks(targets, payload);
 };
 
 export const registerWebhookHook = () => {
@@ -125,7 +131,7 @@ export const registerWebhookHook = () => {
         });
       }
 
-      const audiences = await recordAudiences(
+      const audiences = await fetchWebhookPartiesByRow(
         model,
         records.map(({ resultData }) => resultData),
       );

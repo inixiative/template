@@ -1,30 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { claimLane, db, getJobSupersededBy, laneKey, watchLane } from '@template/db';
+import { claimLane, db, fetchSupersededBy, laneKey, watchLane } from '@template/db';
 import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
+import { jobLaneStore } from '#/jobs/jobLaneStore';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import {
-  createDepthEstimator,
   flushOutbox,
   hasPendingFastSpills,
   hasPendingSlowSpills,
   hasPendingSpills,
-  isOverflowing,
+  isOverflowFlagSet,
+  makeDepthEstimator,
   type OutboxRow,
+  probeDepthsAndSetOverflowFlagForLanesAtCap,
   queueDepths,
   shouldSpill,
   spillToOutbox,
-  tripIfFull,
 } from '#/jobs/outbox';
-import { flagKey } from '#/jobs/outbox/config';
+import { overflowFlagRedisKey } from '#/jobs/outbox/config';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain';
-import { flushQueue } from '#/jobs/outbox/mutex';
+import { jobOutboxWriteMutex } from '#/jobs/outbox/mutex';
 import { queue } from '#/jobs/queue';
 import { JobLane, JobType, type WorkerContext } from '#/jobs/types';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
-const FLAG_KEY = flagKey(JobLane.fast);
-const SLOW_FLAG_KEY = flagKey(JobLane.slow);
+const FLAG_KEY = overflowFlagRedisKey(JobLane.fast);
+const SLOW_FLAG_KEY = overflowFlagRedisKey(JobLane.slow);
 
 const fanRow = (jobId: string): OutboxRow => ({
   handlerName: 'sendWebhook',
@@ -44,59 +45,59 @@ describe('depth estimate', () => {
   it('trips the flag once the adds since the last probe reach the cap', async () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
     let depth = 4;
-    const estimator = createDepthEstimator(async () => depthsOf(depth), 60_000);
+    const estimator = makeDepthEstimator(async () => depthsOf(depth), 60_000);
     const add = () => {
       depth++;
       return estimator.recordAdd(false);
     };
 
     for (let i = 0; i < 5; i++) await add();
-    expect(await isOverflowing(JobLane.fast)).toBe(false);
+    expect(await isOverflowFlagSet(JobLane.fast)).toBe(false);
 
     await add();
-    expect(await isOverflowing(JobLane.fast)).toBe(true);
+    expect(await isOverflowFlagSet(JobLane.fast)).toBe(true);
   });
 
   it('trips the slow flag when slow work reaches the slow share, and the budget flag at the total cap', async () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
     setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
     let depths = { total: 5, slow: 5, slowDeferred: 0 };
-    const estimator = createDepthEstimator(async () => depths, 0);
+    const estimator = makeDepthEstimator(async () => depths, 0);
 
     await estimator.recordAdd(true);
-    expect(await isOverflowing(JobLane.slow)).toBe(true);
-    expect(await isOverflowing(JobLane.fast)).toBe(false);
+    expect(await isOverflowFlagSet(JobLane.slow)).toBe(true);
+    expect(await isOverflowFlagSet(JobLane.fast)).toBe(false);
 
     depths = { total: 10, slow: 5, slowDeferred: 0 };
     await estimator.recordAdd(false);
-    expect(await isOverflowing(JobLane.fast)).toBe(true);
+    expect(await isOverflowFlagSet(JobLane.fast)).toBe(true);
   });
 
   it('does not probe again on a fast add because the slow lane is full', async () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
     setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
     let probes = 0;
-    const estimator = createDepthEstimator(async () => {
+    const estimator = makeDepthEstimator(async () => {
       probes++;
       return { total: 6, slow: 5, slowDeferred: 0 };
     }, 60_000);
 
     await estimator.recordAdd(false);
-    expect(await isOverflowing(JobLane.slow)).toBe(true);
+    expect(await isOverflowFlagSet(JobLane.slow)).toBe(true);
     await estimator.recordAdd(false);
     await estimator.recordAdd(false);
 
     expect(probes).toBe(1);
-    expect(await isOverflowing(JobLane.fast)).toBe(false);
+    expect(await isOverflowFlagSet(JobLane.fast)).toBe(false);
   });
 
   it('never trips on stale add counts: reaching the cap re-probes first', async () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
-    const estimator = createDepthEstimator(async () => depthsOf(4), 60_000);
+    const estimator = makeDepthEstimator(async () => depthsOf(4), 60_000);
 
     for (let i = 0; i < 20; i++) await estimator.recordAdd(false);
 
-    expect(await isOverflowing(JobLane.fast)).toBe(false);
+    expect(await isOverflowFlagSet(JobLane.fast)).toBe(false);
   });
 });
 
@@ -127,7 +128,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   let restoreQueueSpies = (): void => {};
 
   beforeEach(() => {
-    ctx = createTestWorker();
+    ctx = makeTestWorker();
 
     const add = spyOn(queue, 'add').mockImplementation((async (
       name: string,
@@ -192,7 +193,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   it('superseding spills across flushes collapse to the latest (upsert)', async () => {
     const supRow = (n: number): OutboxRow => ({
-      handlerName: 'cleanStaleData',
+      handlerName: 'hardDeleteRecordsPastRetention',
       jobId: `sup-${n}`,
       dedupeKey: 'lane-1',
       data: { type: JobType.adhoc, lane: JobLane.fast, payload: { n }, dedupeKey: 'lane-1' },
@@ -210,7 +211,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   it('superseding spills within one batch collapse to the latest', async () => {
     setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '3'); // the 1st writes at once; the 2nd and 3rd wait and share a batch
     const supRow = (n: number): OutboxRow => ({
-      handlerName: 'cleanStaleData',
+      handlerName: 'hardDeleteRecordsPastRetention',
       jobId: `b-${n}`,
       dedupeKey: 'lane-batch',
       data: { type: JobType.adhoc, lane: JobLane.fast, payload: { n }, dedupeKey: 'lane-batch' },
@@ -228,15 +229,15 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect((rows[0].data as { payload: { n: number } }).payload.n).toBe(3);
   });
 
-  it('tripIfFull sets the flag once depth reaches the cap', async () => {
+  it('probeDepthsAndSetOverflowFlagForLanesAtCap sets the flag once depth reaches the cap', async () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '2');
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
 
     await queueDepths(true); // prime the cache to the current depth
-    await tripIfFull();
+    await probeDepthsAndSetOverflowFlagForLanesAtCap();
 
-    expect(await isOverflowing()).toBe(true);
+    expect(await isOverflowFlagSet()).toBe(true);
   });
 
   it('drain tops up only to the cap, leaving the rest buffered', async () => {
@@ -260,7 +261,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await runDrainOutboxPass();
 
     expect(await db.jobOutbox.count()).toBe(0);
-    expect(await isOverflowing()).toBe(false);
+    expect(await isOverflowFlagSet()).toBe(false);
   });
 
   it('re-enqueues a plain adhoc row with its stored jobId', async () => {
@@ -269,70 +270,91 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect((await ctx.queue.getJob('keep-id'))?.id).toBe('keep-id');
   });
 
-  it('drops a buffered row displaced by a newer direct claim — no re-enqueue, no counter-tombstone', async () => {
+  it('drops a buffered row displaced by a newer direct enqueue, and leaves the newer job alone', async () => {
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     const lane = laneKey('recordAppEvent', 'lane-displaced');
+    const older = Bun.randomUUIDv7();
+    const newer = Bun.randomUUIDv7();
     await spillToOutbox({
       handlerName: 'recordAppEvent',
-      jobId: 'older',
+      jobId: older,
       dedupeKey: 'lane-displaced',
       data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'lane-displaced' },
       options: {},
     });
-    await claimLane(lane, 'older'); // the spill-time claim
-    await claimLane(lane, 'newer'); // a direct enqueue (cron / bypass) usurps while the row is buffered
+    await ctx.queue.redis.hset(ctx.queue.toKey(newer), 'name', 'recordAppEvent');
+    await claimLane(jobLaneStore, lane, newer);
 
     await runDrainOutboxPass();
 
-    // the displaced row is deleted without re-adding — re-claiming would tombstone 'newer' right back
     expect(await db.jobOutbox.count()).toBe(0);
-    expect(await ctx.queue.getJob('older')).toBeUndefined();
-    expect(await ctx.queue.redis.get(lane)).toBe('newer');
-    expect(await getJobSupersededBy('newer')).toBeNull();
+    expect(await ctx.queue.getJob(older)).toBeUndefined();
+    expect(await ctx.queue.redis.get(lane)).toBe(newer);
+    expect(await fetchSupersededBy(jobLaneStore, newer)).toBeNull();
+    await ctx.queue.redis.del(ctx.queue.toKey(newer), lane);
   });
 
-  it('keeps the spill-time baton when re-enqueue fails (self-claim is not rolled back)', async () => {
+  it('a spill takes no lane; the drain takes it when it re-adds the row', async () => {
+    await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
+    const lane = laneKey('recordAppEvent', 'lane-at-drain');
+    const jobId = Bun.randomUUIDv7();
+    await spillToOutbox({
+      handlerName: 'recordAppEvent',
+      jobId,
+      dedupeKey: 'lane-at-drain',
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'lane-at-drain' },
+      options: {},
+    });
+    expect(await ctx.queue.redis.get(lane)).toBeNull();
+
+    await runDrainOutboxPass();
+
+    expect(await ctx.queue.redis.get(lane)).toBe(jobId);
+    await ctx.queue.redis.del(lane);
+  });
+
+  it('a failed re-add keeps the row for a retry', async () => {
     poison.add('poisonHandler');
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
-    const lane = laneKey('poisonHandler', 'lane-poison');
     await spillToOutbox({
       handlerName: 'poisonHandler',
-      jobId: 'p-lane',
+      jobId: Bun.randomUUIDv7(),
       dedupeKey: 'lane-poison',
       data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'lane-poison' },
       options: {},
     });
-    await claimLane(lane, 'p-lane'); // the spill-time claim
 
     await runDrainOutboxPass();
 
     const rows = await db.jobOutbox.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].attempts).toBe(1);
-    expect(await ctx.queue.redis.get(lane)).toBe('p-lane');
+    await ctx.queue.redis.del(laneKey('poisonHandler', 'lane-poison'));
   });
 
-  it('supersede lanes are handler-scoped — usurping one lane leaves another handler untouched', async () => {
+  it('supersede lanes are handler-scoped — taking one lane leaves another handler untouched', async () => {
     const laneA = laneKey('handlerA', 'shared');
     const laneB = laneKey('handlerB', 'shared');
-    let aUsurped = false;
-    let bUsurped = false;
-    await claimLane(laneA, 'jobA');
-    await claimLane(laneB, 'jobB');
-    const stopA = watchLane(laneA, 'jobA', () => {
-      aUsurped = true;
+    let aSuperseded = false;
+    let bSuperseded = false;
+    await claimLane(jobLaneStore, laneA, 'jobA');
+    await claimLane(jobLaneStore, laneB, 'jobB');
+    const stopA = watchLane(jobLaneStore, { lane: laneA, holderId: 'jobA' }, () => {
+      aSuperseded = true;
     });
-    const stopB = watchLane(laneB, 'jobB', () => {
-      bUsurped = true;
+    const stopB = watchLane(jobLaneStore, { lane: laneB, holderId: 'jobB' }, () => {
+      bSuperseded = true;
     });
 
-    await claimLane(laneA, 'jobA2'); // a newer job takes lane A's baton
-    await new Promise((r) => setTimeout(r, 700)); // > one poll
+    await ctx.queue.redis.hset(ctx.queue.toKey('jobA2'), 'name', 'handlerA');
+    await claimLane(jobLaneStore, laneA, 'jobA2');
+    await new Promise((r) => setTimeout(r, 700));
     stopA();
     stopB();
 
-    expect(aUsurped).toBe(true);
-    expect(bUsurped).toBe(false); // different handler's lane — untouched
+    expect(aSuperseded).toBe(true);
+    expect(bSuperseded).toBe(false);
+    await ctx.queue.redis.del(ctx.queue.toKey('jobA2'), laneA, laneB);
   });
 
   it('bumps a failed re-enqueue and keeps draining the rest (no batch stranding)', async () => {
@@ -389,7 +411,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     // queue healthy + nothing admittable → the quarantined row gets another chance and the flag clears
     const row = await db.jobOutbox.findFirst();
     expect(row?.attempts).toBe(0);
-    expect(await isOverflowing()).toBe(false);
+    expect(await isOverflowFlagSet()).toBe(false);
   });
 
   it('trips the overflow flag from the depth it reads, with nothing buffered', async () => {
@@ -398,7 +420,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
     await runDrainOutboxPass();
 
-    expect(await isOverflowing()).toBe(true);
+    expect(await isOverflowFlagSet()).toBe(true);
   });
 
   it('flushOutbox persists rows still buffered at shutdown', async () => {
@@ -412,10 +434,14 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('rejects the spill promise when the commit fails (resolves on commit, not accumulation)', async () => {
-    await createJobOutbox({ handlerName: 'cleanStaleData', jobId: 'taken', dedupeKey: 'pre' });
+    await createJobOutbox({
+      handlerName: 'hardDeleteRecordsPastRetention',
+      jobId: 'taken',
+      dedupeKey: 'pre',
+    });
     // Keyed upsert tries to INSERT a row whose @unique jobId already exists → the commit throws.
     const collide: OutboxRow = {
-      handlerName: 'cleanStaleData',
+      handlerName: 'hardDeleteRecordsPastRetention',
       jobId: 'taken',
       dedupeKey: 'fresh-lane',
       data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'fresh-lane' },
@@ -439,7 +465,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       const gate = new Promise<void>((resolve) => {
         release = resolve;
       });
-      const writeInProgress = flushQueue.run(() => gate);
+      const writeInProgress = jobOutboxWriteMutex.run(() => gate);
 
       const first = spillToOutbox(fanRow('gc1'), { flushImmediately: true });
       const rest = [spillToOutbox(fanRow('gc2')), spillToOutbox(fanRow('gc3'))];
@@ -531,8 +557,8 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
       await runDrainOutboxPass();
 
-      expect(await isOverflowing(JobLane.fast)).toBe(false);
-      expect(await isOverflowing(JobLane.slow)).toBe(true);
+      expect(await isOverflowFlagSet(JobLane.fast)).toBe(false);
+      expect(await isOverflowFlagSet(JobLane.slow)).toBe(true);
       expect(await db.jobOutbox.count()).toBe(1);
     });
 
@@ -596,12 +622,12 @@ describe('jobs overflow buffer (spill + drain)', () => {
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const gate = flushQueue.run(() => held);
+    const gate = jobOutboxWriteMutex.run(() => held);
     const inFlight = spillToOutbox(fanRow('in-flight'), { flushImmediately: true });
     const buffered = spillToOutbox(fanRow('buffered')).catch((e) => e);
 
     let straggler: Promise<unknown> | null = null;
-    const run = spyOn(flushQueue, 'run').mockImplementation((async () => {
+    const run = spyOn(jobOutboxWriteMutex, 'run').mockImplementation((async () => {
       straggler ??= spillToOutbox(fanRow('mid-drain')).catch((e) => e); // lands while flushOutbox is draining
       throw new Error('db down');
     }) as never);

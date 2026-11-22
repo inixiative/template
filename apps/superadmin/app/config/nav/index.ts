@@ -1,10 +1,10 @@
 import type { NavConfig } from '@template/ui/components';
-import { publicContext } from '#/config/nav/contexts/publicContext';
-import { userContext } from '#/config/nav/contexts/userContext';
+import { publicNavigationItems } from '#/config/nav/navigationByContext/publicNavigationItems';
+import { userNavigationItems } from '#/config/nav/navigationByContext/userNavigationItems';
 
 export const navConfig: NavConfig = {
-  user: userContext,
+  user: userNavigationItems,
   organization: [],
   space: [],
-  public: publicContext,
+  public: publicNavigationItems,
 };

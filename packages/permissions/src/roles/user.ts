@@ -6,7 +6,7 @@
  */
 import type { PermissionEntry } from '@template/permissions/client';
 
-export const getUserPermissions = (userId: string): PermissionEntry => ({
+export const permissionEntryForOwnUser = (userId: string): PermissionEntry => ({
   resource: 'db:user',
   id: userId,
   actions: { own: true },

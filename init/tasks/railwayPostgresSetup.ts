@@ -1,6 +1,6 @@
 import { railwayApi } from '../api/railway';
 import { updateConfigField } from '../utils/configHelpers';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import { clearError, isComplete, markComplete, setError } from '../utils/progressTracking';
 import { retryWithTimeout } from '../utils/retry';
 import { setSecretAsync } from './infisicalSetup';
@@ -17,7 +17,7 @@ const provisioningRetry = (label: string, timeoutLabel: string) => ({
   timeoutMessage: `${label} ${timeoutLabel}`,
 });
 
-// getPostgresUrl polls until DATABASE_URL appears in service variables.
+// fetchPostgresUrl polls until DATABASE_URL appears in service variables.
 const urlRetry = (label: string) => ({
   maxRetries: 60,
   delayMs: 5000,
@@ -39,7 +39,7 @@ const fetchVolume = async (
   serviceName: string,
   label: string,
 ): Promise<{ id: string; name: string }> => {
-  const volume = await railwayApi.getServiceVolume(projectId, serviceName);
+  const volume = await railwayApi.fetchServiceVolume(projectId, serviceName);
   if (!volume)
     throw new Error(`${label} volume not found yet. Retry once Railway finishes provisioning.`);
   return volume;
@@ -58,7 +58,7 @@ export const setupRailwayPostgres = async (onStepComplete?: () => Promise<void>)
   await clearError('railwayPostgres');
 
   try {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const { projectId, prodEnvironmentId, stagingEnvironmentId } = config.railway;
     const infisicalProjectId = config.infisical.projectId;
     const stagingEnabled = config.features.staging.enabled;
@@ -120,7 +120,7 @@ export const setupRailwayPostgres = async (onStepComplete?: () => Promise<void>)
     if (!(await isComplete('railwayPostgres', 'storeProdPostgresUrl'))) {
       if (!prodServiceId) throw new Error('Prod Postgres service ID missing');
       const url = await retryWithTimeout(
-        () => railwayApi.getPostgresUrl(prodServiceId, prodEnvironmentId, 'prod', projectId),
+        () => railwayApi.fetchPostgresUrl(prodServiceId, prodEnvironmentId, 'prod', projectId),
         urlRetry('Prod Postgres'),
       );
       await setSecretAsync(infisicalProjectId, 'prod', 'DATABASE_URL', url, '/api');
@@ -178,7 +178,7 @@ export const setupRailwayPostgres = async (onStepComplete?: () => Promise<void>)
         throw new Error('Staging env missing despite staging being enabled');
       const url = await retryWithTimeout(
         () =>
-          railwayApi.getPostgresUrl(stagingServiceId, stagingEnvironmentId, 'staging', projectId),
+          railwayApi.fetchPostgresUrl(stagingServiceId, stagingEnvironmentId, 'staging', projectId),
         urlRetry('Staging Postgres'),
       );
       await setSecretAsync(infisicalProjectId, 'staging', 'DATABASE_URL', url, '/api');

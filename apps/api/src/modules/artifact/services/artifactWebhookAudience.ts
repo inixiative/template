@@ -4,7 +4,7 @@
  * @partOf feature:files, feature:webhooks
  * @uses infrastructure:prisma
  */
-import { db, polymorphicTarget } from '@template/db';
+import { db, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { ArtifactPermission } from '@template/db/generated/client/client';
 import type { WebhookAudienceResolver } from '#/hooks/webhooks/audiences';
 import type { Party as WebhookParty } from '#/hooks/webhooks/parties';
@@ -14,49 +14,59 @@ import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifa
 const directParty = ({ kind, ids }: ArtifactPrincipal): WebhookParty | null => {
   switch (kind) {
     case 'User':
-      return { kind: 'User', id: ids[0]! };
+      return { model: 'User', id: ids[0]! };
     case 'Organization':
     case 'OrganizationManager':
-      return { kind: 'Organization', id: ids[0]! };
+      return { model: 'Organization', id: ids[0]! };
     case 'Space':
     case 'SpaceManager':
-      return { kind: 'Space', id: ids[0]! };
+      return { model: 'Space', id: ids[0]! };
     case 'OrganizationUser':
-      return { kind: 'User', id: ids[1]! };
+      return { model: 'User', id: ids[1]! };
     case 'SpaceUser':
-      return { kind: 'User', id: ids[2]! };
+      return { model: 'User', id: ids[2]! };
     default:
       return null;
   }
 };
 
-const customerParties = async (customerRefIds: string[]): Promise<Map<string, WebhookParty>> => {
-  const customerRefs = await db.customerRef.findMany({ where: { id: { in: customerRefIds } } });
+const customerParties = async (
+  customerRelationshipIds: string[],
+): Promise<Map<string, WebhookParty>> => {
+  const customerRelationships = await db.customerRelationship.findMany({
+    where: { id: { in: customerRelationshipIds } },
+  });
   const parties = new Map<string, WebhookParty>();
-  for (const customerRef of customerRefs) {
-    const customer = polymorphicTarget(customerRef, 'CustomerRef', 'customerModel');
-    if (customer) parties.set(customerRef.id, customer as WebhookParty);
+  for (const customerRelationship of customerRelationships) {
+    const customer = rowPolymorphicAxisPointsAt(
+      customerRelationship,
+      'CustomerRelationship',
+      'customerModel',
+    );
+    if (customer) parties.set(customerRelationship.id, customer as WebhookParty);
   }
   return parties;
 };
 
-const partyKey = (party: WebhookParty) => `${party.kind}:${party.id}`;
+const partyKey = (party: WebhookParty) => `${party.model}:${party.id}`;
 
 const principalParties = async (
   principalsByArtifact: Map<string, ArtifactPrincipal[]>,
 ): Promise<Map<string, WebhookParty[]>> => {
-  const customerRefIds = [...principalsByArtifact.values()]
+  const customerRelationshipIds = [...principalsByArtifact.values()]
     .flat()
-    .filter((principal) => principal.kind === 'CustomerRef')
+    .filter((principal) => principal.kind === 'CustomerRelationship')
     .map((principal) => principal.ids[0]!);
-  const customers = customerRefIds.length ? await customerParties(customerRefIds) : new Map();
+  const customers = customerRelationshipIds.length
+    ? await customerParties(customerRelationshipIds)
+    : new Map();
 
   const audiences = new Map<string, WebhookParty[]>();
   for (const [artifactId, principals] of principalsByArtifact) {
     const parties = new Map<string, WebhookParty>();
     for (const principal of principals) {
       const party =
-        principal.kind === 'CustomerRef'
+        principal.kind === 'CustomerRelationship'
           ? customers.get(principal.ids[0]!)
           : directParty(principal);
       if (party) parties.set(partyKey(party), party);

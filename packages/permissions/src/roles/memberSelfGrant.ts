@@ -1,32 +1,27 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:authz
  * @uses none
  */
-import { Operator } from '@inixiative/json-rules';
 import type { EntitlementEntry } from '@template/permissions/client';
-import { isEqual } from 'lodash-es';
+import { isEqual, pick } from 'lodash-es';
 
 export type MemberResource = 'db:organizationUser' | 'db:spaceUser';
 
 export const memberSelfGrant = (
   resource: MemberResource,
-  member: { id: string; userId: string },
+  member: { id: string },
 ): EntitlementEntry => ({
   resource,
-  anchor: { resource: 'db:user', id: member.userId, path: 'user' },
-  where: { field: 'id', operator: Operator.equals, value: member.id },
+  anchor: { resource, id: member.id },
   actions: { operate: true },
 });
 
 export const isMemberSelfGrant =
-  (resource: MemberResource, member: { id?: string; userId?: string }) =>
-  (entry: EntitlementEntry) => {
-    if (!member.id || !member.userId) return false;
-    const { actions: _, ...grant } = memberSelfGrant(resource, {
-      id: member.id,
-      userId: member.userId,
-    });
-    return isEqual({ resource: entry.resource, anchor: entry.anchor, where: entry.where }, grant);
-  };
+  (resource: MemberResource, member: { id?: string }) => (entry: EntitlementEntry) =>
+    !!member.id &&
+    isEqual(
+      pick(entry, ['resource', 'anchor', 'where', 'actions']),
+      memberSelfGrant(resource, { id: member.id }),
+    );

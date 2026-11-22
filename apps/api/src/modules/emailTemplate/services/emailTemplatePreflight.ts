@@ -7,11 +7,11 @@
 import { deadRuleReferences } from '@template/db';
 import { type PreflightResult, runPreflight } from '@template/email/preflight';
 import { decompose } from '@template/email/render/decompose';
-import { expandWith } from '@template/email/render/expand';
+import type { RuleErrorSink } from '@template/email/render/evaluateTemplate';
+import { expandComponentTagsWithFetcher } from '@template/email/render/expandComponentTags';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
 import { interpolate, type Variables } from '@template/email/render/interpolate';
-import { lookupCascade } from '@template/email/render/lookupCascade';
 import type { EmailOwnerRef } from '@template/email/render/owner';
-import type { RuleErrorSink } from '@template/email/render/settle';
 import type { OwnerScope } from '@template/email/render/types';
 import { collectConditionFieldPaths } from '@template/email/rules/collectHydrationPaths';
 import type { EmailLens } from '@template/email/rules/emailLens';
@@ -21,8 +21,8 @@ import { assertValidConditions } from '@template/email/validations/validateCondi
 import type { RuleReference } from '@template/shared/rules';
 import { referenceKey } from '@template/shared/rules';
 import mjml2html from 'mjml';
-import { emailLensAt, emailLensFor } from '#/lib/email/emailLensFor';
-import { withoutDegradedSegments } from '#/lib/email/withoutDegradedSegments';
+import { emailLensFor, fetchStoredLensAndBuildEmailLens } from '#/lib/email/emailLensFor';
+import { fetchReferenceKeysExcludingDegradedSegments } from '#/lib/email/fetchReferenceKeysExcludingDegradedSegments';
 
 export type EmailTemplatePreflightInput = Partial<EmailOwnerRef> & {
   mjml: string;
@@ -43,9 +43,9 @@ const SAMPLE_VARIABLES: Variables = {
 const expandDraft = (mjml: string, ctx: OwnerScope): Promise<string> => {
   const { mjml: bareRefMjml, writes } = decompose(mjml, () => undefined);
   const drafted = new Map(writes.map((write) => [write.slug, write.mjml]));
-  return expandWith(bareRefMjml, async (slugs) => {
+  return expandComponentTagsWithFetcher(bareRefMjml, async (slugs) => {
     const missing = slugs.filter((slug) => !drafted.has(slug));
-    const persisted = missing.length ? await lookupCascade(missing, ctx) : {};
+    const persisted = missing.length ? await fetchComponentsThroughOwnerCascade(missing, ctx) : {};
     return Object.fromEntries(
       slugs.map((slug) => {
         const draft = drafted.get(slug);
@@ -84,7 +84,9 @@ export const emailTemplatePreflight = async (
     locale,
   };
 
-  const lens = input.slug ? await emailLensAt(input.slug, ctx) : emailLensFor(undefined, ctx);
+  const lens = input.slug
+    ? await fetchStoredLensAndBuildEmailLens(input.slug, ctx)
+    : emailLensFor(undefined, ctx);
   assertValidConditions(input.mjml, { lens });
   if (input.subject) assertValidConditions(input.subject, { isSubject: true, lens });
   const variables = sampleVariables(lens);
@@ -95,7 +97,7 @@ export const emailTemplatePreflight = async (
   };
 
   const expandedMjml = await expandDraft(input.mjml, ctx);
-  const existingTargets = await withoutDegradedSegments(
+  const existingTargets = await fetchReferenceKeysExcludingDegradedSegments(
     await existingReferences(lens, expandedMjml, input.subject ?? ''),
   );
   const options = { locale, lens, existingTargets };

@@ -1,10 +1,11 @@
+import type { FieldEntry } from '@inixiative/field-map';
+
 /**
  * @atlas
  * @kind constant
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { ModelField } from '@template/db';
 
 const ENUM_OPS = ['equals', 'in', 'notIn', 'not'] as const;
 
@@ -29,14 +30,14 @@ const DEFAULT_OP_BY_TYPE: Record<string, string> = {
   String: 'contains',
 };
 
-export const getValidOperators = (field: ModelField): readonly string[] => {
+export const validOperatorsForField = (field: FieldEntry): readonly string[] => {
   if (field.kind === 'enum') return ENUM_OPS;
   if (field.kind !== 'scalar') return [];
   return OPERATORS_BY_TYPE[field.type] ?? [];
 };
 
-export const getDefaultOperator = (field: ModelField): string =>
+export const defaultOperatorForField = (field: FieldEntry): string =>
   field.kind === 'scalar' ? (DEFAULT_OP_BY_TYPE[field.type] ?? 'equals') : 'equals';
 
-export const isValidOperatorForField = (field: ModelField, operator: string): boolean =>
-  getValidOperators(field).includes(operator);
+export const isValidOperatorForField = (field: FieldEntry, operator: string): boolean =>
+  validOperatorsForField(field).includes(operator);

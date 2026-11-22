@@ -6,12 +6,12 @@ import {
   createOrganization,
   createOrganizationUser,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import type { organizationUpdateRoute } from '#/modules/organization/routes/organizationUpdate';
 import { createTestApp } from '#tests/createTestApp';
-import { json, jsonError, patch } from '#tests/utils/request';
+import { parseErrorBody, parseSuccessBody, patch } from '#tests/utils/request';
 
 type UpdateOrgResponse = z.infer<typeof organizationUpdateRoute.responseSchema>;
 
@@ -50,20 +50,20 @@ describe('PATCH /api/v1/organization/:id', () => {
 
   it('updates the organization', async () => {
     const response = await fetch(patch(`/api/v1/organization/${org.id}`, { name: 'Updated Name' }));
-    const { data } = await json<UpdateOrgResponse>(response);
+    const { data } = await parseSuccessBody<UpdateOrgResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.name).toBe('Updated Name');
   });
 
   it('rejects duplicate slug', async () => {
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
     await createOrganization({ slug: `taken-slug-${seq}` });
 
     const response = await fetch(
       patch(`/api/v1/organization/${org.id}`, { slug: `taken-slug-${seq}` }),
     );
-    const body = await jsonError(response);
+    const body = await parseErrorBody(response);
 
     expect(response.status).toBe(409);
     expect(body.error).toBeDefined();

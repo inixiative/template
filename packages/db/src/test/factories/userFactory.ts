@@ -6,11 +6,11 @@
  */
 import { faker } from '@faker-js/faker';
 import { PlatformRole } from '@template/db/generated/client/enums';
-import { createFactory, getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const userFactory = createFactory('User', {
+const userFactory = registerFactory('User', {
   defaults: () => ({
-    email: `user-${getNextSeq()}@${faker.internet.domainName()}`,
+    email: `user-${nextFactorySequenceNumber()}@${faker.internet.domainName()}`,
     emailVerified: true,
     name: faker.person.fullName(),
     displayName: null,

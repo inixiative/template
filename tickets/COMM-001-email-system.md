@@ -18,13 +18,13 @@ inserting variables) plus delivery tracking, preferences, and admin UI.
 
 **Built and operational (verified in code):**
 - `packages/email/src/client/` — Resend adapter (real batch send) + Console fallback.
-- `packages/email/src/render/` — `compose`/`interpolate`/`expand` MJML pipeline:
+- `packages/email/src/render/` — `compose`/`interpolate`/`expandComponentTagsFromOwnerCascade` MJML pipeline:
   nested components, cycle detection, owner-cascade lookup (Space → Org →
   default/admin), and json-rules **conditional blocks** (`evaluateConditions.ts`
   parses `{{#if rule=<Condition JSON>}}…{{/if}}` → `check(rule, data)`).
 - `packages/email/src/targeting/` — declarative recipient resolution (userIds/emails).
 - `packages/email/src/verification/` — Bouncer deliverability check + noop fallback.
-- `apps/api/src/jobs/handlers/sendEmail.ts` — wired end to end (resolveTargets →
+- `apps/api/src/jobs/handlers/planEmailDeliveries.ts` — wired end to end (resolveTargets →
   composeTemplate → interpolate → mjml2html → `client.sendBatch`); emails enqueue
   as BullMQ jobs via the app-event email bridge, not synchronously.
 - **Render issues** (COMM-013 ruling, 2026-09-10) — save refuses everything the lens can
@@ -70,7 +70,7 @@ narrowing.
   — none created yet.
 - Admin UI for template management.
 - Delivery tracking (open/click/bounce) and per-user preferences/opt-out.
-- Per-tenant provider/adapter + template owner/locale resolution (sendEmail uses
+- Per-tenant provider/adapter + template owner/locale resolution (planEmailDeliveries uses
   the first registered adapter and `{ ownerModel: 'default', locale: 'en' }` today).
   This is also the seam that activates the render-error policy beyond `fail` — until
   a send resolves to a non-base owner, `degrade`/`fallback` are unreachable. The
@@ -80,7 +80,7 @@ narrowing.
 
 - **Subtenancy brand lock.** An org setting `spaceEmailPolicy: free | locked` (+
   the locked/required component slugs), enforced server-side: on `locked`,
-  `lookupCascade` stops letting a Space override the locked slugs, and save/render
+  `fetchComponentsThroughOwnerCascade` stops letting a Space override the locked slugs, and save/render
   requires or auto-injects them. The *mechanism* (org component + `inheritToSpaces`
   + cascade) already exists; only the lock/enforcement is missing. **No settings
   table exists** (searched: no `Setting`/`Preference`/`Config`/`Policy` model or

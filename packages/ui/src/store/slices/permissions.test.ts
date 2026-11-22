@@ -20,7 +20,7 @@ describe('permissions slice', () => {
 
       expect(typeof permissions.check).toBe('function');
       expect(typeof permissions.clear).toBe('function');
-      expect(typeof permissions.setup).toBe('function');
+      expect(typeof permissions.installPermissionsForUser).toBe('function');
     });
   });
 
@@ -61,13 +61,14 @@ describe('permissions slice', () => {
         }) as unknown as UserWithRelations;
       const { permissions } = useAppStore.getState();
       permissions.clear();
-      await useAppStore.getState().permissions.setup(member('owner'));
+      await useAppStore.getState().permissions.installPermissionsForUser(member('owner'));
       expect(
         useAppStore.getState().permissions.check('organization', organizationRecord, 'own'),
       ).toBe(true);
-      await useAppStore
-        .getState()
-        .permissions.setup({ ...member('owner'), organizationUsers: [] } as UserWithRelations);
+      await useAppStore.getState().permissions.installPermissionsForUser({
+        ...member('owner'),
+        organizationUsers: [],
+      } as UserWithRelations);
       expect(
         useAppStore.getState().permissions.check('organization', organizationRecord, 'read'),
       ).toBe(false);
@@ -88,7 +89,7 @@ describe('permissions slice', () => {
       } as unknown as UserWithRelations;
 
       // Setup should complete without throwing
-      await store.getState().permissions.setup(mockUser);
+      await store.getState().permissions.installPermissionsForUser(mockUser);
       expect(true).toBe(true); // If we get here, it didn't throw
     });
 
@@ -98,7 +99,7 @@ describe('permissions slice', () => {
         email: 'test@example.com',
       } as unknown as UserWithRelations;
 
-      await store.getState().permissions.setup(mockUser);
+      await store.getState().permissions.installPermissionsForUser(mockUser);
       expect(true).toBe(true);
     });
 
@@ -109,7 +110,7 @@ describe('permissions slice', () => {
         isSuperadmin: true,
       } as unknown as UserWithRelations;
 
-      await store.getState().permissions.setup(mockSuperadminUser);
+      await store.getState().permissions.installPermissionsForUser(mockSuperadminUser);
       expect(true).toBe(true);
     });
 
@@ -133,7 +134,7 @@ describe('permissions slice', () => {
         ],
       } as unknown as UserWithRelations;
 
-      await store.getState().permissions.setup(mockUser);
+      await store.getState().permissions.installPermissionsForUser(mockUser);
       expect(true).toBe(true);
     });
   });

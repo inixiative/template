@@ -20,16 +20,16 @@ const subjectIs = (
   where: Record<string, string>,
 ): Prisma.AuditLogWhereInput => ({
   subjectModel: model,
-  [polymorphicArmRelation('AuditLog', 'subjectModel', model).relationName]: {
+  [polymorphicArmRelation('AuditLog', 'subjectModel', model).field]: {
     ...where,
     ...(hasDeletedAt(model) ? { deletedAt: undefined } : {}),
   },
 });
 
-/** A record's audit entries and those of every registered child whose parent it is, as one where. */
+/** A record's audit entries (by its dual id, so entries written after a hard delete count) and those of every registered child whose parent it is, as one where. */
 export const auditHistoryWhere = (subject: ParentRow & { model: AuditSubjectModel }) => ({
   OR: [
-    subjectIs(subject.model, { id: subject.id }),
+    { subjectModel: subject.model, subjectId: subject.id },
     ...childrenOf(subject).flatMap(({ child, where }) =>
       isAuditEnabled(child) ? [subjectIs(child, where)] : [],
     ),

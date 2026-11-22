@@ -302,7 +302,7 @@ Roles map to actions as everywhere else: viewer → read, member → operate, ad
 |----------|-----|
 | User uploads personal file | user-owned, private |
 | Member uploads into a space folder | space-owned, `inherit`; the member gets an owner grant (SpaceUser) |
-| Customer submits to Space | CustomerRef `viewer` grant + attachment binding |
+| Customer submits to Space | CustomerRelationship `viewer` grant + attachment binding |
 | Set as org logo | the file's own `access = public` + logo binding |
 | Admin shares an org folder with a Space | Space grant on the folder; `inherit` members take it |
 | Admin shares with a specific User | User grant on the file or folder |
@@ -691,7 +691,7 @@ Product surface that matters once there are many files and users.
 
 ## 15. Space Transfer Cascade Audit
 
-Current handler (`apps/api/src/modules/inquiry/handlers/transferSpace/index.ts`) only updates `Space.organizationId`.
+Current handler (`apps/api/src/modules/inquiry/services/transferSpace/index.ts`) only updates `Space.organizationId`.
 
 ### Must update on transfer
 
@@ -708,7 +708,7 @@ Current handler (`apps/api/src/modules/inquiry/handlers/transferSpace/index.ts`)
 | Model | Question | Risk if ignored |
 |-------|----------|-----------------|
 | **WebhookSubscription** | Survive transfer? | Old org gets events from new org's space |
-| **CustomerRef** | Move with space? | Customers lose access or data leaks |
+| **CustomerRelationship** | Move with space? | Customers lose access or data leaks |
 | **Inquiry** (pending) | Cancel on transfer? | Stale inquiries in wrong org context |
 
 ### Should NOT change
@@ -988,7 +988,7 @@ Fully absorbed into §3 and its ripples: false-poly ownership (§3.1), flat immu
 ## Reference
 
 - S3 type stubs: `apps/api/src/types/optionalDeps.d.ts`
-- Transfer handler: `apps/api/src/modules/inquiry/handlers/transferSpace/index.ts`
+- Transfer handler: `apps/api/src/modules/inquiry/services/transferSpace/index.ts`
 - Permissions client: `packages/permissions/src/client.ts`
 - Carde Image model: `~/Carde.io/organized-play-api/src/db/postgres/prisma/models/Image.part.prisma`
 - Carde ResourceImage: `~/Carde.io/organized-play-api/src/db/postgres/prisma/models/ResourceImage.part.prisma`

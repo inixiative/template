@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import type {
   Inquiry,
   Organization,
@@ -17,10 +17,11 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
+import * as emitModule from '#/appEvents/emit';
 import { inquiryRouter } from '#/modules/inquiry';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import { inquiryServices } from '#/modules/inquiry/services';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
@@ -72,7 +73,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.sent);
@@ -96,14 +97,14 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.expiresAt).not.toBeNull();
     expect(new Date(data.expiresAt!).getTime()).toBeGreaterThan(Date.now());
   });
 
-  it('returns target relations but not source relations in response', async () => {
+  it('returns both sides in the response', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -120,11 +121,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Record<string, unknown>>(response);
+    const { data } = await parseSuccessBody<Record<string, unknown>>(response);
 
     expect(response.status).toBe(200);
     expect(data.targetUser).toBeDefined();
-    expect(data.sourceOrganization).toBeUndefined();
+    expect(data.sourceOrganization).toMatchObject({ id: org.id });
   });
 
   it('is a no-op for an already sent inquiry', async () => {
@@ -148,7 +149,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.sent);
@@ -177,7 +178,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.sent);
@@ -212,7 +213,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
   let org: Organization;
   let admin: User;
   let adminOrgUser: OrganizationUser;
-  const origAutoApprove = inquiryHandlers.inviteOrganizationUser.autoApprove;
+  const origAutoApprove = inquiryServices.inviteOrganizationUser.autoApprove;
 
   beforeEach(async () => {
     const { entity: u } = await createUser();
@@ -235,11 +236,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
   });
 
   beforeEach(() => {
-    inquiryHandlers.inviteOrganizationUser.autoApprove = async () => true;
+    inquiryServices.inviteOrganizationUser.autoApprove = async () => true;
   });
 
   afterEach(() => {
-    inquiryHandlers.inviteOrganizationUser.autoApprove = origAutoApprove;
+    inquiryServices.inviteOrganizationUser.autoApprove = origAutoApprove;
   });
 
   afterEach(async () => {
@@ -263,7 +264,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.approved);
@@ -318,7 +319,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
     expect(membership?.role).toBe('member');
   });
 
-  it('auto-approve response only contains target relations, not source', async () => {
+  it('auto-approve response carries both sides', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -335,10 +336,10 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Record<string, unknown>>(response);
+    const { data } = await parseSuccessBody<Record<string, unknown>>(response);
 
     expect(data.targetUser).toBeDefined();
-    expect(data.sourceOrganization).toBeUndefined();
+    expect(data.sourceOrganization).toMatchObject({ id: org.id });
   });
 
   it('auto-approve response matches the final sent-side inquiry record', async () => {
@@ -358,9 +359,9 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Record<string, unknown> & { auditLogsAsSubject?: unknown[] }>(
-      response,
-    );
+    const { data } = await parseSuccessBody<
+      Record<string, unknown> & { auditLogsAsSubject?: unknown[] }
+    >(response);
 
     const record = await db.inquiry.findUniqueOrThrow({
       where: { id: inquiry.id },
@@ -377,5 +378,62 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
     expect(data.updatedAt).toBe(record.updatedAt.toISOString());
     expect(data.auditLogsAsSubject?.length).toBe(record.auditLogsAsSubject.length);
     expect(data.targetUser).toBeDefined();
+  });
+
+  it('rejects re-sending an expired changesRequested inquiry with 410', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.changesRequested,
+      expiresAt: new Date(Date.now() - 60_000),
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
+
+    expect(response.status).toBe(410);
+  });
+
+  it('auto-approve emits inquiry.sent before inquiry.resolved', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.draft,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const emitted: string[] = [];
+    const originalEmit = emitModule.emitAppEvent;
+    const orderSpy = spyOn(emitModule, 'emitAppEvent').mockImplementation((async (name, data) => {
+      emitted.push(name);
+      return originalEmit(name, data);
+    }) as typeof emitModule.emitAppEvent);
+
+    try {
+      const response = await fetch(
+        post(`/api/v1/inquiry/${inquiry.id}/send`, {
+          expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect(emitted.filter((e) => e === 'inquiry.sent' || e === 'inquiry.resolved')).toEqual([
+        'inquiry.sent',
+        'inquiry.resolved',
+      ]);
+    } finally {
+      orderSpy.mockRestore();
+    }
   });
 });

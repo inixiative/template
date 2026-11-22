@@ -1,5 +1,5 @@
 import '#/config/env';
-import { getRedisClient } from '@template/db';
+import { redisClient } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { app } from '#/app';
 import { initializeOpenTelemetry, shutdownOpenTelemetry } from '#/config/otel';
@@ -10,8 +10,8 @@ import {
   acceptWebSocket,
   drainConnections,
   initWebSocketPubSub,
-  startStaleSweep,
-  startStreamReauthorizeSweep,
+  startReauthorizeOpenStreamsInterval,
+  startStaleConnectionCleanupInterval,
   websocketHandler,
 } from '#/ws';
 
@@ -26,9 +26,8 @@ initGracefulShutdown({ timeout: 30_000 });
 // Initialize WebSocket pub/sub for cross-server broadcasting
 initWebSocketPubSub();
 
-// Start the periodic stale-connection sweep
-startStaleSweep();
-startStreamReauthorizeSweep();
+startStaleConnectionCleanupInterval();
+startReauthorizeOpenStreamsInterval();
 
 const server = Bun.serve({
   port: process.env.PORT,
@@ -65,7 +64,7 @@ onShutdown(async () => {
 onShutdown(async () => {
   // 3. Close Redis connections
   try {
-    const redis = getRedisClient();
+    const redis = redisClient();
     await redis.quit();
     log.success('Redis connections closed', LogScope.api);
   } catch {

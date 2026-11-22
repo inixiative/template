@@ -71,7 +71,7 @@ export class VCR {
   async capture<T>(method: string, realFn: () => Promise<T>): Promise<T> {
     if (!isTest) return realFn();
     const fixturePath = this.__popFixturePath(method);
-    const current = await this.getVersion();
+    const current = await this.fetchServiceVersion();
 
     if (existsSync(fixturePath)) {
       const saved = JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
@@ -103,7 +103,7 @@ export class VCR {
   async captureResponse<T>(method: string, realFn: () => Promise<Fixture<T>>): Promise<Fixture<T>> {
     if (!isTest) return realFn();
     const fixturePath = this.__popFixturePath(method);
-    const current = await this.getVersion();
+    const current = await this.fetchServiceVersion();
 
     if (existsSync(fixturePath)) {
       const saved = JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
@@ -137,7 +137,7 @@ export class VCR {
 
   // Public — capture/captureResponse drive through this internally; backfill
   // scripts and one-shot probes get the same cached resolution.
-  async getVersion(): Promise<string> {
+  async fetchServiceVersion(): Promise<string> {
     const cached = VCR.versionCache.get(this.service);
     if (cached !== undefined) return cached;
     const resolved = await this.versionFn();
@@ -186,7 +186,7 @@ export class VCR {
 
   private __applyRule<T>(rule: Sanitizer, data: T): T {
     const transformed = rule.fn ? (rule.fn(data) as T) : data;
-    if (rule.keys?.length) return redactKeys(transformed, rule.keys);
+    if (rule.keys?.length) return maskValuesAtKeyPaths(transformed, rule.keys);
     return transformed;
   }
 
@@ -214,17 +214,17 @@ export class VCR {
   }
 }
 
-const redactKeys = <T>(data: T, keys: string[]): T => {
+const maskValuesAtKeyPaths = <T>(data: T, keys: string[]): T => {
   if (!keys.length) return data;
   const clone = JSON.parse(JSON.stringify(data)) as T;
-  for (const key of keys) redactPath(clone, key.split('.'));
+  for (const key of keys) maskValueAtKeyPath(clone, key.split('.'));
   return clone;
 };
 
-const redactPath = (obj: unknown, parts: string[]): void => {
+const maskValueAtKeyPath = (obj: unknown, parts: string[]): void => {
   if (!obj || typeof obj !== 'object') return;
   if (Array.isArray(obj)) {
-    for (const item of obj) redactPath(item, parts);
+    for (const item of obj) maskValueAtKeyPath(item, parts);
     return;
   }
   const record = obj as Record<string, unknown>;
@@ -232,9 +232,9 @@ const redactPath = (obj: unknown, parts: string[]): void => {
   if (rest.length === 0) {
     if (head in record) {
       const v = record[head];
-      record[head] = v === null || v === undefined || typeof v === 'object' ? v : 'REDACTED';
+      record[head] = v === null || v === undefined || typeof v === 'object' ? v : 'MASKED';
     }
   } else {
-    redactPath(record[head], rest);
+    maskValueAtKeyPath(record[head], rest);
   }
 };

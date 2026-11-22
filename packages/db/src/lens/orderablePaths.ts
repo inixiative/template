@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses none
  */
@@ -11,7 +11,7 @@ import {
   type PathProjection,
   projectLens,
 } from '@inixiative/json-rules';
-import { redactLens } from '@template/db/lens/redactLens';
+import { omitSensitiveFieldsFromLens } from '@template/db/lens/omitSensitiveFieldsFromLens';
 
 const NON_ORDERABLE_TYPES = new Set(['Json', 'Bytes']);
 
@@ -29,7 +29,7 @@ const crossesToMany = (dottedPath: string, rootKey: string, byPath: PathProjecti
 };
 
 export const orderablePaths = (filterLens: LensNarrowing): string[] => {
-  const byPath = projectLens(redactLens(filterLens));
+  const byPath = projectLens(omitSensitiveFieldsFromLens(filterLens));
   const rootKey = getLensRoot(filterLens).model;
 
   const paths: string[] = [];

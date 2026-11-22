@@ -15,7 +15,7 @@ live on `Contact`, but **nothing verifies the owner actually controls that chann
 (the email address / handle). `Contact` already has a `verifiedAt` field, but:
 
 - `acceptedKinds` is honored regardless of `verifiedAt`.
-- `canDeliver(kind, contact, customerRef)` (`apps/api/src/lib/messaging/canDeliver.ts`)
+- `canDeliver(kind, contact, customerRelationship)` (`apps/api/src/lib/messaging/canDeliver.ts`)
   gates on `acceptedKinds` only — it never checks `verifiedAt`.
 - The `Contact` schema comment already flags this: global-within-type uniqueness is
   *"intentionally omitted until handle ownership can be verified (OAuth / DNS proof)."*

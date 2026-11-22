@@ -6,7 +6,7 @@ import { cleanupTouchedTables, createSpaceUser, createUser } from '@template/db/
 import { meRouter } from '#/modules/me';
 import type { meReadManySpacesRoute } from '#/modules/me/routes/meReadManySpaces';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type ReadManySpacesResponse = z.infer<typeof meReadManySpacesRoute.responseSchema>[];
 
@@ -33,7 +33,7 @@ describe('GET /me/spaces', () => {
 
   it('returns empty array when user has no spaces', async () => {
     const response = await fetch(get('/api/v1/me/spaces'));
-    const { data, pagination } = await json<ReadManySpacesResponse>(response);
+    const { data, pagination } = await parseSuccessBody<ReadManySpacesResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data).toEqual([]);
@@ -47,7 +47,7 @@ describe('GET /me/spaces', () => {
     const _org = context.organization!;
 
     const response = await fetch(get('/api/v1/me/spaces'));
-    const { data } = await json<ReadManySpacesResponse>(response);
+    const { data } = await parseSuccessBody<ReadManySpacesResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(1);
@@ -63,7 +63,7 @@ describe('GET /me/spaces', () => {
     await createSpaceUser({ role: Role.member }, { user });
 
     const response = await fetch(get('/api/v1/me/spaces'));
-    const { data, pagination } = await json<ReadManySpacesResponse>(response);
+    const { data, pagination } = await parseSuccessBody<ReadManySpacesResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(2);
@@ -75,7 +75,7 @@ describe('GET /me/spaces', () => {
     await createSpaceUser({});
 
     const response = await fetch(get('/api/v1/me/spaces'));
-    const { data } = await json<ReadManySpacesResponse>(response);
+    const { data } = await parseSuccessBody<ReadManySpacesResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.every((s) => s.spaceUser.userId === user.id)).toBe(true);

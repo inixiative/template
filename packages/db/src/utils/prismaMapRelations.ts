@@ -3,7 +3,7 @@
  * @kind utils
  * @partOf infrastructure:prisma
  */
-import { getRelations, type Identifier, type PrismaMap } from '@inixiative/prisma-map';
+import { type Identifier, relationsOf } from '@inixiative/field-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import {
   type AccessorName,
@@ -12,29 +12,23 @@ import {
   toModelName,
 } from '@template/db/utils/modelNames';
 
-export type { Identifier } from '@inixiative/prisma-map';
-
-// The generated map is declared `as const` (readonly literal arrays); the lib's
-// helpers want the structural PrismaMap shape. Cast once at this boundary.
-const models = prismaMap.models as unknown as PrismaMap;
-
-export type RelationInfo = {
-  relationName: string;
+/** A model's relation, with the target's typed model name and accessor. */
+export type ModelRelation = {
+  /** The relation field's name on the model. */
+  field: string;
   targetModel: ModelName;
   targetAccessor: AccessorName;
   foreignKey: Identifier | null;
   isRequired: boolean;
 };
 
-// List a model's relations with the target's PascalCase model name + camelCase
-// accessor, the foreign key collapsed for lookup, and whether the relation is
-// required. Thin typed wrapper over
-// `@inixiative/prisma-map`'s `getRelations` (which is string-keyed).
-export const getModelRelations = (modelName: ModelName): RelationInfo[] =>
-  getRelations(models, modelName).map((relation) => ({
-    relationName: relation.relationName,
+/** A model's relations as field-map's `relationsOf` lists them, with the target's PascalCase
+ *  model name and camelCase accessor. */
+export const relationsOfModel = (modelName: ModelName): ModelRelation[] =>
+  relationsOf(prismaMap, modelName).map((relation) => ({
+    field: relation.field,
     targetModel: toModelName(relation.targetModel),
     targetAccessor: toAccessor(relation.targetModel),
     foreignKey: relation.foreignKey,
-    isRequired: models[modelName].fields[relation.relationName].isRequired,
+    isRequired: relation.isRequired,
   }));

@@ -17,11 +17,11 @@ import {
 import { adminAuditLogRouter } from '#/modules/admin/auditLog';
 import type { auditLogReadManyRoute } from '#/modules/admin/auditLog/routes/auditLogReadMany';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type ReadManyResponse = z.infer<typeof auditLogReadManyRoute.responseSchema>[];
 
-const readEntitlement = (organizationId: string) => ({
+const organizationReadEntitlement = (organizationId: string) => ({
   resource: 'Organization' as const,
   actions: ['read'],
   sourceModel: 'Organization' as const,
@@ -40,7 +40,10 @@ describe('GET /api/admin/auditLog: a record and its children in one stream', () 
     ({ entity: organization } = await createOrganization());
     ({ entity: member } = await createOrganizationUser({}, { organization }));
     ({ entity: token } = await createToken(
-      { ownerModel: 'OrganizationUser', entitlements: [readEntitlement(organization.id)] },
+      {
+        ownerModel: 'OrganizationUser',
+        entitlements: [organizationReadEntitlement(organization.id)],
+      },
       { organizationUser: member },
     ));
     const harness = createTestApp({
@@ -65,7 +68,7 @@ describe('GET /api/admin/auditLog: a record and its children in one stream', () 
   const read = async (query: string) => {
     const response = await fetch(get(`/api/admin/auditLog?pageSize=100&${query}`));
     expect(response.status).toBe(200);
-    return (await json<ReadManyResponse>(response)).data;
+    return (await parseSuccessBody<ReadManyResponse>(response)).data;
   };
 
   it("a token's history holds its own events and its entitlement rows' create and delete, newest first", async () => {
@@ -87,7 +90,10 @@ describe('GET /api/admin/auditLog: a record and its children in one stream', () 
 
   it("a token's history leaves out another token's entitlements", async () => {
     await createToken(
-      { ownerModel: 'OrganizationUser', entitlements: [readEntitlement(organization.id)] },
+      {
+        ownerModel: 'OrganizationUser',
+        entitlements: [organizationReadEntitlement(organization.id)],
+      },
       { organizationUser: member },
     );
 

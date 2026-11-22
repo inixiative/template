@@ -7,6 +7,7 @@ import {
   createContact,
   createOrganizationUser,
 } from '@template/db/test';
+import { waitFor } from '@template/shared/test/waitFor';
 import { defineStream, STREAM_DEFINITIONS, type StreamDefinition } from '@template/shared/ws';
 import { z } from 'zod';
 import { emitAppEvent } from '#/appEvents/emit';
@@ -14,24 +15,16 @@ import {
   organizationContactRemove,
   organizationContactUpsert,
 } from '#/appEvents/handlers/contact/organizationContactsStream';
-import { routeRow } from '#/appEvents/routeRow';
-import { streamAppend } from '#/appEvents/streamAppend';
+import { parseRowWithRouteResponseSchema } from '#/appEvents/routeRow';
+import { streamAppendHandoff } from '#/appEvents/streamAppendHandoff';
 import { organizationReadManyContactsRoute } from '#/modules/organization/routes/organizationReadManyContacts';
 import { websocketHandler } from '#/ws/handler';
 import { initWebSocketPubSub } from '#/ws/pubsub';
 import { clearRegistry } from '#/ws/registry';
-import { createTestSocket } from '#tests/createTestSocket';
+import { createTestSocket, type SentFrame, sentFrames } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 
 const organizationContactsStream = STREAM_DEFINITIONS.organizationReadManyContacts;
-
-const waitFor = async (predicate: () => boolean, timeoutMs = 3000): Promise<void> => {
-  const start = Date.now();
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) throw new Error('waitFor timed out');
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-};
 
 describe('organization contacts stream producers', () => {
   afterEach(async () => {
@@ -50,7 +43,10 @@ describe('organization contacts stream producers', () => {
     expect(handoff).toEqual<object>({
       kind: 'stream',
       target: { stream: organizationContactsStream.name({ id: context.organization.id }) },
-      append: { type: 'upsert', payload: routeRow(organizationReadManyContactsRoute, contact) },
+      append: {
+        type: 'upsert',
+        payload: parseRowWithRouteResponseSchema(organizationReadManyContactsRoute, contact),
+      },
     });
   });
 
@@ -81,12 +77,18 @@ describe('organization contacts stream producers', () => {
       { ownerModel: 'Organization', organizationId: context.organization.id },
       { organization: context.organization },
     );
-    const row = routeRow(organizationReadManyContactsRoute, contact);
+    const row = parseRowWithRouteResponseSchema(organizationReadManyContactsRoute, contact);
 
-    const plain = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row);
-    const revived = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row, {
-      revive: true,
-    });
+    const plain = streamAppendHandoff(organizationContactsStream, { id: 'org-1' }, 'upsert', row);
+    const revived = streamAppendHandoff(
+      organizationContactsStream,
+      { id: 'org-1' },
+      'upsert',
+      row,
+      {
+        revive: true,
+      },
+    );
 
     expect(plain.append).toStrictEqual<object>({ type: 'upsert', payload: row });
     expect(revived.append).toStrictEqual<object>({ type: 'upsert', payload: row, revive: true });
@@ -100,7 +102,7 @@ describe('organization contacts stream producers', () => {
     }) as StreamDefinition;
 
     // @ts-expect-error a perRecipient stream requires userIds
-    expect(() => streamAppend(perRecipient, {}, 'remove', { id: 'c1' })).toThrow(
+    expect(() => streamAppendHandoff(perRecipient, {}, 'remove', { id: 'c1' })).toThrow(
       'requires userIds',
     );
   });
@@ -130,20 +132,20 @@ describe('organization contacts stream (app event → redis → open socket)', (
     });
     websocketHandler.open(handle.socket);
     await websocketHandler.message(handle.socket, JSON.stringify({ action: 'open', stream }));
-    const snapshot = handle.sent
-      .map((message) => JSON.parse(message))
-      .find((frame) => frame.action === 'snapshot');
+    const snapshot = sentFrames<
+      SentFrame & { seq: number; payload: { data: Array<{ id: string }> } }
+    >(handle.sent).find((frame) => frame.action === 'snapshot');
+    if (!snapshot) throw new Error('no snapshot frame was sent');
     handle.sent.length = 0;
     return {
       ...handle,
       stream,
-      snapshotSeq: snapshot.seq as number,
-      snapshotRows: snapshot.payload.data as Array<{ id: string }>,
+      snapshotSeq: snapshot.seq,
+      snapshotRows: snapshot.payload.data,
     };
   };
 
-  const appends = (sent: string[]) =>
-    sent.map((message) => JSON.parse(message)).filter((frame) => frame.action === 'append');
+  const appends = (sent: string[]) => sentFrames(sent).filter((frame) => frame.action === 'append');
 
   it('pushes contact changes as appends whose rows match what the route snapshot serves', async () => {
     const { entity: contact } = await createContact(

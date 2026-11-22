@@ -5,16 +5,17 @@
  * @uses feature:email, infrastructure:prisma
  */
 import { db } from '@template/db';
-import { recomputeDegradedComponentRefs } from '@template/email/render';
+import { recomputeAndStoreMissingComponentSlugs } from '@template/email/render';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import type { WorkerContext } from '#/jobs/types';
 
 export type RecomputeEmailDependentsPayload = { slug: string };
 
-type Dependent = { model: 'EmailComponent' | 'EmailTemplate'; id: string; slug: string };
+type Dependent = ModelRow<'EmailComponent' | 'EmailTemplate'> & { slug: string };
 
 const directDependentsOf = async (slug: string): Promise<Dependent[]> => {
-  const where = { componentRefs: { has: slug }, deletedAt: null };
+  const where = { componentSlugs: { has: slug }, deletedAt: null };
   const select = { id: true, slug: true };
   const [components, templates] = await Promise.all([
     db.emailComponent.findMany({ where, select }),
@@ -37,13 +38,13 @@ const restampDependentsOf = async (
     visited.add(key);
 
     ctx.signal?.throwIfAborted();
-    await recomputeDegradedComponentRefs(dependent.model, dependent.id);
+    await recomputeAndStoreMissingComponentSlugs(dependent.model, dependent.id);
     if (dependent.model === 'EmailComponent')
       await restampDependentsOf(ctx, dependent.slug, visited);
   }
 };
 
-// Restamps degradedComponentRefs on every live row that renders the component slug, directly or
+// Restamps missingComponentSlugs on every live row that renders the component slug, directly or
 // through other components, after a write to that slug has committed. The versioning hook enqueues
 // it with a 5 second delay, and the job supersedes by slug: a newer enqueue for the same slug
 // displaces a queued run and aborts a running one, so a burst of saves to one component collapses

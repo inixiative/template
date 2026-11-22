@@ -1,7 +1,7 @@
 {
   "id": "frontend-store",
   "title": "Frontend store (Zustand slices)",
-  "routing": "Is this about client-side state in the frontend: the one shared Zustand store useAppStore / AppStore from @template/ui/store, its slices (AuthSlice: auth.initialize / signIn / signUp / logout / refreshMe / setSpoof / setStrategy; PermissionsSlice: permissions.setup / check / clear; TenantSlice: tenant.setOrganization / setSpace / setUser / setPublic / setPage; ClientSlice; UISlice: ui.setTheme / setLoading, useThemePersistence; NavigationSlice: navigatePreserving, setFlowId), adding or removing a slice, narrow selectors and useShallow, getState() outside React, actions with side effects, or a component that wants its own store or to put server data in the store?",
+  "routing": "Is this about client-side state in the frontend: the one shared Zustand store useAppStore / AppStore from @template/ui/store, its slices (AuthSlice: auth.initialize / signIn / signUp / logout / refreshMe / setSpoof / setStrategy; PermissionsSlice: permissions.installPermissionsForUser / check / clear; TenantSlice: tenant.switchToOrganizationContext / switchToSpaceContext / switchToUserContext / switchToPublicContext / setViewedRecords; QueryClientAndWebsocketSlice; UISlice: ui.setTheme, useThemePersistence; NavigationSlice: navigateKeepingSearchParams, setFlowId), adding or removing a slice, narrow selectors and useShallow, getState() outside React, actions with side effects, or a component that wants its own store or to put server data in the store?",
   "concepts": ["frontend-store"],
   "tokens": 11732,
   "tokenMethod": "chars/4",
@@ -26,7 +26,7 @@
       "doc:docs/claude/ZUSTAND.md#1-authslice",
       "doc:docs/claude/ZUSTAND.md#2-permissionsslice",
       "doc:docs/claude/ZUSTAND.md#3-tenantslice",
-      "doc:docs/claude/ZUSTAND.md#4-clientslice",
+      "doc:docs/claude/ZUSTAND.md#4-queryclientandwebsocketslice",
       "doc:docs/claude/ZUSTAND.md#5-uislice",
       "doc:docs/claude/ZUSTAND.md#6-navigationslice",
       "doc:docs/claude/ZUSTAND.md#access-patterns",

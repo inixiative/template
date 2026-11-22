@@ -15,7 +15,10 @@ import {
   cursorPaginateRequestSchema,
   paginateRequestSchema,
 } from '#/lib/routeTemplates/paginationSchemas';
-import { createAdvancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
+import {
+  advancedSearchSchemaForFields,
+  simpleSearchSchema,
+} from '#/lib/routeTemplates/searchSchema';
 import type { RouteArgs, ZodSchema } from '#/lib/routeTemplates/types';
 import { hasIdParam } from '#/lib/routeTemplates/utils/hasIdParam';
 import { sanitizeRequestSchema } from '#/lib/routeTemplates/utils/sanitizeRequestSchema';
@@ -41,9 +44,13 @@ type TransformShape<S> = {
     : S[K];
 };
 
-// Type that represents a sanitized body schema with base keys removed and JSON fields cast to Prisma types
-type SanitizedBodySchema<T extends ZodSchema> = z.ZodObject<
-  TransformShape<Omit<T['shape'], BaseSanitizeKey>>
+type ExtraSanitizeKey<T extends RouteArgs> = T['sanitizeKeys'] extends readonly (infer K extends
+  string)[]
+  ? K
+  : never;
+
+type SanitizedBodySchema<T extends ZodSchema, Extra extends string = never> = z.ZodObject<
+  TransformShape<Omit<T['shape'], BaseSanitizeKey | Extra>>
 >;
 
 // Need ID when: not skipId AND (has submodel OR not many)
@@ -87,8 +94,8 @@ type QueryType<T extends RouteArgs> = T['paginate'] extends 'cursor'
       : ZodAnyObject;
 
 type BodyType<T extends RouteArgs> = T['many'] extends true
-  ? z.ZodArray<SanitizedBodySchema<NonNullable<T['bodySchema']>>>
-  : SanitizedBodySchema<NonNullable<T['bodySchema']>>;
+  ? z.ZodArray<SanitizedBodySchema<NonNullable<T['bodySchema']>, ExtraSanitizeKey<T>>>
+  : SanitizedBodySchema<NonNullable<T['bodySchema']>, ExtraSanitizeKey<T>>;
 
 type RequestWithBody<T extends RouteArgs> = {
   params: ParamsType<T>;
@@ -159,7 +166,7 @@ export const buildRequest = <const T extends RouteArgs>(
   if (admin || searchableFields?.length) {
     const searchFields =
       (filterLens && buildSearchFieldsSchema(filterLens)) ||
-      createAdvancedSearchSchema(searchableFields ?? []);
+      advancedSearchSchemaForFields(searchableFields ?? []);
     querySchema = querySchema.merge(z.object({ search: simpleSearchSchema, searchFields }));
   }
 

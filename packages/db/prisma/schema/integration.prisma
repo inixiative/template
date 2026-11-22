@@ -40,6 +40,9 @@ model Integration {
   auditLogsAsOrigin    AuditLog[]            @relation("AuditLogOriginIntegration")
   auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectIntegration")
   integrationRecords   IntegrationRecord[]
+  integrationResources IntegrationResource[]
+  projectIntegrations  ProjectIntegration[]
+  settings             Setting[]
   artifacts            Artifact[]
   artifactGrants       ArtifactPermission[]  @relation("ArtifactPermissionGranteeIntegration")
 

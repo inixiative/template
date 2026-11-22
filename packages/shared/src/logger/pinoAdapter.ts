@@ -5,14 +5,14 @@
  * @uses none
  */
 
-import { redactLogValue } from '@template/shared/logger/redact';
+import { maskLogValue } from '@template/shared/logger/maskLogValue';
 import type { LoggerAdapter } from '@template/shared/logger/types';
 import { type Bindings, pino } from 'pino';
 
 const nativeOptions = {
   formatters: {
     bindings: (bindings: Record<string, unknown>) =>
-      redactLogValue(bindings) as Record<string, unknown>,
+      maskLogValue(bindings) as Record<string, unknown>,
   },
   hooks: {
     logMethod(
@@ -22,7 +22,7 @@ const nativeOptions = {
     ) {
       return method.apply(
         this,
-        args.map((arg) => redactLogValue(arg)) as Parameters<import('pino').LogFn>,
+        args.map((arg) => maskLogValue(arg)) as Parameters<import('pino').LogFn>,
       );
     },
   },
@@ -30,7 +30,7 @@ const nativeOptions = {
 export const pinoLogger = pino({ ...nativeOptions, level: process.env.LOG_LEVEL ?? 'info' });
 const nativeChild = pinoLogger.child;
 pinoLogger.child = function (this: typeof pinoLogger, bindings, options) {
-  return Reflect.apply(nativeChild, this, [redactLogValue(bindings) as Bindings, options]);
+  return Reflect.apply(nativeChild, this, [maskLogValue(bindings) as Bindings, options]);
 } as typeof pinoLogger.child;
 const pinoSink = pino({ level: 'trace' });
 
@@ -46,7 +46,7 @@ export const pinoAdapter: LoggerAdapter = {
   box: (fields, msg) => pinoSink.info(fields as object, msg as string),
   child: () => {
     throw new Error(
-      'child() not supported — use logScope(id, fn), or import pinoLogger directly for SDK use',
+      'child() not supported — use withLogScope(id, fn), or import pinoLogger directly for SDK use',
     );
   },
 };

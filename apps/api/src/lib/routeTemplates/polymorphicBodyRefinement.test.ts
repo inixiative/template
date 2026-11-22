@@ -4,7 +4,7 @@ import { actionRoute, polymorphicBodyRefinement } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { Modules } from '#/modules/modules';
 import { createTestApp } from '#tests/createTestApp';
-import { jsonError, post } from '#tests/utils/request';
+import { parseErrorBody, post } from '#tests/utils/request';
 
 const ownerBodySchema = z.object({
   ownerModel: z.enum(['User', 'Organization', 'Space']),
@@ -39,7 +39,7 @@ const mountOwnerRoute = () => {
 
 const fieldErrorsOf = async (response: Response) => {
   expect(response.status).toBe(422);
-  return (await jsonError(response)).fieldErrors ?? {};
+  return (await parseErrorBody(response)).fieldErrors ?? {};
 };
 
 describe('polymorphicBodyRefinement', () => {

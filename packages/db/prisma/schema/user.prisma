@@ -10,14 +10,19 @@ model User {
   updatedAt            DateTime        @updatedAt
   deletedAt            DateTime?
 
+  // The tenant's own additions to the permission schema for the records under it.
+  // Shape: Record<Resource, Record<Action, ActionRule>> ('db:contact' → read → rule). check() ORs each
+  // rule with the schema's for that resource and action. Null = schema-only.
+  tenantPermissionRules Json?
+
   email         String  @unique
   emailVerified Boolean @default(false)
   name          String?
   displayName   String?
   image         String?
 
-  // Stamped on sign-in by jwtHandoff when it issues the JWT. Operational, not
-  // versioned — see registries/ignoreFields.
+  // Stamped on sign-in by jwtHandoffPlugin when it issues the JWT. Operational, not
+  // versioned — see registries/noopFields.
   lastLoginAt DateTime?
   // Every person JWT carries it as `ver`; incrementing it signs the user out everywhere.
   jwtVersion  Int       @default(0)
@@ -26,31 +31,32 @@ model User {
   platformRole PlatformRole @default(user)
 
   // Relations
-  accounts               Account[]
-  sessions               Session[]
-  organizationUsers      OrganizationUser[]
-  spaceUsers             SpaceUser[]
-  tokens                 Token[]
-  cronJobsCreated        CronJob[]
-  webhookSubscriptions   WebhookSubscription[]
-  integrations           Integration[]
-  projects               Project[]
-  contacts               Contact[]
-  tagAttachments         TagAttachment[]
-  tags                   Tag[]
-  tagCategories          TagCategory[]
-  inquiriesSent          Inquiry[]             @relation("InquirySource")
-  inquiriesReceived      Inquiry[]             @relation("InquiryTarget")
-  customerRefs           CustomerRef[]         @relation("customerRefs")
-  providerRefs           CustomerRef[]         @relation("providerRefs")
-  auditLogsAsActor       AuditLog[]            @relation("AuditLogActorUser")
-  auditLogsAsSpoofActor  AuditLog[]            @relation("AuditLogActorSpoofUser")
-  auditLogsAsSubject     AuditLog[]            @relation("AuditLogSubjectUser")
-  auditLogsAsContextUser AuditLog[]            @relation("AuditLogContextUser")
-  communicationsSent     CommunicationLog[]    @relation("CommunicationSenderUser")
-  communicationsReceived CommunicationLog[]    @relation("CommunicationRecipientUser")
-  segments               Segment[]
-  flows                  Flow[]
+  accounts                        Account[]
+  sessions                        Session[]
+  organizationUsers               OrganizationUser[]
+  spaceUsers                      SpaceUser[]
+  tokens                          Token[]
+  cronJobsCreated                 CronJob[]
+  webhookSubscriptions            WebhookSubscription[]
+  integrations                    Integration[]
+  projects                        Project[]
+  contacts                        Contact[]
+  tagAttachments                  TagAttachment[]
+  tags                            Tag[]
+  tagCategories                   TagCategory[]
+  inquiriesSent                   Inquiry[]              @relation("InquirySource")
+  inquiriesReceived               Inquiry[]              @relation("InquiryTarget")
+  customerRelationshipsAsProvider CustomerRelationship[] @relation("CustomerRelationshipAsProvider")
+  customerRelationshipsAsCustomer CustomerRelationship[] @relation("CustomerRelationshipAsCustomer")
+  auditLogsAsActor                AuditLog[]             @relation("AuditLogActorUser")
+  auditLogsAsSpoofActor           AuditLog[]             @relation("AuditLogActorSpoofUser")
+  auditLogsAsSubject              AuditLog[]             @relation("AuditLogSubjectUser")
+  auditLogsAsContextUser          AuditLog[]             @relation("AuditLogContextUser")
+  communicationsSent              CommunicationLog[]     @relation("CommunicationSenderUser")
+  communicationsReceived          CommunicationLog[]     @relation("CommunicationRecipientUser")
+  segments                        Segment[]
+  flows                           Flow[]
+  settings                        Setting[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

@@ -10,7 +10,7 @@
 - [Optimistic Mutations](#optimistic-mutations)
 - [Data Hooks](#data-hooks)
   - [Architecture](#architecture)
-  - [makeDataConfig](#makedataconfig)
+  - [queryCapabilitiesFromOpenApi](#querycapabilitiesfromopenapi)
   - [usePaginatedData — Page-Number Pagination](#usepaginateddata--page-number-pagination)
   - [useInfiniteData — Infinite Scroll](#useinfinitedata--infinite-scroll)
   - [Table and Pagination](#table-and-pagination)
@@ -21,6 +21,7 @@
 - [Form Helpers](#form-helpers)
   - [useDebounce](#usedebounce)
   - [useValidateUniqueness](#usevalidateuniqueness)
+  - [Batch Query Transport & Master-Data Preloading (`executeBatchQueries`, `MasterDataPreloader`)](#batch-query-transport--master-data-preloading-executebatchqueries-masterdatapreloader)
 - [Testing](#testing)
 - [Key Files](#key-files)
 
@@ -44,9 +45,9 @@ It lives outside `@template/ui` so non-UI consumers can call apps/api without im
 
 ## apiQuery and apiMutation
 
-**Location:** `packages/ui/src/lib/apiQuery.ts`, `apiMutation.ts`, `apiFetchInternal.ts`
+**Location:** `packages/ui/src/lib/apiQuery.ts`, `apiMutation.ts`, `makeAuthenticatedApiFetch.ts`
 
-Both wrap an SDK call in `apiFetchInternal`, which:
+Both wrap an SDK call in `makeAuthenticatedApiFetch`, which:
 
 - adds `Authorization: Bearer <token>` and `x-spoof-user-email` when spoofing;
 - points the client at `VITE_API_URL`, fills `:id` path params, and bracket-encodes nested query params (`serializeBracketQuery`);
@@ -57,7 +58,7 @@ Both wrap an SDK call in `apiFetchInternal`, which:
 
 ```typescript
 import { organizationRead, organizationReadQueryKey } from '@template/sdk';
-import { useQuery } from '@template/ui/hooks';
+import { useQuery } from '@tanstack/react-query';
 import { apiQuery } from '@template/ui/lib';
 
 const { data } = useQuery({
@@ -129,9 +130,9 @@ Server data primitives for search, filter, sort, pagination, infinite scroll, sc
 ### Architecture
 
 ```
-makeDataConfig(operationId)     → DataConfig (searchable fields, orderable fields, enums)
+queryCapabilitiesFromOpenApi(operationId)     → ListQueryCapabilities (searchable fields, orderable fields, enums)
     ↓
-useDataFilters(config)          → shared search/filter/sort state + filterQuery
+useListSearchFilterAndOrderState(config)          → shared search/filter/sort state + filterQuery
     ↓
 usePaginatedData({ config })    → filters + page/pageSize + scroll restore + URL sync
 useInfiniteData({ config })     → filters + TanStack infinite query + scroll restore
@@ -145,19 +146,19 @@ Supporting hooks (used internally or standalone):
 - `useInfiniteScrollTrigger` — IntersectionObserver sentinel for load-more
 - `useInfiniteDataQuery` — low-level TanStack Query infinite wrapper
 
-### makeDataConfig
+### queryCapabilitiesFromOpenApi
 
 Builds the data configuration from the OpenAPI spec's query metadata.
 
-**Location:** `packages/ui/src/lib/makeDataConfig.ts`
+**Location:** `packages/ui/src/lib/queryCapabilitiesFromOpenApi.ts`
 
 ```typescript
-import { makeDataConfig } from '@template/ui/lib/makeDataConfig';
+import { queryCapabilitiesFromOpenApi } from '@template/ui/lib/queryCapabilitiesFromOpenApi';
 
-const config = makeDataConfig('adminOrganizationReadMany');
+const config = queryCapabilitiesFromOpenApi('adminOrganizationReadMany');
 // { searchableFields, orderableFields, enumFilters, defaultOrderBy, canSearch, canOrder }
 
-makeDataConfig('operationId', {
+queryCapabilitiesFromOpenApi('operationId', {
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
   canSearch: false, // default: true when the operation has searchable fields
   canOrder: true,
@@ -170,7 +171,7 @@ makeDataConfig('operationId', {
 import { usePaginatedData } from '@template/ui/hooks';
 
 const data = usePaginatedData({
-  config: makeDataConfig('adminOrganizationReadMany'),
+  config: queryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
   sectionId: 'orgs',          // scroll restore + section hash
   shareableUrl: true,          // ?page=3&search=acme in URL
 });
@@ -192,7 +193,7 @@ Options: `config`, `sectionId?`, `shareableUrl?`, `scrollRestore?`, `defaultPage
 import { useInfiniteData } from '@template/ui/hooks';
 
 const feed = useInfiniteData({
-  config: makeDataConfig('adminOrganizationReadMany'),
+  config: queryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
   queryKey: ['orgs'],
   queryFn: (page, filterQuery) => fetchOrgPage({ ...filterQuery, page }), // returns one page
   sectionId: 'orgFeed',
@@ -269,7 +270,7 @@ Deep linking with dot notation:
 - `#usersTable.usr_abc123` → scrolls to `[data-key="usr_abc123"]` within that section
 - `#usersTable.3` → scrolls to the 4th `[data-key]` child (0-indexed fallback)
 
-Use camelCase for section IDs (they become URL hash fragments). `useSectionOpen(sectionId)` returns `[open, setOpen]` for a collapsible section tied to the hash.
+Use kebab-case for section IDs (they become URL hash fragments, e.g. `create-token`, `member-connect-slack`). `useSectionOpen(sectionId)` returns `[open, setOpen]` for a collapsible section tied to the hash.
 
 ### Infinite Scroll Trigger — useInfiniteScrollTrigger
 
@@ -331,6 +332,16 @@ const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug'
 
 `CreateOrganizationModal` combines both: it derives the slug from the name until edited, debounces it, and shows checking / available / taken.
 
+### Batch Query Transport & Master-Data Preloading (`executeBatchQueries`, `MasterDataPreloader`)
+
+**Location:** `packages/ui/src/lib/batch/executeBatchQueries.ts` and `packages/ui/src/lib/masterData/` (`registry.ts`, `preloadMasterData.ts`, `useMasterData.ts`)
+
+`executeBatchQueries(queryClient, entries, options)` is the shared React Query batch transport over `POST /api/v1/batch/execute` (`strategy: 'allowFailures'`). Each entry keeps its own SDK `queryKey` and fallback `apiQuery` fetch function; successful sub-responses (`{ data: object | array }`) are seeded directly into their individual React Query cache keys while failed entries stay unseeded for normal hook fallback (reusable for master-data preloading and summary/dashboard batching boundaries).
+
+Static-per-deploy `/api/v1/<model>/info` catalogs declared in `MASTER_DATA_ENTRIES` (`contact`, `inquiry`, `segment`, `webhookSubscription`, with a `TEMPLATE ABOVE` extension marker) use `executeBatchQueries` via `preloadMasterData` once on authenticated mount with infinite `staleTime` and `gcTime`. Each reader hook (`useContactInfo`, `useInquiryInfo`, `useSegmentInfo`, `useWebhookSubscriptionInfo`) awaits an in-flight preload before falling back to its individual `GET /api/v1/<model>/info` endpoint on cache miss, partial failure, or anonymous access.
+
+Mount `<MasterDataPreloader />` as a sibling before `<Outlet />` inside authenticated layouts (`apps/{web,admin,superadmin}/app/routes/_authenticated.tsx`).
+
 ## Testing
 
 Run from `packages/ui` (requires `bunfig.toml` for happy-dom preload):
@@ -339,13 +350,15 @@ Run from `packages/ui` (requires `bunfig.toml` for happy-dom preload):
 cd packages/ui && bun run test
 ```
 
-Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `makeDataConfig.test.ts`, `useDataFilters.test.ts`, `usePaginatedData.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `apiFetchInternal.test.ts`; bracket encoding in `@template/shared/bracketQuery`.
+Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `queryCapabilitiesFromOpenApi.test.ts`, `buildFilterQuery.test.ts`, `dataStatePersistence.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `makeAuthenticatedApiFetch.test.ts`, `masterData.test.tsx`; bracket encoding in `@template/shared/bracketQuery`.
 
 ## Key Files
 
 - `packages/sdk/src/` — generated client
-- `packages/ui/src/lib/{apiQuery,apiMutation,apiFetchInternal,makeContextQueries,makeDataConfig}.ts`
+- `packages/ui/src/lib/{apiQuery,apiMutation,makeAuthenticatedApiFetch,makeContextQueries,queryCapabilitiesFromOpenApi}.ts`
+- `packages/ui/src/lib/batch/executeBatchQueries.ts`
+- `packages/ui/src/lib/masterData/{registry,preloadMasterData,useMasterData}.ts`
 - `packages/ui/src/hooks/useOptimisticMutation.ts`
-- `packages/ui/src/hooks/{useDataFilters,usePaginatedData,useInfiniteData,useInfiniteDataQuery,useInfiniteScrollTrigger,useScrollState,useSectionHash}.ts`
+- `packages/ui/src/hooks/{useListSearchFilterAndOrderState,usePaginatedData,useInfiniteData,useInfiniteDataQuery,useInfiniteScrollTrigger,useScrollState,useSectionHash}.ts`
 - `packages/ui/src/hooks/{useDebounce,useValidateUniqueness}.ts`
 - `packages/ui/src/components/primitives/{Table,Pagination}.tsx`

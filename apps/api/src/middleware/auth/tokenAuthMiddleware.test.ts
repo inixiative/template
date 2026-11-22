@@ -3,8 +3,8 @@ import {
   type AccessorName,
   cacheKey,
   db,
-  fetchOne,
-  getRedisClient,
+  fetchCachedRecordWithTargetEntitlements,
+  redisClient,
   unregisterDbHook,
 } from '@template/db';
 import type {
@@ -52,7 +52,7 @@ const organizationUserToken = (organizationUser: OrganizationUser) =>
 const spaceUserToken = (spaceUser: SpaceUser) =>
   ownerBearer({ ownerModel: 'SpaceUser' }, { spaceUser });
 
-const readMe = (headers: Record<string, string>) => app.request('/api/v1/me', { headers });
+const fetchMe = (headers: Record<string, string>) => app.request('/api/v1/me', { headers });
 
 const { app: tokenApp } = createTestApp({
   mount: [
@@ -131,7 +131,7 @@ describe('an OrganizationUser token follows its member row, not the cached token
     // The FK cascade deletes the token with no Token hook firing, so its cache entry survives.
     unregisterDbHook('preventHardDelete');
     await db.organizationUser.delete({ where: { id: organizationUser.id } });
-    expect((await readMe(headers)).status).toBe(401);
+    expect((await fetchMe(headers)).status).toBe(401);
   });
 
   it('a soft-deleted member row is refused', async () => {
@@ -143,7 +143,7 @@ describe('an OrganizationUser token follows its member row, not the cached token
       where: { id: organizationUser.id },
       data: { deletedAt: new Date() },
     });
-    expect((await readMe(headers)).status).toBe(401);
+    expect((await fetchMe(headers)).status).toBe(401);
   });
 
   it("a superadmin's member token is not superadmin; their own token is, until revoked", async () => {
@@ -208,7 +208,7 @@ describe('a SpaceUser token follows its member row, not the cached token', () =>
 
     unregisterDbHook('preventHardDelete');
     await db.spaceUser.delete({ where: { id: spaceUser.id } });
-    expect((await readMe(headers)).status).toBe(401);
+    expect((await fetchMe(headers)).status).toBe(401);
   });
 
   it('removing the org member row refuses the space token', async () => {
@@ -220,7 +220,7 @@ describe('a SpaceUser token follows its member row, not the cached token', () =>
       where: { id: organizationUser.id },
       data: { deletedAt: new Date() },
     });
-    expect((await readMe(headers)).status).toBe(401);
+    expect((await fetchMe(headers)).status).toBe(401);
   });
 });
 
@@ -236,10 +236,14 @@ describe('the cache hook clears the keys member records are read under', () => {
       userId: spaceUser.userId,
     };
 
-    expect((await fetchOne<SpaceUser>('spaceUser', identifier))?.role).toBe('owner');
+    expect(
+      (await fetchCachedRecordWithTargetEntitlements<SpaceUser>('spaceUser', identifier))?.role,
+    ).toBe('owner');
     await db.spaceUser.update({ where: { id: spaceUser.id }, data: { role: 'viewer' } });
-    expect(await getRedisClient().exists(cacheKey('spaceUser', identifier))).toBe(0);
-    expect((await fetchOne<SpaceUser>('spaceUser', identifier))?.role).toBe('viewer');
+    expect(await redisClient().exists(cacheKey('spaceUser', identifier))).toBe(0);
+    expect(
+      (await fetchCachedRecordWithTargetEntitlements<SpaceUser>('spaceUser', identifier))?.role,
+    ).toBe('viewer');
   });
 
   it("a Space write clears the composite key hydrate reads a token's space under", async () => {
@@ -247,10 +251,10 @@ describe('the cache hook clears the keys member records are read under', () => {
     const { entity: space } = await createSpace({}, { organization });
     const identifier = { organizationId: organization.id, id: space.id };
 
-    await fetchOne<Space>('space', identifier);
-    expect(await getRedisClient().exists(cacheKey('space', identifier))).toBe(1);
+    await fetchCachedRecordWithTargetEntitlements<Space>('space', identifier);
+    expect(await redisClient().exists(cacheKey('space', identifier))).toBe(1);
     await db.space.update({ where: { id: space.id }, data: { name: 'renamed space' } });
-    expect(await getRedisClient().exists(cacheKey('space', identifier))).toBe(0);
+    expect(await redisClient().exists(cacheKey('space', identifier))).toBe(0);
   });
 });
 

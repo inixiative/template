@@ -15,7 +15,7 @@ export type PermissionsSlice = {
   permissions: {
     permix: Permix;
     check: (model: AccessorName, record: HydratedRecord, action: ActionRule) => boolean;
-    setup: (data: UserWithRelations) => Promise<void>;
+    installPermissionsForUser: (me: UserWithRelations) => Promise<void>;
     clear: () => void;
   };
 };

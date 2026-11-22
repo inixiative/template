@@ -5,34 +5,33 @@
  * @uses none
  */
 import { LogScope, log } from '@template/shared/logger';
-import { createSerializedQueue } from '@template/shared/utils';
-import { WS_MAX_PENDING_FRAMES } from '@template/shared/ws';
+import { makeSerializedQueue } from '@template/shared/utils';
+import { retryableErrorFrame, WS_MAX_PENDING_FRAMES } from '@template/shared/ws';
 import type { Server } from 'bun';
 import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import { closeDataStream, openDataStream } from '#/ws/dataStreams';
 import { sendTo } from '#/ws/delivery';
-import { frameError } from '#/ws/frameError';
-import { overFrameLimit } from '#/ws/frameRateLimit';
-import { setIdentity } from '#/ws/identity';
+import { countFrameAndCheckOverFrameLimit } from '#/ws/frameRateLimit';
+import { setSocketIdentityAndDropSubscriptionsOnChange } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
 import { isMeChannel, meChannel } from '#/ws/meChannel';
 import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
-import { addConnection, byId, removeConnection } from '#/ws/registry';
+import { addConnection, connectionsById, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
 import type { StreamFrame, WSData, WSMessage, WSSocket } from '#/ws/types';
 
 type WSServer = Server<WSData>;
 
-const staleSweep = makeUnrefInterval({
+const staleConnectionCleanupInterval = makeUnrefInterval({
   intervalMs: 60_000,
   tick: () => {
     const cleaned = cleanupStaleConnections();
     if (cleaned > 0) log.info(`Cleaned up ${cleaned} stale WebSocket connections`, LogScope.ws);
   },
 });
-export const startStaleSweep = staleSweep.start;
-export const stopStaleSweep = staleSweep.stop;
+export const startStaleConnectionCleanupInterval = staleConnectionCleanupInterval.start;
+export const stopStaleConnectionCleanupInterval = staleConnectionCleanupInterval.stop;
 
 export const acceptWebSocket = (req: Request, server: WSServer): Response | undefined => {
   const now = Date.now();
@@ -46,7 +45,7 @@ export const acceptWebSocket = (req: Request, server: WSServer): Response | unde
     latestStreamFrames: new Map(),
     connectedAt: now,
     lastPing: now,
-    queue: createSerializedQueue(),
+    queue: makeSerializedQueue(),
   };
   return server.upgrade(req, { data })
     ? undefined
@@ -86,9 +85,9 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
     case 'authenticate': {
       const headers = sanitizeWSHeaders(msg.headers);
       const identity = await resolveIdentity(headers);
-      if (!byId.has(ws.data.connectionId)) return;
+      if (!connectionsById.has(ws.data.connectionId)) return;
       if (identity.status === 'retryable') {
-        sendTo(ws, frameError(msg));
+        sendTo(ws, retryableErrorFrame(msg));
         return;
       }
       const actor = identity.status === 'resolved' ? identity : null;
@@ -101,18 +100,22 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
         sendTo(ws, { type: 'spoofRejected' });
         return;
       }
-      setIdentity(ws, actor?.userId ?? null, actor ? headers : {});
+      setSocketIdentityAndDropSubscriptionsOnChange(
+        ws,
+        actor?.userId ?? null,
+        actor ? headers : {},
+      );
       sendTo(ws, { type: 'identity', userId: actor?.userId ?? null });
       return;
     }
     case 'logout': {
-      setIdentity(ws, null, {});
+      setSocketIdentityAndDropSubscriptionsOnChange(ws, null, {});
       sendTo(ws, { type: 'identity', userId: null });
       return;
     }
     case 'subscribe': {
       const granted = await canSubscribe(ws.data.headers, msg.channel);
-      if (!byId.has(ws.data.connectionId)) return;
+      if (!connectionsById.has(ws.data.connectionId)) return;
       const indexed = filedUnder(ws, msg.channel);
       if (!granted || !indexed) {
         sendTo(ws, { type: 'subscribeRejected', channel: msg.channel });
@@ -154,20 +157,20 @@ export const websocketHandler = {
   },
   // Returns the dispatch promise: Bun ignores it, tests await it.
   message(ws: WSSocket, raw: string | Buffer) {
-    if (overFrameLimit(ws)) {
+    if (countFrameAndCheckOverFrameLimit(ws)) {
       ws.close(1008, 'rate limit exceeded');
       return;
     }
     const msg = parseFrame(raw);
     if (!msg) return;
-    // Liveness must not wait behind queued snapshot reads or the re-authorization sweep.
+    // Liveness must not wait behind queued snapshot reads or the periodic stream re-authorization.
     if (msg.action === 'ping') {
       updateLastPing(ws);
       sendTo(ws, { type: 'pong' });
       return;
     }
     if (ws.data.queue.size() >= WS_MAX_PENDING_FRAMES) {
-      sendTo(ws, frameError(msg));
+      sendTo(ws, retryableErrorFrame(msg));
       return;
     }
     if (isStreamFrame(msg)) ws.data.latestStreamFrames.set(msg.stream, msg);
@@ -178,7 +181,7 @@ export const websocketHandler = {
           `ws dispatch failed (${msg.action}): ${err instanceof Error ? err.message : String(err)}`,
           LogScope.ws,
         );
-        sendTo(ws, frameError(msg));
+        sendTo(ws, retryableErrorFrame(msg));
       });
   },
 };

@@ -4,7 +4,8 @@
  * @partOf primitive:batch
  * @uses none
  */
-import type { Context, Hono } from 'hono';
+import type { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 
 export type BatchRequest = {
@@ -36,7 +37,7 @@ export type BatchResult = {
 };
 
 export type StrategyExecutor = (
-  app: Hono<AppEnv>,
+  app: OpenAPIHono<AppEnv>,
   rounds: BatchRequest[][],
   sharedHeaders: Record<string, string>,
   baseRequest: Request,

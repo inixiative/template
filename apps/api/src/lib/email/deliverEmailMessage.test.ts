@@ -86,7 +86,7 @@ describe('deliverEmailMessage — claim policy', () => {
   });
 
   const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
-    (await createCommunicationLog({ senderType: 'platform', address: 'fan@example.com', ...data }))
+    (await createCommunicationLog({ senderModel: 'platform', address: 'fan@example.com', ...data }))
       .entity;
 
   const payloadFor = (logId: string, template = TEMPLATE): DeliverEmailPayload => ({
@@ -246,7 +246,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
   ) => {
     const log = (
       await createCommunicationLog({
-        senderType: 'platform',
+        senderModel: 'platform',
         address: `${recipientId}@example.com`,
       })
     ).entity;

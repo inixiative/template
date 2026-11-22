@@ -1,7 +1,11 @@
 // @wip — barrel for the in-flight ws/ rewrite (see pubsub.ts / handler.ts).
 
-export { acceptWebSocket, startStaleSweep, websocketHandler } from '#/ws/handler';
-export { drainConnections, getConnectionStats } from '#/ws/lifecycle';
+export {
+  acceptWebSocket,
+  startStaleConnectionCleanupInterval,
+  websocketHandler,
+} from '#/ws/handler';
+export { connectionStats, drainConnections } from '#/ws/lifecycle';
 export { canSubscribe } from '#/ws/probe';
 export {
   broadcast,
@@ -9,5 +13,5 @@ export {
   isPubSubEnabled,
   sendToChannel,
 } from '#/ws/pubsub';
-export { startStreamReauthorizeSweep } from '#/ws/streamReauthorizeSweep';
+export { startReauthorizeOpenStreamsInterval } from '#/ws/reauthorizeOpenStreams';
 export type { WSData, WSMessage, WSSocket } from '#/ws/types';

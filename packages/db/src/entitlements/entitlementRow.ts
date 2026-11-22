@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma, primitive:authz
  * @uses none
  */
@@ -12,8 +12,9 @@ import type {
   EntitlementTargetModel,
 } from '@template/db/generated/client/enums';
 import { polymorphicArmKeys } from '@template/db/utils/polymorphicArmKeys';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 
-export type EntitlementTarget = { model: EntitlementTargetModel; id: string };
+export type EntitlementTarget = ModelRow<EntitlementTargetModel>;
 
 /** What a writer gives for one row: the target and the typed foreign keys are filled in. */
 export type EntitlementInput = {
@@ -23,11 +24,12 @@ export type EntitlementInput = {
   sourceModel: EntitlementResourceModel;
   sourceId: string;
   sourcePath?: string | null;
+  lens?: Prisma.InputJsonValue | null;
 };
 
 export type StoredEntitlement = Pick<
   Entitlement,
-  'resource' | 'actions' | 'where' | 'sourceModel' | 'sourceId' | 'sourcePath'
+  'resource' | 'actions' | 'where' | 'lens' | 'sourceModel' | 'sourceId' | 'sourcePath'
 >;
 
 /** The holder a row is stored on, as read: a member arm takes its owner chain off it. */
@@ -46,12 +48,13 @@ export const toEntitlementCreateData = (
   anchors: EntitlementAnchors,
 ): Prisma.EntitlementUncheckedCreateInput[] => {
   const targetKeys = polymorphicArmKeys('Entitlement', 'targetModel', holder.model, holder.row);
-  return inputs.map(({ where, sourcePath, ...input }) => {
+  return inputs.map(({ where, sourcePath, lens, ...input }) => {
     const anchor = anchors[anchorKey(input)];
     if (!anchor) throw new Error(`${input.sourceModel} ${input.sourceId} not found`);
     return {
       ...input,
       ...(where != null ? { where } : {}),
+      ...(lens != null ? { lens } : {}),
       sourcePath: sourcePath ?? null,
       ...polymorphicArmKeys('Entitlement', 'sourceModel', input.sourceModel, anchor),
       sourceDeletedAt: (anchor.deletedAt as Date | null | undefined) ?? null,

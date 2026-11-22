@@ -5,21 +5,24 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { ContactSource } from '@template/db/generated/client/enums';
-import { inquiry } from '@template/permissions/rebac/inquiryPermission';
+import { ContactSource, IntegrationResourceStatus } from '@template/db/generated/client/enums';
+import { inquiryResourcePermission } from '@template/permissions/rebac/inquiryResourcePermission';
 import {
+  actionsForRecordOwnedByAnyOwnerModel,
   actorIsDelegateOfUser,
   actorIsUser,
-  administeredByOwnerKind,
+  actorMayCreateTokenAtOwnerWithRole,
+  actorOperatesOwnerUserOrManagesOwnerTenant,
   chainedStandardActions,
-  createdByItsUserOrManager,
   integrationAccess,
   integrationAdministering,
+  isNull,
   memberRowActions,
   ownerActions,
-  tokenAccessIsYours,
+  rowIsThereAnd,
   tokenAdministering,
-} from '@template/permissions/rebac/schemaHelpers';
+} from '@template/permissions/rebac/rebacSchemaRules';
+import { settingResourcePermission } from '@template/permissions/rebac/settingResourcePermission';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 import { omit } from 'lodash-es';
 
@@ -60,7 +63,7 @@ export const rebacSchema: RebacSchema = {
     },
 
     // Owner-polymorphic models: per-row permissionRules are merged additively
-    // over the standard owner-walk by check() — see packages/permissions/src/rebac/schemaHelpers.ts.
+    // over the standard owner-walk by check() — see packages/permissions/src/rebac/rebacSchemaRules.ts.
     // Contact: the email made at user creation to mirror the login (source userCreation) is
     // locked against manage (update/delete both gate on manage) — it stays in sync
     // with auth, never edited directly. Every other contact takes the owner walk.
@@ -71,7 +74,7 @@ export const rebacSchema: RebacSchema = {
           all: [
             {
               any: [
-                { rule: { field: 'source', operator: Operator.equals, value: null } },
+                rowIsThereAnd('id', isNull('source')),
                 {
                   rule: {
                     field: 'source',
@@ -95,7 +98,7 @@ export const rebacSchema: RebacSchema = {
     },
     'db:webhookSubscription': { actions: { ...ownerActions(), create: 'operate' } },
     'db:segment': {
-      actions: { ...ownerActions(), create: createdByItsUserOrManager },
+      actions: { ...ownerActions(), create: actorOperatesOwnerUserOrManagesOwnerTenant },
     },
     'db:segmentMember': {
       actions: chainedStandardActions({
@@ -106,7 +109,60 @@ export const rebacSchema: RebacSchema = {
       }),
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
-    'db:project': { actions: administeredByOwnerKind },
+    'db:integrationResource': {
+      actions: {
+        manage: { rel: 'integration', action: 'manage' },
+        operate: { any: ['manage', { rel: 'integration', action: 'operate' }] },
+        read: { any: ['operate', { rel: 'integration', action: 'read' }] },
+        create: 'manage',
+        delete: { any: ['manage', { rel: 'integration', action: 'delete' }] },
+      },
+    },
+    'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
+    'db:projectIntegration': {
+      actions: {
+        create: {
+          all: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integration', action: 'operate' },
+          ],
+        },
+        manage: { rel: 'project', action: 'manage' },
+        operate: { any: ['manage', { rel: 'project', action: 'operate' }] },
+        read: { any: ['operate', { rel: 'project', action: 'read' }] },
+        delete: {
+          any: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integration', action: 'manage' },
+          ],
+        },
+      },
+    },
+    'db:projectIntegrationResource': {
+      actions: {
+        create: {
+          all: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integrationResource', action: 'operate' },
+            {
+              rule: {
+                field: 'integrationResource.status',
+                operator: Operator.in,
+                value: [IntegrationResourceStatus.tracked, IntegrationResourceStatus.missing],
+              },
+            },
+          ],
+        },
+        delete: {
+          any: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integrationResource', action: 'manage' },
+          ],
+        },
+        read: { rel: 'project', action: 'read' },
+      },
+    },
+    'db:setting': settingResourcePermission,
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:organizationUser': { actions: memberRowActions('organization') },
@@ -117,7 +173,7 @@ export const rebacSchema: RebacSchema = {
       actions: {
         leave: { rel: 'user', action: 'operate' },
         read: { any: ['leave', tokenAdministering] },
-        create: { all: [actorIsUser, tokenAccessIsYours] },
+        create: { all: [actorIsUser, actorMayCreateTokenAtOwnerWithRole] },
         delete: { any: ['leave', tokenAdministering] },
       },
     },
@@ -128,6 +184,6 @@ export const rebacSchema: RebacSchema = {
         create: 'own',
       },
     },
-    'db:inquiry': inquiry,
+    'db:inquiry': inquiryResourcePermission,
   },
 };

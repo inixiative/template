@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   inquiryFiltersToSearchFields,
-  mergeInquiryFilters,
+  narrowInquiryFiltersWithinPageBounds,
 } from '@template/ui/lib/inquiries/queryKeys';
 
 describe('inquiryFiltersToSearchFields', () => {
@@ -71,9 +71,9 @@ describe('inquiryFiltersToSearchFields', () => {
   });
 });
 
-describe('mergeInquiryFilters', () => {
+describe('narrowInquiryFiltersWithinPageBounds', () => {
   it('external types bound internal values and allow narrowing by overlap', () => {
-    const merged = mergeInquiryFilters(
+    const merged = narrowInquiryFiltersWithinPageBounds(
       { types: ['createSpace', 'transferSpace'] },
       { types: ['transferSpace'] },
     );
@@ -81,17 +81,20 @@ describe('mergeInquiryFilters', () => {
   });
 
   it('falls back to internal when external is undefined', () => {
-    const merged = mergeInquiryFilters(undefined, { types: ['transferSpace'] });
+    const merged = narrowInquiryFiltersWithinPageBounds(undefined, { types: ['transferSpace'] });
     expect(merged.types).toEqual(['transferSpace']);
   });
 
   it('clamps internal values back to external bounds when there is no overlap', () => {
-    const merged = mergeInquiryFilters({ types: ['createSpace'] }, { types: ['transferSpace'] });
+    const merged = narrowInquiryFiltersWithinPageBounds(
+      { types: ['createSpace'] },
+      { types: ['transferSpace'] },
+    );
     expect(merged.types).toEqual(['createSpace']);
   });
 
   it('narrowing works for statuses too', () => {
-    const merged = mergeInquiryFilters(
+    const merged = narrowInquiryFiltersWithinPageBounds(
       { statuses: ['sent', 'approved'] },
       { statuses: ['approved'] },
     );
@@ -99,22 +102,30 @@ describe('mergeInquiryFilters', () => {
   });
 
   it('external includeExpired: false cannot be widened by internal true', () => {
-    const merged = mergeInquiryFilters({ includeExpired: false }, { includeExpired: true });
+    const merged = narrowInquiryFiltersWithinPageBounds(
+      { includeExpired: false },
+      { includeExpired: true },
+    );
     expect(merged.includeExpired).toBe(false);
   });
 
   it('external includeExpired: true still allows internal false to narrow', () => {
-    const merged = mergeInquiryFilters({ includeExpired: true }, { includeExpired: false });
+    const merged = narrowInquiryFiltersWithinPageBounds(
+      { includeExpired: true },
+      { includeExpired: false },
+    );
     expect(merged.includeExpired).toBe(false);
   });
 
   it('internal includeExpired used when external is undefined', () => {
-    const merged = mergeInquiryFilters({}, { includeExpired: false });
+    const merged = narrowInquiryFiltersWithinPageBounds({}, { includeExpired: false });
     expect(merged.includeExpired).toBe(false);
   });
 
   it('undefined external does not clobber internal statuses', () => {
-    const merged = mergeInquiryFilters(undefined, { statuses: ['sent', 'approved'] });
+    const merged = narrowInquiryFiltersWithinPageBounds(undefined, {
+      statuses: ['sent', 'approved'],
+    });
     expect(merged.statuses).toEqual(['sent', 'approved']);
   });
 });

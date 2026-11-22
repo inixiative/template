@@ -6,9 +6,9 @@
 **Created**: 2026-06-18
 **Updated**: 2026-06-24
 
-> **Shipped (reconciled with implementation):** depth probe counts `waiting + active` (not `delayed` — that includes scheduled cron repeats). No `collapseKey` column — the row stores `jobId @unique` + nullable `dedupeKey`, with `@@unique([handlerName, dedupeKey])`. **Everything (fan-out + superseding) routes through the one accumulator.** The flush dedups in a txn: latest-per-lane within the batch, then plain rows via `createMany({ skipDuplicates })` and superseding lanes via `upsert` (cross-process last-wins — `skipDuplicates` would keep whichever commits first and silently drop the latest). The lane claim happens on the *direct* path (the spill path claims at drain admission). The flush and drain share one mutex (`runOnOutboxQueue`). The overflow flag is a start-timestamp with a drain-renewed TTL + a stuck-overflow alert. Shutdown loops + bounded-retries, resets `closing`, wired into worker **and** API. `enqueueJobs(payloads[])` not built — the accumulator makes a single caller unnecessary. Tests written (unrun without Postgres/Redis); cap-edge cases testable via lazy config.
+> **Shipped (reconciled with implementation):** depth probe counts `waiting + active` (not `delayed` — that includes scheduled cron repeats). No `collapseKey` column — the row stores `jobId @unique` + nullable `dedupeKey`, with `@@unique([handlerName, dedupeKey])`. **Everything (fan-out + superseding) routes through the one accumulator.** The flush dedups in a txn: latest-per-lane within the batch, then plain rows via `createMany({ skipDuplicates })` and superseding lanes via `upsert` (cross-process last-wins — `skipDuplicates` would keep whichever commits first and silently drop the latest). The lane claim happens on the *direct* path (the spill path claims at drain admission). The flush and drain share one mutex (`runUnderJobOutboxWriteMutex`). The overflow flag is a start-timestamp with a drain-renewed TTL + a stuck-overflow alert. Shutdown loops + bounded-retries, resets `closing`, wired into worker **and** API. `enqueueJobs(payloads[])` not built — the accumulator makes a single caller unnecessary. Tests written (unrun without Postgres/Redis); cap-edge cases testable via lazy config.
 >
-> **Drain execution model (INFRA-022, 2026-06-24):** the drain moved off the shared-queue cron onto a **per-worker in-process loop** (`startOutboxDrainLoop`, every 15s) under a `createLock` single-drainer guarantee, and gained an `attempts`-based poison-row quarantine. The architecture below reflects that. The standalone `docs/design/jobs-overflow-buffer.md` was folded into this ticket and removed.
+> **Drain execution model (INFRA-022, 2026-06-24):** the drain moved off the shared-queue cron onto a **per-worker in-process loop** (`startOutboxDrainLoop`, every 15s) under a `makeLock` single-drainer guarantee, and gained an `attempts`-based poison-row quarantine. The architecture below reflects that. The standalone `docs/design/jobs-overflow-buffer.md` was folded into this ticket and removed.
 
 ---
 
@@ -49,7 +49,7 @@ Full architecture in the **Design** section below.
 ### Spill batcher (coalescing write-behind)
 - [x] In-process accumulator `{ row, resolve, reject }`
 - [x] Size **or** time trigger (`FLUSH_MAX_ROWS` ~1000 / `FLUSH_LINGER_MS` ~200)
-- [x] Synchronous swap → `createSerializedQueue.run(createMany)` (one write at a time)
+- [x] Synchronous swap → `makeSerializedQueue.run(createMany)` (one write at a time)
 - [x] `resolve` wired to the `createMany` commit — **not** to accumulation
 - [x] Flush accumulator on shutdown (SIGTERM/redeploy)
 
@@ -62,7 +62,7 @@ Full architecture in the **Design** section below.
 - [x] supersession reconciles across queue + outbox via per-lane claim (claimLane / watchLane)
 
 ### Drain (`runDrainOutboxPass` + `startOutboxDrainLoop`) — see INFRA-022
-- [x] Per-worker in-process loop (`createLock`-backed), every 15s — **not** a queued cron
+- [x] Per-worker in-process loop (`makeLock`-backed), every 15s — **not** a queued cron
 - [x] Top up to cap: `room = MAX_QUEUE_DEPTH − depth`; plain `findMany(take: room)` (no FOR UPDATE)
 - [x] Re-enqueue with stored `jobId` via `queue.add` **directly** (bypasses cap)
 - [x] Delete drained rows; quarantine poison rows past a threshold; clear flag at low-water with no admittable backlog
@@ -137,9 +137,9 @@ flowchart TD
     CHK -- "yes" --> SET["set flag (Redis)"]
     F -- "yes (in limit)" --> ACC["spill → coalescing accumulator"]
     ACC --> BATCH["size OR time trigger<br/>(1000 rows / 200ms)"]
-    BATCH --> SQ["createSerializedQueue.run(createMany)"]
+    BATCH --> SQ["makeSerializedQueue.run(createMany)"]
     SQ --> OUT[("JobOutbox (Postgres)")]
-    OUT -. "every 15s · per worker" .-> DRAIN["drain loop (in-process, createLock)"]
+    OUT -. "every 15s · per worker" .-> DRAIN["drain loop (in-process, makeLock)"]
     DRAIN --> ROOM{"room = cap − depth"}
     ROOM --> REQ["queue.add(stored jobId) ×room → BullMQ"]
     REQ --> DEL["delete drained rows"]
@@ -212,7 +212,7 @@ Spilling one `INSERT` per enqueue is slow under a fan-out. Instead, spills coale
 
 ```
 acc = []                                  # { row, resolve, reject }
-flushQueue = createSerializedQueue()      # serialize the writes — one createMany at a time
+jobOutboxWriteMutex = makeSerializedQueue()      # serialize the writes — one createMany at a time
 
 spill(row) => new Promise((resolve, reject) => {
   acc.push({ row, resolve, reject })
@@ -223,7 +223,7 @@ spill(row) => new Promise((resolve, reject) => {
 flush() => {
   clearTimer()
   const batch = acc; acc = []             # synchronous swap — single-threaded JS, no await between
-  flushQueue.run(async () => {
+  jobOutboxWriteMutex.run(async () => {
     try { await db.jobOutbox.createMany({ data: batch.map(b => b.row) }); batch.forEach(b => b.resolve()) }
     catch (e) { batch.forEach(b => b.reject(e)) }
   })
@@ -238,12 +238,12 @@ Design rules, each load-bearing:
   `Promise.all` over 50k partitions itself inline into 1000-row batches, so there's no separate
   "chunk a huge insert" path. Pick `FLUSH_MAX_ROWS` under Postgres's parameter ceiling
   (~65535 / columns-per-row).
-- **One shared mutex for the flush *and* the drain** (`createSerializedQueue`, exposed as
-  `runOnOutboxQueue`). It serializes the `createMany`s so they don't swamp the pool with concurrent
+- **One shared mutex for the flush *and* the drain** (`makeSerializedQueue`, exposed as
+  `runUnderJobOutboxWriteMutex`). It serializes the `createMany`s so they don't swamp the pool with concurrent
   inserts, **and** the drain runs its table read+delete through the same queue — so a flush and a
   drain can never touch `JobOutbox` at the same time (no stale re-enqueue racing a lane delete).
   Canonical "serialize writes to one resource" (`CONCURRENCY.md`); cross-process the drain is also a
-  `createLock` singleton.
+  `makeLock` singleton.
 - **`resolve` is wired to the commit, not to accumulation.** The promise resolves only when the
   write lands. If `enqueueJob` returned "ok" the moment a row joined the in-memory accumulator, a
   crash/redeploy in the flush window would silently drop it — the exact lost-jobs failure this
@@ -263,7 +263,7 @@ Design rules, each load-bearing:
 | Alternative | Why not |
 |---|---|
 | **Chunking** (N recipients per job) | Changes the unit of work → chunk retries re-run many recipients → needs an anti-join ledger; loses clean per-recipient idempotency + observability. The outbox keeps the per-recipient unit and bounds Redis depth a different way. |
-| **`createSerializedQueue` as the cap** | In-process and serializing ≠ capping. N serialized enqueues are still N jobs in Redis, and it can't see other processes. (It *is* the right tool for the flush writes — §6.) |
+| **`makeSerializedQueue` as the cap** | In-process and serializing ≠ capping. N serialized enqueues are still N jobs in Redis, and it can't see other processes. (It *is* the right tool for the flush writes — §6.) |
 | **Depth check on every enqueue** | Replaced by the flag: trip once, then ride a cheap flag read until the drain clears it. |
 | **Worker-awareness / fleet sizing** | The cap is on *queue depth* (Redis memory), which `getJobCounts` reports fleet-globally. A fixed env cap feeds any realistic fleet and is trivial Redis memory — the safe window between "enough to feed N workers" and "OOM" is enormous. `queue.getWorkers()` is there if MAX ever needs to scale with the fleet, but don't build that until a number forces it. |
 | **Coalescing individual `enqueueJob` calls into a batch** (vs. producers passing a list) | The only high-volume spill source is fan-outs, and a fan-out already holds the list. Reconstructing a batch from individual calls adds an in-memory durability window for no gain. Give producers `enqueueJobs(list)`; the accumulator (§6) handles ambient spills generically. |
@@ -300,16 +300,16 @@ direct one). Superseding handlers are idempotent / last-wins by design, so a re-
 same requirement the at-least-once drain already imposes. A strict "never re-run" lane would need a
 per-enqueue claim registry in Redis; deliberately **not** built — it isn't needed for last-wins jobs
 and would touch the shared `makeSupersedingJob` path globally. (Singleton jobs never reach the buffer —
-they're crons, which bypass it — and `createLock` already makes a duplicate a no-op at run time.)
+they're crons, which bypass it — and `makeLock` already makes a duplicate a no-op at run time.)
 
 ### 9. The drain
 
 A **per-worker in-process loop** (`startOutboxDrainLoop`, every 15s) meters rows back into BullMQ,
-under a `createLock` that guarantees one drainer across the fleet. It is **not** a queued cron — see
+under a `makeLock` that guarantees one drainer across the fleet. It is **not** a queued cron — see
 the first bullet.
 
 ```
-runDrainOutboxPass = async () => {               # createLock (in the loop) guarantees one drainer
+runDrainOutboxPass = async () => {               # makeLock (in the loop) guarantees one drainer
   room = MAX_QUEUE_DEPTH - queue.getJobCounts('waiting','active')
   if (room > 0) {
     rows = db.jobOutbox.findMany({ where: { attempts: { lt: CAP } }, orderBy: { id: 'asc' }, take: room })
@@ -326,11 +326,11 @@ runDrainOutboxPass = async () => {               # createLock (in the loop) guar
   fan-out it meters, so under a large fan-out it can't get a worker slot until the backlog clears —
   starved by the overflow it relieves (a 50k load test had the drain not run for ~430s while the
   outbox sat frozen at ~39k rows). Running it on the event loop per worker sidesteps the pool;
-  `createLock` (heartbeated TTL + fenced compare-and-del release) keeps the one-drainer guarantee the
+  `makeLock` (heartbeated TTL + fenced compare-and-del release) keeps the one-drainer guarantee the
   old `makeSingletonJob` cron gave. BullMQ `priority` doesn't help — `moveToActive` pops the wait
   list before the prioritized set, so a prioritized drain runs last.
 - **Tops up *to* the cap** (`room = cap − depth`), self-pacing to fleet throughput without knowing
-  fleet size. One drainer (via `createLock`), so the select stays plain — no `FOR UPDATE SKIP LOCKED`.
+  fleet size. One drainer (via `makeLock`), so the select stays plain — no `FOR UPDATE SKIP LOCKED`.
 - **Re-enqueues with the stored `jobId`**; superseding rows additionally re-claim their lane so the
   prior in-flight copy aborts — see §10. The drain calls `queue.add` **directly**, not `enqueueJob`, so
   it bypasses its own cap.
@@ -351,7 +351,7 @@ runDrainOutboxPass = async () => {               # createLock (in the loop) guar
   replay *only while it's still in Redis* — `queue.ts` sets `removeOnComplete: { count: 100 }`, so a
   completed job's id is evicted under load (exactly when overflow happens), after which a replay is
   accepted and the job runs twice. So the jobId narrows the window but is **not** an exactly-once
-  fence; job handlers must tolerate re-execution. (`createLock` only guarantees one drainer.)
+  fence; job handlers must tolerate re-execution. (`makeLock` only guarantees one drainer.)
 - **Superseding rows drain through the same supersession path** — the drain re-claims the lane
   (`claimLane`) on re-admit, so a newer claim (not jobId dedup) governs supersession, matching the
   direct enqueue path.
@@ -366,11 +366,11 @@ runDrainOutboxPass = async () => {               # createLock (in the loop) guar
 ### 11. Prerequisite refactor (done)
 
 `makeSingletonJob` reimplemented its own `SET NX` + heartbeat + unconditional `del` — a less-safe
-copy of `createLock` (the unconditional `del` can delete a *different* holder's lock after a TTL
-lapse; `createLock` fences release with a per-process `processId`). Folded onto the primitive:
+copy of `makeLock` (the unconditional `del` can delete a *different* holder's lock after a TTL
+lapse; `makeLock` fences release with a per-process `processId`). Folded onto the primitive:
 
 ```ts
-const lock = createLock({ service: 'job-singleton', identifier, ttlMs: 300_000, heartbeatMs: 60_000 });
+const lock = makeLock({ service: 'job-singleton', identifier, ttlMs: 300_000, heartbeatMs: 60_000 });
 if (!(await lock.acquire())) return;
 try { await handler(ctx, ...args); } finally { await lock.release(); }
 ```
@@ -433,7 +433,7 @@ queue layer. This buffer is the generic transport underneath it.
 
 ## Resources
 
-- Concurrency primitives: [`docs/claude/CONCURRENCY.md`](../docs/claude/CONCURRENCY.md) (`createLock`, `createSerializedQueue`)
+- Concurrency primitives: [`docs/claude/CONCURRENCY.md`](../docs/claude/CONCURRENCY.md) (`makeLock`, `makeSerializedQueue`)
 - Jobs system: [`docs/claude/JOBS.md`](../docs/claude/JOBS.md)
 - PR: inixiative/template#62 (email send path — first consumer)
 - Follow-up: INFRA-022 (drain per-worker loop + quarantine)
@@ -453,6 +453,6 @@ queue layer. This buffer is the generic transport underneath it.
 
 _Emerged from the ZLT-3008 email send-path design (template #62): rather than chunk the
 per-recipient fan-out, keep per-recipient jobs and add a generic durable overflow buffer. The
-`makeSingletonJob` → `createLock` refactor landed alongside. The standalone design doc
+`makeSingletonJob` → `makeLock` refactor landed alongside. The standalone design doc
 (`docs/design/jobs-overflow-buffer.md`) was folded into the **Design** section above and the
 `docs/design/` folder removed._

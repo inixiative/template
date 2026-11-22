@@ -6,16 +6,18 @@
  */
 import type { Tag, TagAttachment } from '@template/db/generated/client/client';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { reconcileCustomerOf } from '#/modules/segment/lib/reconcileCustomer';
+import { customerSideOfRow } from '#/modules/customerRelationship/lib/customerRelationshipSides';
+import { enqueueSegmentReconcileForCustomers } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
 export type TagDeletedPayload = { tag: Tag; tagAttachments: TagAttachment[] };
 
 export const tagDeleted = makeAppEvent<TagDeletedPayload>({
   cb: [
-    async ({ tagAttachments }) => {
-      for (const attachment of tagAttachments) {
-        await reconcileCustomerOf({ model: 'TagAttachment', axis: 'resourceModel' }, attachment);
-      }
-    },
+    ({ tagAttachments }) =>
+      enqueueSegmentReconcileForCustomers(
+        tagAttachments.map((attachment) =>
+          customerSideOfRow({ model: 'TagAttachment', axis: 'resourceModel' }, attachment),
+        ),
+      ),
   ],
 });

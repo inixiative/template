@@ -6,6 +6,7 @@
  */
 import { captureTraceContext } from '@template/shared/telemetry';
 import type { Hono } from 'hono';
+import { AUTH_PROBE_HEADER } from '#/lib/utils/authProbe';
 import type { BatchRequest, RequestResult } from '#/modules/batch/services/strategies/types';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -27,6 +28,24 @@ const parseResponseBody = async (response: Response): Promise<unknown> => {
   return JSON.parse(text);
 };
 
+const STRIPPED_SUBREQUEST_HEADERS = new Set([
+  'authorization',
+  'cookie',
+  'x-spoof-user-email',
+  'x-forwarded-for',
+  'x-real-ip',
+  'x-batch-id',
+  'x-internal-secret',
+  AUTH_PROBE_HEADER,
+  'traceparent',
+  'tracestate',
+]);
+
+const omitDisallowedSubrequestHeaders = (headers: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(headers).filter(([key]) => !STRIPPED_SUBREQUEST_HEADERS.has(key.toLowerCase())),
+  );
+
 export const executeRequest = async (
   app: Hono<AppEnv>,
   request: BatchRequest,
@@ -44,10 +63,10 @@ export const executeRequest = async (
     throw new Error('Batch sub-request path must start with /api/');
   }
 
-  const mergedHeaders = {
+  const mergedHeaders = omitDisallowedSubrequestHeaders({
     ...sharedHeaders,
     ...request.headers,
-  };
+  });
 
   // Build full URL
   const url = new URL(request.path, baseRequest.url).toString();
@@ -58,16 +77,15 @@ export const executeRequest = async (
     'Content-Type': 'application/json',
     'x-batch-id': batchId,
   });
-  headers.delete('traceparent');
-  headers.delete('tracestate');
   for (const [key, value] of Object.entries(captureTraceContext())) headers.set(key, value);
 
+  const method = request.method.toUpperCase();
   const init: RequestInit = {
-    method: request.method.toUpperCase(),
+    method,
     headers,
   };
 
-  if (request.body) {
+  if (request.body !== undefined && method !== 'GET' && method !== 'HEAD') {
     init.body = JSON.stringify(request.body);
   }
 

@@ -4,7 +4,7 @@ import { cleanupTouchedTables } from '@template/db/test';
 import { betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { authPlugins } from '#/lib/auth/authPlugins';
-import type { UserJwtHandoff } from '#/lib/auth/jwtHandoff';
+import type { UserJwtHandoff } from '#/lib/auth/jwtHandoffPlugin';
 import { verifyIssuerJwt } from '#/lib/auth/verifyIssuerJwt';
 
 const baseURL = 'http://api.test';

@@ -4,29 +4,29 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquirySentItem } from '@template/sdk';
+import type { InquiryItem } from '@template/sdk';
 import { Button } from '@template/ui/components/primitives/Button';
 import { useCancelInquiryMutation, useSendInquiryMutation } from '@template/ui/hooks/inquiry';
-import { useInquiryPermission } from '@template/ui/hooks/useInquiryPermission';
-import { isTerminalInquiry } from '@template/ui/lib/inquiries/queryKeys';
-import { getInquiryInterface } from '@template/ui/lib/inquiries/registry';
+import { useCanActOnInquiry } from '@template/ui/hooks/useCanActOnInquiry';
+import { isInquiryClosedOrExpired } from '@template/ui/lib/inquiries/queryKeys';
+import { inquiryTypeComponentsFor } from '@template/ui/lib/inquiries/registry';
 import { useState } from 'react';
 
 type InquirySourceControlsProps = {
-  inquiry: InquirySentItem;
+  inquiry: InquiryItem;
   size?: 'sm' | 'default' | 'lg';
 };
 
 export const InquirySourceControls = ({ inquiry, size = 'sm' }: InquirySourceControlsProps) => {
   const cancelMutation = useCancelInquiryMutation();
   const sendMutation = useSendInquiryMutation();
-  const hasPermission = useInquiryPermission(inquiry, 'send', 'source');
+  const hasPermission = useCanActOnInquiry(inquiry, 'send', 'source');
   const [isOpen, setIsOpen] = useState(false);
 
-  const isTerminal = isTerminalInquiry(inquiry);
+  const isTerminal = isInquiryClosedOrExpired(inquiry);
   const isDraft = inquiry.status === 'draft';
 
-  const entry = getInquiryInterface(inquiry.type);
+  const entry = inquiryTypeComponentsFor(inquiry.type);
   const Compose = entry?.source?.compose;
 
   const canEdit = !isTerminal && !!Compose;

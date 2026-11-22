@@ -5,9 +5,9 @@
  * @uses none
  */
 import { Role } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const artifactPermissionFactory = createFactory('ArtifactPermission', {
+const artifactPermissionFactory = registerFactory('ArtifactPermission', {
   defaults: () => ({
     role: Role.viewer,
   }),
@@ -34,9 +34,9 @@ const artifactPermissionFactory = createFactory('ArtifactPermission', {
       },
       required: false,
     },
-    granteeCustomerRef: {
-      modelName: 'CustomerRef',
-      foreignKey: { id: 'granteeCustomerRefId' },
+    granteeCustomerRelationship: {
+      modelName: 'CustomerRelationship',
+      foreignKey: { id: 'granteeCustomerRelationshipId' },
       required: false,
     },
     granteeIntegration: {

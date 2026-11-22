@@ -1,6 +1,6 @@
-import type { EnumField, RelationField, ScalarField } from '@template/db';
+import type { EnumField, RelationField, ScalarField, ScalarType } from '@inixiative/field-map';
 
-export const scalarField = (type: string, isList = false): ScalarField => ({
+export const scalarField = (type: ScalarType, isList = false): ScalarField => ({
   kind: 'scalar',
   type,
   isRequired: true,

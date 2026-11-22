@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
-import { apiRateLimit } from '#/middleware/rateLimit/apiRateLimit';
+import { apiRateLimit, BATCH_SUBREQUESTS_PER_COST_UNIT } from '#/middleware/rateLimit/apiRateLimit';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 const mount =
   (asBatchSubRequest: boolean): MountFn =>
@@ -53,7 +53,7 @@ describe('apiRateLimit', () => {
     expect(statuses.at(-1)).toBe(429);
   });
 
-  it('a real batch pays once however many sub-requests it carries', async () => {
+  it('a real batch pays the discounted sub-request cost, allowing max + 1 sub-requests in one batch', async () => {
     const { entity: user } = await createUser();
     const { fetch } = createTestApp({
       mockUser: user,
@@ -72,12 +72,71 @@ describe('apiRateLimit', () => {
 
     const response = await fetch(post('/api/v1/batch/execute', { requests }));
     expect(response.status).toBe(200);
-    const { data } = await json<{
+    const { data } = await parseSuccessBody<{
       batch: { status: number }[][];
       summary: { failedRequests: number };
     }>(response);
     expect(data.summary.failedRequests).toBe(0);
     expect(data.batch.flat().map((result) => result.status)).toEqual(Array(max + 1).fill(200));
+  });
+
+  it('a batch cannot bypass the principal limit once discounted sub-request cost exhausts the window', async () => {
+    const { entity: user } = await createUser();
+    const { fetch } = createTestApp({
+      mockUser: user,
+      mount: [
+        (app) => {
+          app.use('/api/*', apiRateLimit);
+          app.route('/api/v1/batch', batchRouter);
+          app.get('/api/v1/probe', (c) => c.json({ data: { ok: true } }));
+        },
+      ],
+    });
+    const max = rateLimitMax('user', {} as never);
+    const batchSize = BATCH_SUBREQUESTS_PER_COST_UNIT * 10;
+    const batchesAllowed = Math.floor(max / 10);
+    const requests = [
+      Array.from({ length: batchSize }, () => ({ method: 'GET', path: '/api/v1/probe' })),
+    ];
+
+    for (let i = 0; i < batchesAllowed; i += 1) {
+      expect((await fetch(post('/api/v1/batch/execute', { requests }))).status).toBe(200);
+    }
+    expect((await fetch(post('/api/v1/batch/execute', { requests }))).status).toBe(429);
+  });
+
+  it('a batch whose discounted cost exceeds the remaining budget is rejected with 429 before running sub-requests without burning remaining budget', async () => {
+    const { entity: user } = await createUser();
+    let subrequestsExecuted = 0;
+    const { fetch } = createTestApp({
+      mockUser: user,
+      mount: [
+        (app) => {
+          app.use('/api/*', apiRateLimit);
+          app.route('/api/v1/batch', batchRouter);
+          app.get('/api/v1/probe', (c) => {
+            subrequestsExecuted += 1;
+            return c.json({ data: { ok: true } });
+          });
+        },
+      ],
+    });
+    const max = rateLimitMax('user', {} as never);
+    for (let i = 0; i < max - 2; i += 1) {
+      expect((await fetch(new Request('http://t/api/v1/probe'))).status).toBe(200);
+    }
+    subrequestsExecuted = 0;
+
+    const requests = [
+      Array.from({ length: BATCH_SUBREQUESTS_PER_COST_UNIT * 4 }, () => ({
+        method: 'GET',
+        path: '/api/v1/probe',
+      })),
+    ];
+    const response = await fetch(post('/api/v1/batch/execute', { requests }));
+    expect(response.status).toBe(429);
+    expect(subrequestsExecuted).toBe(0);
+    expect((await fetch(new Request('http://t/api/v1/probe'))).status).toBe(200);
   });
 
   it('a resolved batch sub-request is not counted', async () => {

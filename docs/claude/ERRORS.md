@@ -80,18 +80,18 @@ type guards for those two Prisma codes; they duck-type on `code`, so they match 
 surfaces (raw client, extended client, wrapped transaction error). Use them, not `err.code === 'P2002'`
 or an `instanceof` check, wherever code must tell those errors apart.
 
-On the frontend, `handleApiError` (`packages/ui/src/lib/handleApiError.ts`) turns the envelope into a
+On the frontend, `showApiErrorToast` (`packages/ui/src/lib/showApiErrorToast.ts`) turns the envelope into a
 toast: `fieldErrors` become the message, and `guidance` picks the action (`fixInput`, `tryAgain`,
 `reauthenticate` with a login link, `requestPermission`, `refreshAndRetry`). `createAppQueryClient`
 calls it for every failed query and mutation unless its `meta` sets `skipErrorToast`
-(`shouldSkipToast`). A route that fails to render shows `RouteError`
+(`doesQueryMetaSkipErrorToast`). A route that fails to render shows `RouteError`
 (`packages/ui/src/components/utility/ErrorBoundary.tsx`), the `errorComponent` of every app's root,
 `_authenticated` and `_public` routes. Don't toast API errors by hand in a component.
 
 Every branch, and the not-found handler, answers through `respondAppError`, which
 stamps `requestId` and builds the response through the Hono context so headers
 set with `c.header()` (`Cache-Control: no-store`, `request-id`) are kept. A
-request that failed before `prepareRequest` ran (a root-level 404) gets a fresh id.
+request that failed before `prepareRequestMiddleware` ran (a root-level 404) gets a fresh id.
 
 Responses that do not go through the handler, and so are not the envelope:
 better-auth's own `/api/auth/*` answers, the browser-telemetry beacon

@@ -1,18 +1,19 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses primitive:shared
  */
+import type { ScalarType } from '@inixiative/field-map';
 import {
   assertValidNarrowing,
   type Condition,
   check,
   createLens,
-  type FieldMap,
   type FieldMapEntry,
   getLensRoot,
   type Lens,
+  type LensModelEntry,
   type LensNarrowing,
   lensVisit,
   type ModelNarrowing,
@@ -34,7 +35,7 @@ import {
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { lensFor, live, omitForeignKeys } from '@template/db/lens';
-import { redactLens } from '@template/db/lens/redactLens';
+import { omitSensitiveFieldsFromLens } from '@template/db/lens/omitSensitiveFieldsFromLens';
 import {
   RESERVED_SCOPE_ROOTS,
   SCOPE_ROOTS,
@@ -83,7 +84,7 @@ export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
     tagAttachments: { picks: [], where: live, relations: { tag: referenced } },
     spaceUsers: { picks: ['role'], relations: { space: referenced } },
     organizationUsers: { picks: ['role'], relations: { organization: referenced } },
-    providerRefs: {
+    customerRelationshipsAsCustomer: {
       picks: [],
       relations: { segmentMembers: { picks: [], relations: { segment: referenced } } },
     },
@@ -134,7 +135,7 @@ const referenceableSources = Object.fromEntries(
   ]),
 );
 
-const scalarPicks = (fields: Record<string, { kind: string }>): ModelNarrowing => ({
+const scalarPicks = (fields: LensModelEntry['fields']): ModelNarrowing => ({
   picks: Object.entries(fields)
     .filter(([, field]) => field.kind !== 'object' && field.kind !== 'bridge')
     .map(([name]) => name),
@@ -194,21 +195,27 @@ const slot = (
   const prisma = getLensRoot(lens).mapName === 'prisma';
   const declared = firstLayer(lens, models, surface);
   assertValidNarrowing(declared);
-  const shown = prisma ? redactLens(omitForeignKeys(declared)) : declared;
+  const shown = prisma ? omitSensitiveFieldsFromLens(omitForeignKeys(declared)) : declared;
   if (!view) return shown;
   const viewed: LensNarrowing = { parent: shown, root: exactly(shown, view) };
   assertValidNarrowing(viewed);
   return viewed;
 };
 
-export const fieldsLens = (fields: Record<string, string>, model = EMAIL_DATA_MODEL): Lens =>
+export const lensFromFieldTypes = (
+  fields: Record<string, ScalarType>,
+  model = EMAIL_DATA_MODEL,
+): Lens =>
   createLens({
     maps: {
       [EMAIL_MAP_NAME]: {
         models: {
           [model]: {
             fields: Object.fromEntries(
-              Object.entries(fields).map(([name, type]) => [name, { kind: 'scalar', type }]),
+              Object.entries(fields).map(([name, type]) => [
+                name,
+                { kind: 'scalar' as const, type },
+              ]),
             ),
           },
         },
@@ -234,12 +241,13 @@ const relation = (model: string, relationName: string, isList: boolean): FieldMa
   toFields: [],
 });
 
-const SYSTEM_FIELDS: Record<string, string> = {
+const SYSTEM_FIELDS: Record<string, ScalarType> = {
   ...Object.fromEntries(SYSTEM_TOKENS.map(({ name, kind }) => [name, kind])),
   ...Object.fromEntries(RAIL_PROVIDED_SYSTEM_FIELDS.map((name) => [name, 'String'])),
 };
 
-export const systemSlot = (): Lens => fieldsLens(SYSTEM_FIELDS, EMAIL_SYSTEM_MODEL);
+export const systemFieldsSlotLens = (): Lens =>
+  lensFromFieldTypes(SYSTEM_FIELDS, EMAIL_SYSTEM_MODEL);
 
 const isUserLens = (lens: RuleLens): boolean => {
   const base = getLensRoot(lens);
@@ -262,7 +270,7 @@ export const emailLens = ({
     scope,
   ),
   data: data ? slot(data, narrowing.data, undefined, scope) : OPAQUE_SLOT,
-  system: systemSlot(),
+  system: systemFieldsSlotLens(),
 });
 
 export const defaultEmailLens: EmailLens = emailLens();
@@ -509,8 +517,9 @@ export const narrowEmailLens = (
 export type EmailSurface = Lens & { narrowing: Omit<LensNarrowing, 'parent'> };
 
 export const emailSurface = (lens: EmailLens): EmailSurface => {
-  const models: FieldMap['models'] = {};
-  const enums: NonNullable<FieldMap['enums']> = {};
+  // Built in place from each slot's surface: models and enums are written, entries copied in.
+  const models: Record<string, LensModelEntry> = {};
+  const enums: Record<string, readonly string[]> = {};
   const rootFields: Record<string, FieldMapEntry> = {};
   const relations: Record<string, ModelNarrowing> = {};
   for (const root of SCOPE_ROOTS) {

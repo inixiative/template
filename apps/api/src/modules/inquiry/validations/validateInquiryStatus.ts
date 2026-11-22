@@ -6,7 +6,7 @@
  */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
-import type { Inquiry } from '#/modules/inquiry/handlers/types';
+import type { Inquiry } from '#/modules/inquiry/services/types';
 
 export const inquiryTerminalStatuses: InquiryStatus[] = [
   InquiryStatus.approved,
@@ -14,10 +14,16 @@ export const inquiryTerminalStatuses: InquiryStatus[] = [
   InquiryStatus.canceled,
 ];
 
+export const openInquiryWhere = () => ({
+  status: { notIn: inquiryTerminalStatuses },
+  OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+});
+
 export const validateInquiryIsSendable = (inquiry: Inquiry): void => {
   const sendable: InquiryStatus[] = [InquiryStatus.draft, InquiryStatus.changesRequested];
   if (!sendable.includes(inquiry.status as InquiryStatus))
     throw makeError({ status: 400, message: 'Inquiry must be a draft or have changes requested' });
+  validateInquiryNotExpired(inquiry);
 };
 
 // draft | sent | changesRequested — can still be acted on by the source

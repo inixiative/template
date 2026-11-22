@@ -13,9 +13,9 @@ import { OPAQUE_SLOT } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import type { Sender } from '#/lib/email/sender';
-import { ownerScope } from '#/lib/emailTemplate';
-import { resolveUsers } from '#/lib/messaging/resolveUsers';
-import { targetedBySender } from '#/lib/messaging/senderTargeting';
+import { senderToOwnerScope } from '#/lib/emailTemplate';
+import { fetchUsersMatchingRuleWithContacts } from '#/lib/messaging/fetchUsersMatchingRuleWithContacts';
+import { restrictRuleToSenderMembers } from '#/lib/messaging/senderTargeting';
 
 const widened = {
   recipient: {
@@ -65,11 +65,14 @@ const tree = async () => {
 };
 
 const targeted = async (sender: Sender, ids: string[], stored?: unknown) => {
-  const lens = emailLensFor('sender-targeting', ownerScope(sender), stored, sender);
+  const lens = emailLensFor('sender-targeting', senderToOwnerScope(sender), stored, sender);
   const recipient = lens.recipient as RuleLens;
   expect(recipient).not.toBe(OPAQUE_SLOT);
   const rule = { field: 'id', operator: Operator.in, value: ids };
-  const users = await resolveUsers(targetedBySender(rule, recipient, sender), recipient);
+  const users = await fetchUsersMatchingRuleWithContacts(
+    restrictRuleToSenderMembers(rule, recipient, sender),
+    recipient,
+  );
   return users.map((user) => user.id).sort();
 };
 

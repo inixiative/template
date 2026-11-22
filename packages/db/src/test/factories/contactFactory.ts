@@ -6,12 +6,12 @@
  */
 import { faker } from '@faker-js/faker';
 import { ContactType } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const contactFactory = createFactory('Contact', {
+const contactFactory = registerFactory('Contact', {
   defaults: () => ({
     type: ContactType.email,
-    value: { address: faker.internet.email().toLowerCase() },
+    value: { address: `${nextFactorySequenceNumber()}-${faker.internet.email().toLowerCase()}` },
   }),
   dependencies: {
     // Pass an empty object in overrides to trigger auto-create of the owner.

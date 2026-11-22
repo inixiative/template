@@ -40,7 +40,7 @@ export const auditActorContext = {
   // Await inside the store — a returned lazy thenable would otherwise execute after the scope exits.
   scope: <T>(actor: AuditActor, fn: () => T | PromiseLike<T>): Promise<T> =>
     auditActorStore.run(actor, async () => await fn()),
-  getScope: (): AuditActor | null => auditActorStore.getStore() ?? null,
+  currentActor: (): AuditActor | null => auditActorStore.getStore() ?? null,
   extend: (partial: Partial<AuditActor>): void => {
     const current = auditActorStore.getStore();
     if (current) Object.assign(current, partial);

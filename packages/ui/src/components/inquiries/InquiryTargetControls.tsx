@@ -4,30 +4,30 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquiryReceivedItem } from '@template/sdk';
+import type { InquiryItem } from '@template/sdk';
 import { Button } from '@template/ui/components/primitives/Button';
 import { useResolveInquiryMutation } from '@template/ui/hooks/inquiry';
-import { useInquiryPermission } from '@template/ui/hooks/useInquiryPermission';
-import { isTerminalInquiry } from '@template/ui/lib/inquiries/queryKeys';
-import { getInquiryInterface } from '@template/ui/lib/inquiries/registry';
+import { useCanActOnInquiry } from '@template/ui/hooks/useCanActOnInquiry';
+import { isInquiryClosedOrExpired } from '@template/ui/lib/inquiries/queryKeys';
+import { inquiryTypeComponentsFor } from '@template/ui/lib/inquiries/registry';
 import { useState } from 'react';
 
 type InquiryTargetControlsProps = {
-  inquiry: InquiryReceivedItem;
+  inquiry: InquiryItem;
   size?: 'sm' | 'default' | 'lg';
 };
 
 export const InquiryTargetControls = ({ inquiry, size = 'sm' }: InquiryTargetControlsProps) => {
   const resolveMutation = useResolveInquiryMutation();
-  const hasPermission = useInquiryPermission(inquiry, 'resolve', 'target');
+  const hasPermission = useCanActOnInquiry(inquiry, 'resolve', 'target');
   const [isOpen, setIsOpen] = useState(false);
 
-  const isTerminal = isTerminalInquiry(inquiry);
+  const isTerminal = isInquiryClosedOrExpired(inquiry);
   const canResolve =
     !isTerminal && (inquiry.status === 'sent' || inquiry.status === 'changesRequested');
   const isPersistedInquiry = !!inquiry.id && inquiry.id !== '__optimistic__';
 
-  const entry = getInquiryInterface(inquiry.type);
+  const entry = inquiryTypeComponentsFor(inquiry.type);
   const Review = entry?.target?.review;
 
   return (

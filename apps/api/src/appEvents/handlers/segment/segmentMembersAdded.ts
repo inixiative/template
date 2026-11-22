@@ -5,15 +5,14 @@
  * @uses primitive:websockets
  */
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { WS_CHANNELS } from '@template/shared/ws';
+import { refetchQueryEvent, WS_CHANNELS } from '@template/shared/ws';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { refetch } from '#/appEvents/refetch';
 
 export type SegmentMembersAddedPayload = {
   segmentId: string;
   ownerModel: ProviderModel;
   ownerId: string;
-  customerRefIds: string[];
+  customerRelationshipIds: string[];
 };
 
 export const segmentMembersAdded = makeAppEvent<SegmentMembersAddedPayload>({
@@ -22,7 +21,10 @@ export const segmentMembersAdded = makeAppEvent<SegmentMembersAddedPayload>({
       kind: 'channels',
       target: { channels: [WS_CHANNELS.segmentReadManySegmentMembers.name(data.segmentId)] },
       message: {
-        data: refetch({ _id: 'segmentReadManySegmentMembers', path: { id: data.segmentId } }),
+        data: refetchQueryEvent({
+          _id: 'segmentReadManySegmentMembers',
+          path: { id: data.segmentId },
+        }),
       },
     },
   ],

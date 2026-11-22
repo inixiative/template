@@ -1,16 +1,16 @@
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import type { PlanetScaleAction } from '../utils/progressTracking';
 
 type PlanetScaleProgress = ProjectConfig['planetscale']['progress'];
 
 type PlanetScaleProgressItem = {
   action: PlanetScaleAction;
-  getLabel: (config: ProjectConfig) => string;
+  labelFor: (config: ProjectConfig) => string;
 };
 
 type PlanetScaleProgressGroup = {
   actions: readonly PlanetScaleAction[];
-  getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
+  labelFor: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
 const countCompletedActions = (
@@ -29,104 +29,104 @@ const countLabel =
 const planetscaleProgressItems: readonly PlanetScaleProgressItem[] = [
   {
     action: 'selectOrg',
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.planetscale.organization
         ? `Organization selected: ${config.planetscale.organization}`
         : 'Organization selected',
   },
   {
     action: 'selectRegion',
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.planetscale.region
         ? `Region selected: ${config.planetscale.region}`
         : 'Region selected',
   },
   {
     action: 'recordTokenId',
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.planetscale.tokenId
         ? `Service token recorded: ${config.planetscale.tokenId}`
         : 'Service token recorded',
   },
   {
     action: 'storeOrganizationSecret',
-    getLabel: () => 'PlanetScale organization stored in Infisical',
+    labelFor: () => 'PlanetScale organization stored in Infisical',
   },
   {
     action: 'storeRegionSecret',
-    getLabel: () => 'PlanetScale region stored in Infisical',
+    labelFor: () => 'PlanetScale region stored in Infisical',
   },
   {
     action: 'storeTokenIdSecret',
-    getLabel: () => 'PlanetScale token ID stored in Infisical',
+    labelFor: () => 'PlanetScale token ID stored in Infisical',
   },
   {
     action: 'storeTokenSecret',
-    getLabel: () => 'PlanetScale token stored in Infisical',
+    labelFor: () => 'PlanetScale token stored in Infisical',
   },
   {
     action: 'createDB',
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.planetscale.database
         ? `Database created: ${config.planetscale.database}`
         : 'Database created',
   },
   {
     action: 'renameProductionBranch',
-    getLabel: () => 'Rename main branch to prod',
+    labelFor: () => 'Rename main branch to prod',
   },
   {
     action: 'createStagingBranch',
-    getLabel: () => 'Staging branch created',
+    labelFor: () => 'Staging branch created',
   },
   {
     action: 'createProdRole',
-    getLabel: () => 'Prod role created',
+    labelFor: () => 'Prod role created',
   },
   {
     action: 'createStagingRole',
-    getLabel: () => 'Staging role created',
+    labelFor: () => 'Staging role created',
   },
   {
     action: 'storeProdConnectionString',
-    getLabel: () => 'Prod connection string stored in Infisical',
+    labelFor: () => 'Prod connection string stored in Infisical',
   },
   {
     action: 'storeStagingConnectionString',
-    getLabel: () => 'Staging connection string stored in Infisical',
+    labelFor: () => 'Staging connection string stored in Infisical',
   },
   {
     action: 'initProdMigrationTable',
-    getLabel: () => 'Prod migration table initialized',
+    labelFor: () => 'Prod migration table initialized',
   },
   {
     action: 'initStagingMigrationTable',
-    getLabel: () => 'Staging migration table initialized',
+    labelFor: () => 'Staging migration table initialized',
   },
   {
     action: 'configureDB',
-    getLabel: () => 'Database configured (FK, migrations)',
+    labelFor: () => 'Database configured (FK, migrations)',
   },
 ];
 
 const planetscaleProgressGroups: readonly PlanetScaleProgressGroup[] = [
   {
     actions: ['selectOrg'],
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.planetscale.organization
         ? `Organization selected: ${config.planetscale.organization}`
         : 'Organization selected',
   },
   {
     actions: ['selectRegion'],
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.planetscale.region
         ? `Region selected: ${config.planetscale.region}`
         : 'Region selected',
   },
   {
     actions: ['recordTokenId'],
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.planetscale.tokenId
         ? `Service token recorded: ${config.planetscale.tokenId}`
         : 'Service token recorded',
@@ -138,38 +138,38 @@ const planetscaleProgressGroups: readonly PlanetScaleProgressGroup[] = [
       'storeTokenIdSecret',
       'storeTokenSecret',
     ],
-    getLabel: countLabel('PlanetScale secrets stored in Infisical'),
+    labelFor: countLabel('PlanetScale secrets stored in Infisical'),
   },
   {
     actions: ['createDB'],
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.planetscale.database
         ? `Database created: ${config.planetscale.database}`
         : 'Database created',
   },
   {
     actions: ['renameProductionBranch'],
-    getLabel: () => 'Production branch renamed',
+    labelFor: () => 'Production branch renamed',
   },
   {
     actions: ['createStagingBranch'],
-    getLabel: () => 'Staging branch created',
+    labelFor: () => 'Staging branch created',
   },
   {
     actions: ['createProdRole', 'createStagingRole'],
-    getLabel: countLabel('Roles created'),
+    labelFor: countLabel('Roles created'),
   },
   {
     actions: ['storeProdConnectionString', 'storeStagingConnectionString'],
-    getLabel: countLabel('Connection strings stored'),
+    labelFor: countLabel('Connection strings stored'),
   },
   {
     actions: ['initProdMigrationTable', 'initStagingMigrationTable'],
-    getLabel: countLabel('Migration tables initialized'),
+    labelFor: countLabel('Migration tables initialized'),
   },
   {
     actions: ['configureDB'],
-    getLabel: () => 'Database configured',
+    labelFor: () => 'Database configured',
   },
 ];
 
@@ -180,23 +180,23 @@ export type PlanetScaleProgressSummary = {
   totalCount: number;
 };
 
-export const getPlanetScaleProgressItems = (
+export const planetScaleProgressItems = (
   config: ProjectConfig,
 ): Array<{ label: string; completed: boolean }> => {
   return planetscaleProgressItems.map((item) => ({
-    label: item.getLabel(config),
+    label: item.labelFor(config),
     completed: config.planetscale.progress[item.action],
   }));
 };
 
-export const getPlanetScaleProgressSummaries = (
+export const planetScaleProgressSummaries = (
   config: ProjectConfig,
 ): PlanetScaleProgressSummary[] => {
   return planetscaleProgressGroups.map((group) => {
     const completedCount = countCompletedActions(config.planetscale.progress, group.actions);
     const totalCount = group.actions.length;
     return {
-      label: group.getLabel(config, completedCount, totalCount),
+      label: group.labelFor(config, completedCount, totalCount),
       completed: completedCount === totalCount,
       completedCount,
       totalCount,

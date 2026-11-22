@@ -4,7 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { lookupField } from '@template/db';
+import { fieldAtPath } from '@inixiative/field-map';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { makeError } from '#/lib/errors';
 
 export type SortDirection = 'asc' | 'desc';
@@ -71,7 +72,11 @@ export const hydrateCursorValues = (
 ): unknown[] =>
   chain.map(([key], i) => {
     const value = values[i];
-    if (lookupField(model, key)?.type !== 'BigInt' || typeof value === 'bigint' || value == null)
+    if (
+      fieldAtPath(prismaMap, model, key)?.type !== 'BigInt' ||
+      typeof value === 'bigint' ||
+      value == null
+    )
       return value;
     try {
       return BigInt(value as string | number);

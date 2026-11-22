@@ -1,5 +1,5 @@
 import { setLaunched } from '../utils/configHelpers';
-import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig, type ProjectConfig } from '../utils/fetchProjectConfig';
 import { baselineDeployedDatabases } from './baselineDeployedDatabases';
 
 export type PreflightCheck = {
@@ -84,6 +84,6 @@ export const runPreflightChecks = (
 };
 
 export const executeLaunch = async (): Promise<void> => {
-  await baselineDeployedDatabases(await getProjectConfig());
+  await baselineDeployedDatabases(await fetchProjectConfig());
   await setLaunched(true);
 };

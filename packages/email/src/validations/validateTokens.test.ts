@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { createLens, type FieldMap } from '@inixiative/json-rules';
-import { guardedToken } from '@template/email/render/guardedToken';
-import { type EmailLens, OPAQUE_SLOT, systemSlot } from '@template/email/rules/emailLens';
+import type { FieldMap } from '@inixiative/field-map';
+import { createLens } from '@inixiative/json-rules';
+import { tokenGuardedByExistsCheck } from '@template/email/render/tokenGuardedByExistsCheck';
+import { type EmailLens, OPAQUE_SLOT, systemFieldsSlotLens } from '@template/email/rules/emailLens';
 import { validateTokens } from '@template/email/validations/validateTokens';
 
 const map: FieldMap = {
@@ -28,7 +29,7 @@ const lens: EmailLens = {
   },
   sender: createLens({ maps: { prisma: map }, mapName: 'prisma', model: 'Organization' }),
   data: OPAQUE_SLOT,
-  system: systemSlot(),
+  system: systemFieldsSlotLens(),
 };
 
 const messages = (content: string) =>
@@ -54,7 +55,7 @@ describe('validateTokens — what the lens can decide is decided at save', () =>
 
   it('refuses an optional path that is not guarded, and accepts the guarded form', () => {
     expect(messages('{{recipient.phone}}')[0]).toContain('may be empty');
-    expect(messages(guardedToken('recipient.phone', 'no phone'))).toEqual([]);
+    expect(messages(tokenGuardedByExistsCheck('recipient.phone', 'no phone'))).toEqual([]);
     expect(messages('{{recipient.account.plan}}')[0]).toContain('may be empty');
     expect(
       messages(
@@ -91,7 +92,7 @@ describe('validateTokens — what the lens can decide is decided at save', () =>
 
   it('data is Json: every path beneath it is optional and needs a guard', () => {
     expect(messages('{{data.code}}')[0]).toContain('may be empty');
-    expect(messages(guardedToken('data.code'))).toEqual([]);
+    expect(messages(tokenGuardedByExistsCheck('data.code'))).toEqual([]);
   });
 
   it('lists are iterated, not addressed; loop bindings resolve through the lens', () => {

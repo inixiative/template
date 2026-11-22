@@ -8,7 +8,7 @@ model WebhookSubscription {
   targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
-  model                WebhookModel
+  resourceModel        WebhookModel
   url                  String
   isActive             Boolean         @default(true)
   integrationId        String?         @db.VarChar(36)
@@ -35,16 +35,16 @@ model WebhookSubscription {
   // single-FK uniques are NULL-distinct so they don't actually prevent
   // duplicates when the FK isn't populated. Each partial doubles as a lookup
   // index for that owner column.
-  @@unique([userId, model, url], where: { userId: { not: null } })
-  @@unique([organizationId, model, url], where: { organizationId: { not: null } })
-  @@unique([spaceId, model, url], where: { spaceId: { not: null } })
+  @@unique([userId, resourceModel, url], where: { userId: { not: null } })
+  @@unique([organizationId, resourceModel, url], where: { organizationId: { not: null } })
+  @@unique([spaceId, resourceModel, url], where: { spaceId: { not: null } })
   @@index([ownerModel])
-  @@index([model])
+  @@index([resourceModel])
   @@index([integrationId])
 }
 
 enum WebhookModel {
-  CustomerRef
+  CustomerRelationship
   Artifact
 }
 

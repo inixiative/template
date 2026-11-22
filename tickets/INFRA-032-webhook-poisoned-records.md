@@ -23,13 +23,13 @@ foreign-org record.
 
 - **`IntegrationRecord`** (`packages/db/prisma/schema/integrationRecord.prisma`): one row per
   (Integration, model, record). False polymorphism over `WebhookModel`: `model` plus one nullable FK
-  per value (`customerRefId` today), registered in `PolymorphismRegistry.IntegrationRecord`.
-  `poisonedAt` / `poisonedReason`. Partial unique `[integrationId, customerRefId]`, cascades from
-  Integration and CustomerRef.
-- **Column projection** — `integrationRecordColumn(model: WebhookModel)` reads the registry axis.
+  per value (`customerRelationshipId` today), registered in `PolymorphismRegistry.IntegrationRecord`.
+  `poisonedAt` / `poisonedReason`. Partial unique `[integrationId, customerRelationshipId]`, cascades from
+  Integration and CustomerRelationship.
+- **Column projection** — `integrationRecordForeignKeyForModel(model: WebhookModel)` reads the registry axis.
   `PolymorphismRegistry` is now declared with `satisfies` instead of a type annotation, so its
   literal keys survive: a `WebhookModel` value with no FK in the axis is a compile error there.
-  Indexing by a runtime `ModelName` goes through `getPolymorphismConfig` (used by the factory and
+  Indexing by a runtime `ModelName` goes through `polymorphismConfigForModel` (used by the factory and
   `resolveFalsePolymorphismRef`).
 - **Only integration-owned subscriptions take part** (`subscription.integrationId != null`).
   Subscriptions without an integration keep the current circuit unchanged.
@@ -56,17 +56,17 @@ foreign-org record.
   ids and `DateTime(3)`, so it compares `createdAt` with `gt` and can put an error and a success
   from the same millisecond in the wrong order.
 - **Poison write** — `poisonIntegrationRecord` runs `db.findForUpdate('IntegrationRecord',
-  { integrationId, customerRefId }, { upserting: true })` inside `db.txn` (DB-002), then updates or
+  { integrationId, customerRelationshipId }, { upserting: true })` inside `db.txn` (DB-002), then updates or
   creates. A record that is already poisoned keeps its first stamp and reason. No `.upsert(` and no
   parent-row lock (that was Zealot's workaround before DB-002).
 
 ## Files
 
 - `packages/db/prisma/schema/integrationRecord.prisma` (new), `webhookEvent.prisma` (`httpStatus`),
-  `integration.prisma` / `customerRef.prisma` (back-relations)
+  `integration.prisma` / `customerRelationship.prisma` (back-relations)
 - `packages/db/src/registries/falsePolymorphism.ts`, `packages/db/src/test/factory.ts`
 - `packages/db/src/test/factories/integrationRecordFactory.ts` (new)
-- `apps/api/src/modules/integration/services/{integrationRecordColumn,isIntegrationRecordPoisoned,poisonIntegrationRecord}.ts` (new)
+- `apps/api/src/modules/integration/services/{integrationRecordForeignKeyForModel,isIntegrationRecordPoisoned,poisonIntegrationRecord}.ts` (new)
 - `apps/api/src/jobs/handlers/sendWebhook.ts`
 
 ## Tests

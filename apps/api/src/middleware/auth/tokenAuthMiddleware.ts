@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import { LogScope, log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
-import { loadTokenContext } from '#/lib/context/loadTokenContext';
+import { fetchTokenContext } from '#/lib/context/fetchTokenContext';
 import { setTokenContext } from '#/lib/context/setTokenContext';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -23,7 +23,7 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
   if (!apiKey) return;
   const keyHash = createHash('sha256').update(apiKey).digest('hex');
 
-  const signIn = await loadTokenContext(keyHash);
+  const signIn = await fetchTokenContext(keyHash);
   if (!signIn) return;
   if (signIn.fetched)
     await db.token.update({
@@ -34,7 +34,7 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  if (!c.get('user')) {
+  if (!c.get('user') && !c.get('token')) {
     try {
       await authenticateToken(c);
     } catch (err) {

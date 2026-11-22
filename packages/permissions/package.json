@@ -10,15 +10,19 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
-    "./actorOf": "./src/actorOf.ts",
+    "./actorFromRecordOmittingSensitiveFields": "./src/actorFromRecordOmittingSensitiveFields.ts",
     "./entitlementRows": "./src/entitlementRows.ts",
+    "./lens/mergeProjections": "./src/lens/mergeProjections.ts",
+    "./lens/lensPathsThatDropId": "./src/lens/lensPathsThatDropId.ts",
     "./types": "./src/types.ts",
     "./rebac/*": "./src/rebac/*",
     "./roles/*": "./src/roles/*"
   },
   "dependencies": {
-    "@inixiative/permissions": "^0.21.0",
+    "@inixiative/field-map": "^0.1.2",
+    "@inixiative/permissions": "^0.27.0",
     "@template/db": "workspace:*",
+    "@template/shared": "workspace:*",
     "lodash-es": "^4.18.1",
     "zod": "^4.3.6"
   }

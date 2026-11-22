@@ -1,12 +1,12 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses primitive:shared
  */
 import type { PreflightFinding, SyncPreflightCheck } from '@template/email/preflight/types';
 import { collectJsonOpacityWarnings } from '@template/email/rules/collectJsonOpacityWarnings';
-import { checkExpectations } from '@template/email/rules/componentExpectations';
+import { checkExpectedPathsResolveInLens } from '@template/email/rules/componentExpectations';
 
 export const unresolvedLensPaths: SyncPreflightCheck = ({
   fieldPaths,
@@ -14,7 +14,7 @@ export const unresolvedLensPaths: SyncPreflightCheck = ({
   tokenUnresolvedSeverity = 'error',
 }) => {
   if (!lens) return [];
-  const findings: PreflightFinding[] = checkExpectations([...fieldPaths], lens)
+  const findings: PreflightFinding[] = checkExpectedPathsResolveInLens([...fieldPaths], lens)
     .filter((check) => !check.ok)
     .map((check) => ({
       code: 'token.unresolved',

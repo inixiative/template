@@ -7,12 +7,12 @@
 import { db, type Prisma } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { flushMaxRows, SHUTDOWN_FLUSH_RETRIES } from '#/jobs/outbox/config';
-import { flushQueue } from '#/jobs/outbox/mutex';
+import { jobOutboxWriteMutex } from '#/jobs/outbox/mutex';
 import {
   type OutboxRow,
   outboxLaneOf,
+  outboxRowToJobOutboxCreateInput,
   type SpillOptions,
-  toCreateInput,
 } from '#/jobs/outbox/types';
 import { JobLane } from '#/jobs/types';
 
@@ -20,7 +20,7 @@ import { JobLane } from '#/jobs/types';
 type Pending = { row: OutboxRow; resolve: () => void; reject: (e: unknown) => void };
 
 let acc: Pending[] = [];
-// Flushes queued or running on flushQueue. While one is, new spills wait for it to settle and then go
+// Flushes queued or running on jobOutboxWriteMutex. While one is, new spills wait for it to settle and then go
 // out together (group commit).
 let flushesInFlight = 0;
 let closing = false; // shutdown: stop flushing on accept — flushOutbox owns the final drain
@@ -66,7 +66,7 @@ const writeBatch = (batch: Pending[]): Promise<void> =>
     const keyed = rows.filter((r) => r.dedupeKey !== null);
     if (plain.length)
       await db.jobOutbox.createManyAndReturn({
-        data: plain.map(toCreateInput),
+        data: plain.map(outboxRowToJobOutboxCreateInput),
         skipDuplicates: true,
       });
     for (const row of keyed) {
@@ -77,7 +77,7 @@ const writeBatch = (batch: Pending[]): Promise<void> =>
             dedupeKey: row.dedupeKey as string,
           },
         },
-        create: toCreateInput(row),
+        create: outboxRowToJobOutboxCreateInput(row),
         update: {
           jobId: row.jobId,
           lane: outboxLaneOf(row),
@@ -93,7 +93,7 @@ const flush = (): void => {
   const batch = acc; // synchronous swap — single-threaded JS, no await between
   acc = [];
   flushesInFlight++;
-  lastFlush = flushQueue.run(async () => {
+  lastFlush = jobOutboxWriteMutex.run(async () => {
     try {
       await writeBatch(batch);
       for (const p of batch) p.resolve();
@@ -113,18 +113,18 @@ const accumulate = (row: OutboxRow, { flushImmediately = false }: SpillOptions):
     const isFast = outboxLaneOf(row) === JobLane.fast;
     pendingSpills++;
     if (isFast) pendingFastSpills++;
-    const settle = (): void => {
+    const decrementPendingSpills = (): void => {
       pendingSpills--;
       if (isFast) pendingFastSpills--;
     };
     acc.push({
       row,
       resolve: () => {
-        settle();
+        decrementPendingSpills();
         resolve();
       },
       reject: (e: unknown) => {
-        settle();
+        decrementPendingSpills();
         reject(e);
       },
     });
@@ -152,7 +152,7 @@ const flushBatchWithRetry = async (batch: Pending[]): Promise<void> => {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= SHUTDOWN_FLUSH_RETRIES; attempt++) {
     try {
-      await flushQueue.run(() => writeBatch(batch));
+      await jobOutboxWriteMutex.run(() => writeBatch(batch));
       for (const p of batch) p.resolve();
       return;
     } catch (e) {

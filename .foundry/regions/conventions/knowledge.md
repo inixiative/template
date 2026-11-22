@@ -49,7 +49,7 @@ Hard rule: code self-documents; only the @atlas block and a rare one-line non-ob
 **No TS enum**  
 Use an `as const` object or a Prisma enum instead of the enum keyword.
 
-**no-prisma-maps**  
+**no-map-renames-in-prisma-models**  
 CI rule banning field @map and model @@map so Prisma names equal DB identifiers.
 
 **Polymorphic sides**  
@@ -73,7 +73,7 @@ The template's naming vocabulary and code-style rules: what identifiers, files, 
 
 ## 2. The domain
 
-`naming` is the vocabulary (NAMING.md, API_ROUTES.md § Naming Conventions). Routes and operationIds are `resourceActionSubresource`, resource singular, ReadMany subresource plural (`organizationReadManySpaces`); hooks `<model><Timing><Purpose>`, jobs `<verb><Noun>`, middleware `<purpose>Middleware`. Say `util` not helper, `services` not handlers (handlers are jobs and frontend events), `make*` for factories and currying, `validate*` for guards, `get*` / `is*`, `txn`. Types `<Model>Id`, primitive constants SCREAMING_SNAKE, const objects PascalCase with the type derived by `keyof typeof`. Prisma models are PascalCase singular with camelCase fields, and `no-prisma-maps` bans `@map`. Polymorphic slots are named for their role: `owner` (tenancy only), `source`/`target`, `resource`, `subject`, `actor`; the side carries into FKs and back-relations; never `referenced*`. `_name` = unused, `__name` = internal. Rename a name that misleads.
+`naming` is the vocabulary (NAMING.md, API_ROUTES.md § Naming Conventions). Routes and operationIds are `resourceActionSubresource`, resource singular, ReadMany subresource plural (`organizationReadManySpaces`); hooks `<model><Timing><Purpose>`, jobs `<verb><Noun>`, middleware `<purpose>Middleware`. Say `util` not helper, `services` not handlers (handlers are jobs and frontend events), `make*` for factories and currying, `validate*` for guards, `get*` / `is*`, `txn`. Types `<Model>Id`, primitive constants SCREAMING_SNAKE, const objects PascalCase with the type derived by `keyof typeof`. Prisma models are PascalCase singular with camelCase fields, and `no-map-renames-in-prisma-models` bans `@map`. Polymorphic slots are named for their role: `owner` (tenancy only), `source`/`target`, `resource`, `subject`, `actor`; the side carries into FKs and back-relations; never `referenced*`. `_name` = unused, `__name` = internal. Rename a name that misleads.
 
 `code-style` is how code reads (STYLE.md, AI/ENTRYPOINT.md § 0). No comments (a hard rule); one file, one named export; named exports only; semicolons, single quotes, trailing commas, 2-space indent, typed arrow functions; single-line early exits; `type` over `interface`; no TS `enum` (Prisma enum or `as const` object); types inferred from Zod or Prisma; index files only at module and package level; imports through `#/` or `@template/`; one-line logging; dependencies added to the owning workspace, never the root.
 
@@ -81,7 +81,7 @@ Related regions: `dx-tools` for the tools that enforce these rules (Biome, check
 
 ## 3. Everything that exists here, by class
 
-Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: makeLock, packages/db/src/lock/makeLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `naming`: Naming conventions: identifiers, files, routes, schema names, polymorphic side names, vocabulary
 
@@ -115,7 +115,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| I'll map the field to a snake case column; rename the table in the database with a map; the schema name is the column name, no mapping | **no-prisma-maps** · rule `scripts/ci/rules/no-prisma-maps.sh` — Enum-value @map remains allowed for legacy stored strings. | — | `@map("snake_case_name")` on a field or `@@map("users")` on a model (scripts/ci/rules/no-prisma-maps.sh (CI rule)) |
+| I'll map the field to a snake case column; rename the table in the database with a map; the schema name is the column name, no mapping | **no-map-renames-in-prisma-models** · rule `scripts/ci/rules/no-map-renames-in-prisma-models.sh` — Enum-value @map remains allowed for legacy stored strings. | — | `@map("snake_case_name")` on a field or `@@map("users")` on a model (scripts/ci/rules/no-map-renames-in-prisma-models.sh (CI rule)) |
 | where does a model-specific job go; a cross-cutting job that isn't about one model; where do I mount the routes; I'll put the hook in a shared hooks folder | **Backend directory layout** · pattern docs/claude/NAMING.md > Files & Directories > Backend Structure — Model-specific routes, hooks, jobs go in modules/<model>; cross-cutting helpers in lib; Hono middleware in middleware. | part 4 | — |
 | derive the union type from the object's keys; I'll write out the string union and the object separately; a type that only accepts the keys of this constant; keep the type and the values in sync automatically | **keyof typeof const objects** · pattern docs/claude/NAMING.md > Backend > Constants Pattern: keyof typeof — Instead of hand-written string unions duplicated alongside objects. | part 4 | a hand-written string union that duplicates a const object's keys (docs/claude/NAMING.md › Backend › Constants Pattern: keyof typeof) |
 | validate a value against the constant's keys; I'll write the zod enum with the strings again; a schema for the pseudo-enum values | **Zod enum from const object** · pattern apps/api/src/modules/batch/constants.ts — When a Zod schema must validate values of a const-object enum. | part 4 | — |
@@ -251,7 +251,7 @@ Pattern: `resourceActionSubresource`
 | Type | Convention | Example |
 |------|------------|---------|
 | Route handler | `<model><Action>` | `userCreate`, `organizationReadMany` |
-| Getter | `get<Thing>` | `getResource` |
+| Getter | `get<Thing>` | `contextResource` |
 | Boolean getter | `is<Condition>` | `isAuthenticated`, `isSuperadmin` |
 | Constructor / factory | `make<Thing>` | `makeError`, `makeJob`, `makeController` |
 
@@ -289,7 +289,7 @@ Two distinct meanings — **don't mix them**:
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getResource } from '#/lib/context/getResource'` |
+| Within an app | `#/` | `import { contextResource } from '#/lib/context/contextResource'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -298,14 +298,14 @@ Two distinct meanings — **don't mix them**:
 // apps/api/src/modules/user/routes/userCreate.ts
 import { db } from '@template/db';                    // Shared package
 import { log } from '@template/shared/logger';        // Shared package
-import { getResource } from '#/lib/context/getResource';    // Internal to app
+import { contextResource } from '#/lib/context/contextResource';    // Internal to app
 
 // packages/shared/src/logger/index.ts (top-level barrel)
 export { log } from './logger';                       // Relative OK here
-export { logScope } from './scope';
+export { withLogScope } from './scope';
 
 // packages/shared/src/logger/logger.ts (NOT a barrel)
-import { getLogScopes } from '@template/shared/logger/scope';  // Use alias, not relative
+import { currentLogScopes } from '@template/shared/logger/scope';  // Use alias, not relative
 ```
 
 **Why `@template/` inside shared packages?** Ensures imports work the same whether you're inside or outside the package. Avoids confusing mixed conventions.
@@ -387,6 +387,7 @@ TODO: Tailwind conventions
 ---
 
 <!-- unit doc:docs/claude/NAMING.md#database -->
+
 **Source:** `docs/claude/NAMING.md` § Database (in "Naming Conventions")
 
 #### Database
@@ -414,6 +415,22 @@ A polymorphic slot is named for the role the row plays, as `<side>Model` + typed
 
 Never `referenced*`.
 
+A side whose typed FKs are `onDelete: SetNull` to a model that can be hard-deleted keeps a plain id beside
+them: register the axis with `dualPolymorphismId` (`sourceId`, `targetId`, `subjectId`) in
+`packages/db/src/registries/falsePolymorphism.ts`. A soft-delete target is never hard-deleted and needs none. Why:
+SetNull nulls the typed key when the row it points at is hard-deleted, and only the plain id still says
+what it was; the required-FK rule accepts it in the key's place. CI rule
+`set-null-arm-requires-dual-polymorphism-id` enforces this; `Cascade` arms are exempt.
+
+Every side's columns follow its name (CI rule `polymorphic-sides-follow-their-name`). The discriminator is
+`<side>Model`; each key column of a side other than `owner` is `<side><Column>` (`resourceUserId`,
+`senderSpaceId`, `recordCustomerRelationshipId`); `owner` alone keys on the tenancy columns
+(`organizationId`, `spaceId`, `userId`, and the delegate owners' `integrationId`, `projectId`), because
+those name the tenant a row lives in on every model, polymorphic or not. A lowercase value (`default`,
+`admin`, `platform`) names no row and has no key columns; a PascalCase value is a model and has some. A
+dual polymorphism id is `<side>Id`, declared in the registry exactly when the model has that column. Why
+(Aron 2026-11-19): one rule for every side, so code and readers derive a side's columns from its name.
+
 Each side gets its own enum, named for the question it answers, even when the two lists overlap:
 `TagOwnerModel` (who can own a tag: `Tag.ownerModel`, `TagCategory.ownerModel`) and `TagResource`
 (where a tag can be applied: `TagAttachment.resourceModel`, `Tag.resources`). A value that is only
@@ -424,10 +441,34 @@ The typed FKs and relations carry the side too, so both ends read the same way: 
 back-relations do the same, side plus the full model name: `sourceRuleReferences` on a source model,
 `targetRuleReferences` on a target model, both on a model that is both (`Segment`).
 
+##### Entitlement: source, target and the library's anchor
+
+An `Entitlement` row is a directed edge, so it uses `source` / `target` like `RuleReference`. The
+**source** is the anchor the entitlement acts from, the **target** the holder (`Token`,
+`Integration`, `OrganizationUser`, `SpaceUser`); `resource` is the model its actions apply to. The
+permissions library keeps its own words, and one transformer in `@template/permissions`
+(`toEntitlementEntry` / `toEntitlementInput`, `packages/permissions/src/entitlementRows.ts`) moves
+between them, only where a holder is handed to the library:
+
+| Library entry | Row |
+|---|---|
+| `anchor.resource` (`db:space`) | `sourceModel` (`Space`) and the typed FK `sourceSpaceId` |
+| `anchor.id` | `sourceId` |
+| `anchor.path` | `sourcePath` |
+| `resource` (`db:integration`) | `resource` (`Integration`) |
+| `actions` (`{ read: true }`) | `actions` (`['read']`) |
+| the holder it is installed on | `targetModel`, `targetId` and the arm's keys: `targetTokenId`, `targetIntegrationId`, or a member's owner chain (`targetOrganizationId`, `targetSpaceId`, `targetUserId`, as `Inquiry`'s) |
+
+Back-relations follow the side rule: `targetEntitlements` on a holder, `sourceEntitlements` on every
+model an entitlement can anchor at. An API response carries the holder's live rows as stored, under
+`targetEntitlements`; a create body's `entitlements` is a list of `EntitlementInput` rows. Entries
+never cross the API. The grantor has no name on the row: it is the target's owner.
+
 ##### IDs
 
 TODO: Document ID format
 - UUIDv7 for sortability
+- **Ids and keys that share a space carry a namespace from one registry, never a bare name.** Redis keys take theirs from `redisNamespace` ([REDIS.md](REDIS.md#namespaces)). A new family of keys or ids that can share a space gets a registry of the same shape: a `const` object of namespaces, one builder that joins `<namespace>:<name>` and one reader; nothing writes a prefix by hand, and a written value may not take a namespace only generated ones carry. Why: bare names in a shared space collide silently (Foundry, 2026-11-16: a region named `feedback` took a built-in role's id and the daemon could not boot for five hours).
 
 ---
 
@@ -598,4 +639,4 @@ Unless specifically requested or truly non-obvious.
 From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Each line: **name** `where` [kind] the job it does. Use: canonical usage.
 
 #### Class `naming`
-- **no-prisma-maps** `scripts/ci/rules/no-prisma-maps.sh` [rule] ban field @map and model @@map so Prisma names equal DB identifiers Use: scripts/ci/rules/no-prisma-maps.sh
+- **no-map-renames-in-prisma-models** `scripts/ci/rules/no-map-renames-in-prisma-models.sh` [rule] ban field @map and model @@map so Prisma names equal DB identifiers Use: scripts/ci/rules/no-map-renames-in-prisma-models.sh

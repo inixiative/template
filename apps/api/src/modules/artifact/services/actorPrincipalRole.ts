@@ -9,7 +9,7 @@ import {
   db,
   type HydratedRecord,
   hydrate,
-  polymorphicTarget,
+  rowPolymorphicAxisPointsAt,
 } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import { rebacCheck, rebacSchema, roleToStandardAction } from '@template/permissions';
@@ -79,12 +79,15 @@ export const actorPrincipalRole = (actor: ArtifactActor) => {
           : null;
       case 'SpaceUser':
         return isSelf(third!) && (await roleOn('space', second!)) ? membershipCap(actor) : null;
-      case 'CustomerRef': {
-        const customerRef = await db.customerRef.findUnique({ where: { id: first } });
+      case 'CustomerRelationship': {
+        const customerRelationship = await db.customerRelationship.findUnique({
+          where: { id: first },
+        });
         const customer =
-          customerRef && polymorphicTarget(customerRef, 'CustomerRef', 'customerModel');
+          customerRelationship &&
+          rowPolymorphicAxisPointsAt(customerRelationship, 'CustomerRelationship', 'customerModel');
         if (!customer) return null;
-        return resolve({ kind: customer.kind as ArtifactPrincipal['kind'], ids: [customer.id] });
+        return resolve({ kind: customer.model as ArtifactPrincipal['kind'], ids: [customer.id] });
       }
       case 'Integration':
         return null;

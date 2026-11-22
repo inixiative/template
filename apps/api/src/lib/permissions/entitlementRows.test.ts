@@ -19,13 +19,13 @@ import {
 import { memberSelfGrant, type Permix, toEntitlementInput } from '@template/permissions';
 import { rebacSchema } from '@template/permissions/rebac';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
-import { userPermissions } from '#/lib/permissions/userPermissions';
+import { fetchPermixForUser } from '#/lib/permissions/userPermissions';
 import { integrationRouter } from '#/modules/integration';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import {
   entitlementIds,
   grantEntitlements,
@@ -37,10 +37,10 @@ import { get, patch } from '#tests/utils/request';
 let organization: Organization;
 let owner: { user: User; member: OrganizationUser; permix: Permix };
 
-const readOrganization = (): EntitlementInput =>
-  entry('db:organization', ['db:organization', organization.id], ['read']);
-const readSpace = (spaceId: string): EntitlementInput =>
-  entry('db:space', ['db:space', spaceId], ['read']);
+const organizationReadEntitlement = (): EntitlementInput =>
+  entitlementInputFor('db:organization', ['db:organization', organization.id], ['read']);
+const spaceReadEntitlement = (spaceId: string): EntitlementInput =>
+  entitlementInputFor('db:space', ['db:space', spaceId], ['read']);
 
 const rowsOf = (model: 'Token' | 'Integration' | 'OrganizationUser', id: string) =>
   db.withDeleted(() =>
@@ -56,7 +56,7 @@ beforeEach(async () => {
     { role: 'owner' },
     { organization },
   );
-  owner = { user: context.user, member, permix: (await userPermissions(context.user.id))! };
+  owner = { user: context.user, member, permix: (await fetchPermixForUser(context.user.id))! };
 });
 
 afterEach(async () => {
@@ -81,7 +81,7 @@ describe('the entitlement table: the source names the anchor, the target holds i
     });
     const target = { model: 'Integration' as const, id: integration.id };
     await changeEntitlements(owner.permix, target, {
-      add: [readOrganization(), readSpace(space.id)],
+      add: [organizationReadEntitlement(), spaceReadEntitlement(space.id)],
     });
     const ids = (await rowsOf('Integration', integration.id)).map((row) => row.id);
     await changeEntitlements(owner.permix, target, { remove: ids });
@@ -104,7 +104,7 @@ describe('the entitlement table: the source names the anchor, the target holds i
       changeEntitlements(
         owner.permix,
         { model: 'Integration', id: integration.id },
-        { add: [readOrganization()] },
+        { add: [organizationReadEntitlement()] },
       ),
     ).rejects.toThrow('full takes no entitlements');
   });
@@ -117,10 +117,10 @@ describe('rows live and die with their target', () => {
       ownerModel: 'Organization',
       organizationId: organization.id,
       role: 'viewer',
-      entitlements: [readOrganization(), readSpace(space.id)],
+      entitlements: [organizationReadEntitlement(), spaceReadEntitlement(space.id)],
     });
     const target = { model: 'Integration' as const, id: integration.id };
-    const [removedFirst] = await entitlementIds(target, [readSpace(space.id)]);
+    const [removedFirst] = await entitlementIds(target, [spaceReadEntitlement(space.id)]);
     await changeEntitlements(owner.permix, target, { remove: [removedFirst!] });
 
     const removedAt = new Date();
@@ -130,13 +130,13 @@ describe('rows live and die with their target', () => {
     expect(tombstoned.find((row) => row.id !== removedFirst)?.deletedAt).toEqual(removedAt);
 
     await revive(db.integration, { id: integration.id });
-    expect(await heldEntitlements(target)).toEqual([readOrganization()]);
+    expect(await heldEntitlements(target)).toEqual([organizationReadEntitlement()]);
   });
 
   it('a token never revives, and its rows stay dead when its member is revived', async () => {
     const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
     const { entity: token } = await createToken(
-      { ownerModel: 'OrganizationUser', role: null, entitlements: [readOrganization()] },
+      { ownerModel: 'OrganizationUser', role: null, entitlements: [organizationReadEntitlement()] },
       { organizationUser: member },
     );
 
@@ -155,7 +155,11 @@ describe('a gone anchor is stamped on the row, like a rule reference target', ()
   it('a tombstoned source sets sourceDeletedAt, a revived one clears it', async () => {
     const { entity: space } = await createSpace({}, { organization });
     const { entity: token } = await createToken(
-      { ownerModel: 'Organization', role: 'viewer', entitlements: [readSpace(space.id)] },
+      {
+        ownerModel: 'Organization',
+        role: 'viewer',
+        entitlements: [spaceReadEntitlement(space.id)],
+      },
       { organization },
     );
     const deletedAt = new Date();
@@ -172,7 +176,7 @@ describe('a gone anchor is stamped on the row, like a rule reference target', ()
       {
         ownerModel: 'OrganizationUser',
         role: 'viewer',
-        entitlements: [entry('db:flow', ['db:flow', flow.id], ['read'])],
+        entitlements: [entitlementInputFor('db:flow', ['db:flow', flow.id], ['read'])],
       },
       { organizationUser: owner.member },
     );
@@ -196,10 +200,10 @@ describe('the writer keeps its invariants under a lock on the target', () => {
     const target = { model: 'Token' as const, id: token.id };
 
     await Promise.all([
-      changeEntitlements(owner.permix, target, { add: [readSpace(space.id)] }),
-      changeEntitlements(owner.permix, target, { add: [readSpace(space.id)] }),
+      changeEntitlements(owner.permix, target, { add: [spaceReadEntitlement(space.id)] }),
+      changeEntitlements(owner.permix, target, { add: [spaceReadEntitlement(space.id)] }),
     ]);
-    expect(await heldEntitlements(target)).toEqual([readSpace(space.id)]);
+    expect(await heldEntitlements(target)).toEqual([spaceReadEntitlement(space.id)]);
   });
 
   it('a role-less delegate whose last rows are removed at once holds nothing; neither removal is refused', async () => {
@@ -208,7 +212,7 @@ describe('the writer keeps its invariants under a lock on the target', () => {
       {
         ownerModel: 'Organization',
         role: null,
-        entitlements: [readOrganization(), readSpace(space.id)],
+        entitlements: [organizationReadEntitlement(), spaceReadEntitlement(space.id)],
       },
       { organization },
     );
@@ -251,7 +255,7 @@ describe('a revoked row is denied on the very next token request (cache)', () =>
       {
         ownerModel: 'OrganizationUser',
         role: null,
-        entitlements: [readSpace(space.id), readOrganization()],
+        entitlements: [spaceReadEntitlement(space.id), organizationReadEntitlement()],
       },
       { organizationUser: owner.member },
     );
@@ -259,7 +263,7 @@ describe('a revoked row is denied on the very next token request (cache)', () =>
 
     const target = { model: 'Token' as const, id: token.id };
     await changeEntitlements(owner.permix, target, {
-      remove: await entitlementIds(target, [readSpace(space.id)]),
+      remove: await entitlementIds(target, [spaceReadEntitlement(space.id)]),
     });
 
     expect(await holds(rawKey, 'space', space.id, 'read')).toBe(false);
@@ -283,7 +287,7 @@ describe('the rows as a sub-resource of their holder', () => {
     });
     const target = { model: 'Integration' as const, id: integration.id };
     const app = ownerApp();
-    const created = await grantEntitlements(app, target, [readOrganization()]);
+    const created = await grantEntitlements(app, target, [organizationReadEntitlement()]);
     expect(created.status).toBe(201);
     const granted = (await created.json()) as { data: Entitlement[] };
     const read = (await (await app.fetch(get(`/api/v1/integration/${integration.id}`))).json()) as {
@@ -312,7 +316,7 @@ describe('the rows as a sub-resource of their holder', () => {
       organizationId: organization.id,
       userId: owner.user.id,
       role: 'viewer',
-      entitlements: [readOrganization()],
+      entitlements: [organizationReadEntitlement()],
     });
     const response = await ownerApp().fetch(
       patch(`/api/v1/integration/${integration.id}`, { full: true }),
@@ -331,19 +335,23 @@ describe('edges of the lifecycle the review found (2026-11-03)', () => {
       ownerModel: 'Organization',
       organizationId: organization.id,
       role: null,
-      entitlements: [readOrganization()],
+      entitlements: [organizationReadEntitlement()],
     });
     await db.integration.update({ where: { id: integration.id }, data: { deletedAt: new Date() } });
     await revive(db.integration, { id: integration.id });
     expect(await heldEntitlements({ model: 'Integration', id: integration.id })).toEqual([
-      readOrganization(),
+      organizationReadEntitlement(),
     ]);
   });
 
   it('a row whose anchor is gone can still be removed by whoever writes the holder', async () => {
     const { entity: space } = await createSpace({}, { organization });
     const { entity: token } = await createToken(
-      { ownerModel: 'Organization', role: 'viewer', entitlements: [readSpace(space.id)] },
+      {
+        ownerModel: 'Organization',
+        role: 'viewer',
+        entitlements: [spaceReadEntitlement(space.id)],
+      },
       { organization },
     );
     await db.space.update({ where: { id: space.id }, data: { deletedAt: new Date() } });
@@ -355,20 +363,44 @@ describe('edges of the lifecycle the review found (2026-11-03)', () => {
 });
 
 describe("an entitlement's where names rows as rule-reference edges", () => {
-  const selfGrantEdges = (memberId: string) =>
+  const edgesTo = (spaceId: string) =>
     db.ruleReference.findMany({
-      where: { sourceModel: 'Entitlement', targetModel: 'OrganizationUser', targetId: memberId },
+      where: { sourceModel: 'Entitlement', targetModel: 'Space', targetId: spaceId },
     });
 
-  it('a self-grant names its member; the edge goes with the row and comes back with it', async () => {
-    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
-    expect(await selfGrantEdges(member.id)).toHaveLength(1);
+  it("a row's where names the space it pins; the edge goes with the row and comes back with it", async () => {
+    const { entity: space } = await createSpace({}, { organization });
+    const pinned = {
+      ...entitlementInputFor(
+        'db:space',
+        ['db:organization', organization.id, 'organization'],
+        ['read'],
+      ),
+      where: { field: 'id', operator: 'equals', value: space.id },
+    };
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member', entitlements: [pinned] },
+      { organization },
+    );
+    expect(await edgesTo(space.id)).toHaveLength(1);
 
     await db.organizationUser.update({ where: { id: member.id }, data: { deletedAt: new Date() } });
-    expect(await selfGrantEdges(member.id)).toHaveLength(0);
+    expect(await edgesTo(space.id)).toHaveLength(0);
 
     await revive(db.organizationUser, { id: member.id });
-    expect(await selfGrantEdges(member.id)).toHaveLength(1);
+    expect(await edgesTo(space.id)).toHaveLength(1);
+  });
+
+  it('the self-grant has no where, so it names no row: its anchor is the member itself', async () => {
+    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
+    expect(
+      await db.ruleReference.findMany({
+        where: { sourceModel: 'Entitlement', targetModel: 'OrganizationUser', targetId: member.id },
+      }),
+    ).toEqual([]);
+    expect(await rowsOf('OrganizationUser', member.id)).toMatchObject([
+      { sourceModel: 'OrganizationUser', sourceId: member.id, sourcePath: null, where: null },
+    ]);
   });
 });
 
@@ -376,7 +408,7 @@ describe('a revoked token is refused at sign-in, even with its sign-in cached', 
   it('the token row cached under its keyHash is cleared when the token is revoked', async () => {
     const { call } = createTokenProbeApp();
     const { rawKey, entity: token } = await createKeyedToken(
-      { ownerModel: 'OrganizationUser', role: null, entitlements: [readOrganization()] },
+      { ownerModel: 'OrganizationUser', role: null, entitlements: [organizationReadEntitlement()] },
       { organizationUser: owner.member },
     );
     const actorOf = async () =>

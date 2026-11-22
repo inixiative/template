@@ -4,8 +4,8 @@
  * @partOf primitive:appEvents
  * @uses primitive:websockets
  */
+import type { StreamAppend } from '@template/shared/ws';
+
 declare const validatedByStreamAppend: unique symbol;
 
-export type ValidatedStreamAppend = { type: string; payload: unknown; revive?: true } & {
-  readonly [validatedByStreamAppend]: true;
-};
+export type ValidatedStreamAppend = StreamAppend & { readonly [validatedByStreamAppend]: true };

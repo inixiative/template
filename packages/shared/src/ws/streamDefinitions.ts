@@ -21,8 +21,8 @@ export type StreamFamily = keyof typeof STREAM_DEFINITIONS;
 
 export type RegisteredStream = (typeof STREAM_DEFINITIONS)[StreamFamily];
 
-export const streamDefinitionFor = (family: string): RegisteredStream | null =>
+export const streamDefinitionForFamily = (family: string): RegisteredStream | null =>
   Object.hasOwn(STREAM_DEFINITIONS, family) ? STREAM_DEFINITIONS[family as StreamFamily] : null;
 
-export const streamDefinitionOf = (stream: string): RegisteredStream | null =>
-  streamDefinitionFor(parseChannelKey(stream)._id);
+export const streamDefinitionForChannelKey = (stream: string): RegisteredStream | null =>
+  streamDefinitionForFamily(parseChannelKey(stream)._id);

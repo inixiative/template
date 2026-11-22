@@ -12,26 +12,25 @@ const includeAuditLogNested = {
   orderBy: { id: 'asc' },
 } as const satisfies Prisma.AuditLogFindManyArgs;
 
+const withoutKeyHash = { omit: { keyHash: true } } as const;
+
+// why: a list row shows who it acts on from either side: the party and every owner above it
+const includeBothSides = {
+  sourceUser: true,
+  sourceOrganization: true,
+  sourceSpace: true,
+  sourceIntegration: true,
+  sourceToken: withoutKeyHash,
+  sourceProject: true,
+  targetUser: true,
+  targetOrganization: true,
+  targetSpace: true,
+  targetIntegration: true,
+  targetToken: withoutKeyHash,
+  targetProject: true,
+} as const satisfies Prisma.InquiryInclude;
+
 export const includeInquiryResponse = {
-  sourceUser: true,
-  sourceOrganization: true,
-  sourceSpace: true,
-  targetUser: true,
-  targetOrganization: true,
-  targetSpace: true,
-  auditLogsAsSubject: includeAuditLogNested,
-} as const satisfies Prisma.InquiryInclude;
-
-export const includeInquirySent = {
-  targetUser: true,
-  targetOrganization: true,
-  targetSpace: true,
-  auditLogsAsSubject: includeAuditLogNested,
-} as const satisfies Prisma.InquiryInclude;
-
-export const includeInquiryReceived = {
-  sourceUser: true,
-  sourceOrganization: true,
-  sourceSpace: true,
+  ...includeBothSides,
   auditLogsAsSubject: includeAuditLogNested,
 } as const satisfies Prisma.InquiryInclude;

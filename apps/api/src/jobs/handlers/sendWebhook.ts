@@ -38,8 +38,8 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     subscription.integrationId &&
     (await isIntegrationRecordPoisoned({
       integrationId: subscription.integrationId,
-      model: subscription.model,
-      resourceId,
+      recordModel: subscription.resourceModel,
+      recordId: resourceId,
     }))
   ) {
     log.info(
@@ -48,9 +48,9 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     return;
   }
 
-  // Columns only; a shape needing related rows (CustomerRef + its parties) fetches them fresh here.
+  // Columns only; a shape needing related rows (CustomerRelationship + its parties) fetches them fresh here.
   // timestamp (event time, carried from the hook) is inside the signed body so receivers can reject replays
-  const body = { model: subscription.model, action, payload: data, timestamp };
+  const body = { model: subscription.resourceModel, action, payload: data, timestamp };
   const bodyJson = JSON.stringify(body);
 
   // Sign payload with RSA-SHA256
@@ -90,12 +90,12 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     status = 'unreachable';
   }
 
-  const settled =
+  const isFinalOutcome =
     status === 'success' || !isRetryable({ status, httpStatus }) || isFinalAttempt(ctx.job);
 
   await db.webhookEvent.create({
     data: {
-      status: settled ? status : 'retrying',
+      status: isFinalOutcome ? status : 'retrying',
       action,
       resourceId,
       error,
@@ -110,7 +110,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     return;
   }
 
-  if (!settled) {
+  if (!isFinalOutcome) {
     throw new Error(
       `Webhook delivery to subscription ${subscriptionId} failed on attempt ${ctx.job.attemptsMade + 1}, retrying: ${error}`,
       { cause },
@@ -126,8 +126,8 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   ) {
     await poisonIntegrationRecord({
       integrationId: subscription.integrationId,
-      model: subscription.model,
-      resourceId,
+      recordModel: subscription.resourceModel,
+      recordId: resourceId,
       reason: error ?? 'rejected by the integration',
     });
     log.info(`Webhook record ${resourceId} poisoned for integration ${subscription.integrationId}`);

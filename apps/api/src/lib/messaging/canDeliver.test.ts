@@ -12,7 +12,7 @@ describe('canDeliver', () => {
       expect(canDeliver('system', contact(['platform']))).toBe(true);
     });
 
-    it('always delivers even when customerRef does not list system', () => {
+    it('always delivers even when customerRelationship does not list system', () => {
       expect(canDeliver('system', contact([]), ref([]))).toBe(true);
     });
   });
@@ -29,24 +29,24 @@ describe('canDeliver', () => {
     });
   });
 
-  describe('customerRef gate', () => {
-    it('passes when both contact and customerRef accept the kind', () => {
+  describe('customerRelationship gate', () => {
+    it('passes when both contact and customerRelationship accept the kind', () => {
       expect(canDeliver('platform', contact(['platform']), ref(['platform']))).toBe(true);
     });
 
-    it('refuses when contact accepts but customerRef does not', () => {
+    it('refuses when contact accepts but customerRelationship does not', () => {
       expect(canDeliver('marketing', contact(['platform', 'marketing']), ref(['platform']))).toBe(
         false,
       );
     });
 
-    it('refuses when customerRef accepts but contact does not', () => {
+    it('refuses when customerRelationship accepts but contact does not', () => {
       expect(canDeliver('marketing', contact(['platform']), ref(['platform', 'marketing']))).toBe(
         false,
       );
     });
 
-    it('skips the customerRef gate when not provided', () => {
+    it('skips the customerRelationship gate when not provided', () => {
       expect(canDeliver('platform', contact(['platform']))).toBe(true);
       expect(canDeliver('platform', contact(['platform']), null)).toBe(true);
     });

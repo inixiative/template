@@ -4,10 +4,13 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+import type { FieldEntry } from '@inixiative/field-map';
+import { fieldAtPath } from '@inixiative/field-map';
 import { getLensRoot, type LensNarrowing, projectLens } from '@inixiative/json-rules';
-import { lookupField, type ModelField, type ModelName, toModelName } from '@template/db';
+import { type ModelName, toModelName } from '@template/db';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { dialect, searchablePaths } from '@template/db/lens';
-import { redactLens } from '@template/db/lens/redactLens';
+import { omitSensitiveFieldsFromLens } from '@template/db/lens/omitSensitiveFieldsFromLens';
 import {
   FIELD_OPERATORS,
   isArrayFieldOperator,
@@ -21,8 +24,8 @@ import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
 import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
-import { validatePathNotation } from '#/lib/prisma/pathNotation';
-import { getDefaultOperator, getValidOperators } from '#/lib/prisma/scalarOperators';
+import { isValidPathNotation } from '#/lib/prisma/pathNotation';
+import { defaultOperatorForField, validOperatorsForField } from '#/lib/prisma/scalarOperators';
 import type {
   BracketQueryPrimitive,
   BracketQueryRecord,
@@ -58,7 +61,7 @@ const splitNullFromInClause = (
   return { clause: { ...value, in: value.in.filter((v) => v !== null) }, orNull: true };
 };
 
-// `tokens.some.name` → `tokens.name`. `lookupField` walks Prisma model
+// `tokens.some.name` → `tokens.name`. `modelFieldAtPath` walks Prisma model
 // relations but doesn't know about Prisma's relation operators, so we strip
 // them before calling.
 const stripRelationOperators = (path: string): string =>
@@ -96,16 +99,16 @@ const indexedChildren = (
     .map(([, child]) => child as BracketQueryRecord);
 };
 
-const kindLabel = (field: ModelField): string => (field.kind === 'enum' ? 'enum' : field.type);
+const kindLabel = (field: FieldEntry): string => (field.kind === 'enum' ? 'enum' : field.type);
 
 const PATTERN_OPS = new Set(['contains', 'startsWith', 'endsWith']);
 const EQUALITY_OPS = new Set(['equals', 'not']);
 
-const isTextField = (field: ModelField): boolean =>
+const isTextField = (field: FieldEntry): boolean =>
   field.kind === 'scalar' && field.type === 'String' && !field.isList;
 
 const matchesLiterally = (
-  field: ModelField,
+  field: FieldEntry,
   op: string,
   value: unknown,
   insensitive: boolean,
@@ -117,7 +120,7 @@ const matchesLiterally = (
     : value;
 
 const wrapBareValue = (
-  field: ModelField,
+  field: FieldEntry,
   value: BracketQueryPrimitive,
 ): Record<string, unknown> => {
   // Bare symbols (null/true/false) on a json column → equals that json scalar (null
@@ -128,16 +131,16 @@ const wrapBareValue = (
   if (value === null) {
     return { equals: null };
   }
-  const op = getDefaultOperator(field);
+  const op = defaultOperatorForField(field);
   return { [op]: matchesLiterally(field, op, coerceValueForField(field, value), false) };
 };
 
 const transformOperatorValue = (
-  field: ModelField,
+  field: FieldEntry,
   value: BracketQueryRecord,
   fieldPath: string,
 ): Record<string, unknown> => {
-  const validOps = getValidOperators(field);
+  const validOps = validOperatorsForField(field);
   const out: Record<string, unknown> = {};
 
   for (const [op, opValue] of Object.entries(value)) {
@@ -171,7 +174,7 @@ type EnumValuesAt = (path: string) => readonly string[] | undefined;
 
 const enumValuesLookup = (filterLens: LensNarrowing): EnumValuesAt => {
   const rootKey = getLensRoot(filterLens).model;
-  const byPath = projectLens(redactLens(filterLens));
+  const byPath = projectLens(omitSensitiveFieldsFromLens(filterLens));
   return (path) => {
     const segments = path.split('.');
     const fieldName = segments.pop() as string;
@@ -236,7 +239,7 @@ const validateAndTransformSearchFields = (
 
     // Bare scalar — apply field's default operator + coerce.
     if (isPrimitive(value)) {
-      if (!validatePathNotation(currentPath)) {
+      if (!isValidPathNotation(currentPath)) {
         throw makeError({ status: 400, message: `Invalid search field: ${currentPath}` });
       }
       if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
@@ -245,7 +248,7 @@ const validateAndTransformSearchFields = (
           message: `Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
         });
       }
-      const field = lookupField(model, stripRelationOperators(currentPath));
+      const field = fieldAtPath(prismaMap, model, stripRelationOperators(currentPath));
       if (!field) {
         // Path doesn't resolve in the schema (admin bypass let through an
         // unknown field, or it's a synthetic path). Pass through as-is.
@@ -277,7 +280,7 @@ const validateAndTransformSearchFields = (
 
     // Json fields use their own operator set (path/string_contains/…), translated
     // to a Prisma JSON where rather than the scalar operator pipeline.
-    const jsonField = lookupField(model, stripRelationOperators(currentPath));
+    const jsonField = fieldAtPath(prismaMap, model, stripRelationOperators(currentPath));
     if (jsonField?.kind === 'scalar' && jsonField.type === 'Json') {
       if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
         throw makeError({
@@ -322,7 +325,7 @@ const validateAndTransformSearchFields = (
     }
 
     if (hasFieldOp) {
-      if (!validatePathNotation(currentPath)) {
+      if (!isValidPathNotation(currentPath)) {
         throw makeError({ status: 400, message: `Invalid search field: ${currentPath}` });
       }
       if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
@@ -331,7 +334,7 @@ const validateAndTransformSearchFields = (
           message: `Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
         });
       }
-      const field = lookupField(model, stripRelationOperators(currentPath));
+      const field = fieldAtPath(prismaMap, model, stripRelationOperators(currentPath));
       if (!field) {
         // Unknown path under skip-bypass — pass through unchanged.
         result[key] = value;
@@ -436,10 +439,10 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     // tokens AND together.
     for (const token of search.trim().split(/\s+/)) {
       const searchConditions = globalSearchFields.flatMap((field) => {
-        const def = lookupField(model, stripRelationOperators(field));
+        const def = fieldAtPath(prismaMap, model, stripRelationOperators(field));
         const clause = def && fieldSearchOperator(def, token);
         if (!clause) return [];
-        if (!validatePathNotation(field))
+        if (!isValidPathNotation(field))
           throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
         return [buildSearchPath(model, field, clause)];
       });

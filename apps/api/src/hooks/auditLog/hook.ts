@@ -4,21 +4,24 @@ import {
   DbAction,
   db,
   HookTiming,
+  maskSensitiveFields,
+  maskSensitiveFieldsInChangeDiff,
   Prisma,
-  redactChangeDiff,
-  redactSensitiveFields,
   registerDbHook,
 } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { castArray, keyBy } from 'lodash-es';
-import { type ContextRow, contextRows } from '#/hooks/auditLog/contextRows';
+import {
+  type ContextRow,
+  fetchRowsCarryingTenantColumns,
+} from '#/hooks/auditLog/fetchRowsCarryingTenantColumns';
 import {
   auditActorColumns,
   buildContextFkFields,
-  buildSubjectFkFields,
+  buildSubjectColumns,
   computeDiff,
-  filterForAudit,
+  omitNoopFieldsForAudit,
 } from '#/hooks/auditLog/utils';
 import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
 
@@ -62,13 +65,14 @@ const buildAuditEntry = (
   contextFkFields: Record<string, unknown>,
   withSubjectFkFields = true,
 ): Prisma.AuditLogCreateManyInput | null => {
-  const actor = auditActorContext.getScope();
+  const actor = auditActorContext.currentActor();
 
-  // Filter noop fields, then diff on the UNREDACTED result so a change to a sensitive field is still
-  // detected — redacting first would mask both sides to the same token and the change would vanish
-  // under the empty-diff guard. Redact the stored snapshots and the changed values afterward.
-  const filteredAfter = action !== AuditAction.delete ? filterForAudit(model, record) : undefined;
-  const filteredBefore = previous ? filterForAudit(model, previous) : undefined;
+  // Omit no-op fields, then diff on the UNMASKED result so a change to a sensitive field is still
+  // detected — masking first would mask both sides to the same token and the change would vanish
+  // under the empty-diff guard. Mask the stored snapshots and the changed values afterward.
+  const filteredAfter =
+    action !== AuditAction.delete ? omitNoopFieldsForAudit(model, record) : undefined;
+  const filteredBefore = previous ? omitNoopFieldsForAudit(model, previous) : undefined;
   const changes =
     action === AuditAction.update && filteredBefore && filteredAfter
       ? computeDiff(filteredBefore, filteredAfter)
@@ -76,9 +80,9 @@ const buildAuditEntry = (
 
   if (action === AuditAction.update && changes && Object.keys(changes).length === 0) return null;
 
-  const processedAfter = filteredAfter ? redactSensitiveFields(model, filteredAfter) : undefined;
-  const processedBefore = filteredBefore ? redactSensitiveFields(model, filteredBefore) : undefined;
-  const processedChanges = changes ? redactChangeDiff(model, changes) : undefined;
+  const processedAfter = filteredAfter ? maskSensitiveFields(model, filteredAfter) : undefined;
+  const processedBefore = filteredBefore ? maskSensitiveFields(model, filteredBefore) : undefined;
+  const processedChanges = changes ? maskSensitiveFieldsInChangeDiff(model, changes) : undefined;
 
   return {
     action,
@@ -88,7 +92,7 @@ const buildAuditEntry = (
     changes: (processedChanges as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     ...auditActorColumns(actor),
     ...contextFkFields,
-    ...(withSubjectFkFields ? buildSubjectFkFields(model, record) : {}),
+    ...buildSubjectColumns(model, record, { withKeys: withSubjectFkFields }),
   };
 };
 
@@ -101,7 +105,7 @@ const buildEntries = async (model: AuditSubjectModel, options: HookOptions) => {
   // and clear only the space context for Space deletes.
   if (isDeleteAction(dbAction)) {
     const records = castArray(options.result ?? []) as Record<string, unknown>[];
-    const contexts = await contextRows(model, records);
+    const contexts = await fetchRowsCarryingTenantColumns(model, records);
     records.forEach((record, index) => {
       const entry = buildAuditEntry(
         model,
@@ -119,7 +123,7 @@ const buildEntries = async (model: AuditSubjectModel, options: HookOptions) => {
   const { result, previous } = options;
   const records = castArray(result ?? []) as (Record<string, unknown> & { id: string })[];
   const previousById = keyBy(castArray(previous ?? []) as Record<string, unknown>[], 'id');
-  const contexts = await contextRows(model, records);
+  const contexts = await fetchRowsCarryingTenantColumns(model, records);
 
   records.forEach((record, index) => {
     const prev = previousById[record.id];

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db, revive } from '@template/db';
-import { ContactOwnerModel, InquiryResourceModel } from '@template/db/generated/client/enums';
+import {
+  ContactOwnerModel,
+  InquiryResourceModel,
+  InquiryStatus,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createContact,
@@ -14,7 +18,7 @@ import {
 const spaceById = (id: string) => db.withDeleted(() => db.space.findUnique({ where: { id } }));
 const contactById = (id: string) => db.withDeleted(() => db.contact.findUnique({ where: { id } }));
 
-const makeTree = async () => {
+const createOrganizationWithSpaceAndContact = async () => {
   const { entity: org } = await createOrganization();
   const { entity: space } = await createSpace({}, { organization: org });
   const { entity: contact } = await createContact(
@@ -34,7 +38,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('tombstones column-bearing descendants recursively with the parent timestamp', async () => {
-    const { org, space, contact } = await makeTree();
+    const { org, space, contact } = await createOrganizationWithSpaceAndContact();
 
     const deleted = await tombstoneOrg(org.id);
 
@@ -43,7 +47,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('revive restores exactly the subtree that died with the parent', async () => {
-    const { org, space, contact } = await makeTree();
+    const { org, space, contact } = await createOrganizationWithSpaceAndContact();
 
     await tombstoneOrg(org.id);
     await reviveOrg(org.id);
@@ -53,7 +57,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('a revive written as a set operation restores the subtree too', async () => {
-    const { org, space, contact } = await makeTree();
+    const { org, space, contact } = await createOrganizationWithSpaceAndContact();
 
     await tombstoneOrg(org.id);
     await db.organization.updateManyAndReturn({
@@ -66,7 +70,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('a child deleted independently keeps its own timestamp and stays dead through revive', async () => {
-    const { org, space, contact } = await makeTree();
+    const { org, space, contact } = await createOrganizationWithSpaceAndContact();
     const { entity: survivor } = await createContact(
       { ownerModel: ContactOwnerModel.Space },
       { space },
@@ -86,7 +90,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('re-tombstoning an already-deleted row does not re-cascade', async () => {
-    const { org, space } = await makeTree();
+    const { org, space } = await createOrganizationWithSpaceAndContact();
 
     await tombstoneOrg(org.id);
     const spaceDeletedAt = (await spaceById(space.id))?.deletedAt;
@@ -102,26 +106,35 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('an ordinary update that never touches deletedAt does not cascade', async () => {
-    const { org, space } = await makeTree();
+    const { org, space } = await createOrganizationWithSpaceAndContact();
 
     await db.organization.update({ where: { id: org.id }, data: { name: 'renamed' } });
 
     expect((await spaceById(space.id))?.deletedAt).toBeNull();
   });
 
-  it('exempt reference edges do not cascade: an inquiry outlives its sender', async () => {
+  it("a party's tombstone cancels its open inquiries without burying them, and leaves its closed ones (Aron, 2026-11-16)", async () => {
     const { entity: sender } = await createOrganization();
     const { entity: target } = await createUser();
-    const { entity: inquiry } = await createInquiry({
+    const parties = {
       sourceModel: InquiryResourceModel.Organization,
       sourceOrganizationId: sender.id,
       targetModel: InquiryResourceModel.User,
       targetUserId: target.id,
-    });
+    };
+    const { entity: open } = await createInquiry({ ...parties, status: InquiryStatus.sent });
+    const { entity: decided } = await createInquiry({ ...parties, status: InquiryStatus.denied });
 
     await db.organization.update({ where: { id: sender.id }, data: { deletedAt: new Date() } });
 
-    expect((await db.inquiry.findUnique({ where: { id: inquiry.id } }))?.deletedAt).toBeNull();
+    const read = (id: string) =>
+      db.withDeleted(() => db.inquiry.findUniqueOrThrow({ where: { id } }));
+    expect(await read(open.id)).toMatchObject({
+      status: InquiryStatus.canceled,
+      expiresAt: null,
+      deletedAt: null,
+    });
+    expect(await read(decided.id)).toMatchObject({ status: InquiryStatus.denied, deletedAt: null });
   });
 
   it('revocation registry: tombstoning a user hard-deletes its sessions, and revive does not resurrect them', async () => {

@@ -6,15 +6,15 @@
  */
 import type { Prisma } from '@template/db';
 import { emitAppEvent } from '#/appEvents/emit';
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateSegmentRoute } from '#/modules/me/routes/meCreateSegment';
-import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { attachRuleHealthToSegment } from '#/modules/segment/services/attachRuleHealthToSegments';
 
 export const meCreateSegmentController = makeController(
   meCreateSegmentRoute,
   async (c, respond) => {
-    const user = me(c)!;
+    const user = actingUser(c)!;
     const db = c.get('db');
     const body = c.req.valid('json');
 
@@ -28,6 +28,6 @@ export const meCreateSegmentController = makeController(
 
     await emitAppEvent('segment.created', { segment });
 
-    return respond.created(await withSegmentRuleIssues(segment));
+    return respond.created(await attachRuleHealthToSegment(segment));
   },
 );

@@ -7,7 +7,7 @@
 INFRA-037 ported rolling caches from Zealot #2786. Zealot's AI rules stack (#2872) then changed the
 cache under them:
 
-- A value computed before a clear could still land after it: `cache()` wrote unconditionally.
+- A value computed before a clear could still land after it: `fetchThroughCache()` wrote unconditionally.
 - N cold readers of a rolling cache sent N refresh enqueues.
 - An aborted rolling refresh held its lock until `compute` returned, and a second release could delete
   a successor's lock.
@@ -15,9 +15,9 @@ cache under them:
 
 ## What landed
 
-**A clear cancels the computes it races.** `cache()` captures the key's generation after it takes the
+**A clear cancels the computes it races.** `fetchThroughCache()` captures the key's generation after it takes the
 single-flight lock and before the producer runs, and publishes through one Lua call that writes only
-if it has not moved (`queries/publishIfCurrent`). An exact `clearKey` deletes the value and its write
+if it has not moved (`queries/publishIfCurrent`). An exact `clearCacheKeysMatchingPattern` deletes the value and its write
 time and moves the generation in one call (`queries/clearExact`); a pattern clear does the same for
 every key whose single-flight lock matches the pattern, then scans and deletes the values, and throws
 when it fails. `upsertCache` checks and writes through with a fresh generation in one call
@@ -31,7 +31,7 @@ and `isQueued` beside a held value. `checkRollingCache` sets the target's queued
 only if it set it; a failed enqueue clears the marker. A refresh that wrote clears it; an aborted one
 leaves it for its retry.
 
-**Locks.** A rolling refresh releases its lock when its signal aborts. `createLock`'s `release` is
+**Locks.** A rolling refresh releases its lock when its signal aborts. `makeLock`'s `release` is
 sent once and shared, a released lock cannot acquire again, and a release that lands during a pending
 SET deletes the key that SET wrote. Single-flight is a lock, so it moved to
 `packages/db/src/lock/singleFlight/`, its key built with `lockKeyOf`. The poll loop

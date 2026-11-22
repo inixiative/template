@@ -1,3 +1,4 @@
+import { registerAttributeValidationHook } from '@template/db';
 import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
@@ -5,31 +6,40 @@ import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
-import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
-import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
+import { registerEntitlementChangeRequestsHook } from '#/hooks/entitlementChangeRequests/hook';
+import { registerValidateEntitlementLensHook } from '#/hooks/entitlementLens/hook';
+import { registerCarriedOwnerKeysHook } from '#/hooks/falsePolymorphism/carriedOwnerKeysHook';
+import { registerFullDelegateTakesNoRoleOrEntitlementsHook } from '#/hooks/fullDelegate/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerOrganizationUserFolderHook } from '#/hooks/organizationUserFolder/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerProjectIntegrationOwnerHook } from '#/hooks/projectIntegrationOwner/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
+import { registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
-import { registerUserEmailInvariantHook } from '#/hooks/userEmail/hook';
+import { registerUserEmailAddressValidationHook } from '#/hooks/userEmail/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { registerWebhookSubscriptionUrlHook } from '#/hooks/webhookSubscriptionUrl/hook';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
+import { makeError } from '#/lib/errors';
 
 export const registerHooks = () => {
-  registerDelegatedKeysHook();
-  registerFullDelegateHook();
+  registerCarriedOwnerKeysHook();
+  registerFullDelegateTakesNoRoleOrEntitlementsHook();
+  registerValidateEntitlementLensHook();
+  registerEntitlementChangeRequestsHook();
   registerMemberSelfGrantHook();
   registerRulesHook();
   registerArtifactAccessHook();
+  registerAttributeValidationHook({
+    makeValidationError: (message) => makeError({ status: 422, message }),
+  });
   registerAuditLogHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();
@@ -40,13 +50,14 @@ export const registerHooks = () => {
   registerOrderedListHook();
   registerOrganizationUserFolderHook();
   registerPreventHardDeleteHook();
+  registerProjectIntegrationOwnerHook();
   registerRuleReferenceHook();
   registerRuleReferenceTargetHook();
   registerSegmentConditionsHook();
-  registerSegmentMemberOwnerHook();
+  registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook();
   registerSoftDeleteCascadeHook();
   registerTagOwnerCategoryHook();
-  registerUserEmailInvariantHook();
+  registerUserEmailAddressValidationHook();
   registerUserEmailContactHook();
   registerWebhookHook();
   registerWebhookSubscriptionUrlHook();

@@ -12,7 +12,7 @@ import { artifactOwner } from '#/modules/artifact/lib/artifactOwner';
 import type { ArtifactPrincipal } from '#/modules/artifact/lib/artifactPrincipal';
 import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
-import { readAsCaller } from '#/modules/batch/services/readAsCaller';
+import { fetchAsCaller } from '#/modules/batch/services/fetchAsCaller';
 import type { AppEnv } from '#/types/appEnv';
 
 export type ArtifactUses = {
@@ -25,15 +25,15 @@ export type ArtifactUses = {
 const ownerReadPath: Partial<
   Record<ResourceBinding['resourceModel'], (b: ResourceBinding) => string>
 > = {
-  Organization: (binding) => `/api/v1/organization/${binding.organizationId}`,
-  Space: (binding) => `/api/v1/space/${binding.spaceId}`,
+  Organization: (binding) => `/api/v1/organization/${binding.resourceOrganizationId}`,
+  Space: (binding) => `/api/v1/space/${binding.resourceSpaceId}`,
 };
 
 const visibleToCaller = async (c: Context<AppEnv>, binding: ResourceBinding): Promise<boolean> => {
-  if (binding.resourceModel === 'User') return c.get('user')?.id === binding.userId;
+  if (binding.resourceModel === 'User') return c.get('user')?.id === binding.resourceUserId;
   const path = ownerReadPath[binding.resourceModel]?.(binding);
   if (!path) return false;
-  const { status } = await readAsCaller(c, path);
+  const { status } = await fetchAsCaller(c, path);
   return status >= 200 && status < 300;
 };
 
@@ -45,7 +45,7 @@ export const listArtifactUses = async (
   const [artifact, placements, bindings, resolutions] = await Promise.all([
     db.artifact.findUniqueOrThrow({ where: { id: artifactId } }),
     db.artifactPlacement.findMany({ where: { artifactId } }),
-    db.resourceBinding.findMany({ where: { artifactId } }),
+    db.resourceBinding.findMany({ where: { sourceArtifactId: artifactId } }),
     resolveArtifactAccess([artifactId]),
   ]);
   const containers = await checkArtifactAccess(

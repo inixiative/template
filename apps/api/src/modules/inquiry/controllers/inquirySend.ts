@@ -4,7 +4,7 @@
  * @partOf feature:inquiry
  * @uses primitive:routeTemplates
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
 import { sendInquiry } from '#/modules/inquiry/services/sendInquiry';
@@ -12,7 +12,7 @@ import { sendInquiry } from '#/modules/inquiry/services/sendInquiry';
 export const inquirySendController = makeController(inquirySendRoute, async (c, respond) => {
   const sent = await sendInquiry(
     c,
-    getResource<'inquiry'>(c),
+    contextResource<'inquiry'>(c),
     c.req.valid('json').expectedUpdatedAt,
   );
   return respond.ok(sent);

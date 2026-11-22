@@ -9,7 +9,7 @@ export const CONCEPTS: ConceptRegistry = {
   'feature:users': { module: ['user', 'me'] },
   'feature:inquiry': { module: ['inquiry'], docs: ['INQUIRIES.md'] },
   'feature:contact': { module: ['contact'] },
-  'feature:customer': { module: ['customerRef'] },
+  'feature:customer': { module: ['customerRelationship'] },
   'feature:segment': { module: ['segment'] },
   'feature:files': { module: ['artifact'], docs: ['ARTIFACTS.md'] },
   'feature:auditLogs': { module: ['auditLog'], docs: ['HOOKS.md'] }, // lives under modules/admin/, but is its own feature
@@ -18,6 +18,7 @@ export const CONCEPTS: ConceptRegistry = {
   'feature:webhooks': { module: ['webhookSubscription'], docs: ['HOOKS.md'] },
   'feature:integrations': { module: ['integration'] },
   'feature:project': { module: ['project'] },
+  'feature:setting': { module: ['setting'], docs: ['SETTINGS.md'] },
   'feature:email': { package: ['email'], docs: ['COMMUNICATIONS.md'] },
 
   // classless cross-cutting tag (derived): the BE admin surface IS superadmin.

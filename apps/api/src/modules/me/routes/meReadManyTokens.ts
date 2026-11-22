@@ -9,9 +9,9 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { organizationUserReadResponseSchema } from '#/modules/organizationUser/schemas/organizationUserSchemas';
 import { spaceUserReadResponseSchema } from '#/modules/spaceUser/schemas/spaceUserSchemas';
-import { Tags } from '#/modules/tags';
 import { tokenReadResponseSchema } from '#/modules/token/schemas/tokenSchemas';
 
 const responseSchema = tokenReadResponseSchema.extend({
@@ -30,5 +30,5 @@ export const meReadManyTokensRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('Token') },
   responseSchema,
-  tags: [Tags.me, Tags.token],
+  tags: [OpenApiTags.me, OpenApiTags.token],
 });

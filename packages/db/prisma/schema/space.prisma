@@ -13,6 +13,11 @@ model Space {
   updatedAt          DateTime      @updatedAt
   deletedAt          DateTime?
 
+  // The tenant's own additions to the permission schema for the records under it.
+  // Shape: Record<Resource, Record<Action, ActionRule>> ('db:contact' → read → rule). check() ORs each
+  // rule with the schema's for that resource and action. Null = schema-only.
+  tenantPermissionRules Json?
+
   name String
   slug String
 
@@ -25,26 +30,27 @@ model Space {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Relations
-  spaceUsers           SpaceUser[]
-  tokens               Token[]
-  webhookSubscriptions WebhookSubscription[]
-  integrations         Integration[]
-  projects             Project[]
-  contacts             Contact[]
-  tagAttachments       TagAttachment[]
-  tags                 Tag[]
-  tagCategories        TagCategory[]
-  emailComponents      EmailComponent[]
-  emailTemplates       EmailTemplate[]
-  targetRuleReferences RuleReference[]       @relation("RuleReferenceTarget")
-  customerRefs         CustomerRef[]         @relation("customerRefs")
-  providerRefs         CustomerRef[]         @relation("providerRefs")
-  inquiriesSent        Inquiry[]             @relation("InquirySource")
-  inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
-  auditLogsAsContext   AuditLog[]            @relation("AuditLogContextSpace")
-  auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectSpace")
-  communicationsSent   CommunicationLog[]    @relation("CommunicationSenderSpace")
-  segments             Segment[]
+  spaceUsers                      SpaceUser[]
+  tokens                          Token[]
+  webhookSubscriptions            WebhookSubscription[]
+  integrations                    Integration[]
+  projects                        Project[]
+  contacts                        Contact[]
+  tagAttachments                  TagAttachment[]
+  tags                            Tag[]
+  tagCategories                   TagCategory[]
+  emailComponents                 EmailComponent[]
+  emailTemplates                  EmailTemplate[]
+  targetRuleReferences            RuleReference[]        @relation("RuleReferenceTarget")
+  customerRelationshipsAsProvider CustomerRelationship[] @relation("CustomerRelationshipAsProvider")
+  customerRelationshipsAsCustomer CustomerRelationship[] @relation("CustomerRelationshipAsCustomer")
+  inquiriesSent                   Inquiry[]              @relation("InquirySource")
+  inquiriesReceived               Inquiry[]              @relation("InquiryTarget")
+  auditLogsAsContext              AuditLog[]             @relation("AuditLogContextSpace")
+  auditLogsAsSubject              AuditLog[]             @relation("AuditLogSubjectSpace")
+  communicationsSent              CommunicationLog[]     @relation("CommunicationSenderSpace")
+  segments                        Segment[]
+  settings                        Setting[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

@@ -23,7 +23,7 @@ export const webhookUrlSchema = z.string().superRefine((url, ctx) => {
 });
 
 export const webhookSubscriptionCreateBodySchema = WebhookSubscriptionScalarInputSchema.pick({
-  model: true,
+  resourceModel: true,
   url: true,
 }).extend({ url: webhookUrlSchema });
 

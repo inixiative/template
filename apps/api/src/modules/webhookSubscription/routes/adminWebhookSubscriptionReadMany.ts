@@ -18,7 +18,7 @@ const querySchema = z.object({
   ownerModel: z.nativeEnum(WebhookOwnerModel).optional(),
   userId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),
-  model: z.nativeEnum(WebhookModel).optional(),
+  resourceModel: z.nativeEnum(WebhookModel).optional(),
   isActive: z.coerce.boolean().optional(),
 });
 

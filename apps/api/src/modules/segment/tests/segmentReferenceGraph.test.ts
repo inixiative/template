@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import type { ReferenceMap } from '@template/shared/graph';
-import { referencedBy, sortByDependency } from '#/modules/segment/services/segmentReferenceGraph';
+import {
+  segmentIdsReferencingSegment,
+  sortByDependency,
+} from '#/modules/segment/services/segmentReferenceGraph';
 
 const graph = (edges: Record<string, string[]>): ReferenceMap =>
   new Map(Object.entries(edges).map(([id, targets]) => [id, new Set(targets)]));
@@ -19,7 +22,7 @@ describe('segmentReferenceGraph', () => {
 
   it('answers who references a segment', () => {
     const references = graph({ a: ['c'], b: ['c'], c: [] });
-    expect(referencedBy(references, 'c').sort()).toEqual(['a', 'b']);
-    expect(referencedBy(references, 'a')).toEqual([]);
+    expect(segmentIdsReferencingSegment(references, 'c').sort()).toEqual(['a', 'b']);
+    expect(segmentIdsReferencingSegment(references, 'a')).toEqual([]);
   });
 });

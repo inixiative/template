@@ -9,7 +9,7 @@ import {
 } from '@template/db/test';
 import { ConditionValidationError } from '@template/email/errors';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
-import { deadReferencesOf } from '#tests/utils/deadReferences';
+import { expectRuleReferenceErrorDeadReferences } from '#tests/utils/deadReferences';
 
 const deadTargets = (edges: RuleReferenceRow[]) =>
   ruleReferenceTargets(edges).filter((target) => target.state !== 'existing');
@@ -171,7 +171,7 @@ describe('ruleReference — the save path writes edges, the target side stamps t
 
   it('naming a row that does not exist is refused at save', async () => {
     const id = '01900000-0000-7000-8000-000000000000';
-    expect(await deadReferencesOf(save(mjml(taggedBlock(id))))).toEqual([
+    expect(await expectRuleReferenceErrorDeadReferences(save(mjml(taggedBlock(id))))).toEqual([
       { model: 'Tag', id, state: 'missing' },
     ]);
   });
@@ -180,7 +180,7 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     const { entity: tag } = await createTag();
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
 
-    expect(await deadReferencesOf(save(mjml(taggedBlock(tag.id))))).toEqual([
+    expect(await expectRuleReferenceErrorDeadReferences(save(mjml(taggedBlock(tag.id))))).toEqual([
       { model: 'Tag', id: tag.id, state: 'deleted' },
     ]);
   });
@@ -257,7 +257,7 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     expect(edited.subject).toBe('Typo fixed');
 
     expect(
-      await deadReferencesOf(
+      await expectRuleReferenceErrorDeadReferences(
         save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit', subject: 'Typo fixed' }),
       ),
     ).toEqual([{ model: 'Tag', id: tag.id, state: 'deleted' }]);

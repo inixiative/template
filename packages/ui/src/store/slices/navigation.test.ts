@@ -26,7 +26,7 @@ describe('navigation slice', () => {
       expect(typeof navigation.setNavigate).toBe('function');
       expect(typeof navigation.setNavConfig).toBe('function');
       expect(typeof navigation.setCurrentRouteMatch).toBe('function');
-      expect(typeof navigation.navigatePreserving).toBe('function');
+      expect(typeof navigation.navigateKeepingSearchParams).toBe('function');
     });
   });
 
@@ -81,10 +81,10 @@ describe('navigation slice', () => {
     });
   });
 
-  describe('navigatePreserving', () => {
+  describe('navigateKeepingSearchParams', () => {
     it('should do nothing when navigate is not set', () => {
       expect(() => {
-        store.getState().navigation.navigatePreserving('/dashboard', 'context');
+        store.getState().navigation.navigateKeepingSearchParams('/dashboard', 'context');
       }).not.toThrow();
     });
 
@@ -92,7 +92,7 @@ describe('navigation slice', () => {
       const mockNavigate = mock(() => {});
       store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
-      store.getState().navigation.navigatePreserving('/dashboard', 'context');
+      store.getState().navigation.navigateKeepingSearchParams('/dashboard', 'context');
 
       expect(mockNavigate).toHaveBeenCalled();
     });
@@ -101,7 +101,7 @@ describe('navigation slice', () => {
       const mockNavigate = mock(() => {});
       store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
-      store.getState().navigation.navigatePreserving('/dashboard', 'context');
+      store.getState().navigation.navigateKeepingSearchParams('/dashboard', 'context');
 
       expect(mockNavigate).toHaveBeenCalled();
       const [arg] = mockNavigate.mock.calls[0] as unknown as [
@@ -115,7 +115,7 @@ describe('navigation slice', () => {
       const mockNavigate = mock(() => {});
       store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
-      store.getState().navigation.navigatePreserving('/dashboard#section', 'context');
+      store.getState().navigation.navigateKeepingSearchParams('/dashboard#section', 'context');
 
       expect(mockNavigate).toHaveBeenCalled();
       const [arg] = mockNavigate.mock.calls[0] as unknown as [
@@ -135,7 +135,7 @@ describe('navigation slice', () => {
         },
       });
 
-      store.getState().navigation.navigatePreserving('/dashboard', 'spoof');
+      store.getState().navigation.navigateKeepingSearchParams('/dashboard', 'spoof');
 
       expect(mockNavigate).toHaveBeenCalled();
       const [arg] = mockNavigate.mock.calls[0] as unknown as [

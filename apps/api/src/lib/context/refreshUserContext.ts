@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma, primitive:errors, feature:users
  */
 import type { Context } from 'hono';
-import { loadTokenContext } from '#/lib/context/loadTokenContext';
+import { fetchTokenContext } from '#/lib/context/fetchTokenContext';
 import { setTokenContext } from '#/lib/context/setTokenContext';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
@@ -15,7 +15,7 @@ import type { AppEnv } from '#/types/appEnv';
 export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
   const token = c.get('token');
   if (token) {
-    const signIn = await loadTokenContext(token.keyHash);
+    const signIn = await fetchTokenContext(token.keyHash);
     if (!signIn) throw makeError({ status: 401, message: 'Token no longer valid' });
     return setTokenContext(c, signIn.context);
   }

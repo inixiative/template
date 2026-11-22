@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { bindLens } from '#/lib/email/bindLens';
 import { bindWhere } from '#/lib/email/bindWhere';
-import { pickSender } from '#/lib/email/pickSender';
-import { registry } from '#/lib/email/registry';
+import { emailTemplateRegistry } from '#/lib/email/emailTemplateRegistry';
+import { senderFromEntityFields } from '#/lib/email/senderFromEntityFields';
 
-const inquiry = registry['inquiry-invite-organization-user'];
+const inquiry = emailTemplateRegistry['inquiry-invite-organization-user'];
 
 describe('bindLens', () => {
   it('binds the entity where from the handoff by name', () => {
@@ -54,20 +54,22 @@ describe('bindWhere', () => {
   });
 });
 
-describe('pickSender', () => {
+describe('senderFromEntityFields', () => {
   it('platform reads nothing from the entity', () => {
-    expect(pickSender(registry.welcome.sender, {})).toEqual({ type: 'platform' });
+    expect(senderFromEntityFields(emailTemplateRegistry.welcome.sender, {})).toEqual({
+      type: 'platform',
+    });
   });
 
   it('Organization reads its id from the named entity field', () => {
-    expect(pickSender(inquiry.sender, { sourceOrganizationId: 'org-9' })).toEqual({
+    expect(senderFromEntityFields(inquiry.sender, { sourceOrganizationId: 'org-9' })).toEqual({
       type: 'Organization',
       organizationId: 'org-9',
     });
   });
 
   it('throws when the named field is empty', () => {
-    expect(() => pickSender(inquiry.sender, { sourceOrganizationId: null })).toThrow(
+    expect(() => senderFromEntityFields(inquiry.sender, { sourceOrganizationId: null })).toThrow(
       'Sender organizationId reads entity field "sourceOrganizationId", which is empty',
     );
   });

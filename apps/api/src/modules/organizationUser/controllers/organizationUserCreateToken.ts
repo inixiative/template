@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { organizationUserCreateTokenRoute } from '#/modules/organizationUser/routes/organizationUserCreateToken';
@@ -12,7 +12,7 @@ import { organizationUserCreateTokenRoute } from '#/modules/organizationUser/rou
 export const organizationUserCreateTokenController = makeController(
   organizationUserCreateTokenRoute,
   async (c, respond) => {
-    const orgUser = getResource<'organizationUser'>(c);
+    const orgUser = contextResource<'organizationUser'>(c);
     const body = c.req.valid('json');
 
     const token = await createToken(c, {

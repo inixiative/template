@@ -15,7 +15,7 @@ import { memo, useState } from 'react';
 type CreateIntegrationFormData = Pick<MeCreateIntegrationData['body'], 'name' | 'provider'>;
 
 type CreateIntegrationModalProps = {
-  provider: IntegrationProvider | null | undefined;
+  provider: IntegrationProvider | null;
   onClose: () => void;
   onSubmit: (data: CreateIntegrationFormData) => void;
 };
@@ -48,12 +48,12 @@ export const CreateIntegrationModal = memo(
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!trimmedName) return;
-      onSubmit({ name: trimmedName, provider: provider ?? null });
+      onSubmit({ name: trimmedName, provider });
       close();
     };
 
     return (
-      <Modal isOpen={provider !== undefined} onClose={close} title={copy.title}>
+      <Modal isOpen onClose={close} title={copy.title}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="integration-name">Integration name</Label>

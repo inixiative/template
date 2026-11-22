@@ -5,6 +5,7 @@
  * @uses none
  */
 import {
+  applyWriteDataOverPreviousRow,
   DbAction,
   type HookOptions,
   HookTiming,
@@ -12,7 +13,6 @@ import {
   SOFT_DELETE_MODELS,
 } from '@template/db';
 import { castArray } from 'lodash-es';
-import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { reviveChildren, tombstoneChildren } from '#/hooks/softDeleteCascade/cascade';
 import { validateDeleteBehavior } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
 
@@ -57,7 +57,8 @@ export const registerSoftDeleteCascadeHook = () => {
         groups.set(key, group);
       };
 
-      const isReviving = shadowMerge(undefined, { deletedAt: data.deletedAt }).deletedAt === null;
+      const isReviving =
+        applyWriteDataOverPreviousRow(undefined, { deletedAt: data.deletedAt }).deletedAt === null;
       for (const row of castArray(result) as Row[]) {
         if (isReviving && priorStamp(row) != null) addTo(priorStamp(row), row);
         if (!isReviving && row.deletedAt != null && priorStamp(row) == null)

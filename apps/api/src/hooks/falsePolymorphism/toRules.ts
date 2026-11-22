@@ -1,15 +1,16 @@
 import type { Condition } from '@inixiative/json-rules';
 import { Operator } from '@inixiative/json-rules';
 import {
-  delegatedKeys,
+  keysHeldOnAxis,
   type ModelName,
   type PolymorphicAxis,
   type PolymorphicValue,
   PolymorphismRegistry,
+  sideKeyColumns,
   toModelName,
 } from '@template/db';
 
-// why: a hard-deleted source (SegmentMember, Flow, WebhookSubscription) nulls its SetNull FK; the plain id still names it.
+// why: a hard-deleted source (Flow, WebhookSubscription) nulls its SetNull FK; the plain id still names it.
 const requiredForeignKey = (
   model: ModelName,
   axis: PolymorphicAxis,
@@ -18,21 +19,24 @@ const requiredForeignKey = (
 ): Condition => {
   const error = `${model} with ${axis.field}=${typeValue} requires ${fk}`;
   const present: Condition = { field: fk, operator: Operator.notEmpty, value: true };
-  return axis.materialized
+  return axis.dualPolymorphismId
     ? {
-        any: [present, { field: axis.materialized, operator: Operator.notEmpty, value: true }],
+        any: [
+          present,
+          { field: axis.dualPolymorphismId, operator: Operator.notEmpty, value: true },
+        ],
         error,
       }
     : { ...present, error };
 };
 
 const buildAxisRule = (model: ModelName, axis: PolymorphicAxis): Condition => {
-  const allFks = [...new Set(Object.values(axis.fkMap).flat())];
+  const allFks = sideKeyColumns(axis);
   const typeValues = Object.keys(axis.fkMap) as PolymorphicValue[];
 
   const branches = typeValues.map((typeValue) => {
     const requiredFks = axis.fkMap[typeValue] ?? [];
-    const carriedFks = [...requiredFks, ...delegatedKeys(axis, typeValue)];
+    const carriedFks = keysHeldOnAxis(model, axis, typeValue);
     const forbiddenFks = allFks.filter((fk: string) => !carriedFks.includes(fk));
 
     const conditions: Condition[] = [

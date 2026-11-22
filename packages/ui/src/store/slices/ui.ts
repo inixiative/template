@@ -5,29 +5,12 @@
  * @uses none
  */
 import type { AppStore } from '@template/ui/store/types';
+import type { UISlice } from '@template/ui/store/types/ui';
 import type { StateCreator } from 'zustand';
-
-export type Theme = 'light' | 'dark' | 'system';
-
-export type UISlice = {
-  ui: {
-    theme: Theme;
-    isLoading: boolean;
-    projectName: string;
-    appName: string;
-    shortName: string;
-    logo: string;
-    description: string;
-    setTheme: (theme: Theme) => void;
-    setLoading: (loading: boolean) => void;
-    updateTheme: (theme: Theme) => Promise<void>;
-  };
-};
 
 export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => ({
   ui: {
     theme: 'system',
-    isLoading: false,
     projectName: import.meta.env.VITE_PROJECT_NAME || 'Template',
     appName: import.meta.env.VITE_APP_NAME || 'App',
     shortName: import.meta.env.VITE_APP_SHORT_NAME || 'Template',
@@ -38,18 +21,5 @@ export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => (
       set((state) => ({
         ui: { ...state.ui, theme },
       })),
-
-    setLoading: (loading) =>
-      set((state) => ({
-        ui: { ...state.ui, isLoading: loading },
-      })),
-
-    updateTheme: async (theme) => {
-      // TODO: Call API to update user settings
-      // await fetch('/api/users/me/settings', { method: 'PATCH', body: { theme } })
-      set((state) => ({
-        ui: { ...state.ui, theme },
-      }));
-    },
   },
 });

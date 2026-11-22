@@ -1,12 +1,12 @@
 import type { NavConfig } from '@template/ui/components';
-import { organizationContext } from '#/config/nav/contexts/organizationContext';
-import { publicContext } from '#/config/nav/contexts/publicContext';
-import { spaceContext } from '#/config/nav/contexts/spaceContext';
-import { userContext } from '#/config/nav/contexts/userContext';
+import { organizationNavigationItems } from '#/config/nav/navigationByContext/organizationNavigationItems';
+import { publicNavigationItems } from '#/config/nav/navigationByContext/publicNavigationItems';
+import { spaceNavigationItems } from '#/config/nav/navigationByContext/spaceNavigationItems';
+import { userNavigationItems } from '#/config/nav/navigationByContext/userNavigationItems';
 
 export const navConfig: NavConfig = {
-  user: userContext,
-  organization: organizationContext,
-  space: spaceContext,
-  public: publicContext,
+  user: userNavigationItems,
+  organization: organizationNavigationItems,
+  space: spaceNavigationItems,
+  public: publicNavigationItems,
 };

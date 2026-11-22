@@ -4,6 +4,8 @@
 
 model Project {
   id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  inquiriesSent        Inquiry[]       @relation("InquirySource")
+  inquiriesReceived    Inquiry[]       @relation("InquiryTarget")
   sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
   targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
   createdAt            DateTime        @default(now())
@@ -24,7 +26,12 @@ model Project {
   space            Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
   spaceUser        SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
 
-  tagAttachments TagAttachment[]
+  tagAttachments              TagAttachment[]
+  settings                    Setting[]
+  projectIntegrations         ProjectIntegration[]
+  projectIntegrationResources ProjectIntegrationResource[]
+
+  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProject")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

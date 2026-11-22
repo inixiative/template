@@ -19,8 +19,8 @@ import { Modal } from '@template/ui/components/layout/Modal';
 import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
 import { Button } from '@template/ui/components/primitives/Button';
 import { type StartedFlow, useStartFlow } from '@template/ui/hooks/flow/useStartFlow';
-import { useAuthenticatedRouting } from '@template/ui/hooks/useAuthenticatedRouting';
 import { useRegisterNavigation } from '@template/ui/hooks/useRegisterNavigation';
+import { useSyncTenantContextWithUrlAndAuthorizeRoute } from '@template/ui/hooks/useSyncTenantContextWithUrlAndAuthorizeRoute';
 import { createAppQueryClient } from '@template/ui/lib/createAppQueryClient';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
@@ -101,6 +101,7 @@ const Work = () => {
 };
 
 let withModal: boolean;
+let modalClosedCount: number;
 
 const Starter = () => {
   const { mutateAsync } = useStartFlow();
@@ -121,14 +122,20 @@ const Starter = () => {
 
 const Root = () => {
   useRegisterNavigation(navConfig);
-  useAuthenticatedRouting();
+  useSyncTenantContextWithUrlAndAuthorizeRoute();
   return (
     <>
       <FlowBanner />
       <Work />
       <Starter />
       {withModal && (
-        <Modal isOpen onClose={() => undefined} title="Your key">
+        <Modal
+          isOpen
+          onClose={() => {
+            modalClosedCount += 1;
+          }}
+          title="Your key"
+        >
           key
         </Modal>
       )}
@@ -164,6 +171,7 @@ const doWork = async () => {
 beforeEach(() => {
   holding = 0;
   withModal = false;
+  modalClosedCount = 0;
   started = undefined;
   gone = false;
   requests = [];
@@ -197,11 +205,13 @@ afterEach(() => {
 });
 
 describe('flow client', () => {
-  it('is seeded from ?flow= and kept across navigatePreserving', async () => {
+  it('is seeded from ?flow= and kept across navigateKeepingSearchParams', async () => {
     const router = await renderInFlow();
     expect(useAppStore.getState().navigation.flowId).toBe(FLOW_ID);
 
-    act(() => useAppStore.getState().navigation.navigatePreserving('/settings/tokens', 'context'));
+    act(() =>
+      useAppStore.getState().navigation.navigateKeepingSearchParams('/settings/tokens', 'context'),
+    );
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/settings/tokens'));
     expect(router.state.location.search).toMatchObject({ flow: FLOW_ID });
@@ -245,6 +255,21 @@ describe('flow client', () => {
     expect(router.state.location.hash).toBe('create-token');
   });
 
+  it('Escape and backdrop click close an open modal without navigating to the next flow step', async () => {
+    holding = 1;
+    withModal = true;
+    const router = await renderInFlow();
+
+    await screen.findAllByRole('button', { name: 'Continue: Create an API token for CI' });
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(modalClosedCount).toBe(1);
+    expect(router.state.location.pathname).toBe('/users/members');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close modal' }));
+    expect(modalClosedCount).toBe(2);
+    expect(router.state.location.pathname).toBe('/users/members');
+  });
+
   it('finishes on returnUrl once the last step is confirmed', async () => {
     holding = 2;
     const router = await renderInFlow('/settings/tokens');
@@ -284,7 +309,9 @@ describe('flow client', () => {
   it('drops the flow when the user leaves its pages', async () => {
     await renderInFlow();
 
-    act(() => useAppStore.getState().navigation.navigatePreserving('/elsewhere', 'context'));
+    act(() =>
+      useAppStore.getState().navigation.navigateKeepingSearchParams('/elsewhere', 'context'),
+    );
 
     await waitFor(() => expect(useAppStore.getState().navigation.flowId).toBeNull());
     await waitFor(() =>

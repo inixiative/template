@@ -100,7 +100,7 @@ if [ -z "$SLOT" ]; then
   warn "Warning: No WORKTREE_SLOT found in $WORKTREE_DIR/.env.local"
   warn "Proceeding with worktree removal only (no DB / bucket / Redis / port cleanup)"
 else
-  valid_slot "$SLOT" || die "Error: WORKTREE_SLOT='$SLOT' in $WORKTREE_DIR/.env.local is not a slot number (1-9). Fix the file, then re-run."
+  is_valid_slot "$SLOT" || die "Error: WORKTREE_SLOT='$SLOT' in $WORKTREE_DIR/.env.local is not a slot number (1-9). Fix the file, then re-run."
   slot_resources "$SLOT"
 
   if CLAIMANT="$(slot_claimant "$SLOT" "$WORKTREE_DIR")"; then
@@ -132,7 +132,7 @@ else
 
     info "Removing MinIO buckets for slot ${SLOT}..."
     storage_env_from "$ROOT_DIR/.env.local"
-    PATH="$(dirname "$DOCKER"):$PATH" bash "$SCRIPT_DIR/../db/minio-remove.sh" \
+    bash "$SCRIPT_DIR/../db/minio-remove.sh" \
       "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
       "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST" \
       || warn "Warning: bucket removal did not complete."

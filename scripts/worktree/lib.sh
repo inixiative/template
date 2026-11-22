@@ -123,7 +123,7 @@ project_name() {
   printf '%s' "$name"
 }
 
-valid_slot() {
+is_valid_slot() {
   [[ "$1" =~ ^[1-9]$ ]]
 }
 
@@ -213,6 +213,8 @@ storage_env_from() {
   STORAGE_ENDPOINT="$(env_value "$file" STORAGE_ENDPOINT)"
   STORAGE_ACCESS_KEY_ID="$(env_value "$file" STORAGE_ACCESS_KEY_ID)"
   STORAGE_SECRET_ACCESS_KEY="$(env_value "$file" STORAGE_SECRET_ACCESS_KEY)"
+  STORAGE_REGION="$(env_value "$file" STORAGE_REGION)"
+  export STORAGE_REGION="${STORAGE_REGION:-us-east-1}"
   export STORAGE_ENDPOINT="${STORAGE_ENDPOINT:-http://localhost:9000}"
   export STORAGE_ACCESS_KEY_ID="${STORAGE_ACCESS_KEY_ID:-minioadmin}"
   export STORAGE_SECRET_ACCESS_KEY="${STORAGE_SECRET_ACCESS_KEY:-minioadmin}"
@@ -463,7 +465,7 @@ registry_entries() {
   for f in "$(slots_dir)"/*; do
     [ -f "$f" ] || continue
     slot="$(basename "$f")"
-    valid_slot "$slot" || continue
+    is_valid_slot "$slot" || continue
     printf '%s %s\n' "$slot" "$(registry_owner "$slot")"
   done
   return 0
@@ -479,7 +481,7 @@ registry_problems() {
     [ -e "$f" ] || continue
     slot="$(basename "$f")"
     if [ ! -f "$f" ]; then echo "$slot: not a regular file"; continue; fi
-    valid_slot "$slot" || { echo "$slot: not a slot number"; continue; }
+    is_valid_slot "$slot" || { echo "$slot: not a slot number"; continue; }
     raw="$(registry_raw "$slot")"
     if [ -z "$raw" ]; then echo "$slot: empty (corrupt)"
     elif [[ "$raw" != /* ]]; then echo "$slot: relative path '$raw' (should be absolute)"
@@ -496,7 +498,7 @@ prune_slot_registry() {
   for f in "$(slots_dir)"/*; do
     [ -f "$f" ] || continue
     slot="$(basename "$f")"
-    if ! valid_slot "$slot"; then
+    if ! is_valid_slot "$slot"; then
       warn "Slot registry entry '$slot' is not a slot number — removing it. $(registry_repair_hint)"
       rm -f "$f"
       continue

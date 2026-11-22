@@ -21,7 +21,7 @@ import { artifactPlacementRouter } from '#/modules/artifactPlacement';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { del, get, json, patch, post } from '#tests/utils/request';
+import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [
   (app) => {
@@ -50,7 +50,7 @@ describe('artifact routes', () => {
   const createFolder = async (fetch: Fetch, path: string, body: Record<string, unknown> = {}) => {
     const response = await fetch(post(path, { kind: 'folder', name: 'folder', ...body }));
     expect(response.status).toBe(201);
-    return (await json<Artifact>(response)).data;
+    return (await parseSuccessBody<Artifact>(response)).data;
   };
 
   const place = (fetch: Fetch, artifact: Artifact, container: Artifact) =>
@@ -63,7 +63,7 @@ describe('artifact routes', () => {
   const placeDraftsInShared = async () => {
     const response = await place(memberFetch, drafts, shared);
     expect(response.status).toBe(201);
-    return (await json<ArtifactPlacement>(response)).data;
+    return (await parseSuccessBody<ArtifactPlacement>(response)).data;
   };
 
   beforeEach(async () => {
@@ -108,7 +108,7 @@ describe('artifact routes', () => {
     expect(created.ownerModel).toBe('Organization');
     expect(created.access).toBe('private');
     const access = await memberFetch(get(`/api/v1/artifact/${created.id}/access`));
-    expect((await json<{ role: string }>(access)).data.role).toBe('owner');
+    expect((await parseSuccessBody<{ role: string }>(access)).data.role).toBe('owner');
   });
 
   it('creating inside a container inherits by default', async () => {
@@ -155,7 +155,7 @@ describe('artifact routes', () => {
       `/api/v1/organization/${organization.id}/artifacts`,
     );
     const access = await tokenFetch(get(`/api/v1/artifact/${viewerOwned.id}/access`));
-    expect((await json<{ role: string }>(access)).data.role).toBe('viewer');
+    expect((await parseSuccessBody<{ role: string }>(access)).data.role).toBe('viewer');
     expect((await place(tokenFetch, viewerOwned, shared)).status).toBe(403);
   });
 
@@ -249,11 +249,11 @@ describe('artifact routes', () => {
     await place(adminFetch, hidden, shared);
     await db.artifact.update({ where: { id: hidden.id }, data: { access: 'private' } });
 
-    const asAdmin = await json<Artifact[]>(
+    const asAdmin = await parseSuccessBody<Artifact[]>(
       await adminFetch(get(`/api/v1/artifact/${shared.id}/artifacts`)),
     );
     expect(asAdmin.data.map((artifact) => artifact.id)).toContain(hidden.id);
-    const asMember = await json<Artifact[]>(
+    const asMember = await parseSuccessBody<Artifact[]>(
       await memberFetch(get(`/api/v1/artifact/${shared.id}/artifacts`)),
     );
     expect(asMember.data.map((artifact) => artifact.id)).toContain(drafts.id);
@@ -297,7 +297,7 @@ describe('artifact routes', () => {
     const edge = await placeDraftsInShared();
     expect((await strangerFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(404);
     expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(204);
-    const roots = await json<Artifact[]>(
+    const roots = await parseSuccessBody<Artifact[]>(
       await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
     );
     expect(roots.data.map((artifact) => artifact.id)).toContain(drafts.id);

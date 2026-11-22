@@ -1,7 +1,7 @@
 import { describe, expect, it, spyOn } from 'bun:test';
-import { getRedisClient } from '@template/db';
-import { clientIp } from '#/lib/clientIp';
+import { redisClient } from '@template/db';
 import { type RateLimitRule, rateLimit } from '#/middleware/rateLimit/rateLimit';
+import { globalRateLimitKey, ipRateLimitKey } from '#/middleware/rateLimit/rateLimitKeys';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 
 const mount =
@@ -14,7 +14,7 @@ const ipRule = (over: Partial<RateLimitRule> = {}): RateLimitRule => ({
   scope: 'test:ip',
   windowMs: 60_000,
   max: 2,
-  key: (c) => `ip:${clientIp(c)}`,
+  key: ipRateLimitKey,
   ...over,
 });
 
@@ -77,7 +77,7 @@ describe('rateLimit', () => {
       mount: [
         mount([
           ipRule({ max: 100 }),
-          { scope: 'test:global', windowMs: 60_000, max: 1, key: () => 'all' },
+          { scope: 'test:global', windowMs: 60_000, max: 1, key: globalRateLimitKey },
         ]),
       ],
     });
@@ -114,7 +114,7 @@ describe('rateLimit', () => {
 
   it('fails open when Redis is unavailable', async () => {
     const { fetch } = createTestApp({ mount: [mount([ipRule({ max: 1 })])] });
-    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValue(new Error('redis down'));
+    const evalSpy = spyOn(redisClient(), 'eval').mockRejectedValue(new Error('redis down'));
 
     try {
       expect((await hit(fetch, '10.10.10.10')).status).toBe(200);
@@ -122,5 +122,30 @@ describe('rateLimit', () => {
     } finally {
       evalSpy.mockRestore();
     }
+  });
+
+  it('charges custom per-request cost against the window', async () => {
+    const { fetch } = createTestApp({
+      mount: [
+        (app) => {
+          app.get('/rl', rateLimit([ipRule({ max: 5 })], { cost: 3 }), (c) => c.text('ok'));
+        },
+      ],
+    });
+
+    expect((await hit(fetch, '11.11.11.11')).status).toBe(200);
+    expect((await hit(fetch, '11.11.11.11')).status).toBe(429);
+  });
+
+  it('rejects non-integer or negative cost instead of failing open', async () => {
+    const { fetch } = createTestApp({
+      mount: [
+        (app) => {
+          app.get('/rl', rateLimit([ipRule({ max: 5 })], { cost: 1.5 }), (c) => c.text('ok'));
+        },
+      ],
+    });
+
+    expect((await hit(fetch, '12.12.12.12')).status).toBe(500);
   });
 });

@@ -12,7 +12,7 @@ import {
   artifactReadResponseSchema,
 } from '#/modules/artifact/schemas/artifactSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meCreateArtifactRoute = createRoute({
   model: Modules.me,
@@ -23,5 +23,5 @@ export const meCreateArtifactRoute = createRoute({
   bodySchema: artifactCreateBodySchema,
   responseSchema: artifactReadResponseSchema,
   sanitizeKeys: ARTIFACT_CREATE_IMMUTABLE_FIELDS,
-  tags: [Tags.me, Tags.artifact],
+  tags: [OpenApiTags.me, OpenApiTags.artifact],
 });

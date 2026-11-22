@@ -4,12 +4,13 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { getPolymorphismConfig } from '@template/db';
+import { polymorphismConfigForModel } from '@template/db';
 
 // The relation names of a false-polymorphic axis, one per model it can point at.
-const axisRelations = (model: 'Entitlement' | 'Inquiry' | 'RuleReference', side: string) =>
+const axisRelations = (model: 'Entitlement' | 'RuleReference', side: string) =>
   Object.keys(
-    getPolymorphismConfig(model)?.axes.find((axis) => axis.field === `${side}Model`)?.fkMap ?? {},
+    polymorphismConfigForModel(model)?.axes.find((axis) => axis.field === `${side}Model`)?.fkMap ??
+      {},
   )
     .filter((value) => value !== 'admin')
     .map((value) => `${side}${value}`);
@@ -18,12 +19,14 @@ const axisRelations = (model: 'Entitlement' | 'Inquiry' | 'RuleReference', side:
 // field. An FK is ownership by default; list the edges that merely point at a
 // counterparty or an author — those rows outlive the referenced parent.
 export const CASCADE_EXEMPT: Record<string, readonly string[]> = {
-  CustomerRef: ['customerOrganization', 'customerSpace', 'customerUser'],
+  CustomerRelationship: ['customerOrganization', 'customerSpace', 'customerUser'],
   // An entitlement acts from its anchor; it does not belong to it. A deleted anchor is stamped on
   // the row (`sourceDeletedAt`), and the row dies only with its target.
   Entitlement: axisRelations('Entitlement', 'source'),
-  // An inquiry stays when a party dies and shows that party as deleted.
-  Inquiry: [...axisRelations('Inquiry', 'source'), ...axisRelations('Inquiry', 'target')],
+  // A lazy-copy snapshot outlives the source file it was copied from.
+  File: ['source'],
+  // A binding belongs to its bound resource, not to the source artifact it points at.
+  ResourceBinding: ['sourceArtifact'],
   // A rule names these rows; it does not own them. Tombstoning one stamps the edges that name it
   // (ruleReference:target) — deleting them would erase the record that a rule is degraded.
   RuleReference: axisRelations('RuleReference', 'target'),

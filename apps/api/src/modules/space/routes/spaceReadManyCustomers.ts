@@ -8,9 +8,9 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
-  customerRefAsProviderSchema,
-  customerRefTags,
-} from '#/modules/customerRef/schemas/customerRefSchemas';
+  customerRelationshipAsProviderSchema,
+  customerRelationshipTags,
+} from '#/modules/customerRelationship/schemas/customerRelationshipSchemas';
 import { Modules } from '#/modules/modules';
 
 // List customers of this space (where space is the provider)
@@ -19,8 +19,8 @@ export const spaceReadManyCustomersRoute = readRoute({
   submodel: Modules.customer,
   many: true,
   paginate: true,
-  filterLens: { parent: lensFor('CustomerRef') },
-  responseSchema: customerRefAsProviderSchema,
+  filterLens: { parent: lensFor('CustomerRelationship') },
+  responseSchema: customerRelationshipAsProviderSchema,
   middleware: [validatePermission('read')],
-  tags: [...customerRefTags],
+  tags: [...customerRelationshipTags],
 });

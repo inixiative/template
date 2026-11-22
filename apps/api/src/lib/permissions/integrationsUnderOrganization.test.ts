@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { EntitlementInput } from '@template/db';
 import { db } from '@template/db';
 import type { Integration, Organization, Role } from '@template/db/generated/client/client';
 import {
@@ -17,7 +18,7 @@ import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { del, patch, post } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
@@ -64,7 +65,7 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-const memberKey = async (role: Role, entitlements?: Entry[]) => {
+const memberKey = async (role: Role, entitlements?: EntitlementInput[]) => {
   const { entity: member } = await createOrganizationUser({ role, entitlements }, { organization });
   return (
     await createKeyedToken(
@@ -143,7 +144,11 @@ describe("a token given operate on its member row operates the member, whatever 
         ownerModel: 'OrganizationUser',
         role,
         entitlements: [
-          entry('db:organizationUser', ['db:organizationUser', member.id], ['operate']),
+          entitlementInputFor(
+            'db:organizationUser',
+            ['db:organizationUser', member.id],
+            ['operate'],
+          ),
         ],
       },
       { organizationUser: member },
@@ -182,7 +187,11 @@ describe("a token given operate on its member row operates the member, whatever 
         ownerModel: 'OrganizationUser',
         role: 'member',
         entitlements: [
-          entry('db:organizationUser', ['db:organizationUser', member.id], ['operate']),
+          entitlementInputFor(
+            'db:organizationUser',
+            ['db:organizationUser', member.id],
+            ['operate'],
+          ),
         ],
       },
       { organizationUser: member },

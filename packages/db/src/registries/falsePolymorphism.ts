@@ -23,15 +23,12 @@ export type PolymorphicValue = ModelName | SpecialOwner;
 export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
   fkMap: Partial<Record<PolymorphicValue, readonly string[]>>; // typeValue → required FK fields
-  materialized?: string; // the plain column holding the one id the set typed FK points at
-  delegates?: Partial<Record<PolymorphicValue, ModelName>>;
+  dualPolymorphismId?: string; // the plain column holding the one id the set typed FK points at
+  carriesOwnerKeysOf?: readonly ModelName[];
 };
 
 export type PolymorphicConfig = {
   axes: readonly PolymorphicAxis[];
-  // If multiple axes, which combinations are valid (axis0Value → allowed axis1Values)
-  // Only needed when there are restrictions
-  allowedCombinations?: Partial<Record<PolymorphicValue, readonly PolymorphicValue[]>>;
 };
 
 // ============================================================================
@@ -40,7 +37,7 @@ export type PolymorphicConfig = {
 
 // Reference to a model via its false polymorphic relationship
 export type FalsePolymorphismRef = {
-  model: ModelName; // The polymorphic model (e.g., CustomerRef)
+  model: ModelName; // The polymorphic model (e.g., CustomerRelationship)
   axis: string; // Which axis (e.g., customerModel, providerModel)
   value: string; // The type value (e.g., User, Organization, Space)
 };
@@ -65,7 +62,7 @@ export const PolymorphismRegistry = {
           SpaceUser: ['organizationId', 'spaceId', 'userId'],
           Integration: ['integrationId'],
         },
-        delegates: { Integration: 'Integration' },
+        carriesOwnerKeysOf: ['Integration'],
       },
     ],
   },
@@ -103,10 +100,10 @@ export const PolymorphismRegistry = {
       {
         field: 'resourceModel',
         fkMap: {
-          User: ['userId'],
-          Organization: ['organizationId'],
-          Space: ['spaceId'],
-          Project: ['projectId'],
+          User: ['resourceUserId'],
+          Organization: ['resourceOrganizationId'],
+          Space: ['resourceSpaceId'],
+          Project: ['resourceProjectId'],
         },
       },
     ],
@@ -165,23 +162,10 @@ export const PolymorphismRegistry = {
           Space: ['spaceId'],
         },
       },
-      {
-        field: 'model',
-        fkMap: {
-          CustomerRef: [],
-          Artifact: [],
-        },
-      },
     ],
-    // All owner types can subscribe to CustomerRef and Artifact
-    allowedCombinations: {
-      User: ['CustomerRef', 'Artifact'],
-      Organization: ['CustomerRef', 'Artifact'],
-      Space: ['CustomerRef', 'Artifact'],
-    },
   },
 
-  CustomerRef: {
+  CustomerRelationship: {
     axes: [
       {
         field: 'customerModel',
@@ -200,18 +184,13 @@ export const PolymorphismRegistry = {
         },
       },
     ],
-    allowedCombinations: {
-      User: ['User', 'Organization', 'Space'],
-      Organization: ['User', 'Organization', 'Space'],
-      Space: ['User', 'Organization', 'Space'],
-    },
   },
 
   RuleReference: {
     axes: [
       {
         field: 'sourceModel',
-        materialized: 'sourceId',
+        dualPolymorphismId: 'sourceId',
         fkMap: {
           EmailTemplate: ['sourceEmailTemplateId'],
           EmailComponent: ['sourceEmailComponentId'],
@@ -221,7 +200,7 @@ export const PolymorphismRegistry = {
       },
       {
         field: 'targetModel',
-        materialized: 'targetId',
+        dualPolymorphismId: 'targetId',
         fkMap: {
           Tag: ['targetTagId'],
           Organization: ['targetOrganizationId'],
@@ -239,6 +218,10 @@ export const PolymorphismRegistry = {
           Flow: ['targetFlowId'],
           AuthProvider: ['targetAuthProviderId'],
           WebhookSubscription: ['targetWebhookSubscriptionId'],
+          IntegrationResource: ['targetIntegrationResourceId'],
+          ProjectIntegrationResource: ['targetProjectIntegrationResourceId'],
+          Setting: ['targetSettingId'],
+          ProjectIntegration: ['targetProjectIntegrationId'],
         },
       },
     ],
@@ -248,7 +231,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'sourceModel',
-        materialized: 'sourceId',
+        dualPolymorphismId: 'sourceId',
         fkMap: {
           User: ['sourceUserId'],
           Organization: ['sourceOrganizationId'],
@@ -265,11 +248,15 @@ export const PolymorphismRegistry = {
           Flow: ['sourceFlowId'],
           AuthProvider: ['sourceAuthProviderId'],
           WebhookSubscription: ['sourceWebhookSubscriptionId'],
+          IntegrationResource: ['sourceIntegrationResourceId'],
+          ProjectIntegrationResource: ['sourceProjectIntegrationResourceId'],
+          Setting: ['sourceSettingId'],
+          ProjectIntegration: ['sourceProjectIntegrationId'],
         },
       },
       {
         field: 'targetModel',
-        materialized: 'targetId',
+        dualPolymorphismId: 'targetId',
         fkMap: {
           Token: ['targetTokenId'],
           Integration: ['targetIntegrationId'],
@@ -284,29 +271,35 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'sourceModel',
+        dualPolymorphismId: 'sourceId',
         fkMap: {
           admin: [],
           User: ['sourceUserId'],
           OrganizationUser: ['sourceOrganizationId', 'sourceUserId'],
           Organization: ['sourceOrganizationId'],
-          Space: ['sourceSpaceId'],
+          Space: ['sourceOrganizationId', 'sourceSpaceId'],
           SpaceUser: ['sourceOrganizationId', 'sourceSpaceId', 'sourceUserId'],
           Integration: ['sourceIntegrationId'],
           Token: ['sourceTokenId'],
+          Project: ['sourceProjectId'],
         },
+        carriesOwnerKeysOf: ['Integration', 'Token', 'Project'],
       },
       {
         field: 'targetModel',
+        dualPolymorphismId: 'targetId',
         fkMap: {
           admin: [],
           User: ['targetUserId'],
           OrganizationUser: ['targetOrganizationId', 'targetUserId'],
           Organization: ['targetOrganizationId'],
-          Space: ['targetSpaceId'],
+          Space: ['targetOrganizationId', 'targetSpaceId'],
           SpaceUser: ['targetOrganizationId', 'targetSpaceId', 'targetUserId'],
           Integration: ['targetIntegrationId'],
           Token: ['targetTokenId'],
+          Project: ['targetProjectId'],
         },
+        carriesOwnerKeysOf: ['Integration', 'Token', 'Project'],
       },
     ],
   },
@@ -349,6 +342,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'subjectModel',
+        dualPolymorphismId: 'subjectId',
         fkMap: {
           User: ['subjectUserId'],
           Organization: ['subjectOrganizationId'],
@@ -364,13 +358,37 @@ export const PolymorphismRegistry = {
           CronJob: ['subjectCronJobId'],
           EmailTemplate: ['subjectEmailTemplateId'],
           EmailComponent: ['subjectEmailComponentId'],
-          CustomerRef: ['subjectCustomerRefId'],
+          CustomerRelationship: ['subjectCustomerRelationshipId'],
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
           Entitlement: ['subjectEntitlementId'],
+          Project: ['subjectProjectId'],
+          IntegrationResource: ['subjectIntegrationResourceId'],
+          ProjectIntegrationResource: ['subjectProjectIntegrationResourceId'],
+          Setting: ['subjectSettingId'],
+          ProjectIntegration: ['subjectProjectIntegrationId'],
           Artifact: ['subjectArtifactId'],
           ArtifactPlacement: ['subjectArtifactPlacementId'],
           ArtifactPermission: ['subjectArtifactPermissionId'],
+        },
+      },
+    ],
+  },
+
+  Setting: {
+    axes: [
+      {
+        field: 'resourceModel',
+        dualPolymorphismId: 'resourceId',
+        fkMap: {
+          User: ['resourceUserId'],
+          Organization: ['resourceOrganizationId'],
+          OrganizationUser: ['resourceOrganizationId', 'resourceUserId'],
+          Space: ['resourceOrganizationId', 'resourceSpaceId'],
+          SpaceUser: ['resourceOrganizationId', 'resourceSpaceId', 'resourceUserId'],
+          Project: ['resourceProjectId'],
+          Integration: ['resourceIntegrationId'],
+          ProjectIntegration: ['resourceProjectIntegrationId'],
         },
       },
     ],
@@ -408,7 +426,7 @@ export const PolymorphismRegistry = {
           Space: ['granteeSpaceId'],
           OrganizationUser: ['granteeOrganizationId', 'granteeUserId'],
           SpaceUser: ['granteeOrganizationId', 'granteeSpaceId', 'granteeUserId'],
-          CustomerRef: ['granteeCustomerRefId'],
+          CustomerRelationship: ['granteeCustomerRelationshipId'],
           Integration: ['granteeIntegrationId'],
         },
       },
@@ -417,14 +435,14 @@ export const PolymorphismRegistry = {
 
   ResourceBinding: {
     axes: [
-      { field: 'sourceModel', fkMap: { Artifact: ['artifactId'], url: [] } },
+      { field: 'sourceModel', fkMap: { Artifact: ['sourceArtifactId'], url: [] } },
       {
         field: 'resourceModel',
         fkMap: {
-          Organization: ['organizationId'],
-          Space: ['spaceId'],
-          User: ['userId'],
-          CustomerRef: ['customerRefId'],
+          Organization: ['resourceOrganizationId'],
+          Space: ['resourceSpaceId'],
+          User: ['resourceUserId'],
+          CustomerRelationship: ['resourceCustomerRelationshipId'],
         },
       },
     ],
@@ -433,10 +451,10 @@ export const PolymorphismRegistry = {
   IntegrationRecord: {
     axes: [
       {
-        field: 'model',
+        field: 'recordModel',
         fkMap: {
-          CustomerRef: ['customerRefId'],
-          Artifact: ['artifactId'],
+          CustomerRelationship: ['recordCustomerRelationshipId'],
+          Artifact: ['recordArtifactId'],
         },
       },
     ],
@@ -445,15 +463,15 @@ export const PolymorphismRegistry = {
   CommunicationLog: {
     axes: [
       {
-        field: 'senderType',
+        field: 'senderModel',
         fkMap: {
           platform: [],
           admin: [],
           User: ['senderUserId'],
           Organization: ['senderOrganizationId'],
-          Space: ['senderSpaceId'],
-          OrganizationUser: ['senderUserId', 'senderOrganizationId'],
-          SpaceUser: ['senderUserId', 'senderSpaceId'],
+          Space: ['senderOrganizationId', 'senderSpaceId'],
+          OrganizationUser: ['senderOrganizationId', 'senderUserId'],
+          SpaceUser: ['senderOrganizationId', 'senderSpaceId', 'senderUserId'],
         },
       },
     ],
@@ -463,20 +481,22 @@ export const PolymorphismRegistry = {
 const polymorphicConfigs: Partial<Record<ModelName, PolymorphicConfig>> = PolymorphismRegistry;
 
 // Helper to get config for a model
-export const getPolymorphismConfig = (model: ModelName): PolymorphicConfig | null =>
+export const polymorphismConfigForModel = (model: ModelName): PolymorphicConfig | null =>
   polymorphicConfigs[model] ?? null;
 
 export const polymorphicAxis = (model: ModelName, axisField: string): PolymorphicAxis => {
-  const axis = getPolymorphismConfig(model)?.axes.find(
+  const axis = polymorphismConfigForModel(model)?.axes.find(
     (candidate) => candidate.field === axisField,
   );
   if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
   return axis;
 };
 
-export const delegatedKeys = (axis: PolymorphicAxis, value: unknown): string[] => {
-  const parent = axis.delegates?.[value as PolymorphicValue];
-  if (!parent) return [];
-  const parentAxis = polymorphicAxis(parent, axis.field);
-  return [...new Set(Object.values(parentAxis.fkMap).flat())] as string[];
-};
+/** Every key column a side uses, across all its values, once each. */
+export const sideKeyColumns = (axis: PolymorphicAxis): string[] => [
+  ...new Set(Object.values(axis.fkMap).flatMap((keys) => [...(keys ?? [])])),
+];
+
+/** Every key column of a side, null: the base a writer sets one value's keys over. */
+export const emptySideKeyColumns = (axis: PolymorphicAxis): Record<string, null> =>
+  Object.fromEntries(sideKeyColumns(axis).map((column) => [column, null]));

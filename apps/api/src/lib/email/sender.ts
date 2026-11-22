@@ -4,9 +4,9 @@
  * @partOf feature:email
  * @uses none
  */
-import type { SenderType } from '@template/db/generated/client/client';
+import type { CommunicationLogSenderModel } from '@template/db/generated/client/client';
 
-export type { SenderType };
+export type { CommunicationLogSenderModel };
 
 export type Sender =
   | { type: 'platform' }

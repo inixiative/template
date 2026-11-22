@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { createEncryption, type Encryption } from '@template/db/lib/encryption/encryptionService';
+import {
+  type Encryption,
+  makeEncryptionService,
+} from '@template/db/lib/encryption/encryptionService';
 import type { EncryptionKeyring } from '@template/db/lib/encryption/types';
 
-describe('createEncryption', () => {
+describe('makeEncryptionService', () => {
   const testKey1Base64 = Buffer.from('12345678901234567890123456789012', 'utf8').toString('base64');
   const testKey2Base64 = Buffer.from('abcdefghijklmnopqrstuvwxyz123456', 'utf8').toString('base64');
 
@@ -11,17 +14,17 @@ describe('createEncryption', () => {
 
   beforeEach(() => {
     keyring = { currentVersion: 1, currentKey: testKey1Base64 };
-    service = createEncryption(keyring);
+    service = makeEncryptionService(keyring);
   });
 
   describe('keyring validation', () => {
     it('accepts valid keyring', () => {
-      expect(() => createEncryption(keyring)).not.toThrow();
+      expect(() => makeEncryptionService(keyring)).not.toThrow();
     });
 
     it('rejects invalid current key length', () => {
       const shortKey = Buffer.from('short', 'utf8').toString('base64');
-      expect(() => createEncryption({ currentVersion: 1, currentKey: shortKey })).toThrow(
+      expect(() => makeEncryptionService({ currentVersion: 1, currentKey: shortKey })).toThrow(
         'Current key must be exactly 32 bytes',
       );
     });
@@ -29,7 +32,7 @@ describe('createEncryption', () => {
     it('rejects invalid previous key length', () => {
       const shortKey = Buffer.from('short', 'utf8').toString('base64');
       expect(() =>
-        createEncryption({
+        makeEncryptionService({
           currentVersion: 2,
           currentKey: testKey1Base64,
           previousVersion: 1,
@@ -75,10 +78,10 @@ describe('createEncryption', () => {
     });
 
     it('decrypts data encrypted with previous key', () => {
-      const old = createEncryption({ currentVersion: 1, currentKey: testKey2Base64 });
+      const old = makeEncryptionService({ currentVersion: 1, currentKey: testKey2Base64 });
       const encrypted = old.encrypt('old-data', 'aad');
 
-      const next = createEncryption({
+      const next = makeEncryptionService({
         currentVersion: 2,
         currentKey: testKey1Base64,
         previousVersion: 1,
@@ -99,14 +102,14 @@ describe('createEncryption', () => {
 
     it('throws when no keys can decrypt', () => {
       const encrypted = service.encrypt('data', 'aad');
-      const other = createEncryption({ currentVersion: 1, currentKey: testKey2Base64 });
+      const other = makeEncryptionService({ currentVersion: 1, currentKey: testKey2Base64 });
       expect(() => other.decrypt(encrypted, 'aad')).toThrow();
     });
   });
 
   describe('key rotation', () => {
     it('always encrypts with current key version', () => {
-      const v2 = createEncryption({
+      const v2 = makeEncryptionService({
         currentVersion: 2,
         currentKey: testKey1Base64,
         previousVersion: 1,
@@ -116,10 +119,10 @@ describe('createEncryption', () => {
     });
 
     it('supports multiple version transitions', () => {
-      const v1 = createEncryption({ currentVersion: 1, currentKey: testKey2Base64 });
+      const v1 = makeEncryptionService({ currentVersion: 1, currentKey: testKey2Base64 });
       const encryptedV1 = v1.encrypt('data', 'aad');
 
-      const v2 = createEncryption({
+      const v2 = makeEncryptionService({
         currentVersion: 2,
         currentKey: testKey1Base64,
         previousVersion: 1,

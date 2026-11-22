@@ -1,5 +1,6 @@
 export * from './contextQueries';
-export * from './inquiryCheckRecord';
+export * from './inquiryPartyDisplayName';
+export * from './inquiryRecordForPermissionCheck';
 export * from './queryKeys';
 export * from './registry';
 

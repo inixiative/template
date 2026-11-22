@@ -4,20 +4,21 @@
  * @partOf infrastructure:prisma
  * @uses primitive:routeTemplates
  */
+import { fieldAtPath, isScalarField, modelOf } from '@inixiative/field-map';
 import {
   andWhere,
   bindLens,
   getLensRoot,
-  type LensNarrowing,
   listLensBindings,
   type RuleValue,
 } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
-import { isScalarField, lookupField, modelFields } from '@template/db';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { stableHash } from '@template/shared/utils';
-import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
+import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
+import { applyFilterLensWheresToPrismaWhere } from '#/lib/prisma/applyFilterLensWheresToPrismaWhere';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import {
@@ -29,7 +30,6 @@ import {
   hydrateCursorValues,
   type SortKey,
 } from '#/lib/prisma/keysetCursor';
-import { lensWhere } from '#/lib/prisma/lensWhere';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 const DEFAULT_CURSOR_PAGE_SIZE = 100;
@@ -63,18 +63,51 @@ type FindManyCursor<T extends AnyDelegate> =
   FindManyArgs<T> extends { cursor?: infer C } ? C : never;
 type FindManyDistinct<T extends AnyDelegate> =
   FindManyArgs<T> extends { distinct?: infer D } ? D : never;
-type PaginateOptions<T extends AnyDelegate> = {
+type PaginateOptions<
+  T extends AnyDelegate,
+  Include extends FindManyInclude<T> | undefined = FindManyInclude<T> | undefined,
+  Select extends FindManySelect<T> | undefined = FindManySelect<T> | undefined,
+  OmitOpt extends FindManyOmit<T> | undefined = FindManyOmit<T> | undefined,
+> = {
   orNullFields?: string[];
   searchPaths?: string[];
   bindings?: Record<string, RuleValue>;
   where?: FindManyWhere<T>;
   orderBy?: FindManyOrderBy<T>;
-  include?: FindManyInclude<T>;
-  omit?: FindManyOmit<T>;
-  select?: FindManySelect<T>;
+  include?: Include;
+  omit?: OmitOpt;
+  select?: Select;
   cursor?: FindManyCursor<T>;
   distinct?: FindManyDistinct<T>;
 };
+
+type PaginateResultItem<
+  T extends AnyDelegate,
+  TItem,
+  Include,
+  Select,
+  OmitOpt,
+> = unknown extends TItem
+  ? Result<
+      T,
+      ([Include] extends [undefined]
+        ? unknown
+        : FindManyInclude<T> extends Include
+          ? unknown
+          : { include: Include }) &
+        ([Select] extends [undefined]
+          ? unknown
+          : FindManySelect<T> extends Select
+            ? unknown
+            : { select: Select }) &
+        ([OmitOpt] extends [undefined]
+          ? unknown
+          : FindManyOmit<T> extends OmitOpt
+            ? unknown
+            : { omit: OmitOpt }),
+      'findMany'
+    >[number]
+  : TItem;
 
 type PaginationResult = {
   page: number;
@@ -97,7 +130,7 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
   c: ValidatedContext<'query', PaginationQuery>,
   options?: PaginateOptions<T>,
 ) => {
-  const query = getValidatedQuery(c);
+  const query = validatedQuery(c);
   const { search } = query;
   const {
     orderBy: callerOrderByOption,
@@ -142,7 +175,7 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
   });
 
   // Lens relation wheres are authorization scope — they apply on superadmin endpoints too.
-  const composed = await lensWhere(
+  const composed = await applyFilterLensWheresToPrismaWhere(
     filterLens,
     andWhere([baseWhere, searchWhere as Record<string, unknown>]),
   );
@@ -153,15 +186,21 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
 
 export const paginate = async <
   T extends AnyDelegate,
-  TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
+  TItem = unknown,
   C extends ValidatedContext<'query', PaginationQuery> = ValidatedContext<'query', PaginationQuery>,
+  const Include extends FindManyInclude<T> | undefined = FindManyInclude<T> | undefined,
+  const Select extends FindManySelect<T> | undefined = FindManySelect<T> | undefined,
+  const OmitOpt extends FindManyOmit<T> | undefined = FindManyOmit<T> | undefined,
 >(
   c: C,
   delegate: T,
-  options?: PaginateOptions<T>,
-): Promise<PaginatedResult<TItem>> => {
-  const { page = 1, pageSize = 20, orderBy: rawOrderBy } = getValidatedQuery(c);
-  const { where, findManyOptions, callerOrderByOption } = await composeScopedFindMany(c, options);
+  options?: PaginateOptions<T, Include, Select, OmitOpt>,
+): Promise<PaginatedResult<PaginateResultItem<T, TItem, Include, Select, OmitOpt>>> => {
+  const { page = 1, pageSize = 20, orderBy: rawOrderBy } = validatedQuery(c);
+  const { where, findManyOptions, callerOrderByOption } = await composeScopedFindMany(
+    c,
+    options as PaginateOptions<T> | undefined,
+  );
 
   const orderBy = buildOrderBy({
     callerOrderBy: callerOrderByOption,
@@ -182,7 +221,7 @@ export const paginate = async <
   ]);
 
   return {
-    data,
+    data: data as PaginateResultItem<T, TItem, Include, Select, OmitOpt>[],
     pagination: {
       page,
       pageSize,
@@ -196,13 +235,13 @@ export const paginate = async <
 // why: either voids the boundary comparison or silently skips rows on ties. That column is the
 // why: model's own @id, read off prismaMap rather than assumed by name.
 const primaryKeysOf = (model: string): string[] =>
-  Object.entries(modelFields(model) ?? {})
+  Object.entries(modelOf(prismaMap, model)?.fields ?? {})
     .filter(([, field]) => isScalarField(field) && field.isId && field.isRequired)
     .map(([name]) => name);
 
 export const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
   const lastKey = chain[chain.length - 1]?.[0];
-  const lastField = lastKey ? lookupField(model, lastKey) : undefined;
+  const lastField = lastKey ? fieldAtPath(prismaMap, model, lastKey) : undefined;
   if (lastField && isScalarField(lastField) && lastField.isId && lastField.isRequired) return chain;
 
   const [primaryKey, ...rest] = primaryKeysOf(model);
@@ -241,20 +280,23 @@ type CursorPaginatedResult<T> = {
 // writes. No count() is issued — `hasMore` comes from fetching one row past the page.
 export const cursorPaginate = async <
   T extends AnyDelegate,
-  TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
+  TItem = unknown,
   C extends ValidatedContext<'query', CursorPaginationQuery> = ValidatedContext<
     'query',
     CursorPaginationQuery
   >,
+  const Include extends FindManyInclude<T> | undefined = FindManyInclude<T> | undefined,
+  const Select extends FindManySelect<T> | undefined = FindManySelect<T> | undefined,
+  const OmitOpt extends FindManyOmit<T> | undefined = FindManyOmit<T> | undefined,
 >(
   c: C,
   delegate: T,
-  options?: PaginateOptions<T>,
-): Promise<CursorPaginatedResult<TItem>> => {
-  const { pageSize = DEFAULT_CURSOR_PAGE_SIZE, cursor } = getValidatedQuery(c);
+  options?: PaginateOptions<T, Include, Select, OmitOpt>,
+): Promise<CursorPaginatedResult<PaginateResultItem<T, TItem, Include, Select, OmitOpt>>> => {
+  const { pageSize = DEFAULT_CURSOR_PAGE_SIZE, cursor } = validatedQuery(c);
   const { where, model, findManyOptions, callerOrderByOption } = await composeScopedFindMany(
     c as unknown as ValidatedContext<'query', PaginationQuery>,
-    options,
+    options as PaginateOptions<T> | undefined,
   );
   const chain = withTotalOrder(model, normalizeChain(callerOrderByOption));
   // The token binds to the composed filter — lens narrowing, search, live scope and the caller's
@@ -292,5 +334,8 @@ export const cursorPaginate = async <
         )
       : null;
 
-  return { data, pagination: { pageSize, hasMore, nextCursor } };
+  return {
+    data: data as PaginateResultItem<T, TItem, Include, Select, OmitOpt>[],
+    pagination: { pageSize, hasMore, nextCursor },
+  };
 };

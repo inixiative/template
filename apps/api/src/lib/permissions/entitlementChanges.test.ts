@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { EntitlementInput } from '@template/db';
 import { db } from '@template/db';
 import type { Organization, OrganizationUser, Role } from '@template/db/generated/client/client';
 import {
@@ -6,6 +7,7 @@ import {
   createIntegration,
   createOrganization,
   createOrganizationUser,
+  createSpace,
 } from '@template/db/test';
 import { isMemberSelfGrant, toEntitlementEntry } from '@template/permissions';
 import { integrationRouter } from '#/modules/integration';
@@ -13,7 +15,7 @@ import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import {
   changeEntitlements,
   heldEntitlements,
@@ -50,13 +52,21 @@ const writer = async (role: Role) => {
 };
 
 const ownIntegrations = (actions: string[]) => ({
-  ...entry('db:integration', ['db:organization', organization.id, 'organization'], actions),
+  ...entitlementInputFor(
+    'db:integration',
+    ['db:organization', organization.id, 'organization'],
+    actions,
+  ),
   where: { field: 'ownerModel', operator: 'equals', value: 'Organization' },
 });
 const spaceIntegrations = (actions: string[]) =>
-  entry('db:integration', ['db:organization', organization.id, 'space.organization'], actions);
+  entitlementInputFor(
+    'db:integration',
+    ['db:organization', organization.id, 'space.organization'],
+    actions,
+  );
 
-const member = async (entitlements?: Entry[]) =>
+const member = async (entitlements?: EntitlementInput[]) =>
   (await createOrganizationUser({ role: 'member', entitlements }, { organization })).entity;
 
 const onMember = (target: OrganizationUser) => ({
@@ -72,7 +82,7 @@ const stored = async (target: OrganizationUser): Promise<unknown> =>
 const change = async (
   role: Role,
   target: OrganizationUser,
-  body: { add?: Entry[]; remove?: Entry[] },
+  body: { add?: EntitlementInput[]; remove?: EntitlementInput[] },
 ) => changeEntitlements(await writer(role), onMember(target), body);
 
 describe("a member's entitlements change only through its entitlement rows: create-many and delete-many (Aron, 2026-11-02)", () => {
@@ -100,14 +110,25 @@ describe("a member's entitlements change only through its entitlement rows: crea
     expect(await stored(target)).toEqual([]);
   });
 
-  it('removing needs the ability to grant it: an admin cannot strip what only an owner gives', async () => {
+  it('removing takes administering the holder, not the right to grant: an admin strips what only an owner gives, and cannot give it back (Aron, 2026-11-16)', async () => {
     const target = await member([spaceIntegrations(['delete'])]);
     expect(
       (await change('admin', target, { remove: [spaceIntegrations(['delete'])] })).status,
-    ).toBe(403);
-    expect(
-      (await change('owner', target, { remove: [spaceIntegrations(['delete'])] })).status,
     ).toBe(204);
+    expect(await stored(target)).toEqual([]);
+    expect((await change('admin', target, { add: [spaceIntegrations(['delete'])] })).status).toBe(
+      403,
+    );
+  });
+
+  it('a row whose anchor is tombstoned is removed by whoever manages the member (Aron, 2026-11-16)', async () => {
+    const { entity: space } = await createSpace({}, { organization });
+    const onSpace = entitlementInputFor('db:space', ['db:space', space.id], ['manage']);
+    const target = await member();
+    expect((await change('owner', target, { add: [onSpace] })).status).toBe(201);
+    await db.space.update({ where: { id: space.id }, data: { deletedAt: new Date() } });
+
+    expect((await change('admin', target, { remove: [onSpace] })).status).toBe(204);
     expect(await stored(target)).toEqual([]);
   });
 
@@ -156,7 +177,11 @@ describe("a member's entitlements change only through its entitlement rows: crea
 
   it('a malformed entry is refused before anything is saved', async () => {
     const target = await member();
-    const pathless = entry('db:integration', ['db:organization', organization.id], ['read']);
+    const pathless = entitlementInputFor(
+      'db:integration',
+      ['db:organization', organization.id],
+      ['read'],
+    );
     expect((await change('owner', target, { add: [pathless] })).status).toBe(422);
   });
 
@@ -181,7 +206,7 @@ describe('integrations and tokens change their entitlements the same way', () =>
       role: 'viewer',
     });
     const app = await writer('admin');
-    const to = (add: Entry[]) =>
+    const to = (add: EntitlementInput[]) =>
       changeEntitlements(app, { model: 'Integration', id: integration.id }, { add });
     expect((await to([ownIntegrations(['manage'])])).status).toBe(201);
     expect((await to([spaceIntegrations(['manage'])])).status).toBe(403);
@@ -202,7 +227,7 @@ describe('integrations and tokens change their entitlements the same way', () =>
       mount: [(hono) => hono.route('/api/v1/token', tokenRouter)],
     });
     const onToken = { model: 'Token' as const, id: token.id };
-    const to = (body: { add?: Entry[]; remove?: Entry[] }) =>
+    const to = (body: { add?: EntitlementInput[]; remove?: EntitlementInput[] }) =>
       changeEntitlements(app, onToken, body);
     expect((await to({ add: [ownIntegrations(['manage'])] })).status).toBe(201);
     expect((await to({ add: [spaceIntegrations(['manage'])] })).status).toBe(403);

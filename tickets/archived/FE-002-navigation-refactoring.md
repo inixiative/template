@@ -62,7 +62,7 @@ export const Breadcrumbs = ({ className }: BreadcrumbsProps) => {
 
 **Current:** Repeated pattern in multiple places:
 ```typescript
-// packages/shared/src/hooks/useAuthenticatedRouting.ts
+// packages/shared/src/hooks/useSyncTenantContextWithUrlAndAuthorizeRoute.ts
 const searchParams = new URLSearchParams(location.search);
 const org = searchParams.get('org');
 const space = searchParams.get('space');
@@ -102,7 +102,7 @@ navigate({ to: '/somewhere', search: contextSearch });
 ```
 
 **Files to search for duplicated logic:**
-- `packages/shared/src/hooks/useAuthenticatedRouting.ts`
+- `packages/shared/src/hooks/useSyncTenantContextWithUrlAndAuthorizeRoute.ts`
 - `packages/ui/src/components/RootNotFound.tsx`
 - Any other components that build `?org=`, `?space=`, `?spoof=` manually
 
@@ -145,7 +145,7 @@ Task 2 (Context Preservation) - **FULLY DONE**:
 - ✅ Created `navigatePreservingContext()` in navigation slice
 - ✅ Created `navigatePreservingSpoof()` in navigation slice
 - ✅ Created helper utilities: `pickSearchParams()`, `readSearchParam()`, `parseNavigateTarget()`, `mergeSearch()`
-- ✅ All components now use store functions (RootNotFound, useAuthenticatedRouting, useBreadcrumbs)
+- ✅ All components now use store functions (RootNotFound, useSyncTenantContextWithUrlAndAuthorizeRoute, useBreadcrumbs)
 - ✅ No manual query param building anywhere in codebase
 
 Task 1 (Breadcrumbs) - **Implemented with better pattern**:

@@ -5,12 +5,12 @@
  * @uses none
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { redactLogValue } from '@template/shared/logger/redact';
+import { maskLogValue } from '@template/shared/logger/maskLogValue';
 import { browserTelemetrySchema } from '@template/shared/telemetry/browserSchema';
-import { readTelemetryConfig, signalExportOptions } from '@template/shared/telemetry/config';
+import { signalExportOptions, telemetryConfigFromEnv } from '@template/shared/telemetry/config';
 import { bodyLimit } from 'hono/body-limit';
-import { ipIdentity } from '#/middleware/rateLimit/identities';
 import { rateLimit } from '#/middleware/rateLimit/rateLimit';
+import { globalRateLimitKey, ipRateLimitKey } from '#/middleware/rateLimit/rateLimitKeys';
 import type { AppEnv } from '#/types/appEnv';
 
 export const browserTelemetryRouter = new OpenAPIHono<AppEnv>();
@@ -18,13 +18,13 @@ browserTelemetryRouter.use('*', bodyLimit({ maxSize: 64 * 1024 }));
 browserTelemetryRouter.use(
   '*',
   rateLimit([
-    { scope: 'telemetry:ip', windowMs: 60_000, max: 30, key: ipIdentity },
-    { scope: 'telemetry:global', windowMs: 60_000, max: 1000, key: () => 'all' },
+    { scope: 'telemetry:ip', windowMs: 60_000, max: 30, key: ipRateLimitKey },
+    { scope: 'telemetry:global', windowMs: 60_000, max: 1000, key: globalRateLimitKey },
   ]),
 );
 browserTelemetryRouter.post('/', async (c) => {
   if (process.env.OTEL_BROWSER_ENABLED !== 'true') return c.body(null, 404);
-  const config = readTelemetryConfig('api');
+  const config = telemetryConfigFromEnv('api');
   if (!config) return c.body(null, 404);
   const origin = c.req.header('origin');
   const allowedOrigins = [
@@ -49,7 +49,7 @@ browserTelemetryRouter.post('/', async (c) => {
     (BigInt(Math.trunc(milliseconds * 1000)) * 1000n).toString();
   const attribute = (key: string, value: unknown) => ({
     key,
-    value: { stringValue: String(redactLogValue(value)) },
+    value: { stringValue: String(maskLogValue(value)) },
   });
   const spans = parsed.data.spans.map((span) => ({
     traceId: span.traceId,

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { EntitlementInput } from '@template/db';
 import { db } from '@template/db';
 import type { Organization, Role, Space } from '@template/db/generated/client/client';
 import {
@@ -13,7 +14,7 @@ import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 
 const { app, call, holds } = createTokenProbeApp((hono) => {
   hono.get('/grants', (c) => c.json(c.get('permix').getJSON()));
@@ -55,7 +56,7 @@ afterEach(async () => {
 const memberKey = async (
   memberRole: Role,
   token: { role: Role | null; full?: boolean },
-  entitlements?: Entry[],
+  entitlements?: EntitlementInput[],
 ) => {
   const { entity: organizationUser } = await createOrganizationUser(
     { role: memberRole, entitlements },
@@ -103,7 +104,11 @@ describe('a member token holds its member row, never the user (template #210 7f6
 
   it('a token create stored on a member mints nothing through its token: only a user mints', async () => {
     const { rawKey } = await memberKey('member', { role: null, full: true }, [
-      entry('db:token', ['db:organization', organization.id, 'organization'], ['create']),
+      entitlementInputFor(
+        'db:token',
+        ['db:organization', organization.id, 'organization'],
+        ['create'],
+      ),
     ]);
     const response = await call(rawKey, 'POST', `/api/v1/organization/${organization.id}/tokens`, {
       name: 'k',
@@ -135,7 +140,7 @@ describe('a member token holds its member row, never the user (template #210 7f6
       {
         ownerModel: 'OrganizationUser',
         role: 'admin',
-        entitlements: [entry('db:space', ['db:space', space.id], ['manage'])],
+        entitlements: [entitlementInputFor('db:space', ['db:space', space.id], ['manage'])],
       },
       { organizationUser },
     );
@@ -149,7 +154,11 @@ describe('a member token holds its member row, never the user (template #210 7f6
       role: 'viewer',
     });
     const manageTheOrganizations = {
-      ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
+      ...entitlementInputFor(
+        'db:integration',
+        ['db:organization', organization.id, 'organization'],
+        ['manage'],
+      ),
       where: { field: 'ownerModel', operator: 'equals', value: 'Organization' },
     };
     const { rawKey } = await memberKey('viewer', { role: 'admin' }, [manageTheOrganizations]);
@@ -160,7 +169,10 @@ describe('a member token holds its member row, never the user (template #210 7f6
   it("a space member's stored entitlement stands on the space owner's table, not the member's role", async () => {
     const { context } = await createOrganizationUser({ role: 'member' }, { organization });
     const { entity: spaceUser } = await createSpaceUser(
-      { role: 'viewer', entitlements: [entry('db:space', ['db:space', space.id], ['manage'])] },
+      {
+        role: 'viewer',
+        entitlements: [entitlementInputFor('db:space', ['db:space', space.id], ['manage'])],
+      },
       { ...context, space },
     );
     const { rawKey } = await createKeyedToken(
@@ -243,7 +255,7 @@ describe("a member's entitlements are owned by its organization (Aron, 2026-10-2
   const entitledMember = async (anchor: Space) =>
     (
       await memberKey('viewer', { role: null, full: true }, [
-        entry('db:space', ['db:space', anchor.id], ['operate']),
+        entitlementInputFor('db:space', ['db:space', anchor.id], ['operate']),
       ])
     ).rawKey;
 
@@ -263,7 +275,11 @@ describe("a member token holds its member's role, narrowed, not its member's ent
   const tokenOn = async (tokenRole: 'member' | 'viewer') =>
     (
       await memberKey('viewer', { role: tokenRole }, [
-        entry('db:space', ['db:organization', organization.id, 'organization'], ['operate']),
+        entitlementInputFor(
+          'db:space',
+          ['db:organization', organization.id, 'organization'],
+          ['operate'],
+        ),
       ])
     ).rawKey;
 
@@ -279,7 +295,7 @@ describe("a member token holds its member's role, narrowed, not its member's ent
 });
 
 describe('what an integration entitlement from the organization reaches (2026-10-26)', () => {
-  const fullMemberToken = async (role: Role, entitlements?: Entry[]) => {
+  const fullMemberToken = async (role: Role, entitlements?: EntitlementInput[]) => {
     const { entity: organizationUser } = await createOrganizationUser(
       { role, entitlements },
       { organization },
@@ -312,7 +328,11 @@ describe('what an integration entitlement from the organization reaches (2026-10
 
   const fromOrganization = () =>
     fullMemberToken('viewer', [
-      entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
+      entitlementInputFor(
+        'db:integration',
+        ['db:organization', organization.id, 'organization'],
+        ['manage'],
+      ),
     ]);
 
   it('manage on integrations from the organization reaches its own integrations', async () => {
@@ -331,7 +351,7 @@ describe('what an integration entitlement from the organization reaches (2026-10
 
   it("via space.organization it reaches the spaces' integrations, not the organization's own", async () => {
     const key = await fullMemberToken('viewer', [
-      entry(
+      entitlementInputFor(
         'db:integration',
         ['db:organization', organization.id, 'space.organization'],
         ['manage'],
@@ -362,7 +382,7 @@ describe('what an integration entitlement from the organization reaches (2026-10
         })
       ).entity;
     const key = await fullMemberToken('viewer', [
-      entry(
+      entitlementInputFor(
         'db:integration',
         ['db:organizationUser', anchorMember.id, 'organizationUser'],
         ['read'],
@@ -378,8 +398,12 @@ describe('what an integration entitlement from the organization reaches (2026-10
 
   it('a full token keeps every branch its member holds: one entry per path is not collapsed', async () => {
     const rawKey = await fullMemberToken('viewer', [
-      entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
-      entry(
+      entitlementInputFor(
+        'db:integration',
+        ['db:organization', organization.id, 'organization'],
+        ['manage'],
+      ),
+      entitlementInputFor(
         'db:integration',
         ['db:organization', organization.id, 'space.organization'],
         ['manage'],

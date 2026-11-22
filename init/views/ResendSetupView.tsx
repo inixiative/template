@@ -2,21 +2,21 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import { getDomain } from '../api/resend';
+import { fetchResendDomain } from '../api/resend';
 import { StepProgress } from '../components/StepProgress';
 import {
   confirmResendDnsSetup,
   type DnsVerificationResult,
   ensureResendDomain,
-  getInfisicalProjectId,
-  getStoredResendApiKey,
+  fetchInfisicalProjectIdOrThrow,
+  fetchStoredResendApiKeyOrThrow,
   storeResendApiKey,
   storeResendFromAddress,
 } from '../tasks/resendSetup';
-import { getResendProgressItems } from '../tasks/resendSteps';
+import { resendProgressItems } from '../tasks/resendSteps';
 import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
-import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig, type ProjectConfig } from '../utils/fetchProjectConfig';
 import { clearError, clearProgress, setError } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
@@ -75,7 +75,7 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
   const [verificationResult, setVerificationResult] = useState<DnsVerificationResult | null>(null);
 
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
-  const progressItems = useMemo(() => (config ? getResendProgressItems(config) : []), [config]);
+  const progressItems = useMemo(() => (config ? resendProgressItems(config) : []), [config]);
   const error = config?.resend.error ?? '';
 
   const restartSetup = async () => {
@@ -94,20 +94,20 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
   };
 
   const showDnsRecords = async (currentFromAddress: string) => {
-    const projectId = await getInfisicalProjectId();
+    const projectId = await fetchInfisicalProjectIdOrThrow();
     setRunning(true);
     setActiveAction('Loading domain details from Resend...');
 
     try {
       await clearError('resend');
       await syncConfig();
-      const freshConfig = await getProjectConfig();
-      const apiKey = await getStoredResendApiKey(projectId);
+      const freshConfig = await fetchProjectConfig();
+      const apiKey = await fetchStoredResendApiKeyOrThrow(projectId);
       const storedDomainId = freshConfig.resend.domainId;
 
       // If we already have the domainId, fetch directly (avoids upsert round-trip)
       const domain = storedDomainId
-        ? await getDomain(apiKey, storedDomainId)
+        ? await fetchResendDomain(apiKey, storedDomainId)
         : await ensureResendDomain(projectId, currentFromAddress);
 
       setFromAddress(currentFromAddress);
@@ -148,8 +148,8 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
       await clearError('resend');
       await syncConfig();
 
-      const projectId = await getInfisicalProjectId();
-      const latestConfig = await getProjectConfig();
+      const projectId = await fetchInfisicalProjectIdOrThrow();
+      const latestConfig = await fetchProjectConfig();
       const resendProgress = latestConfig.resend.progress;
 
       if (!hasStoredApiKey(resendProgress)) {
@@ -173,7 +173,7 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
       }
 
       // Re-read progress after stores (may have changed)
-      const updatedConfig = await getProjectConfig();
+      const updatedConfig = await fetchProjectConfig();
       const updatedProgress = updatedConfig.resend.progress;
 
       if (!updatedProgress.addDomain) {

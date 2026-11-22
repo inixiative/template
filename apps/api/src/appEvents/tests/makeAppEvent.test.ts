@@ -75,7 +75,7 @@ describe('makeAppEvent', () => {
       expect(rows[0].actorUserId).toBe('user-1');
     });
 
-    it('redacts sensitive keys anywhere in the persisted payload', async () => {
+    it('masks sensitive keys anywhere in the persisted payload', async () => {
       const event = createEvent('test', {
         userId: 'u1',
         keyHash: 'super-secret',
@@ -88,8 +88,8 @@ describe('makeAppEvent', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].data).toEqual({
         userId: 'u1',
-        keyHash: '[REDACTED]',
-        nested: { password: '[REDACTED]' },
+        keyHash: '[MASKED]',
+        nested: { password: '[MASKED]' },
       });
     });
   });

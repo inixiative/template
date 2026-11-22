@@ -1,8 +1,8 @@
-import { getRedisPub, getRedisSub } from '@template/db';
+import { redisPublisher, redisSubscriber } from '@template/db';
 import { appendToStream, initWebSocketPubSub } from '#/ws/pubsub';
 import { addConnection } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
-import { createTestSocket, type TestSocketHandle } from '#tests/createTestSocket';
+import { createTestSocket, sentFrames, type TestSocketHandle } from '#tests/createTestSocket';
 import {
   WS_INSTANCE_REPLY,
   type WSInstanceCommand,
@@ -26,7 +26,7 @@ const append = ({ stream, ids, userIds }: Extract<WSInstanceCommand, { op: 'appe
 let subscriberBack: Promise<void> = Promise.resolve();
 
 const dropSubscriber = async (downMs: number) => {
-  const sub = getRedisSub();
+  const sub = redisSubscriber();
   const retryStrategy = sub.options.retryStrategy;
   sub.options.retryStrategy = () => downMs;
   const closed = new Promise((resolve) => sub.once('close', resolve));
@@ -38,7 +38,7 @@ const dropSubscriber = async (downMs: number) => {
 };
 
 const failAppends = (count: number) => {
-  const redis = getRedisPub();
+  const redis = redisPublisher();
   const evaluate = redis.eval.bind(redis);
   let remaining = count;
   redis.eval = ((...args: Parameters<typeof evaluate>) =>
@@ -54,7 +54,7 @@ const run = async (command: WSInstanceCommand): Promise<unknown> => {
     case 'append':
       return append(command);
     case 'frames':
-      return (sockets.get(command.connectionId)?.sent ?? []).map((frame) => JSON.parse(frame));
+      return sentFrames(sockets.get(command.connectionId)?.sent ?? []);
     case 'dropSubscriber':
       return dropSubscriber(command.downMs);
     case 'awaitSubscriber':
@@ -68,7 +68,7 @@ const reply = (message: WSInstanceReply) =>
   process.stdout.write(`${WS_INSTANCE_REPLY}${JSON.stringify(message)}\n`);
 
 if (process.env.WS_INSTANCE_SUBSCRIBES === 'true') await initWebSocketPubSub();
-await getRedisPub().ping();
+await redisPublisher().ping();
 reply({ ready: true });
 
 for await (const line of console) {

@@ -1,17 +1,19 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+import { fieldOf } from '@inixiative/field-map';
 import { type Condition, describeRuleSources } from '@inixiative/json-rules';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { RuleLens, RuleReference } from '@template/shared/rules';
 
-type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
-
-const isRowIdSource = (model: string, field: string): boolean =>
-  (prismaMap.models as unknown as IdFields)[model]?.fields[field]?.isId === true;
+/** Whether a model's field is its id column: a rule source naming it references a row. */
+export const isRowIdSource = (model: string, field: string): boolean => {
+  const entry = fieldOf(prismaMap, model, field);
+  return entry?.kind === 'scalar' && entry.isId === true;
+};
 
 const memo = new WeakMap<RuleLens, Map<string, RuleReference[]>>();
 

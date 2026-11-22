@@ -17,7 +17,7 @@ import type { Sender } from '#/lib/email/sender';
 export const emailRegistry = makeBroadcastRegistry<EmailClient>();
 
 // Only register a connector when one is actually configured. In test, no
-// connector is registered and sendEmail logs a warning + returns. Tests that
+// connector is registered and deliverEmail logs a warning + returns. Tests that
 // want to exercise email delivery should register an adapter explicitly.
 if (process.env.RESEND_API_KEY) {
   emailRegistry.register('resend', createResendClient(process.env.RESEND_API_KEY));

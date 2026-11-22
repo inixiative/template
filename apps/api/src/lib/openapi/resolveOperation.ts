@@ -11,7 +11,7 @@ const DOT_SEGMENTS = new Set(['.', '..']);
 
 let operations: Map<string, { method: string; path: string }> | null = null;
 
-const loadOperations = async (): Promise<Map<string, { method: string; path: string }>> => {
+const fetchOperations = async (): Promise<Map<string, { method: string; path: string }>> => {
   if (operations) return operations;
   const doc = (await (await app.request('/openapi/docs')).json()) as unknown as {
     paths?: Record<string, Record<string, { operationId?: string }>>;
@@ -29,7 +29,7 @@ export const resolveOperation = async (
   operationId: string,
   pathParams: Record<string, unknown> = {},
 ): Promise<ResolvedOperation | null> => {
-  const op = (await loadOperations()).get(operationId);
+  const op = (await fetchOperations()).get(operationId);
   if (!op) return null;
 
   let path = op.path;

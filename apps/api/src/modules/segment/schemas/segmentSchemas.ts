@@ -11,7 +11,7 @@ import {
   SegmentScalarInputSchema,
   SegmentScalarSchema,
 } from '@template/db';
-import { customerRefAsProviderSchema } from '#/modules/customerRef/schemas/customerRefSchemas';
+import { customerRelationshipAsProviderSchema } from '#/modules/customerRelationship/schemas/customerRelationshipSchemas';
 import { selectSegmentForCustomer } from '#/modules/segment/queries/segmentIncludes';
 
 export const SEGMENT_CREATE_IMMUTABLE_FIELDS = [
@@ -30,7 +30,7 @@ export const segmentCreateBodySchema = SegmentScalarInputSchema.omit({
 }).extend({
   conditions: z
     .unknown()
-    .describe('A json-rules condition over CustomerRef; see GET /api/v1/segment/info.'),
+    .describe('A json-rules condition over CustomerRelationship; see GET /api/v1/segment/info.'),
 });
 
 export const segmentUpdateBodySchema = segmentCreateBodySchema.partial();
@@ -57,13 +57,15 @@ export const segmentReadResponseSchema = SegmentScalarSchema.extend({
 });
 
 export const segmentMemberWithCustomerSchema = SegmentMemberScalarSchema.extend({
-  customerRef: customerRefAsProviderSchema,
+  customerRelationship: customerRelationshipAsProviderSchema,
 });
 
 export const segmentMembershipSchema = SegmentMemberScalarSchema.extend({
   segment: SegmentScalarSchema.pick(selectSegmentForCustomer),
 });
 
-export const segmentReachBodySchema = segmentCreateBodySchema.pick({ conditions: true });
+export const segmentEstimateReachBodySchema = segmentCreateBodySchema.pick({ conditions: true });
 
-export const segmentReachResponseSchema = z.object({ count: z.number().int().nonnegative() });
+export const segmentEstimateReachResponseSchema = z.object({
+  count: z.number().int().nonnegative(),
+});

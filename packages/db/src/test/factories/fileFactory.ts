@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const fileFactory = createFactory('File', {
+const fileFactory = registerFactory('File', {
   defaults: () => ({}),
   dependencies: {
     artifact: { modelName: 'Artifact', foreignKey: { id: 'artifactId' } },

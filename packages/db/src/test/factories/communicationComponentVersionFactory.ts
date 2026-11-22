@@ -4,11 +4,11 @@
  * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import { createFactory, getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const communicationComponentVersionFactory = createFactory('CommunicationComponentVersion', {
+const communicationComponentVersionFactory = registerFactory('CommunicationComponentVersion', {
   defaults: () => ({
-    slug: `component-${getNextSeq()}`,
+    slug: `component-${nextFactorySequenceNumber()}`,
   }),
 });
 

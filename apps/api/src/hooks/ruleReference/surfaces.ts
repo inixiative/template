@@ -18,7 +18,7 @@ import type {
   Segment,
 } from '@template/db/generated/client/client';
 import type { RuleReferenceSourceModel } from '@template/db/generated/client/enums';
-import { rowOwner, templateLens } from '@template/email/render';
+import { fetchTemplateLens, ownerScopeOfRow } from '@template/email/render';
 import {
   componentRuleContents,
   contentDynamicRuleReferences,
@@ -31,7 +31,7 @@ import {
 import type { RuleLens, RuleReference } from '@template/shared/rules';
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
+import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
 type Row = Record<string, unknown>;
@@ -56,7 +56,7 @@ type RuleReferenceDeclaration<Lens> = {
 };
 
 export type RuleReferenceSurface = Pick<RuleReferenceDeclaration<unknown>, 'columns' | 'label'> & {
-  read: (
+  fetchRuleReferencesOfRow: (
     row: Row,
     judged: readonly string[],
   ) => Promise<{ references: RuleReference[]; judged: RuleReferenceReading }>;
@@ -90,7 +90,7 @@ const storedAsCondition =
 const declare = <Lens>(declaration: RuleReferenceDeclaration<Lens>): RuleReferenceSurface => ({
   columns: declaration.columns,
   label: declaration.label,
-  read: async (row, judged) => {
+  fetchRuleReferencesOfRow: async (row, judged) => {
     const lens = await declaration.lens(row);
     return {
       references: declaration.storage(row, lens, declaration.columns).references,
@@ -107,8 +107,8 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
       const template = row as EmailTemplate;
       return emailLensFor(
         template.slug,
-        rowOwner(template),
-        await templateLens(template.slug, template),
+        ownerScopeOfRow(template),
+        await fetchTemplateLens(template.slug, template),
       );
     },
     storage: storedAsMjml(templateRuleContents),
@@ -116,14 +116,14 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
   EmailComponent: declare({
     columns: ['mjml'],
     label: (row) => `email component '${row.slug}'`,
-    lens: (row) => emailLensFor(undefined, rowOwner(row as EmailComponent)),
+    lens: (row) => emailLensFor(undefined, ownerScopeOfRow(row as EmailComponent)),
     storage: storedAsMjml(componentRuleContents),
   }),
   Segment: declare({
     columns: ['conditions'],
     label: (row) => `segment '${row.name ?? row.id}'`,
     lens: (row) =>
-      resolvedCustomerRefLens((row as Segment).ownerModel, segmentOwnerId(row as Segment)),
+      resolvedCustomerRelationshipLens((row as Segment).ownerModel, segmentOwnerId(row as Segment)),
     storage: storedAsCondition('conditions'),
   }),
   Entitlement: declare({

@@ -11,6 +11,8 @@
     "./generated/client/models": "./src/generated/client/models.ts",
     "./generated/client/enums": "./src/generated/client/enums.ts",
     "./generated/zod/scalarSchemas.gen": "./src/generated/zod/scalarSchemas.gen.ts",
+    "./lib/attributes": "./src/lib/attributes/index.ts",
+    "./lib/attributes/*": "./src/lib/attributes/*",
     "./lib/auditActorContext": "./src/lib/auditActorContext.ts",
     "./lib/encryption/*": "./src/lib/encryption/*",
     "./test": "./src/test/index.ts",
@@ -26,7 +28,7 @@
   },
   "scripts": {
     "test": "bun run --cwd ../.. with test api env __TEST_REDIRECT__=1 bun test --max-concurrency=1 packages/db/",
-    "db:generate": "rm -rf src/generated/zod && PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 bunx prisma generate && bun run scripts/generatePrismaMap.ts && bun run scripts/generateScalarSchemas.ts && echo $(date) > .prisma.gen",
+    "db:generate": "rm -rf src/generated/zod && PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 bunx prisma generate && field-map generate --client src/generated/client --out src/generated/prismaMap.gen.ts && bun run scripts/generateScalarSchemas.ts && echo $(date) > .prisma.gen",
     "db:push": "prisma db push",
     "db:push:force": "if [ \"$ENV\" = \"test\" ] || [ \"$ENV\" = \"local\" ]; then ../../scripts/db/push-local.sh; else echo \"ERROR: db:push:force only allowed in test/local env\" >&2; exit 1; fi",
     "db:migrate": "prisma migrate dev",
@@ -38,8 +40,9 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^3.6.0",
-    "@inixiative/permissions": "^0.21.1",
+    "@inixiative/field-map": "^0.1.2",
+    "@inixiative/json-rules": "^4.6.0",
+    "@inixiative/permissions": "^0.27.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@supercharge/promise-pool": "^3.3.0",
@@ -54,7 +57,6 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
-    "@inixiative/prisma-map": "^0.4.1",
     "@types/bcryptjs": "^3.0.0",
     "@types/ioredis-mock": "^8.2.7",
     "@types/lodash-es": "^4.17.12",

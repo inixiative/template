@@ -26,8 +26,8 @@ import {
   ParentBasedSampler,
   TraceIdRatioBasedSampler,
 } from '@opentelemetry/sdk-trace-base';
+import { stringifyLogValue } from '@template/shared/logger/maskLogValue';
 import { observeLogRecords } from '@template/shared/logger/records';
-import { stringifyLogValue } from '@template/shared/logger/redact';
 import { signalExportOptions, type TelemetryConfig } from '@template/shared/telemetry/config';
 import { createFetchExporter } from '@template/shared/telemetry/fetchExporter';
 

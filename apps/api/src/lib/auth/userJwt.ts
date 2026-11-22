@@ -10,7 +10,7 @@ import { jwksStore } from '#/lib/auth/jwksStore';
 export const USER_JWT_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SIGNING_KEY_LIFETIME_SECONDS = 90 * 24 * 60 * 60;
 
-export const selfIssuer = (): string => {
+export const userJwtIssuerUrlOrThrow = (): string => {
   if (!process.env.API_URL) throw new Error('API_URL is required to issue user JWTs');
   return process.env.API_URL;
 };
@@ -24,8 +24,8 @@ export const userJwtOptions = (): JwtOptions => ({
   },
   adapter: jwksStore,
   jwt: {
-    issuer: selfIssuer(),
-    audience: selfIssuer(),
+    issuer: userJwtIssuerUrlOrThrow(),
+    audience: userJwtIssuerUrlOrThrow(),
     expirationTime: `${USER_JWT_TTL_SECONDS}s`,
   },
   disableSettingJwtHeader: true,

@@ -50,6 +50,7 @@ const RESOLUTION_EFFECTS: Record<
     });
   },
   transferArtifact: async () => {},
+  changeEntitlements: async () => {},
 };
 
 export const useInquiryResolutionEffects = () => {

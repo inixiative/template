@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:jobs
  * @uses none
  */

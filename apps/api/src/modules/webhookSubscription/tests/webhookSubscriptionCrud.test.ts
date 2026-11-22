@@ -13,7 +13,7 @@ import {
 } from '@template/db/test';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { createTestApp } from '#tests/createTestApp';
-import { del, get, json, patch } from '#tests/utils/request';
+import { del, get, parseSuccessBody, patch } from '#tests/utils/request';
 
 describe('WebhookSubscription CRUD', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -59,13 +59,13 @@ describe('WebhookSubscription CRUD', () => {
   describe('GET /webhookSubscription/:id', () => {
     it('reads own user webhook', async () => {
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'User',
         userId: user.id,
       });
 
       const response = await fetch(get(`/api/v1/webhookSubscription/${sub.id}`));
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
       expect(data.id).toBe(sub.id);
@@ -73,7 +73,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('reads org webhook as member', async () => {
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'Organization',
         organizationId: org.id,
       });
@@ -85,7 +85,7 @@ describe('WebhookSubscription CRUD', () => {
     it('rejects reading other user webhook', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'User',
         userId: otherUser.id,
       });
@@ -98,7 +98,7 @@ describe('WebhookSubscription CRUD', () => {
   describe('PATCH /webhookSubscription/:id', () => {
     it('updates own user webhook', async () => {
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'User',
         userId: user.id,
         isActive: true,
@@ -107,7 +107,7 @@ describe('WebhookSubscription CRUD', () => {
       const response = await fetch(
         patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
       expect(data.isActive).toBe(false);
@@ -115,7 +115,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('reactivates webhook by default on update', async () => {
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'User',
         userId: user.id,
         isActive: false,
@@ -124,7 +124,7 @@ describe('WebhookSubscription CRUD', () => {
       const response = await fetch(
         patch(`/api/v1/webhookSubscription/${sub.id}`, { url: 'https://new-url.com/webhook' }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
       expect(data.isActive).toBe(true);
@@ -133,7 +133,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('rejects a private/internal URL (SSRF guard)', async () => {
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'User',
         userId: user.id,
         isActive: true,
@@ -148,7 +148,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('keeps inactive when explicitly set', async () => {
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'User',
         userId: user.id,
         isActive: false,
@@ -157,7 +157,7 @@ describe('WebhookSubscription CRUD', () => {
       const response = await fetch(
         patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
       expect(data.isActive).toBe(false);
@@ -166,7 +166,7 @@ describe('WebhookSubscription CRUD', () => {
     it('rejects updating other user webhook', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'User',
         userId: otherUser.id,
       });
@@ -181,7 +181,7 @@ describe('WebhookSubscription CRUD', () => {
   describe('DELETE /webhookSubscription/:id', () => {
     it('deletes own user webhook', async () => {
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'User',
         userId: user.id,
       });
@@ -195,7 +195,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('deletes org webhook as admin', async () => {
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'Organization',
         organizationId: org.id,
       });
@@ -207,7 +207,7 @@ describe('WebhookSubscription CRUD', () => {
     it('rejects deleting other user webhook', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: sub } = await createWebhookSubscription({
-        model: 'CustomerRef',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'User',
         userId: otherUser.id,
       });

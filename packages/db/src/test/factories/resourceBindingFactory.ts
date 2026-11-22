@@ -4,22 +4,38 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const resourceBindingFactory = createFactory('ResourceBinding', {
+const resourceBindingFactory = registerFactory('ResourceBinding', {
   defaults: () => ({
     bindingType: 'logo',
   }),
   dependencies: {
-    artifact: { modelName: 'Artifact', foreignKey: { id: 'artifactId' }, required: false },
-    organization: {
-      modelName: 'Organization',
-      foreignKey: { id: 'organizationId' },
+    sourceArtifact: {
+      modelName: 'Artifact',
+      foreignKey: { id: 'sourceArtifactId' },
       required: false,
     },
-    space: { modelName: 'Space', foreignKey: { id: 'spaceId' }, required: false },
-    user: { modelName: 'User', foreignKey: { id: 'userId' }, required: false },
-    customerRef: { modelName: 'CustomerRef', foreignKey: { id: 'customerRefId' }, required: false },
+    resourceOrganization: {
+      modelName: 'Organization',
+      foreignKey: { id: 'resourceOrganizationId' },
+      required: false,
+    },
+    resourceSpace: {
+      modelName: 'Space',
+      foreignKey: { id: 'resourceSpaceId' },
+      required: false,
+    },
+    resourceUser: {
+      modelName: 'User',
+      foreignKey: { id: 'resourceUserId' },
+      required: false,
+    },
+    resourceCustomerRelationship: {
+      modelName: 'CustomerRelationship',
+      foreignKey: { id: 'resourceCustomerRelationshipId' },
+      required: false,
+    },
   },
 });
 

@@ -5,9 +5,9 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const jobOutboxFactory = createFactory('JobOutbox', {
+const jobOutboxFactory = registerFactory('JobOutbox', {
   defaults: () => ({
     handlerName: 'sendWebhook',
     jobId: faker.string.uuid(),

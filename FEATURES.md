@@ -103,7 +103,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Standardized Response Shape** - Route templates enforce consistent structure: `{ data, pagination, error? }`. Every endpoint returns the same shape automatically, so your frontend handles all API responses with the same code and TypeScript knows exactly what to expect. Errors include guidance text to help users fix issues. No manual response formatting needed.
 
-- ✅ **Resource Context Middleware** - Routes with `:id` params auto-load the resource into request context using `getResource()`. Supports custom lookup queries (find by email, slug, etc.) and Prisma `include` options per route. No more fetching the same record in middleware and controller. Handles 404s automatically if resource doesn't exist.
+- ✅ **Resource Context Middleware** - Routes with `:id` params auto-load the resource into request context using `contextResource()`. Supports custom lookup queries (find by email, slug, etc.) and Prisma `include` options per route. No more fetching the same record in middleware and controller. Handles 404s automatically if resource doesn't exist.
 
 - ✅ **Request Context Scoping** - Every request gets isolated context (AppEnv) containing db client, authenticated user, current org/space, and permissions. Context flows through all middleware and controllers without manual passing. Prevents cross-tenant data leaks since context is scoped per-request.
 
@@ -125,7 +125,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Person JWT (BetterAuth sign-in)
 
-- ✅ **BetterAuth Sign-in** - BetterAuth ^1.6 runs email/password, email verification and OAuth. Its session exists only for the sign-in handshake (10 minutes at most, in Redis); `jwtHandoff` swaps it for a JWT before the response leaves the API and deletes it
+- ✅ **BetterAuth Sign-in** - BetterAuth ^1.6 runs email/password, email verification and OAuth. Its session exists only for the sign-in handshake (10 minutes at most, in Redis); `jwtHandoffPlugin` swaps it for a JWT before the response leaves the API and deletes it
 - ✅ **Person JWT** - Sign-in answers with `{ token, expiresAt, user }`: an ES256 JWT (`sub` = user, `iss` = `aud` = `API_URL`, 30 days). The SPAs store it in localStorage and send it as `Authorization: Bearer <jwt>`. `jwtAuthMiddleware` verifies it from its signature; no session lookup. Details: [AUTH.md](docs/claude/AUTH.md#user-jwt)
 - ✅ **Email/Password Auth** - Password hashing via BetterAuth. Email verification is required before sign-in
 - ✅ **OAuth Flow → JWT** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the JWT. Neither the JWT nor a session token appears in a URL
@@ -243,7 +243,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Post-Transaction Queue** - Jobs enqueued during transaction but only executed after successful commit. Ensures webhooks and external notifications don't fire for rolled-back changes. Critical for maintaining consistency between database state and external systems
 
-- ✅ **Robust False Polymorphism** - Pattern for polymorphic relationships without database-level polymorphism. Models like Token (user/organization/space scoped) and CustomerRef (references different customer types) use explicit foreign keys with validation. More type-safe and performant than traditional polymorphic associations. [Learn more: DATABASE.md](docs/claude/DATABASE.md)
+- ✅ **Robust False Polymorphism** - Pattern for polymorphic relationships without database-level polymorphism. Models like Token (user/organization/space scoped) and CustomerRelationship (references different customer types) use explicit foreign keys with validation. More type-safe and performant than traditional polymorphic associations. [Learn more: DATABASE.md](docs/claude/DATABASE.md)
 
 - ✅ **Split Schema Architecture** - One Prisma file per model in `packages/db/prisma/schema/` for better organization and merge conflict reduction. Schema files dynamically combined during generation. Makes large schemas manageable
 
@@ -257,7 +257,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories). The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
-- ✅ **34 Database Models** - account, appEvent, auditLog, authProvider, communicationLog, communicationComponentVersion, contact, cronJob, customerRef, emailTemplate, emailComponent, flow, integrationRecord, integration, jobOutbox, inquiry, organizationUser, organization, project, jwks, segment, segmentMember, session, ruleReference, spaceUser, tag, space, tagAttachment, user, token, tagCategory, verification, webhookSubscription, webhookEvent
+- ✅ **36 Database Models** - account, appEvent, auditLog, authProvider, communicationLog, communicationComponentVersion, contact, cronJob, customerRelationship, emailTemplate, emailComponent, flow, integrationRecord, integrationResource, integration, jobOutbox, inquiry, organizationUser, organization, project, projectIntegrationResource, jwks, segment, segmentMember, session, ruleReference, spaceUser, tag, space, tagAttachment, user, token, tagCategory, verification, webhookSubscription, webhookEvent
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -267,9 +267,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Runtime Schema Introspection** - Parse Prisma's runtime data model and inline schema to extract FK mappings, relations, and field metadata at runtime. Enables dynamic hydration, validation, and tooling without hardcoded model knowledge
 
-- ✅ **Advanced Constraints** - Partial unique indexes are declared in the Prisma schema (the `partialIndexes` preview feature: `@@unique([...], where: { ... })`; `CustomerRef` keeps one row per customer/provider pair this way). Row checks the schema can't express are json-rules in `RulesRegistry` (`apps/api/src/hooks/rules/registry.ts`), enforced by the `rules` hook on every write, so the rule lives in the mutation lifecycle with the rest of the write guards instead of in hand-written SQL. [Learn more: HOOKS.md](docs/claude/HOOKS.md#rules-registry)
+- ✅ **Advanced Constraints** - Partial unique indexes are declared in the Prisma schema (the `partialIndexes` preview feature: `@@unique([...], where: { ... })`; `CustomerRelationship` keeps one row per customer/provider pair this way). Row checks the schema can't express are json-rules in `RulesRegistry` (`apps/api/src/hooks/rules/registry.ts`), enforced by the `rules` hook on every write, so the rule lives in the mutation lifecycle with the rest of the write guards instead of in hand-written SQL. [Learn more: HOOKS.md](docs/claude/HOOKS.md#rules-registry)
 
-- ✅ **False Polymorphism Registry** - Centralized configuration (`PolymorphismRegistry`) defining polymorphic patterns across models. Single source of truth for constraints, validation hooks, and FK resolution. Supports multi-axis polymorphism (Token owner + model, CustomerRef customer + provider)
+- ✅ **False Polymorphism Registry** - Centralized configuration (`PolymorphismRegistry`) defining polymorphic patterns across models. Single source of truth for constraints, validation hooks, and FK resolution. Supports multi-axis polymorphism (Token owner + model, CustomerRelationship customer + provider)
 
 - ✅ **Model Name Utilities** - Type-safe conversion between model names (`User`) and accessor names (`user`). Guards like `isModelName()` and `isAccessorName()` prevent runtime errors from invalid model references
 
@@ -299,11 +299,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **makeSingletonJob()** - Ensures only one instance runs at a time across all workers using Redis locks with heartbeat. Prevents duplicate execution of sensitive operations (database migrations, billing runs, encryption key rotation). Keyed per payload with `lockKey`, otherwise per cron row. A busy key skips — collision policy is binary (singleton skips, superseding takes over, nothing parks; the `no-job-parking` CI rule enforces it). Keyed runs are also deduplicated at enqueue (BullMQ `deduplication`), so the skip holds while a staged singleton waits on its children. Lock TTL is 5 minutes with a 1-minute heartbeat; refresh/release are token-fenced and lock loss is reported without cancelling the running handler
 
-- ✅ **makeSupersedingJob()** - Allows newer jobs to cancel/supersede older jobs with same dedupeKey. Long-running jobs poll Redis every 500ms for supersession signal and abort gracefully. Perfect for search indexing, cache warming, or report generation where only latest matters. A superseding job's children honour its tombstone, at start and on every poll, at any depth
+- ✅ **makeSupersedingJob()** - Allows newer jobs to cancel/supersede older jobs with same dedupeKey. Long-running jobs poll Redis every 500ms for supersession signal and abort gracefully. Perfect for search indexing, cache warming, or report generation where only latest matters. A superseding job's children honour its superseded mark, at start and on every poll, at any depth
 
 - ✅ **Staged jobs (fan out and wait)** - Every constructor takes `{ stages, finish }` in place of a handler: each stage adds children with `ctx.enqueueChildJob`, the job parks in BullMQ's `waiting-children` (holding no worker slot) until they report, and `finish` runs once after the last stage. The stage index lives on the job, so a resumed run never repeats a stage. Children keep their retries and then count as done (`ignoreDependencyOnFailure`). The `no-hand-rolled-flows` CI rule keeps the flow machinery in the primitive; `apps/api/scripts/jobFlowCheck.ts` proves it against real Redis
 
-- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, targets, results, compute, channel })` keeps computed values warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args; `results` are key functions over one params object, all filled by one `compute` pass per target under one single-flight lock. Reads never compute: `checkCache` reports empty / queued / computing / fresh / stale from a write time stored beside each value, and `checkRollingCache` queues the target's leaf on a miss (one enqueue per target however many readers miss, through a queued marker) and returns the channel to wait on. The worker warms every cache on boot. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out superseding slow-lane leaves spread over `spreadSeconds`, each under a per-attempt timeout (`rollingCache.leafStuck` when it runs over, `rollingCache.refreshed` with a websocket refetch hint when it lands). Entries outlive every retry; the `rolling-cache-registered` CI rule keeps every definition imported by the worker
+- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, targets, results, compute, channel })` keeps computed values warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args; `results` are key functions over one params object, all filled by one `compute` pass per target under one single-flight lock. Reads never compute: `checkCache` reports empty / queued / computing / fresh / stale from a write time stored beside each value, and `fetchRollingCacheAndQueueRefreshWhenMissing` queues the target's leaf on a miss (one enqueue per target however many readers miss, through a queued marker) and returns the channel to wait on. The worker warms every cache on boot. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out superseding slow-lane leaves spread over `spreadSeconds`, each under a per-attempt timeout (`rollingCache.leafStuck` when it runs over, `rollingCache.refreshed` with a websocket refetch hint when it lands). Entries outlive every retry; the `rolling-caches-imported-by-worker-barrel` CI rule keeps every definition imported by the worker
 
 - ✅ **BullMQ Integration** - Redis-backed persistent queue with automatic retries (3 attempts, exponential backoff 5s base). Jobs survive server restarts. One `jobs` queue serves registered handlers; `REDIS_BULLMQ_URL` can isolate it from cache Redis (fallback: `REDIS_URL`)
 
@@ -346,8 +346,8 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## Real-Time Communication
 
 - ✅ **Authenticated WebSockets** — Bun transport with message-based authentication through the HTTP `/me` route; spoof authority follows the same middleware. Credentials are not sent as a token query parameter.
-- ✅ **WebSocket Data Streams** — open/snapshot/append/close streams keyed to a read route, declared once as typed shared definitions (`defineStream`: route snapshot schema, zod-validated action payloads, a required `shared`/`perRecipient` audience enforced by test). The route's response authorizes the open and is the snapshot; open streams are re-authorized every 45s, and transient failures retry with backoff. App-event handlers emit typed appends (`streamAppend`) through Redis, serialized per stream; the frontend folds them with exhaustive reducers (`useStream`) and side-effect listeners (`useStreamAction`) that share one open stream. The only stream, `organizationReadManyContacts`, is scaffolding.
-- ✅ **Authorized Query Channels** — `WS_CHANNELS` declares channel families and supplies `LIVE_QUERIES`. Subscribe probes the corresponding HTTP route; unauthorized, unknown or malformed channels are rejected. Effective identity changes drop previous subscriptions.
+- ✅ **WebSocket Data Streams** — open/snapshot/append/close streams keyed to a read route, declared once as typed shared definitions (`defineStream`: route snapshot schema, zod-validated action payloads, a required `shared`/`perRecipient` audience enforced by test). The route's response authorizes the open and is the snapshot; open streams are re-authorized every 45s, and transient failures retry with backoff. App-event handlers emit typed appends (`streamAppendHandoff`) through Redis, serialized per stream; the frontend folds them with exhaustive reducers (`useDataStreamSnapshot`) and side-effect listeners (`useDataStreamMessageListener`) that share one open stream. The only stream, `organizationReadManyContacts`, is scaffolding.
+- ✅ **Authorized Query Channels** — `WS_CHANNELS` declares channel families; its keys are the `WSChannelFamily` names. Subscribe probes the corresponding HTTP route; unauthorized, unknown or malformed channels are rejected. Effective identity changes drop previous subscriptions.
 - ✅ **Refetch and Recovery** — Mounted live queries subscribe automatically. After reconnect, identity and subscriptions are replayed before recovery invalidation. Hints are not persisted or replayed; delivery is not guaranteed while disconnected.
 - ✅ **Redis Pub/Sub** — Channel and user-targeted messages reach connected clients across API instances, with local-only fallback on Redis failure.
 - ✅ **App Events** — `emitAppEvent` captures actor context and defers through `onCommit` inside a transaction. `makeAppEvent` uses `db.parallel(..., { resolution: 'allSettled' })` to isolate observation, email/WebSocket handoffs and callbacks. Observation directly upserts `AppEvent`; email delivery runs through jobs.
@@ -360,7 +360,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## Email System
 
 - ✅ **Templates and Components** — Stored MJML, subjects, locales, reusable nested components, audit-backed versions and owner-tier cascade. Ownership supports default/admin, User, Organization, Space, OrganizationUser and SpaceUser tiers.
-- ✅ **Planner and Delivery** — App-event handoffs select a registry template plus bindings. `sendEmail` resolves sender and recipients, records per-recipient `CommunicationLog` intent and enqueues `deliverEmail`; delivery settles, renders, sends and records the outcome.
+- ✅ **Planner and Delivery** — App-event handoffs select a registry template plus bindings. `planEmailDeliveries` resolves sender and recipients, records per-recipient `CommunicationLog` intent and enqueues `deliverEmail`; delivery settles, renders, sends and records the outcome.
 - ✅ **Preferences and Verification** — Communication kind, contact acceptance and cached address deliverability participate in delivery. System messages bypass preference opt-out; other kinds must be accepted by the contact.
 - ✅ **Owner-Scoped Email Lenses** — Separate sender, recipient, data and system lenses govern tokens, rules, loops, picker options and runtime projection. Recipient data can include scoped tags and segment memberships; foreign data is filtered before interpolation.
 - ✅ **Rule References and Degradation** — Save paths maintain `RuleReference` edges; stale or transitively degraded segment references affect rule health. Preflight and render use the same lens vocabulary and reference admission.
@@ -393,7 +393,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### General Security
 
-- ✅ **Cookies and Sessions Never Authenticate the API** - BetterAuth's cookies on the API origin are used only inside `/api/auth/*` (OAuth state); `jwtHandoff` expires the session cookie on every sign-in response. The CI rule `bearer-only-auth` fences cookie and session auth (cookie cache, `credentials: 'include'`, `withCredentials`, `document.cookie`, any `getSession` / `findSession` / session-table read, the BetterAuth `bearer` plugin)
+- ✅ **Cookies and Sessions Never Authenticate the API** - BetterAuth's cookies on the API origin are used only inside `/api/auth/*` (OAuth state); `jwtHandoffPlugin` expires the session cookie on every sign-in response. The CI rule `bearer-only-auth` fences cookie and session auth (cookie cache, `credentials: 'include'`, `withCredentials`, `document.cookie`, any `getSession` / `findSession` / session-table read, the BetterAuth `bearer` plugin)
 - ✅ **Bearer JWT** - Both email/password and OAuth sign-ins store the person JWT in localStorage and send it as `Authorization: Bearer <jwt>`. No cookie, so CSRF is not a risk, but XSS is (localStorage is JS-accessible); revocation ends a stolen JWT. Trade-off accepted for cross-origin SPAs
 - ✅ **SQL Injection Prevention** - Prisma uses parameterized queries exclusively. No string interpolation in queries. Raw SQL escape hatches disabled by convention
 - ✅ **XSS Prevention** - React escapes all interpolated values by default. No `dangerouslySetInnerHTML` usage. Content Security Policy headers configurable via Hono middleware
@@ -436,9 +436,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Registry** - `FlowKey` enum + `flowRegistry` in `modules/flow/registry`, one file per flow: a bindings schema and `steps(bindings)`, each step a `to`, an `advance` (`auto` / `confirm`), a `readPath` built with `apiPath(operationId, …)` and a json-rules rule over the response
 - ✅ **Resolved at create** - steps are resolved and stored on the row; editing the registry never affects a running flow. Create checks too, so callers just create a flow instead of pre-checking whether it is needed
-- ✅ **Rechecked on every read** - from step 0, as the caller, with `readAllAsCaller` (batch sub-requests, every page via `fetchAllPages`). Steps can move backward. A failed read deletes the flow (404); a finished one is returned once and deleted
-- ✅ **Transient** - `cleanStaleData` deletes flows idle for 15 minutes
-- ✅ **Client** - only `flowId` in the store (`?flow=` mirrors it like `spoof`), the flow read from the query cache, one `FlowBanner` per app, every mutation rechecks via the `MutationCache`, one `flowNext` rule drives the banner and `Modal` close ("Continue" / "Finish"), leaving the flow's pages drops it
+- ✅ **Rechecked on every read** - from step 0, as the caller, with `fetchAllAsCaller` (batch sub-requests, every page via `fetchAllPages`). Steps can move backward. A failed read deletes the flow (404); a finished one is returned once and deleted
+- ✅ **Transient** - `hardDeleteRecordsPastRetention` deletes flows idle for 15 minutes
+- ✅ **Client** - only `flowId` in the store (`?flow=` mirrors it like `spoof`), the flow read from the query cache, one `FlowBanner` per app, every mutation rechecks via the `MutationCache`, one `nextFlowStepLink` rule drives the banner and `Modal` close ("Continue" / "Finish"), leaving the flow's pages drops it
 
 [Learn more: FLOWS.md](docs/claude/FLOWS.md)
 
@@ -454,9 +454,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **`contactRules` Hook** - Single before-mutation hook validates and normalizes every Contact write across `create`, `createManyAndReturn`, `upsert`, `update`, `updateManyAndReturn`. Looks up the type def, runs subtype rules, parses + canonicalizes `value`, computes `valueKey`. Update paths shadow-merge with `previous` so partial updates validate against the merged record. `position` ordering is handled by the separate `orderedList` hook (below)
 
-- ✅ **Ordered List Hook** - Generic hook system in `apps/api/src/hooks/orderedList/` that auto-manages dense `[1..N]` position columns for any registered model + scope combination. Registry-driven (`packages/db/src/registries/orderedList.ts` maps `model → { field: scopeFields[] }`); covers `create`, `createManyAndReturn`, `update`, `updateManyAndReturn` (deletedAt only — bulk position writes throw), `upsert`, `delete`, `deleteMany`. Soft-deleted rows get distinct negative positions; restoring appends to the live tail. Bulk paths are O(scopes) — single CTE `UPDATE … FROM (VALUES …)` per scope, not per row. The registry composes into `HOOK_IGNORE_FIELDS` so audit/webhooks/generic-noop detection treat ordering-only updates as noise; cascade helpers use `UPDATE … RETURNING *` and the hook queues per-row cache invalidation on commit. Core algorithm in `apps/api/src/lib/prisma/orderedList.ts`
+- ✅ **Ordered List Hook** - Generic hook system in `apps/api/src/hooks/orderedList/` that auto-manages dense `[1..N]` position columns for any registered model + scope combination. Registry-driven (`packages/db/src/registries/orderedList.ts` maps `model → { field: scopeFields[] }`); covers `create`, `createManyAndReturn`, `update`, `updateManyAndReturn` (deletedAt only — bulk position writes throw), `upsert`, `delete`, `deleteMany`. Soft-deleted rows get distinct negative positions; restoring appends to the live tail. Bulk paths are O(scopes) — single CTE `UPDATE … FROM (VALUES …)` per scope, not per row. The registry composes into `NOOP_FIELDS` so audit/webhooks/generic-noop detection treat ordering-only updates as noise; cascade helpers use `UPDATE … RETURNING *` and the hook queues per-row cache invalidation on commit. Core algorithm in `apps/api/src/lib/prisma/orderedList.ts`
 
 - ✅ **Row-Level Permission Overrides** - Optional `permissionRules: Json?` column lets owners share individual rows (e.g. "make this email readable by anyone"). Stored as `Record<Action, ActionRule>`; `check()` OR's the row rule with the schema rule for that action (additive only — row rules can grant, never restrict). Boundary validation via `buildPermissionRulesSchema(model, pick?)` derives valid action keys from the rebac schema; routes typically only expose `read` for sharing, keeping write actions owner-only
+
+- ✅ **Tenant Permission Rules** - `tenantPermissionRules: Json?` on `User`, `Organization` and `Space` lets a tenant extend the permission schema for every record under it (`{ "db:contact": { "read": true } }`). `tenantRowsAbove` names a record's tenants; `check()` ORs each one's rule with the schema rule (the library's `additionalRules`), so it only widens and cannot add an action. Written by the tenant's owner through `POST .../setTenantPermissionRules`; validated by `tenantPermissionRulesSchema`. A user's rules reach only what no organization or space holds. A lens over the schema (`tenantPermissionRulesLens`) says what a tenant may extend: product records it can hold (contacts and segments by default) and, for an organization, `read` or `operate` on its spaces; never the rest of the permission system's own resources, never `own`
 
 - ✅ **`ownerActions()` Helper** - Spreadable rebac action block for owner-polymorphic models. Each of `own`/`manage`/`operate`/`read` fans out across the configured owner relations (default: user/organization/space) — only the populated FK resolves, the others' rel returns false. `contact: { actions: ownerActions() }` is the entire schema entry
 
@@ -470,7 +472,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Customer Management
 
-- ✅ `CustomerRef` models a customer/provider pair, with User, Organization and Space branches on both axes. Segments operate on these references.
+- ✅ `CustomerRelationship` models a customer/provider pair, with User, Organization and Space branches on both axes. Segments operate on these relationships.
 - ✅ Provider list (`/me/providers`) and Space customer list (`/space/:id/customers`) routes exist.
 - 🟡 Provider-side User/Organization customer lists and broader relationship-management UI remain work in progress.
 
@@ -478,8 +480,8 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Segments
 
-- ✅ **Provider-Owned Audiences** — Named sets of `CustomerRef` rows owned by a User, Organization or Space. Every segment has a lens-validated rule; hand-picked audiences are static ID rules.
-- ✅ **Static and Dynamic Membership** — Set-based segment reconciliation plus customer-side dynamic evaluation, driven by business events and backed by a nightly sweep. Segment-of-segment rules run in dependency order.
+- ✅ **Provider-Owned Audiences** — Named sets of `CustomerRelationship` rows owned by a User, Organization or Space. Every segment has a lens-validated rule; hand-picked audiences are static ID rules.
+- ✅ **Static and Dynamic Membership** — Set-based segment reconciliation plus customer-side dynamic evaluation, driven by business events and backed by a nightly reconcile of every healthy dynamic segment. Segment-of-segment rules run in dependency order.
 - ✅ **Reference Health** — RuleReference edges, cycle/ownership checks and transitive degradation. Owner reads include `ruleIssues`; membership reads hide the rule. Degraded segments retain their existing members and are skipped by continuous reconciliation.
 - ✅ **API and Reach Preview** — Owner-scoped create/list and reach estimation, segment read/update/delete and member lists, plus customer-facing membership lists.
 - ✅ **Nested Navigation** — Segments → Owned and Memberships in user, organization and space contexts. Each page enables only its own query; `/segments` defaults to Owned.
@@ -524,7 +526,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Declarative Navigation System** - Navigation config files organized by context (user/org/space/public) and feature (dashboard/settings/communications). Each nav item declares path, label, icon, and required permissions. Menu items automatically filtered based on user permissions and current context. Config reusable across web/admin/superadmin apps with context-specific overrides
 
-- ✅ **Context-Aware Routing** - Routes automatically include current context params (`?org=`, `?space=`). Navigate to organization settings and URL becomes `/settings?org=orgId`. Switch organizations and all links update automatically. `getContextParams()` generates params for any route based on current state
+- ✅ **Context-Aware Routing** - Routes automatically include current context params (`?org=`, `?space=`). Navigate to organization settings and URL becomes `/settings?org=orgId`. Switch organizations and all links update automatically. `permissionCheckTargetForTenantContext()` generates params for any route based on current state
 
 - ✅ **Zustand State Management** - Six slices manage different concerns: **auth** (user/JWT), **tenant** (org/space), **permissions** (RBAC/ReBAC cache), **navigation** (breadcrumbs/menu state), **ui** (theme/modals/toasts), **client** (API base URL/headers). Slice factories enable testing without circular dependencies
 
@@ -532,7 +534,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **API Client Wrappers** - `apiQuery()` for GET requests unwraps nested `data.data` for clean usage. `apiMutation()` for mutations returns full response enabling optimistic update patterns. Both handle auth headers (JWT/token) and spoof headers (`x-spoof-user-email`) automatically
 
-- ✅ **Route Guards** - `requireAuth()` redirects unauthenticated users to `/login?redirectTo=currentPath`. `requirePublic()` redirects authenticated users away from login/signup. Guards preserve context params across redirects. Execute in route `beforeLoad` for instant feedback before component renders
+- ✅ **Route Guards** - `redirectToLoginUnlessAuthenticated()` redirects unauthenticated users to `/login?redirectTo=currentPath`. `redirectAuthenticatedUserAwayFromPublicPage()` redirects authenticated users away from login/signup. Guards preserve context params across redirects. Execute in route `beforeLoad` for instant feedback before component renders
 
 - ✅ **Vite Build System** - Lightning-fast HMR during development, optimized production builds with tree-shaking and code splitting. Supports workspace dependency hot reload via Turborepo watch mode
 
@@ -544,7 +546,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Done (Primitives)
 
-- ✅ **Core Primitives** - Avatar, Badge, Breadcrumb, Button, Card, DropdownMenu, EmptyState, Input, Label, Pagination, PasswordInput, Select, SlugInput, Table, ThemeToggle
+- ✅ **Core Primitives** - Avatar, Badge, Breadcrumb, Button, Card, DropdownMenu, EmptyState, Input, Label, Pagination, PasswordInput, Select, SlugInput, Table, ThemeSelector
 
 - ✅ **AppShell** - Main application layout with sidebar, header, and breadcrumb navigation. Wires to Zustand store for current user, org, space
 
@@ -552,11 +554,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **UserMenu** - Profile dropdown with avatar, name, email, logout, and spoof badge for impersonation
 
-- ✅ **ContextSelector** - Dropdown for switching organizations and spaces, updates URL params and global state
+- ✅ **TenantContextSelector** - Dropdown for switching organizations and spaces, updates URL params and global state
 
 - ✅ **Table + Pagination** - Table primitive with fixed-page pagination (page numbers, per-page selector, record count) and infinite scroll (IntersectionObserver sentinel). Supports viewport scroll with sticky headers and window scroll. All items rendered in DOM (no virtualization) so text selection, Ctrl+F, and copy-paste work.
 
-- ✅ **Data Hooks** - `usePaginatedData` and `useInfiniteData` manage search, filter, sort, and pagination state. `makeDataConfig` auto-generates configuration from the OpenAPI spec (searchable fields, orderable fields, enum filters). Scroll position persisted in `history.state` for back/forward restoration. Optional shareable URL sync (`?page=3&search=acme`).
+- ✅ **Data Hooks** - `usePaginatedData` and `useInfiniteData` manage search, filter, sort, and pagination state. `queryCapabilitiesFromOpenApi` auto-generates configuration from the OpenAPI spec (searchable fields, orderable fields, enum filters). Scroll position persisted in `history.state` for back/forward restoration. Optional shareable URL sync (`?page=3&search=acme`).
 
 - ✅ **Section Hash Navigation** - `useSectionHash` auto-discovers `data-section` elements via MutationObserver, syncs URL hash to most visible section. Dot-notation deep linking (`#usersTable.usr_abc123`) scrolls to specific rows.
 
@@ -574,29 +576,29 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 **20+ Custom Hooks for Common Patterns** - Reusable logic extracted into hooks for consistency across apps. All hooks are type-safe, tested, and follow React best practices.
 
-- ✅ **useAuthenticatedRouting()** - Initializes authentication state, syncs URL params (`?org=`, `?space=`) with store, handles redirects for auth/public routes. Call once in root component - sets up entire auth flow
+- ✅ **useSyncTenantContextWithUrlAndAuthorizeRoute()** - Initializes authentication state, syncs URL params (`?org=`, `?space=`) with store, handles redirects for auth/public routes. Call once in root component - sets up entire auth flow
 
 - ✅ **useOptimisticMutation()** - Wrapper around TanStack Query mutations with optimistic updates for list operations. Instantly updates UI on create/update/delete, automatically rolls back on error. Prevents loading states for better UX
 
 - ✅ **useValidateUniqueness()** - Real-time uniqueness validation for form fields (email, username, slug). Debounces input, calls API to check uniqueness, returns validation error. Integrates with React Hook Form
 
-- ✅ **useApiWebsocket()** - Mounted once at each app root. Every mounted query whose family is in `LIVE_QUERIES` subscribes to its channel, and refetches when a business event publishes a refetch to that channel (a `websocket` handoff from the event handler). A change made by any user, request or job then refreshes every open view of that data, with no prop drilling or manual invalidation. [Learn more: WEBSOCKETS.md](docs/claude/WEBSOCKETS.md#publishing-a-refetch)
+- ✅ **useApiWebsocket()** - Mounted once at each app root. Every mounted query whose family is a key of `WS_CHANNELS` subscribes to its channel, and refetches when a business event publishes a refetch to that channel (a `websocket` handoff from the event handler). A change made by any user, request or job then refreshes every open view of that data, with no prop drilling or manual invalidation. [Learn more: WEBSOCKETS.md](docs/claude/WEBSOCKETS.md#publishing-a-refetch)
 
 - ✅ **useBreadcrumbs()** - Generates breadcrumb trail from current route using navigation config. Returns array of `{ label, path }` objects for rendering breadcrumb navigation
 
 - ✅ **useAuthStrategy()** - Detects and configures multi-provider authentication (email/password, OAuth, SAML). Returns available providers, handles provider selection, manages auth flow
 
-- ✅ **usePermission()** - Checks if current user has specific permission in current context. Returns boolean for conditional rendering. Reacts to context switches (org/space changes)
+- ✅ **canActOnRecordIfPresent()** - Checks whether the current permissions allow an action on a record; false when the record is missing. Reads the permissions slice, so it follows context switches (org/space changes)
 
 - ✅ **useDebounce()** - Debounces rapidly changing values (search input, filter selections). Prevents excessive API calls. Configurable delay, cancels pending updates on unmount
 
 - ✅ **useMediaQuery()** - Responsive design helper that returns boolean for media query matches. Use for conditional rendering based on screen size. Server-safe (returns false during SSR)
 
 - ✅ **useAuthProviders()** - Fetches available auth providers for current org or platform. Used by login/signup to render correct OAuth buttons, show SSO option, or show password field based on configured providers
-- ✅ **useDarkMode()** - Reads and sets theme preference (light/dark/system). Syncs with Zustand ui slice, persists across sessions, applies Tailwind `dark:` class to document root. Returns `{ theme, setTheme, isDark }`
-- ✅ **useLanguage()** - Returns current locale string and setter. Backed by Zustand ui slice. Ready for i18n integration — currently returns `en` as default, locale-aware components read from this hook
-- ✅ **usePageMeta()** - Sets `document.title` and meta description for the current route. Accepts raw strings or template with app name. Called in page components to keep browser tab titles contextual
-- 🟡 **useSpaceTheme()** - Hook exists but returns mock values; space theming not yet wired to real data
+- ✅ **useApplyThemeClassToDocument()** - Reads and sets theme preference (light/dark/system). Syncs with Zustand ui slice, persists across sessions, applies Tailwind `dark:` class to document root. Returns `{ theme, setTheme, isDark }`
+- ✅ **useSetDocumentLanguageFromBrowser()** - Returns current locale string and setter. Backed by Zustand ui slice. Ready for i18n integration — currently returns `en` as default, locale-aware components read from this hook
+- ✅ **useDocumentTitleAndDescription()** - Sets `document.title` and meta description for the current route. Accepts raw strings or template with app name. Called in page components to keep browser tab titles contextual
+- 🟡 **useApplySpaceThemeCssVariables()** - Hook exists but returns mock values; space theming not yet wired to real data
 
 ---
 
@@ -640,7 +642,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Custom Lint Checks** - Three custom validators run after Biome: `check-import-aliases.sh` (enforces `#/` imports), `check-generated-files.sh` (ensures Prisma/OpenAPI SDK up to date), `run-post-biome-checks.sh` (orchestrates all checks). Prevents common mistakes
 
-- ✅ **Custom CI Rules** - `scripts/ci/run-ci-rules.sh` executes alphabetical rules in `scripts/ci/rules`: `no-jest.sh` (blocks Jest deps/imports/globals), `no-vitest.sh` (blocks Vitest deps/imports), and `ui-serialized-factories.sh` (requires `__serialize()` and forbids `__serialize() as any` in UI tests). `--test` runs rule self-tests against `scripts/ci/rule-violations/*` pass/fail fixtures
+- ✅ **Custom CI Rules** - `scripts/ci/run-ci-rules.sh` executes alphabetical rules in `scripts/ci/rules`: `no-jest.sh` (blocks Jest deps/imports/globals), `no-vitest.sh` (blocks Vitest deps/imports), and `ui-tests-serialize-factory-records.sh` (requires `__serialize()` and forbids `__serialize() as any` in UI tests). `--test` runs rule self-tests against `scripts/ci/rule-violations/*` pass/fail fixtures
 
 - ✅ **Optional Pre-commit Hooks** - Git hooks available for local validation before commit. Not enforced (developer choice) but recommended. Runs lint + type check on staged files
 
@@ -652,9 +654,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Route Templates** - Pre-built patterns (readRoute, createRoute, updateRoute) reduce API definition from ~100 lines to ~20 lines. Enforces consistency while eliminating boilerplate
 
-- ✅ **Data Config Builder** - `makeDataConfig(operationId)` reads the OpenAPI spec and auto-generates searchable fields, orderable fields, and enum filters. One line of config per table/list view. `usePaginatedData` and `useInfiniteData` consume the config and produce query objects, pagination props, and scroll restoration
+- ✅ **Data Config Builder** - `queryCapabilitiesFromOpenApi(operationId)` reads the OpenAPI spec and auto-generates searchable fields, orderable fields, and enum filters. One line of config per table/list view. `usePaginatedData` and `useInfiniteData` consume the config and produce query objects, pagination props, and scroll restoration
 
-- ✅ **Route Guards** - Reusable auth/permission checks with automatic redirects and context preservation. Drop `beforeLoad: requireAuth()` in route definition - done
+- ✅ **Route Guards** - Reusable auth/permission checks with automatic redirects and context preservation. Drop `beforeLoad: redirectToLoginUnlessAuthenticated()` in route definition - done
 
 [Learn more: TESTING.md](docs/claude/TESTING.md) | [DEVELOPER.md](docs/claude/DEVELOPER.md)
 
@@ -674,7 +676,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **OpenTelemetry Integration** - OTLP-compatible distributed tracing and metrics ready to use. Auto-instruments HTTP requests (excluding `/health`) and Prisma queries when `OTEL_EXPORTER_OTLP_ENDPOINT` configured. Sends to any OTLP backend (BetterStack, Datadog, Honeycomb, etc.). Skipped in local/test to avoid performance overhead. Dynamic imports ensure zero cost when disabled
 
-- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`makeAdapterRouter`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
+- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`resolveAdapterForEnvironmentOrThrow`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
 
 ### Environment & Secrets
 
@@ -690,13 +692,13 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ job schedulers) opens its own connection
 
-- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
+- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `fetchThroughCache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
 - ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, cacheGeneration, cacheQueued, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
 
-- ✅ **Transaction Cache Overlay** - `cache()` inside `db.txn` reads through a per-transaction overlay: the transaction reads its own writes, a rollback leaves nothing cached, and at commit each key is one Lua call behind its generation fence. Written keys are cleared before the transaction's locks are released and a failed clear makes `db.txn` throw; read-only keys are published after, and a failure only counts `cache.publish.failed`. [Learn more: REDIS.md](docs/claude/REDIS.md#cache-inside-a-transaction)
+- ✅ **Transaction Cache Overlay** - `fetchThroughCache()` inside `db.txn` reads through a per-transaction overlay: the transaction reads its own writes, a rollback leaves nothing cached, and at commit each key is one Lua call behind its generation fence. Written keys are cleared before the transaction's locks are released and a failed clear makes `db.txn` throw; read-only keys are published after, and a failure only counts `cache.publish.failed`. [Learn more: REDIS.md](docs/claude/REDIS.md#fetchthroughcache-inside-a-transaction)
 
-- ✅ **Create-If-Missing Fence and Lock Sets** - `db.findForUpdate(model, where, { upserting: true })` fences a row that does not exist yet with a Redis key lock held until the transaction settles; one field may list values to fence a batch as one lock set (one token, one heartbeat, one release, one Lua call per step). A wait past `waitMs` throws `FindForUpdateLockTimeoutError`, answered 409. `db.withLockUntilSettled` holds any `createLock` lock the same way and joins a key the transaction already holds. [Learn more: DATABASE.md](docs/claude/DATABASE.md#row-locks-and-create-if-missing)
+- ✅ **Create-If-Missing Fence and Lock Sets** - `db.findForUpdate(model, where, { upserting: true })` fences a row that does not exist yet with a Redis key lock held until the transaction settles; one field may list values to fence a batch as one lock set (one token, one heartbeat, one release, one Lua call per step). A wait past `waitMs` throws `FindForUpdateLockTimeoutError`, answered 409. `db.withLockUntilSettled` holds any `makeLock` lock the same way and joins a key the transaction already holds. [Learn more: DATABASE.md](docs/claude/DATABASE.md#row-locks-and-create-if-missing)
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 
@@ -710,7 +712,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Coming Soon
 
-- 🟡 **Adapter Primitives** (ticket INFRA-009) - `makeAdapterRouter` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
+- 🟡 **Adapter Primitives** (ticket INFRA-009) - `resolveAdapterForEnvironmentOrThrow` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
 
 - 🟣 **Product Analytics** (ticket INFRA-010) - User behavior tracking for product decisions. Evaluating OpenPanel, Mixpanel, or internal solution. Track page views, feature usage, funnels, retention
 
@@ -730,7 +732,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Context Isolation in Batch API** - Each request in a batch gets its own isolated AppEnv (db, auth, permissions). Prevents one batch operation from leaking context into another. Transaction strategies (transactionAll, transactionPerRound) wrap operations without sharing mutable state
 - ✅ **Multi-Strategy Authentication** - Single middleware chain handles person JWTs, Bearer API tokens, and API-token URL params (never cookies or sessions). Strategy auto-detected from request headers — no route-level branching. Spoof header (`x-spoof-user-email`) layered on top for superadmin impersonation
-- ✅ **False Polymorphism** - Polymorphic relationships (Token owner, CustomerRef) use explicit FK columns instead of type + ID string pairs. Each possible owner type has its own nullable FK. Prisma enforces referential integrity per FK. PolymorphismRegistry centralizes constraints, validation, and FK resolution
+- ✅ **False Polymorphism** - Polymorphic relationships (Token owner, CustomerRelationship) use explicit FK columns instead of type + ID string pairs. Each possible owner type has its own nullable FK. Prisma enforces referential integrity per FK. PolymorphismRegistry centralizes constraints, validation, and FK resolution
 - ✅ **Dynamic Schema Generation** - Prisma schema split across one file per model in `prisma/schema/`. Build step concatenates files before generation. Reduces merge conflicts, enables per-model organization, and makes large schemas navigable
 - ✅ **Permission-Based Menu Rendering** - Navigation config declares required permissions per item. Menu rendered by evaluating each item's permission against the Permix client. Items hidden (not just disabled) if user lacks permission. Re-evaluated on context switch (org/space change)
 - ✅ **Encryption Versioning** - Each encrypted field stores the key version used to encrypt it. Rotation job queries fields WHERE version < current and re-encrypts in batches. CI blocks deploys if version gaps or downgrades detected. Dual-key window (current + previous) enables zero-downtime rotation

@@ -80,8 +80,13 @@ run_self_tests() {
       local fail_case_name="${fail_case#$fail_root/}"
       [[ "$fail_case_name" != "$fail_case" ]] || fail_case_name="default"
       echo "Self-test $(basename "$rule"): fail fixture ($fail_case_name)"
-      if bash "$rule" "$fail_case"; then
+      local fail_exit=0
+      bash "$rule" "$fail_case" || fail_exit=$?
+      if [[ "$fail_exit" -eq 0 ]]; then
         echo "Expected failure but passed: $rule_name ($fail_case_name)"
+        exit_code=1
+      elif [[ "$fail_exit" -eq 2 ]]; then
+        echo "Expected a reported violation but the rule crashed: $rule_name ($fail_case_name)"
         exit_code=1
       fi
     done < <(case_dirs_for "$fail_root")

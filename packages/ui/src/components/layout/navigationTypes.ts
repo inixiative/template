@@ -5,7 +5,7 @@
  * @uses primitive:authz
  */
 import type { PermissionsCheck } from '@template/permissions/types';
-import type { PageContext, TenantContext } from '@template/ui/store/types/tenant';
+import type { TenantContext, ViewedRecords } from '@template/ui/store/types/tenant';
 
 type LucideIcon = string;
 
@@ -13,12 +13,12 @@ export type NavItem = {
   label: string;
   path?: string;
   icon?: LucideIcon;
-  title?: string | ((context: TenantContext, pageContext?: PageContext) => string);
-  description?: string | ((context: TenantContext, pageContext?: PageContext) => string);
+  title?: string | ((context: TenantContext, viewedRecords?: ViewedRecords) => string);
+  description?: string | ((context: TenantContext, viewedRecords?: ViewedRecords) => string);
   access?: (
     permissions: PermissionsCheck,
     context: TenantContext,
-    pageContext?: PageContext,
+    viewedRecords?: ViewedRecords,
   ) => boolean;
   alias?: boolean;
   breadcrumbLabel?: (record: Record<string, unknown>) => string;

@@ -30,7 +30,7 @@ import { inquiryRouter } from '#/modules/inquiry';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get, json, patch, post } from '#tests/utils/request';
+import { get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [
   (app) => {
@@ -130,11 +130,11 @@ describe('artifact actions', () => {
       granteeUserId: member.id,
       role: 'viewer',
     });
-    const asMember = await json<Artifact[]>(
+    const asMember = await parseSuccessBody<Artifact[]>(
       await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
     );
     expect(ids(asMember.data)).toContain(report.id);
-    const asAdmin = await json<Artifact[]>(
+    const asAdmin = await parseSuccessBody<Artifact[]>(
       await adminFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
     );
     expect(ids(asAdmin.data)).not.toContain(report.id);
@@ -179,7 +179,7 @@ describe('artifact actions', () => {
       post(`/api/v1/artifact/${source.id}/copy`, { containerArtifactId: inbox.id }),
     );
     expect(response.status).toBe(200);
-    const copy = (await json<Artifact>(response)).data;
+    const copy = (await parseSuccessBody<Artifact>(response)).data;
     expect(copy.ownerModel).toBe('Organization');
     const copied = await db.file.findUniqueOrThrow({
       where: { artifactId: copy.id },
@@ -217,12 +217,12 @@ describe('artifact actions', () => {
     }
     await createResourceBinding({
       sourceModel: 'Artifact',
-      artifactId: logo.id,
+      sourceArtifactId: logo.id,
       resourceModel: 'Organization',
-      organizationId: organization.id,
+      resourceOrganizationId: organization.id,
       bindingType: 'logo',
     });
-    const { data } = await json<{
+    const { data } = await parseSuccessBody<{
       owner: { ownerModel: string };
       access: { grants: unknown[] };
       placements: { containerArtifactId: string }[];
@@ -266,11 +266,11 @@ describe('artifact actions', () => {
       expect(after.ownerModel).toBe('Organization');
       expect(after.organizationId).toBe(organization.id);
       expect(await db.artifactPlacement.count({ where: { artifactId: file.id } })).toBe(0);
-      const tracking = await db.resourceBinding.findMany({ where: { artifactId: file.id } });
-      expect(tracking.map((binding) => [binding.bindingType, binding.userId])).toEqual([
+      const tracking = await db.resourceBinding.findMany({ where: { sourceArtifactId: file.id } });
+      expect(tracking.map((binding) => [binding.bindingType, binding.resourceUserId])).toEqual([
         ['tracking', stranger.id],
       ]);
-      const access = await json<{ role: string }>(
+      const access = await parseSuccessBody<{ role: string }>(
         await strangerFetch(get(`/api/v1/artifact/${file.id}/access`)),
       );
       expect(access.data.role).toBe('viewer');
@@ -289,7 +289,7 @@ describe('artifact actions', () => {
           expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         }),
       );
-      expect(await db.resourceBinding.count({ where: { artifactId: file.id } })).toBe(0);
+      expect(await db.resourceBinding.count({ where: { sourceArtifactId: file.id } })).toBe(0);
       const copies = await db.artifact.findMany({
         where: { ownerModel: 'User', userId: stranger.id, name: file.name, id: { not: file.id } },
       });
@@ -412,8 +412,9 @@ describe('artifact actions', () => {
       const early = await findOrganizationUserFolder(organization.id, invitee.id);
       expect(early).not.toBeNull();
       expect(await db.artifactPermission.count({ where: { artifactId: early?.id } })).toBe(0);
-      const { id: inquiryId, updatedAt } = (await json<{ id: string; updatedAt: string }>(response))
-        .data;
+      const { id: inquiryId, updatedAt } = (
+        await parseSuccessBody<{ id: string; updatedAt: string }>(response)
+      ).data;
       const inviteeFetch = createTestApp({ mockUser: invitee, mount }).fetch;
       expect(
         (

@@ -1,7 +1,7 @@
 import { infisicalRailwayApi } from '../api/infisicalRailway';
 import { railwayApi } from '../api/railway';
 import { updateConfigField, updateConfigFields } from '../utils/configHelpers';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import {
   clearError,
   clearProgress,
@@ -10,7 +10,7 @@ import {
   setError,
 } from '../utils/progressTracking';
 import { retryWithTimeout } from '../utils/retry';
-import { getSecretAsync, setSecretAsync } from './infisicalSetup';
+import { fetchSecretOrThrow, setSecretAsync } from './infisicalSetup';
 
 type SetupResult = {
   projectId: string;
@@ -74,7 +74,7 @@ export const setupRailway = async (
   onStepComplete?: () => Promise<void>,
 ): Promise<SetupResult> => {
   try {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const configProjectName = config.project.name;
     const infisicalProjectId = config.infisical.projectId;
 
@@ -136,7 +136,7 @@ export const setupRailway = async (
 
     // Step 2: Store Railway user token in Infisical
     if (!(await isComplete('railway', 'storeRailwayToken'))) {
-      await railwayApi.getRailwayUserToken(); // This will upload to Infisical if not already there
+      await railwayApi.fetchRailwayUserToken(); // This will upload to Infisical if not already there
       await markComplete('railway', 'storeRailwayToken');
       await onStepComplete?.();
     }
@@ -152,7 +152,7 @@ export const setupRailway = async (
     }
 
     // Get existing environments first to check what needs to be created
-    let environments = await railwayApi.getProjectEnvironments(projectId);
+    let environments = await railwayApi.fetchProjectEnvironments(projectId);
     let prodEnv = environments.find((env) => env.name === 'prod');
     let stagingEnv = environments.find((env) => env.name === 'staging');
 
@@ -162,7 +162,7 @@ export const setupRailway = async (
         try {
           prodEnv = await railwayApi.createEnvironment(projectId, 'prod');
         } catch (_error) {
-          environments = await railwayApi.getProjectEnvironments(projectId);
+          environments = await railwayApi.fetchProjectEnvironments(projectId);
           prodEnv = environments.find((env) => env.name === 'prod');
         }
       }
@@ -201,7 +201,7 @@ export const setupRailway = async (
       await markComplete('railway', 'deleteLegacyProductionEnvironment');
       await onStepComplete?.();
 
-      environments = await railwayApi.getProjectEnvironments(projectId);
+      environments = await railwayApi.fetchProjectEnvironments(projectId);
       prodEnv = environments.find((env) => env.name === 'prod');
       stagingEnv = environments.find((env) => env.name === 'staging');
     }
@@ -212,7 +212,7 @@ export const setupRailway = async (
         try {
           stagingEnv = await railwayApi.createEnvironment(projectId, 'staging', prodEnv?.id);
         } catch (_error) {
-          environments = await railwayApi.getProjectEnvironments(projectId);
+          environments = await railwayApi.fetchProjectEnvironments(projectId);
           stagingEnv = environments.find((env) => env.name === 'staging');
         }
       }
@@ -275,7 +275,7 @@ export const setupRailway = async (
     // Step 5: Capture prod Redis volume ID
     if (!(await isComplete('railway', 'captureProdRedisVolume'))) {
       if (!prodRedisVolumeId) {
-        const volume = await railwayApi.getServiceVolume(
+        const volume = await railwayApi.fetchServiceVolume(
           projectId,
           `${configProjectName}-prod-redis`,
         );
@@ -339,7 +339,7 @@ export const setupRailway = async (
     // Step 9: Capture staging Redis volume ID
     if (stagingEnabled && !(await isComplete('railway', 'captureStagingRedisVolume'))) {
       if (!stagingRedisVolumeId) {
-        const volume = await railwayApi.getServiceVolume(
+        const volume = await railwayApi.fetchServiceVolume(
           projectId,
           `${configProjectName}-staging-redis`,
         );
@@ -384,7 +384,7 @@ export const setupRailway = async (
     // Step 12: Store prod Redis URL in Infisical
     if (!(await isComplete('railway', 'storeProdRedisUrl'))) {
       const prodRedisUrl = await retryWithTimeout(
-        () => railwayApi.getRedisUrl(prodRedisServiceId, prodEnv.id, prodEnv.name, projectId),
+        () => railwayApi.fetchRedisUrl(prodRedisServiceId, prodEnv.id, prodEnv.name, projectId),
         {
           maxRetries: 60,
           delayMs: 2000,
@@ -401,7 +401,12 @@ export const setupRailway = async (
     if (stagingEnabled && !(await isComplete('railway', 'storeStagingRedisUrl'))) {
       const stagingRedisUrl = await retryWithTimeout(
         () =>
-          railwayApi.getRedisUrl(stagingRedisServiceId, stagingEnv.id, stagingEnv.name, projectId),
+          railwayApi.fetchRedisUrl(
+            stagingRedisServiceId,
+            stagingEnv.id,
+            stagingEnv.name,
+            projectId,
+          ),
         {
           maxRetries: 60,
           delayMs: 2000,
@@ -416,12 +421,12 @@ export const setupRailway = async (
 
     // Step 11: Create Infisical Railway connection
     let connectionId = '';
-    const getConnectionId = async (): Promise<string> => {
+    const fetchOrCreateRailwayConnectionId = async (): Promise<string> => {
       if (connectionId) {
         return connectionId;
       }
 
-      const railwayWorkspaceToken = await railwayApi.getRailwayWorkspaceToken();
+      const railwayWorkspaceToken = await railwayApi.fetchRailwayWorkspaceToken();
       connectionId = await infisicalRailwayApi.createRailwayConnection(
         infisicalProjectId,
         railwayWorkspaceToken,
@@ -434,14 +439,14 @@ export const setupRailway = async (
       serviceId: string,
       environmentId: string,
     ): Promise<void> => {
-      const latestDeployment = await railwayApi.getLatestDeployment(serviceId, environmentId);
+      const latestDeployment = await railwayApi.fetchLatestDeployment(serviceId, environmentId);
       if (!latestDeployment) {
         await railwayApi.triggerServiceDeployment(serviceId, environmentId);
       }
     };
 
     if (!(await isComplete('railway', 'createInfisicalConnection'))) {
-      connectionId = await getConnectionId();
+      connectionId = await fetchOrCreateRailwayConnectionId();
       await markComplete('railway', 'createInfisicalConnection');
       await onStepComplete?.();
     }
@@ -486,7 +491,7 @@ export const setupRailway = async (
     }
 
     // Get connection ID once for all syncs
-    const resolvedConnectionId = await getConnectionId();
+    const resolvedConnectionId = await fetchOrCreateRailwayConnectionId();
 
     // Step 16: Ensure prod API service sync before GitHub connect
     if (!(await isComplete('railway', 'createInfisicalSyncProd'))) {
@@ -794,25 +799,25 @@ export const setupRailway = async (
     }
 
     // Fetch final URLs from Infisical (source of truth)
-    const prodApiUrl = await getSecretAsync('API_URL', {
+    const prodApiUrl = await fetchSecretOrThrow('API_URL', {
       projectId: infisicalProjectId,
       environment: 'prod',
       path: '/',
     });
 
-    const stagingApiUrl = await getSecretAsync('API_URL', {
+    const stagingApiUrl = await fetchSecretOrThrow('API_URL', {
       projectId: infisicalProjectId,
       environment: 'staging',
       path: '/',
     });
 
-    const prodRedisUrl = await getSecretAsync('REDIS_URL', {
+    const prodRedisUrl = await fetchSecretOrThrow('REDIS_URL', {
       projectId: infisicalProjectId,
       environment: 'prod',
       path: '/api',
     });
 
-    const stagingRedisUrl = await getSecretAsync('REDIS_URL', {
+    const stagingRedisUrl = await fetchSecretOrThrow('REDIS_URL', {
       projectId: infisicalProjectId,
       environment: 'staging',
       path: '/api',

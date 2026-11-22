@@ -2,8 +2,11 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
+  createIntegration,
+  createOrganization,
   createOrganizationUser,
   createSpaceUser,
+  createToken,
   createUser,
 } from '@template/db/test';
 import { validator } from 'hono/validator';
@@ -12,7 +15,7 @@ import {
   resolveInquiryTarget,
 } from '#/modules/inquiry/services/resolveInquiryTarget';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 const { fetch, db } = createTestApp({
   mount: [
@@ -40,13 +43,14 @@ describe('resolveInquiryTarget', () => {
       targetUserId: membership.userId,
     });
     expect(response.status).toBe(200);
-    expect((await json(response)).data).toEqual({
+    expect((await parseSuccessBody(response)).data).toEqual({
       targetModel: 'OrganizationUser',
       targetOrganizationId: membership.organizationId,
       targetUserId: membership.userId,
       targetSpaceId: null,
       targetIntegrationId: null,
       targetTokenId: null,
+      targetProjectId: null,
     });
   });
 
@@ -77,13 +81,14 @@ describe('resolveInquiryTarget', () => {
       targetUserId: membership.userId,
     });
     expect(response.status).toBe(200);
-    expect((await json(response)).data).toEqual({
+    expect((await parseSuccessBody(response)).data).toEqual({
       targetModel: 'SpaceUser',
       targetOrganizationId: membership.organizationId,
       targetSpaceId: membership.spaceId,
       targetUserId: membership.userId,
       targetIntegrationId: null,
       targetTokenId: null,
+      targetProjectId: null,
     });
   });
 
@@ -104,8 +109,32 @@ describe('resolveInquiryTarget', () => {
     ).toBe(422);
   });
 
-  it('keeps Integration and Token targets out of request resolution', async () => {
-    expect((await resolve({ targetModel: InquiryResourceModel.Integration })).status).toBe(422);
-    expect((await resolve({ targetModel: InquiryResourceModel.Token })).status).toBe(422);
+  it('resolves a token or an integration by its id; a missing one is a 404, a project cannot be named', async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+    });
+    const { entity: token } = await createToken({ ownerModel: 'Integration' }, { integration });
+    expect(
+      (
+        await parseSuccessBody(
+          await resolve({ targetModel: InquiryResourceModel.Token, targetTokenId: token.id }),
+        )
+      ).data,
+    ).toMatchObject({ targetModel: 'Token', targetTokenId: token.id, targetOrganizationId: null });
+    expect(
+      (
+        await parseSuccessBody(
+          await resolve({
+            targetModel: InquiryResourceModel.Integration,
+            targetIntegrationId: integration.id,
+          }),
+        )
+      ).data,
+    ).toMatchObject({ targetModel: 'Integration', targetIntegrationId: integration.id });
+    expect((await resolve({ targetModel: InquiryResourceModel.Token })).status).toBe(404);
+    expect((await resolve({ targetModel: InquiryResourceModel.Integration })).status).toBe(404);
+    expect((await resolve({ targetModel: InquiryResourceModel.Project })).status).toBe(422);
   });
 });

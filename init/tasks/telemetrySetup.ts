@@ -4,7 +4,7 @@
  * @partOf infrastructure:observability
  * @uses none
  */
-import { getProjectConfig, writeProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig, writeProjectConfig } from '../utils/fetchProjectConfig';
 import { setSecretAsync } from './infisicalSetup';
 import { type TelemetrySetupInput, telemetrySettings } from './telemetrySettings';
 
@@ -12,7 +12,7 @@ export const setupTelemetry = async (
   input: TelemetrySetupInput,
   onProgress?: (key: string) => void,
 ): Promise<void> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   if (!config.infisical.projectId) throw new Error('Run Infisical setup first');
   const settings = telemetrySettings(config.project.name, input);
   config.monitoring = { mode: input.mode, configProjectName: config.project.name, progress: {} };
@@ -31,7 +31,7 @@ export const setupTelemetry = async (
     } catch {
       throw new Error(`Could not store ${id}; rerun Monitoring setup to retry`);
     }
-    const current = await getProjectConfig();
+    const current = await fetchProjectConfig();
     current.monitoring = {
       ...config.monitoring,
       progress: { ...current.monitoring?.progress, [id]: true },

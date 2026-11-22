@@ -8,7 +8,7 @@ import { readRoute } from '#/lib/routeTemplates';
 
 import { artifactReadResponseSchema } from '#/modules/artifact/schemas/artifactSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meReadManyArtifactsRoute = readRoute({
   model: Modules.me,
@@ -18,5 +18,5 @@ export const meReadManyArtifactsRoute = readRoute({
   description:
     "Lists the owner's root artifacts (those in no container) that the caller can read: the top of the browser.",
   responseSchema: artifactReadResponseSchema,
-  tags: [Tags.me, Tags.artifact],
+  tags: [OpenApiTags.me, OpenApiTags.artifact],
 });

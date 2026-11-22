@@ -4,7 +4,7 @@ import type {
   EmailProvider,
   FrontendProvider,
   RedisProvider,
-} from './utils/getProjectConfig';
+} from './utils/fetchProjectConfig';
 
 export type ProviderOption<T extends string> = {
   value: T;

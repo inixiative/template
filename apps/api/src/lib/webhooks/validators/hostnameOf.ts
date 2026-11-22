@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:webhooks
  */
 // URL.hostname wraps IPv6 literals in brackets ([::1]); strip them for classification.

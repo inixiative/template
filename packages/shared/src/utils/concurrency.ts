@@ -24,7 +24,7 @@ export const concurrencyLimits: Record<ConcurrencyType, number> = {
   [ConcurrencyType.integration]: 5,
 };
 
-export const getConcurrency = (types?: ConcurrencyType[]): number | undefined => {
+export const minimumConcurrencyLimitFor = (types?: ConcurrencyType[]): number | undefined => {
   if (!types?.length) return undefined;
   return Math.min(...types.map((t) => concurrencyLimits[t]));
 };

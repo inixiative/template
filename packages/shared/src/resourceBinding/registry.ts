@@ -38,5 +38,5 @@ export const ResourceBindings = {
   Organization: ['logo', 'tracking'],
   Space: ['logo', 'tracking'],
   User: ['avatar', 'tracking'],
-  CustomerRef: ['avatar'],
+  CustomerRelationship: ['avatar'],
 } satisfies Partial<Record<ResourceBindingResourceModel, ResourceBindingType[]>>;

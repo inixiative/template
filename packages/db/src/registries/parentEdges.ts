@@ -4,9 +4,13 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { type PolymorphicAxis, polymorphicAxis } from '@template/db/registries/falsePolymorphism';
-import { polymorphicKeyColumns } from '@template/db/registries/polymorphicIs';
+import { polymorphicAxis } from '@template/db/registries/falsePolymorphism';
+import {
+  axisTargetIdColumn,
+  rowPolymorphicAxisPointsAt,
+} from '@template/db/registries/polymorphicAxisPointsAt';
 import { isModelName, type ModelName } from '@template/db/utils/modelNames';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 
 // why: one statement of "this row's change is that row's" for the cache hook, audit tenancy and the history read (DATABASE.md#parent-edges).
 /** The parent is the row a false-polymorphic axis points at, or the row one foreign key names. */
@@ -14,26 +18,18 @@ export type ParentEdge = { axis: string } | { parent: ModelName; foreignKey: str
 
 export const ParentEdgeRegistry = {
   Entitlement: { axis: 'targetModel' },
+  ProjectIntegration: { parent: 'Project', foreignKey: 'projectId' },
+  Setting: { axis: 'resourceModel' },
 } as const satisfies Partial<Record<ModelName, ParentEdge>>;
 
 const parentEdges: Partial<Record<ModelName, ParentEdge>> = ParentEdgeRegistry;
 
-export type ParentRow = { model: ModelName; id: string };
+export type ParentRow = ModelRow<ModelName>;
 
 export const parentEdgeOf = (child: ModelName): ParentEdge | null => parentEdges[child] ?? null;
 
-const axisIdColumn = (child: ModelName, axis: PolymorphicAxis, value: string): string | null => {
-  if (axis.materialized) return axis.materialized;
-  const columns = polymorphicKeyColumns(child, axis.field, value);
-  if (columns.length > 1)
-    throw new Error(
-      `${child}.${axis.field}=${value} keys on ${columns.join('+')}; materialize its id`,
-    );
-  return columns[0] ?? null;
-};
-
 /** The row a child's edge points at: model and id, or null when the edge is unset. */
-export const parentAlong = (
+export const parentRowAlongEdge = (
   child: ModelName,
   edge: ParentEdge,
   row: Record<string, unknown>,
@@ -42,20 +38,17 @@ export const parentAlong = (
     const id = row[edge.foreignKey];
     return typeof id === 'string' ? { model: edge.parent, id } : null;
   }
-  const value = row[edge.axis];
-  if (typeof value !== 'string' || !isModelName(value)) return null;
-  const column = axisIdColumn(child, polymorphicAxis(child, edge.axis), value);
-  const id = column ? row[column] : null;
-  return typeof id === 'string' ? { model: value, id } : null;
+  const target = rowPolymorphicAxisPointsAt(row, child, edge.axis);
+  return target && isModelName(target.model) ? { model: target.model, id: target.id } : null;
 };
 
 export const parentOf = (child: ModelName, row: Record<string, unknown>): ParentRow | null => {
   const edge = parentEdgeOf(child);
-  return edge ? parentAlong(child, edge, row) : null;
+  return edge ? parentRowAlongEdge(child, edge, row) : null;
 };
 
 /** The where on a child's table for "its parent is this row", or null when the edge never reaches that model. */
-export const childWhereAlong = (
+export const childWhereForParentAlongEdge = (
   child: ModelName,
   edge: ParentEdge,
   parent: ParentRow,
@@ -64,7 +57,7 @@ export const childWhereAlong = (
     return edge.parent === parent.model ? { [edge.foreignKey]: parent.id } : null;
   const axis = polymorphicAxis(child, edge.axis);
   if (!(parent.model in axis.fkMap)) return null;
-  const column = axisIdColumn(child, axis, parent.model);
+  const column = axisTargetIdColumn(child, axis, parent.model);
   return column ? { [edge.axis]: parent.model, [column]: parent.id } : null;
 };
 
@@ -73,6 +66,6 @@ export const childrenOf = (
   parent: ParentRow,
 ): { child: ModelName; where: Record<string, string> }[] =>
   (Object.entries(parentEdges) as [ModelName, ParentEdge][]).flatMap(([child, edge]) => {
-    const where = childWhereAlong(child, edge, parent);
+    const where = childWhereForParentAlongEdge(child, edge, parent);
     return where ? [{ child, where }] : [];
   });

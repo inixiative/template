@@ -8,10 +8,10 @@ import { createRootRoute, Outlet } from '@tanstack/react-router';
 import { FlowBanner, RootNotFound, RouteError, Toaster } from '@template/ui/components';
 import {
   useApiWebsocket,
-  useDarkMode,
-  useLanguage,
-  usePageMeta,
+  useApplyThemeClassToDocument,
+  useDocumentTitleAndDescription,
   useRegisterNavigation,
+  useSetDocumentLanguageFromBrowser,
   useThemePersistence,
 } from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
@@ -21,11 +21,11 @@ const RootComponent = () => {
   const theme = useAppStore((state) => state.ui.theme);
 
   useRegisterNavigation(navConfig);
-  usePageMeta();
-  useLanguage();
+  useDocumentTitleAndDescription();
+  useSetDocumentLanguageFromBrowser();
   useThemePersistence();
   useApiWebsocket();
-  useDarkMode(theme);
+  useApplyThemeClassToDocument(theme);
 
   return (
     <>

@@ -10,7 +10,7 @@ import {
 import {
   cleanupTouchedTables,
   createContact,
-  createCustomerRef,
+  createCustomerRelationship,
   createEmailComponent,
   createEmailTemplate,
   createIntegration,
@@ -23,10 +23,10 @@ import {
   createTagCategory,
   createUser,
   createWebhookSubscription,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 
-const seq = (prefix: string) => `${prefix}-${getNextSeq()}`;
+const seq = (prefix: string) => `${prefix}-${nextFactorySequenceNumber()}`;
 
 describe('partial unique constraints', () => {
   afterEach(async () => {
@@ -81,7 +81,7 @@ describe('partial unique constraints', () => {
     });
   });
 
-  describe('TagAttachment: per-(userId, tagId)', () => {
+  describe('TagAttachment: per-(resourceUserId, tagId)', () => {
     it('blocks two attachments of the same tag to the same user', async () => {
       const { entity: user } = await createUser();
       const cat = await createTagCategory({ ownerModel: TagOwnerModel.platform });
@@ -141,20 +141,20 @@ describe('partial unique constraints', () => {
     });
   });
 
-  describe('CustomerRef: per-(customer, provider)', () => {
+  describe('CustomerRelationship: per-(customer, provider)', () => {
     it('blocks two refs linking the same user customer to the same space provider', async () => {
       const { entity: customer } = await createUser();
       const { entity: org } = await createOrganization();
       const { entity: providerSpace } = await createSpace({}, { organization: org });
       // Context is keyed by model accessor, so it can't disambiguate customerSpace from providerSpace; pass FKs.
-      await createCustomerRef({
+      await createCustomerRelationship({
         customerModel: 'User',
         providerModel: 'Space',
         customerUserId: customer.id,
         providerSpaceId: providerSpace.id,
       });
       const dupe = async () =>
-        createCustomerRef({
+        createCustomerRelationship({
           customerModel: 'User',
           providerModel: 'Space',
           customerUserId: customer.id,
@@ -164,17 +164,25 @@ describe('partial unique constraints', () => {
     });
   });
 
-  describe('WebhookSubscription: per-(userId, model, url)', () => {
-    it('blocks two subscriptions with the same model+url on the same user', async () => {
+  describe('WebhookSubscription: per-(userId, resourceModel, url)', () => {
+    it('blocks two subscriptions with the same resourceModel+url on the same user', async () => {
       const { entity: user } = await createUser();
       const url = `https://example.com/${seq('hook')}`;
       await createWebhookSubscription(
-        { ownerModel: WebhookOwnerModel.User, model: WebhookModel.CustomerRef, url },
+        {
+          ownerModel: WebhookOwnerModel.User,
+          resourceModel: WebhookModel.CustomerRelationship,
+          url,
+        },
         { user },
       );
       const dupe = async () =>
         createWebhookSubscription(
-          { ownerModel: WebhookOwnerModel.User, model: WebhookModel.CustomerRef, url },
+          {
+            ownerModel: WebhookOwnerModel.User,
+            resourceModel: WebhookModel.CustomerRelationship,
+            url,
+          },
           { user },
         );
       await expect(dupe()).rejects.toThrow();

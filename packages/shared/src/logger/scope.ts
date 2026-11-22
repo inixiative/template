@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:shared
  * @uses none
  */
@@ -22,7 +22,7 @@ export enum LogScope {
 
 const store = new AsyncLocalStorage<string[]>();
 
-export const getLogScopes = (): string[] => store.getStore() ?? [];
+export const currentLogScopes = (): string[] => store.getStore() ?? [];
 
 // --- Log broadcasting ---
 
@@ -30,7 +30,7 @@ export type LogBroadcastFn = (level: string, message: string) => void;
 
 const broadcastStore = new AsyncLocalStorage<LogBroadcastFn[]>();
 
-export const logScope = <T>(id: string | LogScope, fn: () => T): T => {
+export const withLogScope = <T>(id: string | LogScope, fn: () => T): T => {
   const current = store.getStore() ?? [];
   const broadcasts = broadcastStore.getStore();
   const run = () => store.run([...current, id], fn);
@@ -42,4 +42,4 @@ export const addLogBroadcast = (target: LogBroadcastFn): void => {
   if (broadcasts) broadcasts.push(target);
 };
 
-export const getLogBroadcasts = (): LogBroadcastFn[] => broadcastStore.getStore() ?? [];
+export const currentLogBroadcasts = (): LogBroadcastFn[] => broadcastStore.getStore() ?? [];

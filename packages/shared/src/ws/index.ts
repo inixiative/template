@@ -13,12 +13,16 @@ export {
   type StreamParams,
   type StreamParamsSchema,
 } from './defineStream';
-export type {
-  WSDataEvent,
-  WSEvent,
-  WSQueryEvent,
-  WSStreamAppendEvent,
-  WSStreamSnapshotEvent,
+export {
+  refetchQueryEvent,
+  type StreamAppend,
+  streamAppendFrame,
+  streamSnapshotFrame,
+  type WSDataEvent,
+  type WSEvent,
+  type WSQueryEvent,
+  type WSStreamAppendEvent,
+  type WSStreamSnapshotEvent,
 } from './events';
 export {
   WS_FRAME_LIMIT,
@@ -26,14 +30,18 @@ export {
   WS_MAX_PENDING_FRAMES,
   WS_MAX_STREAM_NAME_LENGTH,
 } from './frameLimits';
-export { LIVE_QUERIES } from './liveQueries';
-export type { WSFrameErrorFrame, WSStreamAckFrame, WSStreamResyncFrame } from './streamControl';
+export {
+  retryableErrorFrame,
+  type WSFrameErrorFrame,
+  type WSStreamAckFrame,
+  type WSStreamResyncFrame,
+} from './streamControl';
 export {
   type RegisteredStream,
   STREAM_DEFINITIONS,
   type StreamFamily,
-  streamDefinitionFor,
-  streamDefinitionOf,
+  streamDefinitionForChannelKey,
+  streamDefinitionForFamily,
 } from './streamDefinitions';
 export type {
   StreamKind,

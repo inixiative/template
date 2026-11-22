@@ -16,7 +16,7 @@ const validateKey = (key: string, label: string): void => {
   }
 };
 
-export const createEncryption = (keyring: EncryptionKeyring) => {
+export const makeEncryptionService = (keyring: EncryptionKeyring) => {
   validateKey(keyring.currentKey, 'Current key');
   if (keyring.previousKey) validateKey(keyring.previousKey, 'Previous key');
 
@@ -56,4 +56,4 @@ export const createEncryption = (keyring: EncryptionKeyring) => {
   return { encrypt, decrypt };
 };
 
-export type Encryption = ReturnType<typeof createEncryption>;
+export type Encryption = ReturnType<typeof makeEncryptionService>;

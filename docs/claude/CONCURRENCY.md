@@ -4,17 +4,17 @@
 
 ## Contents
 
-- [Serialized Queue (`createSerializedQueue`)](#serialized-queue-createserializedqueue)
+- [Serialized Queue (`makeSerializedQueue`)](#serialized-queue-makeserializedqueue)
   - [When to use](#when-to-use)
   - [When NOT to use](#when-not-to-use)
   - [Error model](#error-model)
   - [Implementation](#implementation)
-- [Concurrency Limits (`getConcurrency`)](#concurrency-limits-getconcurrency)
-- [Bounded Batch (`resolveAll`)](#bounded-batch-resolveall)
-- [Distributed Lock (`createLock`)](#distributed-lock-createlock)
+- [Concurrency Limits (`minimumConcurrencyLimitFor`)](#concurrency-limits-minimumconcurrencylimitfor)
+- [Bounded Batch (`runAllWithConcurrencyLimit`)](#bounded-batch-runallwithconcurrencylimit)
+- [Distributed Lock (`makeLock`)](#distributed-lock-makelock)
 - [Supersede Lanes (`claimLane` / `watchLane`)](#supersede-lanes-claimlane--watchlane)
 - [Job Lanes (`withLanePriority`)](#job-lanes-withlanepriority)
-- [Recurring Beat (`heartbeat`)](#recurring-beat-heartbeat)
+- [Recurring Beat (`startHeartbeat`)](#recurring-beat-startheartbeat)
 - [Row Locks (`db.findForUpdate`)](#row-locks-dbfindforupdate)
 - [Cross-references](#cross-references)
 
@@ -24,29 +24,29 @@ Mechanisms for coordinating async operations. Different concerns, different tool
 
 | Concern | Tool | Scope |
 |---|---|---|
-| Cap parallelism (don't open 1000 DB connections at once) | `getConcurrency` + `ConcurrencyType` | in-process |
-| Run a batch with a concurrency cap, get ordered results | `resolveAll` | in-process |
-| Serialize writes to one resource (no interleaving) | `createSerializedQueue` | in-process |
+| Cap parallelism (don't open 1000 DB connections at once) | `minimumConcurrencyLimitFor` + `ConcurrencyType` | in-process |
+| Run a batch with a concurrency cap, get ordered results | `runAllWithConcurrencyLimit` | in-process |
+| Serialize writes to one resource (no interleaving) | `makeSerializedQueue` | in-process |
 | Lock rows you read and then write inside a transaction | `db.findForUpdate` | in-transaction (Postgres row lock) |
-| Only one process owns this resource | `createLock` | cross-process (Redis) |
+| Only one process owns this resource | `makeLock` | cross-process (Redis) |
 | Newest job for a key wins; older ones bow out | `claimLane` / `watchLane` | cross-process (Redis) |
 | Background work yields to foreground work in one shared queue | job lanes (`withLanePriority`) | cross-process (BullMQ priority) |
-| Run a recurring beat without overlapping itself | `heartbeat` | in-process timer |
+| Run a recurring beat without overlapping itself | `startHeartbeat` | in-process timer |
 
-The ordering and mutual-exclusion primitives — `createSerializedQueue`, `createLock` and `claimLane` / `watchLane` — carry the atlas tag `mutex`: `bunx atlas query --partOf mutex` lists them.
+The ordering and mutual-exclusion primitives — `makeSerializedQueue`, `makeLock` and `claimLane` / `watchLane` — carry the atlas tag `mutex`: `bunx atlas query --partOf mutex` lists them.
 
-Combine when needed: a per-resource Redis lock + a per-resource serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes" — `createLock` to claim ownership, `createSerializedQueue` to order that owner's writes.
+Combine when needed: a per-resource Redis lock + a per-resource serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes" — `makeLock` to claim ownership, `makeSerializedQueue` to order that owner's writes.
 
 ---
 
-## Serialized Queue (`createSerializedQueue`)
+## Serialized Queue (`makeSerializedQueue`)
 
 `@template/shared/utils/serializedQueue`. Per-instance promise chain — each `run(fn)` waits for the previous to settle before invoking. In-process only.
 
 ```ts
-import { createSerializedQueue } from '@template/shared/utils';
+import { makeSerializedQueue } from '@template/shared/utils';
 
-const queue = createSerializedQueue();
+const queue = makeSerializedQueue();
 
 await queue.run(async () => updateA());
 await queue.run(async () => updateB());  // doesn't start until updateA settles
@@ -65,8 +65,8 @@ WebSocket data streams use one queue per stream key (`apps/api/src/ws/streamPubl
 
 ### When NOT to use
 
-- Need to cap parallelism but allow N in flight → `getConcurrency`
-- Multiple processes can race for the resource → `createLock` (or both)
+- Need to cap parallelism but allow N in flight → `minimumConcurrencyLimitFor`
+- Multiple processes can race for the resource → `makeLock` (or both)
 - The operations are independent → just run them, no serialization needed
 
 ### Error model
@@ -101,14 +101,14 @@ Six lines. The `.then(onSuccess, onReject)` form ensures fn runs whether the pre
 
 ---
 
-## Concurrency Limits (`getConcurrency`)
+## Concurrency Limits (`minimumConcurrencyLimitFor`)
 
 `@template/shared/utils/concurrency`. Pre-defined caps for different resource classes (db, redis, queue, socket, etc.). Pass to `Promise.all`-style batches or BullMQ workers.
 
 ```ts
-import { getConcurrency, ConcurrencyType } from '@template/shared/utils';
+import { minimumConcurrencyLimitFor, ConcurrencyType } from '@template/shared/utils';
 
-const limit = getConcurrency([ConcurrencyType.db, ConcurrencyType.integration]);
+const limit = minimumConcurrencyLimitFor([ConcurrencyType.db, ConcurrencyType.integration]);
 // limit = min(10, 5) = 5
 ```
 
@@ -116,26 +116,26 @@ Use when you'd otherwise blow through a connection pool or rate limit.
 
 ---
 
-## Bounded Batch (`resolveAll`)
+## Bounded Batch (`runAllWithConcurrencyLimit`)
 
-`@template/shared/utils/resolveAll`. `Promise.all` with an optional concurrency cap. Takes an array of thunks (`() => Promise<T>`) rather than promises, so it controls *when* each starts. Results come back in input order regardless of completion order.
+`@template/shared/utils/runAllWithConcurrencyLimit`. `Promise.all` with an optional concurrency cap. Takes an array of thunks (`() => Promise<T>`) rather than promises, so it controls *when* each starts. Results come back in input order regardless of completion order.
 
 ```ts
-import { resolveAll, getConcurrency, ConcurrencyType } from '@template/shared/utils';
+import { runAllWithConcurrencyLimit, minimumConcurrencyLimitFor, ConcurrencyType } from '@template/shared/utils';
 
-const results = await resolveAll(
+const results = await runAllWithConcurrencyLimit(
   ids.map((id) => () => fetchRecord(id)),
-  getConcurrency([ConcurrencyType.db]),
+  minimumConcurrencyLimitFor([ConcurrencyType.db]),
 );
 ```
 
-No cap (or cap ≥ length) → degrades to a plain `Promise.all`. `getConcurrency` is the natural source of the cap. Pass thunks, not already-started promises — `resolveAll([p1, p2])` would run everything immediately and defeat the limit.
+No cap (or cap ≥ length) → degrades to a plain `Promise.all`. `minimumConcurrencyLimitFor` is the natural source of the cap. Pass thunks, not already-started promises — `runAllWithConcurrencyLimit([p1, p2])` would run everything immediately and defeat the limit.
 
 ---
 
-## Distributed Lock (`createLock`)
+## Distributed Lock (`makeLock`)
 
-`@template/db` (`packages/db/src/lock/createLock.ts`; options and return types in `packages/db/src/lock/types.ts`). Single-node Redis lock with heartbeat. Its footguns:
+`@template/db` (`packages/db/src/lock/makeLock.ts`; options and return types in `packages/db/src/lock/types.ts`). Single-node Redis lock with heartbeat. Its footguns:
 
 - It is not Redlock: don't rely on it across Redis cluster nodes.
 - A holder suspended longer than `ttlMs` (debugger pause, OS sleep) loses the key to the next holder and wakes up believing it still holds it. Keep `ttlMs` well above any pause you expect.
@@ -144,9 +144,9 @@ No cap (or cap ≥ length) → degrades to a plain `Promise.all`. `getConcurrenc
 `heartbeat: false` makes a one-shot claim (`acquire()` returns `{ claimed, holder }`) that is never renewed and expires at its TTL. A `{ service, identifier }` target is keyed under the `lock:*` namespace ([REDIS.md](./REDIS.md#job-coordination-job-lock)); a `{ key }` target is used as given. A `{ service, identifiers: [...] }` target is one lock over several keys: one token, one heartbeat, one release ([DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends)); a claim takes a single key only.
 
 ```ts
-import { createLock } from '@template/db';
+import { makeLock } from '@template/db';
 
-const lock = createLock({
+const lock = makeLock({
   service: 'botSession',
   identifier: botId,
   onLockLost: () => closeBotSession(botId),
@@ -164,30 +164,34 @@ try {
 
 Use when multiple processes can race for the same resource (multiple golem instances both wanting to own the same bot session, multiple workers wanting to run a singleton cron, etc.).
 
-**Inside a transaction, release at the end of the transaction, not the critical section.** A lock that guards a check-then-write must stay held until that write commits, or the next holder checks against state from before it. `db.withLockUntilSettled(lockOptions, fn)` holds a `createLock` lock until the open transaction settles, joins a key the transaction already holds (including one an upserting `findForUpdate` took) instead of waiting on itself, and runs the transaction's own holders of the key one at a time (the lock + serialized-queue pair above, scoped to the transaction). A holder whose turn comes after the transaction settled throws instead of running. `withOwnerLock` switches to it whenever it runs inside a transaction, which is how a `transactionAll` batch's sub-requests keep the owner lock until the batch commits. Its scopes are one per owner-wide invariant: `rules` (an owner's rule graph) and `entitlements` (a holder's set of entitlement rows, held by `changeEntitlements` so two writers on one target can't race: each reads the rows the other committed before it checks and writes). See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
+**Inside a transaction, release at the end of the transaction, not the critical section.** A lock that guards a check-then-write must stay held until that write commits, or the next holder checks against state from before it. `db.withLockUntilSettled(lockOptions, fn)` holds a `makeLock` lock until the open transaction settles, joins a key the transaction already holds (including one an upserting `findForUpdate` took) instead of waiting on itself, and runs the transaction's own holders of the key one at a time (the lock + serialized-queue pair above, scoped to the transaction). A holder whose turn comes after the transaction settled throws instead of running. `withOwnerLock` switches to it whenever it runs inside a transaction, which is how a `transactionAll` batch's sub-requests keep the owner lock until the batch commits. Its scopes are one per owner-wide invariant: `rules` (an owner's rule graph) and `entitlements` (a holder's set of entitlement rows, held by `changeEntitlements` so two writers on one target can't race: each reads the rows the other committed before it checks and writes). See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
 
 ---
 
 ## Supersede Lanes (`claimLane` / `watchLane`)
 
-`packages/db/src/lanes/lanes.ts` (exported from `@template/db`). A Redis baton scoped to `(handlerName, dedupeKey)`: the newest claimant wins, and an in-flight older job learns it's been usurped and bows out. Cross-process, the inverse of a lock — a lock keeps the *first* holder and rejects late-comers; a lane hands the baton to the *latest* and evicts the incumbent.
+`packages/db/src/lanes/lanes.ts` (exported from `@template/db`). A Redis baton scoped to `(handlerName, dedupeKey)`: the newest claimant wins, and an in-flight older holder learns it has been superseded and bows out. Cross-process, the inverse of a lock: a lock keeps the *first* holder and rejects late-comers; a lane hands the baton to the *latest* and evicts the incumbent.
+
+Every call takes a `LaneStore`: the Redis connection, where each holder's own record lives (`holderKeyPrefix`), and the field on that record that says who superseded it (`supersededField`). The lane writes no key of its own beyond the baton. The superseded fact goes on the displaced holder's record and is deleted with it, so nothing outlives the holder. Jobs use `jobLaneStore` (`apps/api/src/jobs/jobLaneStore.ts`): the queue's Redis, BullMQ job hashes, field `supersededBy`. The lane must run on the same Redis as the records it marks; a lane script cannot see a key on another instance.
 
 ```ts
-import { claimLane, watchLane, laneKey } from '@template/db';
+import { claimLane, laneKey, markDisplacedHolder, watchLane } from '@template/db';
 
 const lane = laneKey(handlerName, dedupeKey);
-await claimLane(lane, jobId);                 // take the baton (last claim wins)
-const stop = watchLane(lane, jobId, () => {   // bow out once a newer job claims it
-  abortThisJob();
-});
-try {
-  /* work */
-} finally {
-  stop();
-}
+const previous = await claimLane(store, lane, jobId);    // take the baton (last claim wins)
+await queue.add(handlerName, data, { jobId });          // the new holder must exist first
+await markDisplacedHolder(store, lane, jobId, previous); // then mark the one it displaced
+const stop = watchLane(store, { lane, holderId: jobId }, () => abortThisJob());
 ```
 
-`claimLane` writes `jobId` with a TTL (`LANE_TTL_SEC`). `watchLane` polls (`LANE_POLL_MS`, via `heartbeat`) and fires `onUsurped` only when a *different* holder appears — an expired/absent key counts as still held, so a momentary Redis blip doesn't false-trigger. Use for "only the most recent enqueue for this key should finish" (debounced/superseding jobs); see [JOBS.md](./JOBS.md) for the supersede pattern this backs.
+- `claimLane` only takes the baton, with a TTL covering the job's delay (`LANE_TTL_SEC` plus the delay).
+- `markDisplacedHolder` runs once the new holder exists. While the lane still names it, the displaced holder's record gets the field; if a newer claim that exists got there first, the new holder marks itself. It never creates a record that does not exist.
+- A failed add throws and leaves nothing to undo: no mark was written, and a baton naming a holder with no record counts as no holder.
+- `claimLaneUnlessNewerHolder` takes the baton unless a newer holder that exists holds it (holder ids are uuidv7, so a string compare is an age compare). A job's start and the outbox drain use it.
+- `watchLane` polls (`LANE_POLL_MS`) in one script: it fires when the holder's record says it was superseded, when its parent's record does (copying the superseder onto its own record so its own children stop), or when another holder with a record takes the lane. Otherwise it refreshes its own baton, and its parent's while the parent still holds it.
+- `holdLaneWhileParked` stretches a parked holder's baton to `PARKED_LANE_TTL_SEC` (3 hours). Nothing in a lane lives longer without a refresh.
+
+Use it for "only the most recent enqueue for this key should finish". Jobs that use it must be safe to re-run: see [JOBS.md § Superseding Job](./JOBS.md#superseding-job). Lane scripts touch the holder's record without declaring it, so they need a standalone Redis, not Redis Cluster.
 
 ---
 
@@ -197,21 +201,21 @@ try {
 
 ---
 
-## Recurring Beat (`heartbeat`)
+## Recurring Beat (`startHeartbeat`)
 
-`@template/shared/utils/heartbeat`. A self-managing timer that runs `beat` every `intervalMs`, scheduling the next tick only *after* the previous settles — a slow async beat never overlaps itself. Returns `stop()`; no trailing beat fires after stop. Rejections route to `onError` instead of becoming unhandled. In-process.
+`@template/shared/utils/startHeartbeat`. A self-managing timer that runs `beat` every `intervalMs`, scheduling the next tick only *after* the previous settles — a slow async beat never overlaps itself. Returns `stop()`; no trailing beat fires after stop. Rejections route to `onError` instead of becoming unhandled. In-process.
 
 ```ts
 import { heartbeat } from '@template/shared/utils';
 
-const stop = heartbeat(async () => {
+const stop = startHeartbeat(async () => {
   await refreshLease();
 }, 10_000, { onError: (err) => log.error('beat failed', err) });
 // later
 stop();
 ```
 
-This is the primitive under both `createLock` (lease renewal) and `watchLane` (usurp polling). Reach for it directly when you need a non-overlapping recurring task you can cleanly stop — prefer it over a bare `setInterval`, which fires regardless of whether the prior async run finished.
+This is the primitive under both `makeLock` (lease renewal) and `watchLane` (usurp polling). Reach for it directly when you need a non-overlapping recurring task you can cleanly stop — prefer it over a bare `setInterval`, which fires regardless of whether the prior async run finished.
 
 ---
 
@@ -231,5 +235,5 @@ The one way to lock rows. `db.findForUpdate(model, where, { upserting?, changesK
 
 ## Cross-references
 
-- [REDIS.md](./REDIS.md) — namespace conventions, including the `lock:*` keys `createLock` writes
+- [REDIS.md](./REDIS.md) — namespace conventions, including the `lock:*` keys `makeLock` writes
 - [JOBS.md](./JOBS.md) — BullMQ workers, supersede pattern (the consumer of `claimLane`/`watchLane`), fast/slow lanes

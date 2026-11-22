@@ -5,12 +5,12 @@
  * @uses primitive:routeTemplates
  */
 import { webhookOwnerAllowedModels } from '@template/db';
-import { schemaGuide } from '#/lib/jsonSchema/schemaGuide';
+import { descriptionsBySchemaFieldPath } from '#/lib/jsonSchema/descriptionsBySchemaFieldPath';
 import { makeController } from '#/lib/utils/makeController';
 import { webhookSubscriptionInfoRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionInfo';
 import { webhookSubscriptionInfoResponseSchema } from '#/modules/webhookSubscription/schemas/webhookSubscriptionInfoResponseSchema';
 
-const guide = schemaGuide(webhookSubscriptionInfoResponseSchema);
+const guide = descriptionsBySchemaFieldPath(webhookSubscriptionInfoResponseSchema);
 
 export const webhookSubscriptionInfoController = makeController(
   webhookSubscriptionInfoRoute,

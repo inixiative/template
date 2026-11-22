@@ -6,7 +6,7 @@
  */
 import type { OrganizationReadManyContactsResponse } from '@template/sdk';
 import { STREAM_DEFINITIONS } from '@template/shared/ws';
-import { useStream } from '@template/ui/hooks/useStream';
+import { useDataStreamSnapshot } from '@template/ui/hooks/useDataStreamSnapshot';
 import type { ListStreamState } from '@template/ui/lib/ws/listStream';
 
 export type OrganizationContactsStream = ListStreamState<
@@ -14,6 +14,6 @@ export type OrganizationContactsStream = ListStreamState<
 >;
 
 export const useOrganizationContactsStream = (organizationId: string) =>
-  useStream<OrganizationContactsStream>(
+  useDataStreamSnapshot<OrganizationContactsStream>(
     STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: organizationId }),
   );

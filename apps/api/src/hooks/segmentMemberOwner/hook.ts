@@ -1,40 +1,93 @@
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import type { SegmentMember } from '@template/db/generated/client/client';
-import { castArray } from 'lodash-es';
+import type { ProviderModel } from '@template/db/generated/client/enums';
+import { castArray, chunk } from 'lodash-es';
 import { makeError } from '#/lib/errors';
-import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { customerRelationshipProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
 type MemberRow = Partial<SegmentMember>;
 
-const assertMemberBelongsToOwner = async (row: MemberRow): Promise<void> => {
-  if (!row.segmentId || !row.customerRefId) return;
-  const segment = await db.segment.findUnique({ where: { id: row.segmentId } });
-  if (!segment) throw makeError({ status: 422, message: `Segment ${row.segmentId} not found` });
-  const customerRef = await db.customerRef.findFirst({
-    where: {
-      id: row.customerRefId,
-      providerModel: segment.ownerModel,
-      [customerRefProviderFk(segment.ownerModel)]: segmentOwnerId(segment),
+const VALIDATION_CHUNK_SIZE = 2_000;
+
+const validateMembersBelongToOwners = async (rows: MemberRow[]): Promise<void> => {
+  const pending = rows.filter((row): row is { segmentId: string; customerRelationshipId: string } =>
+    Boolean(row.segmentId && row.customerRelationshipId),
+  );
+  if (!pending.length) return;
+
+  const uniqueSegmentIds = [...new Set(pending.map((row) => row.segmentId))];
+  const segments = await db.segment.findMany({
+    where: { id: { in: uniqueSegmentIds } },
+    select: {
+      id: true,
+      ownerModel: true,
+      userId: true,
+      organizationId: true,
+      spaceId: true,
     },
   });
-  if (!customerRef) {
-    throw makeError({
-      status: 422,
-      message: `CustomerRef ${row.customerRefId} is not a customer of the segment's ${segment.ownerModel}`,
-    });
+  const segmentsById = new Map(segments.map((segment) => [segment.id, segment]));
+
+  const groups = new Map<
+    string,
+    {
+      ownerModel: ProviderModel;
+      ownerId: string;
+      customerRelationshipIds: Set<string>;
+    }
+  >();
+
+  for (const row of pending) {
+    const segment = segmentsById.get(row.segmentId);
+    if (!segment) throw makeError({ status: 422, message: `Segment ${row.segmentId} not found` });
+    const ownerId = segmentOwnerId(segment);
+    const key = `${segment.ownerModel}:${ownerId}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { ownerModel: segment.ownerModel, ownerId, customerRelationshipIds: new Set() };
+      groups.set(key, group);
+    }
+    group.customerRelationshipIds.add(row.customerRelationshipId);
+  }
+
+  for (const group of groups.values()) {
+    const uniqueCustomerRelationshipIds = [...group.customerRelationshipIds];
+    const matchedIds = new Set<string>();
+    const fk = customerRelationshipProviderFk(group.ownerModel);
+
+    for (const batch of chunk(uniqueCustomerRelationshipIds, VALIDATION_CHUNK_SIZE)) {
+      const matched = await db.customerRelationship.findMany({
+        where: {
+          id: { in: batch },
+          providerModel: group.ownerModel,
+          [fk]: group.ownerId,
+        },
+        select: { id: true },
+      });
+      for (const relationship of matched) matchedIds.add(relationship.id);
+    }
+
+    for (const customerRelationshipId of uniqueCustomerRelationshipIds) {
+      if (!matchedIds.has(customerRelationshipId)) {
+        throw makeError({
+          status: 422,
+          message: `CustomerRelationship ${customerRelationshipId} is not a customer of the segment's ${group.ownerModel}`,
+        });
+      }
+    }
   }
 };
 
-export const registerSegmentMemberOwnerHook = () => {
+export const registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook = () => {
   registerDbHook(
     'segmentMemberOwner:create',
     'SegmentMember',
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ args }) => {
-      for (const row of castArray((args as { data: MemberRow | MemberRow[] }).data)) {
-        await assertMemberBelongsToOwner(row);
-      }
+      await validateMembersBelongToOwners(
+        castArray((args as { data: MemberRow | MemberRow[] }).data),
+      );
     },
   );
 
@@ -45,7 +98,7 @@ export const registerSegmentMemberOwnerHook = () => {
     [DbAction.upsert],
     async ({ args }) => {
       const a = args as { create?: MemberRow };
-      if (a.create) await assertMemberBelongsToOwner(a.create);
+      if (a.create) await validateMembersBelongToOwners([a.create]);
     },
   );
 };

@@ -9,10 +9,15 @@ import {
   createSpace,
 } from '@template/db/test';
 import { gate } from '@template/db/test/gate';
+import { waitFor } from '@template/shared/test/waitFor';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
-import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
+import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 
-const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+const acmeEmailDomainRule = {
+  field: 'customerUser.email',
+  operator: Operator.endsWith,
+  value: '@acme.test',
+};
 
 const membersOf = (segmentId: string) => ({
   field: 'segmentMembers',
@@ -25,17 +30,14 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 // The contender's blocked FOR NO KEY UPDATE is observed in pg_stat_activity before the holder
 // mutates, so the contender has provably finished its unlocked reads against the live row; a fixed
 // delay would only guess at that and make the race flaky in both directions.
-const waitForBlockedLockOn = async (table: string): Promise<void> => {
+const waitForBlockedLockOn = (table: string): Promise<void> => {
   const pattern = `%"${table}"%FOR NO KEY UPDATE%`;
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
+  return waitFor(async () => {
     const rows = await db.$queryRaw<{ n: bigint | number }[]>`
       SELECT COUNT(*) AS n FROM pg_stat_activity
       WHERE pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query ILIKE ${pattern}`;
-    if (Number(rows[0]?.n ?? 0) > 0) return;
-    await sleep(25);
-  }
-  throw new Error(`no contender blocked on ${table}`);
+    return Number(rows[0]?.n ?? 0) > 0;
+  }, 10_000);
 };
 
 const settles = (promise: Promise<unknown>, withinMs: number) =>
@@ -74,11 +76,11 @@ describe('ruleReference — edges under concurrency and repair', () => {
   describe('a save racing the delete of the row it names', () => {
     it('waits for the delete to commit and writes the edge stamped, never unstamped against a deleted row', async () => {
       const { entity: target } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const { entity: other } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const held = gate();
@@ -122,13 +124,13 @@ describe('ruleReference — edges under concurrency and repair', () => {
       db.txn(() =>
         syncRuleReferenceEdges(
           { model: 'Segment', id: segment.id },
-          ruleReferences(customerRefLens, segment.conditions as Condition),
+          ruleReferences(customerRelationshipLens, segment.conditions as Condition),
         ),
       );
 
     it('repairs a drifted stamp and keeps the edge id', async () => {
       const { entity: target } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const { entity: dependent } = await createSegment(
@@ -147,7 +149,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
 
     it('stamps an edge whose target died behind the hooks, keeps the id, and a second rebuild changes nothing', async () => {
       const { entity: target } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const { entity: dependent } = await createSegment(

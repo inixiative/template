@@ -6,7 +6,11 @@
  */
 import { Operator } from '@inixiative/json-rules';
 import type { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
-import { highRoles, lowRoles } from '@template/permissions/rebac/schemaHelpers';
+import {
+  actorIsUser,
+  privilegedRoles,
+  unprivilegedRoles,
+} from '@template/permissions/rebac/rebacSchemaRules';
 import type { ActionRule } from '@template/permissions/rebac/types';
 
 // A party that can stand on a side of an inquiry. `admin` is the platform (superadmin): it has no
@@ -15,7 +19,7 @@ export type InquiryPartyModel = Exclude<InquiryResourceModel, 'admin'>;
 
 // The level a party needs: an action of the party model's own resource, asked on its relation; or,
 // for a case one action cannot say, a plain rebac rule (rel, any, all, rule), used as written.
-// inquiryPermission.test.ts checks every relation, action and field either form names exists.
+// inquiryResourcePermission.test.ts checks every relation, action and field either form names exists.
 export type PartyLevel = string | Exclude<ActionRule, string>;
 
 export type InquiryParty =
@@ -27,18 +31,20 @@ export type InquiryTypeParties = {
   targets: readonly InquiryParty[];
 };
 
-// Reading an inquiry is party-wide, whatever its type: the person on a side reads it, and an
-// organization or space reads what it sent and received with manage (the entitlement rulings,
-// R74/R76). Sending and resolving are per type, below.
-// Open: lower-level types may want an operator to read, possibly per type and side. Left
-// party-wide because the received/sent lists filter by party in the query.
-export const INQUIRY_READ_LEVELS: Partial<Record<InquiryPartyModel, string>> = {
-  User: 'read',
-  Organization: 'manage',
-  Space: 'manage',
+// Reading an inquiry is party-wide, whatever its type, and each party reads its own ownership
+// channel only: a person reads the sides that name them (their own, their memberships', and what
+// those hold); an organization reads, with manage, the sides on the organization alone (no space,
+// no person); a space the sides on the space with no person (Aron, 2026-11-16). `clear` lists the
+// side keys that must be empty. Sending and resolving are per type, below.
+export const INQUIRY_READ_LEVELS: Partial<
+  Record<InquiryPartyModel, { action: string; clear: readonly string[] }>
+> = {
+  User: { action: 'read', clear: [] },
+  Organization: { action: 'manage', clear: ['SpaceId', 'UserId'] },
+  Space: { action: 'manage', clear: ['UserId'] },
 };
 
-const role = (operator: Operator, value: string[] | null): ActionRule => ({
+const role = (operator: Operator, value: string[]): ActionRule => ({
   rule: { field: 'content.role', operator, value },
 });
 
@@ -51,10 +57,15 @@ export const INQUIRY_TYPES = {
         model: 'Organization',
         send: {
           any: [
-            { all: [role(Operator.in, highRoles), { rel: 'sourceOrganization', action: 'own' }] },
             {
               all: [
-                { any: [role(Operator.in, lowRoles), role(Operator.equals, null)] },
+                role(Operator.in, privilegedRoles),
+                { rel: 'sourceOrganization', action: 'own' },
+              ],
+            },
+            {
+              all: [
+                role(Operator.in, unprivilegedRoles),
                 { rel: 'sourceOrganization', action: 'manage' },
               ],
             },
@@ -87,5 +98,35 @@ export const INQUIRY_TYPES = {
   transferSpace: {
     sources: [{ model: 'Space', send: { rel: 'sourceSpace.organization', action: 'own' } }],
     targets: [{ model: 'Organization', resolve: 'own' }],
+  },
+  // Addressed to the record whose entitlements change. Only someone who can read that record asks,
+  // so a stranger cannot probe ids or have its owner shown to them. Whoever administers it may answer (a token
+  // has no manage; delete is its administering action); the handler then runs the direct routes'
+  // own checks, so an approver who could not grant it gets the refusal and the inquiry stays open. A person
+  // answers, never a token: a token may approve one day, for now it neither approves nor denies.
+  changeEntitlements: {
+    sources: [
+      {
+        model: 'User',
+        send: {
+          all: [
+            { rel: 'sourceUser', action: 'operate' },
+            {
+              any: [
+                { rel: 'targetToken', action: 'read' },
+                { rel: 'targetIntegration', action: 'read' },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    targets: [
+      { model: 'Token', resolve: { all: [actorIsUser, { rel: 'targetToken', action: 'delete' }] } },
+      {
+        model: 'Integration',
+        resolve: { all: [actorIsUser, { rel: 'targetIntegration', action: 'manage' }] },
+      },
+    ],
   },
 } as const satisfies Record<InquiryType, InquiryTypeParties>;

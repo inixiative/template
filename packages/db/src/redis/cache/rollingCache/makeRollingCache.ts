@@ -69,7 +69,7 @@ const selectedFields = (selector: AnyRollingCacheTargets | undefined): string[] 
 //
 // Definitions are written inline in the module that owns the data and register themselves on import,
 // the way factories do. Every module that defines one must be imported by the worker's rolling-cache
-// barrel (apps/api/src/lib/rollingCaches.ts); the `rolling-cache-registered` CI rule enforces that. The
+// barrel (apps/api/src/lib/rollingCaches.ts); the `rolling-caches-imported-by-worker-barrel` CI rule enforces that. The
 // worker schedules in three layers (coordinateRollingCaches → refreshRollingCache →
 // refreshRollingCacheTarget); this module only defines a cache: its targets, its results and the job
 // that writes them.
@@ -77,10 +77,10 @@ const selectedFields = (selector: AnyRollingCacheTargets | undefined): string[] 
 // - `targets` is `{ model, args }`: the model's own findMany args. Each row is one target: a leaf
 //   job's payload and the argument to `compute`. A cache with no selector has one target, the whole
 //   system.
-// - `read(result, params)` never computes. It is `checkCache` on that result's key, fresh for one
+// - `fetchResult(result, params)` never computes. It is `checkCache` on that result's key, fresh for one
 //   scheduled refresh (interval + spread + one attempt + a tick), with `computing` taken from the
 //   target's lock. Only a leaf computes; a caller that wants a miss to start one goes through
-//   `checkRollingCache` in the api.
+//   `fetchRollingCacheAndQueueRefreshWhenMissing` in the api.
 // - `refresh(target)` holds the target's single-flight lock from the start of `compute` until its last
 //   write lands, so every result reads "computing", never "empty", meanwhile. It waits up to
 //   `timeoutSeconds` for the lock (the usual holder is a superseded refresh that is stopping) and
@@ -155,7 +155,7 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
     return (key as (params: unknown) => string)(params);
   };
 
-  const read = (result: string, params: unknown): Promise<CacheCheck<RollingCacheValue>> =>
+  const fetchResult = (result: string, params: unknown): Promise<CacheCheck<RollingCacheValue>> =>
     checkCache(resultKey(result, params), {
       freshForSeconds,
       computedUnder: targetKey(targetOf(params)),
@@ -209,7 +209,7 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
     targetKey,
     targetOf,
     results,
-    read,
+    fetchResult,
     markQueued,
     clearQueued,
     refresh,

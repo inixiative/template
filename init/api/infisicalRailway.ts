@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { getInfisicalToken } from './infisical';
+import { fetchInfisicalTokenOrThrow } from './infisical';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisicalRailway');
 
@@ -41,7 +41,7 @@ class InfisicalRailwayApi {
     version: async () =>
       (await Promise.all([cliVersion('infisical'), cliVersion('railway')])).join('|'),
     sanitizers: {
-      createRailwayConnection: { fn: () => 'REDACTED' },
+      createRailwayConnection: { fn: () => 'MASKED' },
     },
   });
 
@@ -49,7 +49,7 @@ class InfisicalRailwayApi {
     infisicalProjectId: string,
   ): Promise<Array<{ id: string; name: string }>> {
     return this.vcr.capture('listRailwayConnections', async () => {
-      const infisicalToken = await getInfisicalToken();
+      const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/app-connections/railway?projectId=${infisicalProjectId}`,
         { method: 'GET', headers: { Authorization: `Bearer ${infisicalToken}` } },
@@ -68,7 +68,7 @@ class InfisicalRailwayApi {
 
   async listRailwaySyncs(infisicalProjectId: string): Promise<RailwaySecretSync[]> {
     return this.vcr.capture('listRailwaySyncs', async () => {
-      const infisicalToken = await getInfisicalToken();
+      const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/secret-syncs/railway?projectId=${infisicalProjectId}`,
         { method: 'GET', headers: { Authorization: `Bearer ${infisicalToken}` } },
@@ -89,7 +89,7 @@ class InfisicalRailwayApi {
     connectionName: string,
   ): Promise<string> {
     return this.vcr.capture('createRailwayConnection', async () => {
-      const infisicalToken = await getInfisicalToken();
+      const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch('https://app.infisical.com/api/v1/app-connections/railway', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${infisicalToken}` },
@@ -123,7 +123,7 @@ class InfisicalRailwayApi {
 
   async createRailwaySync(input: EnsureRailwaySyncInput): Promise<void> {
     return this.vcr.capture('createRailwaySync', async () => {
-      const infisicalToken = await getInfisicalToken();
+      const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch('https://app.infisical.com/api/v1/secret-syncs/railway', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${infisicalToken}` },

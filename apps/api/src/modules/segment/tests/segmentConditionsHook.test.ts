@@ -9,9 +9,13 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { deadReferencesOf } from '#tests/utils/deadReferences';
+import { expectRuleReferenceErrorDeadReferences } from '#tests/utils/deadReferences';
 
-const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+const acmeEmailDomainRule = {
+  field: 'customerUser.email',
+  operator: Operator.endsWith,
+  value: '@acme.test',
+};
 
 describe('segmentConditions hook', () => {
   let space: Space;
@@ -57,13 +61,15 @@ describe('segmentConditions hook', () => {
     const { entity } = await createSegment(
       {
         ownerModel: 'Space',
-        conditions: { all: [acmeRule, { field: 'customerUser.contacts', arrayOperator: 'any' }] },
+        conditions: {
+          all: [acmeEmailDomainRule, { field: 'customerUser.contacts', arrayOperator: 'any' }],
+        },
       },
       { space },
     );
     expect(entity.conditions).toEqual({
       all: [
-        acmeRule,
+        acmeEmailDomainRule,
         { field: 'customerUser.contacts', arrayOperator: 'any', condition: { all: [] } },
       ],
     });
@@ -72,7 +78,7 @@ describe('segmentConditions hook', () => {
   it('refuses an empty arm inside any', async () => {
     await expect(
       createSegment(
-        { ownerModel: 'Space', conditions: { any: [acmeRule, { all: [] }] } },
+        { ownerModel: 'Space', conditions: { any: [acmeEmailDomainRule, { all: [] }] } },
         { space },
       ),
     ).rejects.toThrow('matches every row');
@@ -80,7 +86,7 @@ describe('segmentConditions hook', () => {
 
   it('refuses a segment that references its own membership', async () => {
     const { entity } = await createSegment(
-      { ownerModel: 'Space', conditions: acmeRule },
+      { ownerModel: 'Space', conditions: acmeEmailDomainRule },
       { space },
     );
     await expect(
@@ -137,7 +143,7 @@ describe('segmentConditions hook', () => {
     });
     const absent = '00000000-0000-7000-8000-00000000dead';
     expect(
-      await deadReferencesOf(
+      await expectRuleReferenceErrorDeadReferences(
         createSegment({ ownerModel: 'Space', conditions: membersOf(absent) }, { space }),
       ),
     ).toEqual([{ model: 'Segment', id: absent, state: 'missing' }]);
@@ -145,17 +151,17 @@ describe('segmentConditions hook', () => {
     const { context } = await createOrganizationUser();
     const elsewhere = (await createSpace({}, { organization: context.organization })).entity;
     const { entity: foreign } = await createSegment(
-      { ownerModel: 'Space', conditions: acmeRule },
+      { ownerModel: 'Space', conditions: acmeEmailDomainRule },
       { space: elsewhere },
     );
     expect(
-      await deadReferencesOf(
+      await expectRuleReferenceErrorDeadReferences(
         createSegment({ ownerModel: 'Space', conditions: membersOf(foreign.id) }, { space }),
       ),
     ).toEqual([{ model: 'Segment', id: foreign.id, state: 'missing' }]);
 
     const { entity: own } = await createSegment(
-      { ownerModel: 'Space', conditions: acmeRule },
+      { ownerModel: 'Space', conditions: acmeEmailDomainRule },
       { space },
     );
     const { entity } = await createSegment(
@@ -167,12 +173,12 @@ describe('segmentConditions hook', () => {
 
   it('validates a user-owned and an organization-owned segment against their own customer lens', async () => {
     const mine = await createSegment(
-      { ownerModel: ProviderModel.User, conditions: acmeRule },
+      { ownerModel: ProviderModel.User, conditions: acmeEmailDomainRule },
       { user },
     );
     expect(mine.entity.userId).toBe(user.id);
     const ours = await createSegment(
-      { ownerModel: ProviderModel.Organization, conditions: acmeRule },
+      { ownerModel: ProviderModel.Organization, conditions: acmeEmailDomainRule },
       { organization },
     );
     expect(ours.entity.organizationId).toBe(organization.id);
@@ -180,7 +186,7 @@ describe('segmentConditions hook', () => {
 
   it('refuses clearing conditions on update and leaves an untouched rule alone', async () => {
     const { entity } = await createSegment(
-      { ownerModel: 'Space', conditions: acmeRule },
+      { ownerModel: 'Space', conditions: acmeEmailDomainRule },
       { space },
     );
     await expect(
@@ -190,6 +196,6 @@ describe('segmentConditions hook', () => {
       where: { id: entity.id },
       data: { type: SegmentType.dynamic },
     });
-    expect(renamed.conditions).toEqual(acmeRule);
+    expect(renamed.conditions).toEqual(acmeEmailDomainRule);
   });
 });

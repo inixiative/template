@@ -39,7 +39,7 @@ Why one table: a grant, a placement, an audit entry and a webhook each have a si
 | Share with a person, an org, a space, a member or a customer; time-limited share: "give Bob edit access", "share this folder with the design space" | **`ArtifactPermission`** · model — a role on an artifact, inherited by `inherit` artifacts inside it | § Access | a per-feature share table; a shared-with JSON column |
 | Can this caller read / edit / manage this artifact: "who can see this file", "is it public" | **`checkArtifactAccess`** · service, **`validateArtifactAccess(action)`** · middleware `apps/api/src/middleware/validations/` | § Access | `validatePermission` on an artifact route (it skips grants); reading `artifact.access` alone to decide public |
 | Everyone with access to an artifact, without an actor: "build the reader set for an index", "who should hear about this change" | **`resolveArtifactAccess`** · service — public flag + grants with roles, through containers | § Access | re-walking containers by hand to collect grants |
-| Give an artifact to another user, org or space: "hand this file over", "move it to the client's workspace" | **`transferArtifact`** · Inquiry handler `apps/api/src/modules/inquiry/handlers/transferArtifact/` | § Ownership | rewriting `organizationId` on the row; copying the file and deleting the original |
+| Give an artifact to another user, org or space: "hand this file over", "move it to the client's workspace" | **`transferArtifact`** · Inquiry service `apps/api/src/modules/inquiry/services/transferArtifact/` | § Ownership | rewriting `organizationId` on the row; copying the file and deleting the original |
 | Where something is used and placed, as the caller sees it: "what uses this logo", "which folders is this in" | **`GET /artifact/:id/uses`** (`listArtifactUses`) | § Navigating | joining placements and bindings by hand without the caller's view |
 | Delete a folder, or delete a folder and what is in it: "empty this folder", "remove the folder but keep the files" | **`deleteArtifact`** · service (`DELETE /artifact/:id`), **`artifactReadExclusiveContents`** · route, **`/v1/batch`** | § Deleting | a delete that walks a container's members and removes them; a bespoke delete-many endpoint |
 
@@ -152,7 +152,7 @@ There is no "primary parent": with several parents, a browser shows two link lis
 | The full graph above, to the root | `GET /artifact/:id/ancestors` → `{ artifacts, edges }`, each shared ancestor once, depth-capped like the access walk |
 | Everything it is in and used by | `GET /artifact/:id/uses` → `{ owner, access, placements, bindings }` |
 
-**A placement in a container the caller can't see doesn't count for them.** The item shows at that caller's root, with its owner and who has access, but not the container. `/uses` lists only placements in containers the caller can read, and bindings on resources the caller can read (organizations and spaces checked with `readAsCaller` against their own read routes; a user's bindings only to that user).
+**A placement in a container the caller can't see doesn't count for them.** The item shows at that caller's root, with its owner and who has access, but not the container. `/uses` lists only placements in containers the caller can read, and bindings on resources the caller can read (organizations and spaces checked with `fetchAsCaller` against their own read routes; a user's bindings only to that user).
 
 No frontend is built yet.
 
@@ -173,7 +173,7 @@ No frontend is built yet.
 | Access resolution | `apps/api/src/modules/artifact/services/resolveArtifactAccess.ts`, `checkArtifactAccess.ts`, `actorPrincipalRole.ts` |
 | Placements | `apps/api/src/modules/artifact/services/artifactPlacements.ts`, `removeArtifactPlacement.ts`, `assertNoContainerCycle.ts` |
 | Navigation and uses | `apps/api/src/modules/artifact/services/listRootArtifacts.ts`, `readArtifactAncestors.ts`, `listArtifactUses.ts` |
-| Ownership | `apps/api/src/modules/inquiry/handlers/transferArtifact/` |
+| Ownership | `apps/api/src/modules/inquiry/services/transferArtifact/` |
 | Org-user folders | `apps/api/src/modules/artifact/services/ensureOrganizationUserFolder.ts`, `apps/api/src/hooks/organizationUserFolder/hook.ts` |
 | Deleting | `apps/api/src/modules/artifact/services/deleteArtifact.ts`, `listExclusiveContents.ts` |
 | Hooks | `apps/api/src/hooks/artifactAccess/hook.ts` (kind default and type) |

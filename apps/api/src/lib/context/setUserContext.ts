@@ -6,7 +6,7 @@
  */
 import type { UserWithRelations } from '@template/db';
 import type { Context } from 'hono';
-import { installPermissions } from '#/lib/context/installPermissions';
+import { installPermissionsFromRequestContext } from '#/lib/context/installPermissionsFromRequestContext';
 import type { AppEnv } from '#/types/appEnv';
 
 type Members = Pick<
@@ -25,5 +25,5 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
   const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userWithRelations;
   c.set('user', user);
   setMemberContext(c, { organizationUsers, organizations, spaceUsers, spaces });
-  await installPermissions(c);
+  await installPermissionsFromRequestContext(c);
 };

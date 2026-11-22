@@ -107,22 +107,22 @@ describe('recomposeCommunication (DB-backed)', () => {
   };
 
   const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
-    (await createCommunicationLog({ senderType: 'platform', address: 'fan@example.com', ...data }))
+    (await createCommunicationLog({ senderModel: 'platform', address: 'fan@example.com', ...data }))
       .entity;
 
-  it('returns the recorded settledMjml — the sent truth — not a recompose of the save-time pin', async () => {
+  it('returns the recorded evaluatedMjml — the sent truth — not a recompose of the save-time pin', async () => {
     const { template, pin } = await savedPin();
     const sent = '<mj-text>What the sender-scoped cascade actually rendered</mj-text>';
     const log = await createLog({
       emailTemplateId: template.id,
       emailTemplateAuditLogId: pin.id,
-      settledMjml: sent,
+      evaluatedMjml: sent,
     });
 
     expect(await recomposeCommunication(log.id)).toBe(sent);
   });
 
-  it('falls back to the pinned snapshot for legacy rows without settledMjml', async () => {
+  it('falls back to the pinned snapshot for legacy rows without evaluatedMjml', async () => {
     const { template, pin } = await savedPin();
     const log = await createLog({ emailTemplateId: template.id, emailTemplateAuditLogId: pin.id });
 

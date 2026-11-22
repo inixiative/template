@@ -4,18 +4,20 @@
  * @partOf feature:segment
  * @uses primitive:appEvents, infrastructure:prisma
  */
-import { db, polymorphicTarget } from '@template/db';
-import type { CustomerRef, Segment } from '@template/db/generated/client/client';
+import { db, rowPolymorphicAxisPointsAt } from '@template/db';
+import type { CustomerRelationship, Segment } from '@template/db/generated/client/client';
 import { emitAppEvent } from '#/appEvents/emit';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import type { MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
 
 export type MembershipChange = { segment: Segment; diff: MembershipDiff };
 
-type PerCustomerRef = { added: string[]; removed: string[] };
+type PerCustomerRelationship = { added: string[]; removed: string[] };
 
-export const customerRefCustomerId = (customerRef: CustomerRef): string =>
-  polymorphicTarget(customerRef, 'CustomerRef', 'customerModel')!.id;
+export const customerRelationshipCustomerId = (
+  customerRelationship: CustomerRelationship,
+): string =>
+  rowPolymorphicAxisPointsAt(customerRelationship, 'CustomerRelationship', 'customerModel')!.id;
 
 const bySegment = async ({ segment, diff }: MembershipChange): Promise<void> => {
   const subject = {
@@ -24,13 +26,18 @@ const bySegment = async ({ segment, diff }: MembershipChange): Promise<void> => 
     ownerId: segmentOwnerId(segment),
   };
   if (diff.added.length)
-    await emitAppEvent('segment.membersAdded', { ...subject, customerRefIds: diff.added });
+    await emitAppEvent('segment.membersAdded', { ...subject, customerRelationshipIds: diff.added });
   if (diff.removed.length)
-    await emitAppEvent('segment.membersRemoved', { ...subject, customerRefIds: diff.removed });
+    await emitAppEvent('segment.membersRemoved', {
+      ...subject,
+      customerRelationshipIds: diff.removed,
+    });
 };
 
-const byCustomerRef = (changes: MembershipChange[]): Map<string, PerCustomerRef> => {
-  const out = new Map<string, PerCustomerRef>();
+const byCustomerRelationship = (
+  changes: MembershipChange[],
+): Map<string, PerCustomerRelationship> => {
+  const out = new Map<string, PerCustomerRelationship>();
   const entry = (id: string) => out.get(id) ?? out.set(id, { added: [], removed: [] }).get(id)!;
   for (const { segment, diff } of changes) {
     for (const id of diff.added) entry(id).added.push(segment.id);
@@ -45,18 +52,23 @@ export const publishMembershipChanges = async (changes: MembershipChange[]): Pro
 
   for (const change of moved) await bySegment(change);
 
-  const perRef = byCustomerRef(moved);
-  const refs = await db.customerRef.findMany({ where: { id: { in: [...perRef.keys()] } } });
-  for (const customerRef of refs) {
-    const { added, removed } = perRef.get(customerRef.id)!;
+  const changesByCustomerRelationship = byCustomerRelationship(moved);
+  const customerRelationships = await db.customerRelationship.findMany({
+    where: { id: { in: [...changesByCustomerRelationship.keys()] } },
+  });
+  for (const customerRelationship of customerRelationships) {
+    const { added, removed } = changesByCustomerRelationship.get(customerRelationship.id)!;
     const subject = {
-      customerRefId: customerRef.id,
-      customerModel: customerRef.customerModel,
-      customerId: customerRefCustomerId(customerRef),
+      customerRelationshipId: customerRelationship.id,
+      customerModel: customerRelationship.customerModel,
+      customerId: customerRelationshipCustomerId(customerRelationship),
     };
     if (added.length)
-      await emitAppEvent('customerRef.segmentsAdded', { ...subject, segmentIds: added });
+      await emitAppEvent('customerRelationship.segmentsAdded', { ...subject, segmentIds: added });
     if (removed.length)
-      await emitAppEvent('customerRef.segmentsRemoved', { ...subject, segmentIds: removed });
+      await emitAppEvent('customerRelationship.segmentsRemoved', {
+        ...subject,
+        segmentIds: removed,
+      });
   }
 };

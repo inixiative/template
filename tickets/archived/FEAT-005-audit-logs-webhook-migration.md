@@ -53,7 +53,7 @@ export const isNoOpUpdate = <T>(
 
 **Action**: Delete `apps/api/src/hooks/webhooks/constants/ignoredFields.ts`
 
-**Content moves to**: `packages/db/src/lib/hooks/ignoreFields.ts`
+**Content moves to**: `packages/db/src/lib/hooks/noopFields.ts`
 
 No changes to structure - keep `_global` key (used by existing code).
 
@@ -145,11 +145,11 @@ import { isNoOpUpdate } from '#/hooks/webhooks/utils'; // Still works - isNoOpUp
 **If yes**, update webhook payload processing:
 
 ```typescript
-import { filterIgnoredFields, redactSensitiveFields } from '@template/db/lib/hooks';
+import { filterIgnoredFields, maskSensitiveFields } from '@template/db/lib/hooks';
 
 const processWebhookData = <T>(model: string, data: T): T => {
   const filtered = filterIgnoredFields(model, data);
-  const redacted = redactSensitiveFields(model, filtered);
+  const redacted = maskSensitiveFields(model, filtered);
   return redacted;
 };
 ```
@@ -188,8 +188,8 @@ const processWebhookData = <T>(model: string, data: T): T => {
 - `apps/api/src/hooks/cache/hook.ts` - no changes needed (uses isNoOpUpdate which internally uses shared utils)
 
 ### Created (in main ticket)
-- `packages/db/src/lib/hooks/ignoreFields.ts`
-- `packages/db/src/lib/hooks/redactFields.ts`
+- `packages/db/src/lib/hooks/noopFields.ts`
+- `packages/db/src/lib/hooks/sensitiveFields.ts`
 
 ---
 

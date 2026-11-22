@@ -20,35 +20,41 @@ model Inquiry {
 
   // Source (who creates/sends) - fake polymorphism
   sourceModel          InquiryResourceModel
+  sourceId             String?              @db.VarChar(36)
   sourceUserId         String?              @db.VarChar(36)
   sourceOrganizationId String?              @db.VarChar(36)
   sourceSpaceId        String?              @db.VarChar(36)
   sourceIntegrationId  String?              @db.VarChar(36)
   sourceTokenId        String?              @db.VarChar(36)
+  sourceProjectId      String?              @db.VarChar(36)
 
   sourceUser             User?             @relation("InquirySource", fields: [sourceUserId], references: [id], onDelete: Cascade)
   sourceOrganization     Organization?     @relation("InquirySource", fields: [sourceOrganizationId], references: [id], onDelete: Cascade)
-  sourceSpace            Space?            @relation("InquirySource", fields: [sourceSpaceId], references: [id], onDelete: Cascade)
+  sourceSpace            Space?            @relation("InquirySource", fields: [sourceOrganizationId, sourceSpaceId], references: [organizationId, id], onDelete: Cascade)
   sourceOrganizationUser OrganizationUser? @relation("InquirySource", fields: [sourceOrganizationId, sourceUserId], references: [organizationId, userId], onDelete: Cascade)
   sourceSpaceUser        SpaceUser?        @relation("InquirySource", fields: [sourceOrganizationId, sourceSpaceId, sourceUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
   sourceIntegration      Integration?      @relation("InquirySource", fields: [sourceIntegrationId], references: [id], onDelete: Cascade)
   sourceToken            Token?            @relation("InquirySource", fields: [sourceTokenId], references: [id], onDelete: Cascade)
+  sourceProject            Project?          @relation("InquirySource", fields: [sourceProjectId], references: [id], onDelete: Cascade)
 
   // Target (who receives/resolves) - fake polymorphism
   targetModel          InquiryResourceModel
+  targetId             String?              @db.VarChar(36)
   targetUserId         String?              @db.VarChar(36)
   targetOrganizationId String?              @db.VarChar(36)
   targetSpaceId        String?              @db.VarChar(36)
   targetIntegrationId  String?              @db.VarChar(36)
   targetTokenId        String?              @db.VarChar(36)
+  targetProjectId      String?              @db.VarChar(36)
 
   targetUser             User?             @relation("InquiryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   targetOrganization     Organization?     @relation("InquiryTarget", fields: [targetOrganizationId], references: [id], onDelete: Cascade)
-  targetSpace            Space?            @relation("InquiryTarget", fields: [targetSpaceId], references: [id], onDelete: Cascade)
+  targetSpace            Space?            @relation("InquiryTarget", fields: [targetOrganizationId, targetSpaceId], references: [organizationId, id], onDelete: Cascade)
   targetOrganizationUser OrganizationUser? @relation("InquiryTarget", fields: [targetOrganizationId, targetUserId], references: [organizationId, userId], onDelete: Cascade)
   targetSpaceUser        SpaceUser?        @relation("InquiryTarget", fields: [targetOrganizationId, targetSpaceId, targetUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
   targetIntegration      Integration?      @relation("InquiryTarget", fields: [targetIntegrationId], references: [id], onDelete: Cascade)
   targetToken            Token?            @relation("InquiryTarget", fields: [targetTokenId], references: [id], onDelete: Cascade)
+  targetProject            Project?          @relation("InquiryTarget", fields: [targetProjectId], references: [id], onDelete: Cascade)
   auditLogsAsSubject     AuditLog[]        @relation("AuditLogSubjectInquiry")
   auditLogsAsSource      AuditLog[]        @relation("AuditLogSourceInquiry")
 
@@ -56,18 +62,20 @@ model Inquiry {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@index([sourceModel])
+  @@index([sourceModel, sourceId])
   @@index([sourceUserId])
   @@index([sourceOrganizationId])
   @@index([sourceSpaceId])
   @@index([sourceIntegrationId])
   @@index([sourceTokenId])
-  @@index([targetModel])
+  @@index([sourceProjectId])
+  @@index([targetModel, targetId])
   @@index([targetUserId])
   @@index([targetOrganizationId])
   @@index([targetSpaceId])
   @@index([targetIntegrationId])
   @@index([targetTokenId])
+  @@index([targetProjectId])
   @@index([type, status])
   @@index([expiresAt])
 }
@@ -78,6 +86,7 @@ enum InquiryType {
   updateSpace
   transferSpace
   transferArtifact
+  changeEntitlements
 }
 
 enum InquiryStatus {
@@ -98,4 +107,5 @@ enum InquiryResourceModel {
   SpaceUser
   Integration
   Token
+  Project
 }

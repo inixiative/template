@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:ui, primitive:websockets
  * @uses primitive:shared
  */
@@ -25,7 +25,9 @@ const withTotal = (
   return {
     ...pagination,
     total,
-    totalPages: pagination.pageSize ? Math.ceil(total / pagination.pageSize) : undefined,
+    totalPages: pagination.pageSize
+      ? Math.ceil(total / pagination.pageSize)
+      : pagination.totalPages,
   };
 };
 

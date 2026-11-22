@@ -1,12 +1,12 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:ui
  * @uses none
  */
 export type SearchInput = string | URLSearchParams | Record<string, unknown> | null | undefined;
 
-const readStringValue = (value: unknown): string | null => {
+const nonEmptyStringOrNull = (value: unknown): string | null => {
   return typeof value === 'string' && value.length > 0 ? value : null;
 };
 
@@ -25,7 +25,7 @@ export const toUrlSearchParams = (search: SearchInput): URLSearchParams => {
 
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(search)) {
-    const stringValue = readStringValue(value);
+    const stringValue = nonEmptyStringOrNull(value);
     if (stringValue) {
       params.set(key, stringValue);
     }
@@ -33,7 +33,7 @@ export const toUrlSearchParams = (search: SearchInput): URLSearchParams => {
   return params;
 };
 
-export const readSearchParam = (search: SearchInput, key: string): string | null => {
+export const searchParamValue = (search: SearchInput, key: string): string | null => {
   const params = toUrlSearchParams(search);
   return params.get(key);
 };

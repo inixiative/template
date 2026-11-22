@@ -1,0 +1,111 @@
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { Organization } from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  PlatformRole,
+} from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createInquiry,
+  createOrganization,
+  createOrganizationUser,
+  createUser,
+} from '@template/db/test';
+import { inquiryRouter } from '#/modules/inquiry';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
+import { post } from '#tests/utils/request';
+
+const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
+
+describe('handler: createSpace — approve', () => {
+  let db: ReturnType<typeof createTestApp>['db'];
+  let org: Organization;
+  let adminFetch: ReturnType<typeof createTestApp>['fetch'];
+
+  beforeEach(async () => {
+    const { entity: owner } = await createUser();
+    const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
+    const { entity: o } = await createOrganization();
+    org = o;
+    await createOrganizationUser({ role: 'owner' }, { user: owner, organization: org });
+
+    const harness = createTestApp({ mockUser: superadmin, mount });
+    adminFetch = harness.fetch;
+    db = harness.db;
+  });
+
+  afterEach(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('approve creates the space under the source org', async () => {
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.createSpace,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.admin,
+      content: { name: 'Approved Space', slug: 'approved-space' },
+    });
+
+    const response = await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
+    );
+    expect(response.status).toBe(200);
+
+    const space = await db.space.findFirst({
+      where: { slug: 'approved-space', organizationId: org.id },
+    });
+    expect(space).toBeTruthy();
+    expect(space?.name).toBe('Approved Space');
+  });
+
+  it('deny does not create a space', async () => {
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.createSpace,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.admin,
+      content: { name: 'Denied Space', slug: 'denied-space' },
+    });
+
+    await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+      }),
+    );
+
+    const space = await db.space.findFirst({ where: { slug: 'denied-space' } });
+    expect(space).toBeNull();
+  });
+
+  it('a deny stores nothing the handler did not produce', async () => {
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.createSpace,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.admin,
+      content: { name: 'Forged Space', slug: 'forged-space' },
+    });
+
+    await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+        explanation: 'no',
+        spaceId: 'forged',
+      }),
+    );
+
+    const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(stored.resolution).toEqual({ explanation: 'no' });
+  });
+});

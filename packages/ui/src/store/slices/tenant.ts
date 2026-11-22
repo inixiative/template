@@ -5,15 +5,15 @@
  * @uses none
  */
 import type { AppStore } from '@template/ui/store/types';
-import type { PageContext, TenantSlice } from '@template/ui/store/types/tenant';
+import type { TenantSlice, ViewedRecords } from '@template/ui/store/types/tenant';
 import type { StateCreator } from 'zustand';
 
 export const createTenantSlice: StateCreator<AppStore, [], [], TenantSlice> = (set, get) => ({
   tenant: {
     context: { type: 'public' },
-    page: {},
+    viewedRecords: {},
 
-    setPublic: () => {
+    switchToPublicContext: () => {
       set((state) => ({
         tenant: {
           ...state.tenant,
@@ -22,7 +22,7 @@ export const createTenantSlice: StateCreator<AppStore, [], [], TenantSlice> = (s
       }));
     },
 
-    setUser: () => {
+    switchToUserContext: () => {
       set((state) => ({
         tenant: {
           ...state.tenant,
@@ -31,7 +31,7 @@ export const createTenantSlice: StateCreator<AppStore, [], [], TenantSlice> = (s
       }));
     },
 
-    setOrganization: (organizationId: string) => {
+    switchToOrganizationContext: (organizationId: string) => {
       const auth = get().auth;
       const organization = auth.organizations?.[organizationId];
       if (!organization) return false;
@@ -48,7 +48,7 @@ export const createTenantSlice: StateCreator<AppStore, [], [], TenantSlice> = (s
       return true;
     },
 
-    setSpace: (spaceId: string) => {
+    switchToSpaceContext: (spaceId: string) => {
       const auth = get().auth;
       const space = auth.spaces?.[spaceId];
       if (!space) return false;
@@ -69,20 +69,20 @@ export const createTenantSlice: StateCreator<AppStore, [], [], TenantSlice> = (s
       return true;
     },
 
-    setPage: (page: PageContext) => {
+    setViewedRecords: (viewedRecords: ViewedRecords) => {
       set((state) => ({
         tenant: {
           ...state.tenant,
-          page,
+          viewedRecords,
         },
       }));
     },
 
-    clearPage: () => {
+    clearViewedRecords: () => {
       set((state) => ({
         tenant: {
           ...state.tenant,
-          page: {},
+          viewedRecords: {},
         },
       }));
     },

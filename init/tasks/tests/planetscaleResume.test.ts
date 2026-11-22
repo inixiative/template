@@ -49,18 +49,18 @@ describe('PlanetScale Resume Scenario', () => {
       'storeStagingConnectionString',
     ]);
 
-    // getSecret VCR fixtures for connection strings (fetched from Infisical):
+    // fetchSecret VCR fixtures for connection strings (fetched from Infisical):
     // initProdMigrationTable step + final return
-    infisicalApi.vcr.queue('getSecret', 'prodDatabaseUrl');
-    infisicalApi.vcr.queue('getSecret', 'stagingDatabaseUrl');
+    infisicalApi.vcr.queue('fetchSecret', 'prodDatabaseUrl');
+    infisicalApi.vcr.queue('fetchSecret', 'stagingDatabaseUrl');
     // final return fetches both again
-    infisicalApi.vcr.queue('getSecret', 'prodDatabaseUrl');
-    infisicalApi.vcr.queue('getSecret', 'stagingDatabaseUrl');
+    infisicalApi.vcr.queue('fetchSecret', 'prodDatabaseUrl');
+    infisicalApi.vcr.queue('fetchSecret', 'stagingDatabaseUrl');
 
     // createDB complete → else branch: fetch existing DB
-    planetscaleApi.vcr.queue('getDatabase', 'success');
+    planetscaleApi.vcr.queue('fetchDatabase', 'success');
     // createStagingBranch complete → else branch: fetch existing branch
-    planetscaleApi.vcr.queue('getBranch', 'staging');
+    planetscaleApi.vcr.queue('fetchBranch', 'staging');
   });
 
   afterEach(() => {
@@ -79,7 +79,7 @@ describe('PlanetScale Resume Scenario', () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
     await setupPlanetScale('test-org');
 
-    // All VCR cassettes consumed — getSecret was called the expected number of times
+    // All VCR cassettes consumed — fetchSecret was called the expected number of times
     expect(infisicalApi.vcr.isEmpty()).toBe(true);
 
     const calls = system.mocks.exec.mock.calls;

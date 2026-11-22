@@ -68,7 +68,7 @@
 ```
 Request
   │
-  ├─► prepareRequest     # Initialize context (db, requestId, permix)
+  ├─► prepareRequestMiddleware     # Initialize context (db, requestId, permix)
   ├─► jwtAuthMiddleware  # User JWT
   ├─► tokenAuthMiddleware # API token auth
   ├─► spoofMiddleware    # Superadmin impersonation
@@ -185,9 +185,10 @@ What makes this hold up:
 - **Live records, no sync.** Rules read your own records as they are. There is no separate authorization store to keep in sync.
 - **Self-describing.** Each rule field's info route says what the rule may read, so a client editor needs no hard-coding.
 
-Sharing is the clearest case. Without rules you get only the access the system was built to give; with them, three ways to share ad hoc:
+Sharing is the clearest case. Without rules you get only the access the system was built to give; with them, four ways to share ad hoc:
 
 - **A rule on the record.** A model with a `permissionRules` column (`Contact` today, for `read`; the model picks which actions take one) carries its own `ActionRule`, ORed with the schema's. It can share one record with one user, with anyone matching a rule on the acting user or token's own row, or with anyone who can reach a record it relates to.
+- **A rule on the tenant.** `tenantPermissionRules` on a user, organization or space carries an `ActionRule` per resource and action, ORed with the schema's for every record under that tenant. It is the tenant's own extension of the schema: "every contact of mine is readable".
 - **An entitlement on a holder.** A member row, token or integration can be given an action on a resource from an anchor, narrowed by a `where`, and re-checked against whoever granted it each time it is used.
 - **A relation.** To share with a whole tenant the record has no relation to, add a row that relates the two and let the schema walk it. That is a developer change, made once: a model and a schema line, not new engine code.
 

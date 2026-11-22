@@ -27,7 +27,11 @@ const taggedBlock = (tagId: string) => {
   return `{{#if rule=${JSON.stringify(rule)}}}VIP{{/if}}`;
 };
 
-const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+const acmeEmailDomainRule = {
+  field: 'customerUser.email',
+  operator: Operator.endsWith,
+  value: '@acme.test',
+};
 
 const membersOf = (segmentId: string) => ({
   field: 'segmentMembers',
@@ -142,7 +146,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
   describe('segment, which is both a source and a target row', () => {
     it('tombstoning a target segment keeps the edges that name it, and stamps them', async () => {
       const { entity: target } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const { entity: dependent } = await createSegment(
@@ -159,7 +163,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
 
     it('drops its own edges when it is tombstoned and regenerates them on revive', async () => {
       const { entity: target } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const { entity: dependent } = await createSegment(

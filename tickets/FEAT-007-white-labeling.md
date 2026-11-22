@@ -82,12 +82,12 @@ Components then reference only these semantic tokens — they never pick their o
 - Three-tier variable indirection (works as-is)
 - `color-mix()` shade generation (works as-is)
 - `.dark` class toggle with mode-specific values (works as-is)
-- `useSpaceTheme` hook for dynamic tenant overrides (works as-is)
+- `useApplySpaceThemeCssVariables` hook for dynamic tenant overrides (works as-is)
 
 **What needs to be built:**
 - [ ] Define the semantic token vocabulary (inventory all component states: Default, Hover, Pressed, Disabled, Active, Error)
 - [ ] Add semantic token declarations to `theme.css` (light + dark)
-- [ ] Update `useSpaceTheme` to support space-level semantic token overrides
+- [ ] Update `useApplySpaceThemeCssVariables` to support space-level semantic token overrides
 - [ ] Migrate core components (Button, Input, Card) to reference semantic tokens instead of generic tokens
 - [ ] Enforce "no generic tokens in component code" via lint or review convention
 

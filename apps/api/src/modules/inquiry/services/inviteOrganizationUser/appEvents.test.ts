@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'bun:test';
+import { channelKey } from '@template/shared/ws';
+import type { WSChannelsHandoff } from '#/appEvents/types';
+import { inviteOrganizationUserAppEvents } from '#/modules/inquiry/services/inviteOrganizationUser/appEvents';
+
+const refetchHandoff = (id: string): WSChannelsHandoff => {
+  const key = { _id: 'inquiryRead', path: { id } };
+  return {
+    kind: 'channels',
+    target: { channels: [channelKey(key)] },
+    message: { data: { category: 'query', action: 'refetch', key } },
+  };
+};
+
+const sentInviteInquiry = (overrides = {}) => ({
+  id: 'inq-1',
+  type: 'inviteOrganizationUser' as const,
+  status: 'sent' as const,
+  content: { role: 'member' },
+  sourceUserId: 'user-source',
+  sourceOrganizationId: 'org-1',
+  sourceSpaceId: null,
+  sourceModel: 'Organization' as const,
+  targetUserId: 'user-target',
+  targetOrganizationId: null,
+  targetSpaceId: null,
+  targetModel: 'User' as const,
+  sourceUser: { id: 'user-source', name: 'Alice', email: 'alice@example.com' },
+  sourceOrganization: { id: 'org-1', name: 'Acme Corp' },
+  sourceSpace: null,
+  targetUser: { id: 'user-target', name: 'Bob', email: 'bob@example.com' },
+  targetOrganization: null,
+  targetSpace: null,
+  auditLogsAsSubject: [],
+  resolution: {},
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  deletedAt: null,
+  sentAt: new Date(),
+  expiresAt: null,
+  ...overrides,
+});
+
+describe('inviteOrganizationUserAppEvents', () => {
+  describe('sent.email', () => {
+    it('returns invitation email handoff', () => {
+      const inquiry = sentInviteInquiry();
+      const handoffs = inviteOrganizationUserAppEvents.sent!.email!(inquiry as never);
+
+      expect(handoffs).toHaveLength(1);
+      expect(handoffs![0].template).toBe('inquiry-invite-organization-user');
+      expect(handoffs![0].data.inquiryId).toBe('inq-1');
+    });
+
+    it('returns null when no targetUserId', () => {
+      const inquiry = sentInviteInquiry({ targetUserId: null });
+      const handoffs = inviteOrganizationUserAppEvents.sent!.email!(inquiry as never);
+      expect(handoffs).toBeNull();
+    });
+  });
+
+  describe('sent.websocket', () => {
+    it('refetches the inquiry the send touched', () => {
+      const events = inviteOrganizationUserAppEvents.sent!.websocket!(sentInviteInquiry() as never);
+      expect(events).toEqual([refetchHandoff('inq-1')]);
+    });
+  });
+
+  describe('resolved.websocket', () => {
+    it('refetches the inquiry the resolution touched', () => {
+      const events = inviteOrganizationUserAppEvents.resolved!.websocket!(
+        sentInviteInquiry() as never,
+      );
+      expect(events).toEqual([refetchHandoff('inq-1')]);
+    });
+  });
+});

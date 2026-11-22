@@ -13,7 +13,7 @@ import {
   Input,
   Label,
   SlugInput,
-  ThemeToggle,
+  ThemeSelector,
 } from '@template/ui/components';
 
 type ProfileFormCardProps = {
@@ -26,7 +26,7 @@ type ProfileFormCardProps = {
   onSave?: () => void;
   isSaving?: boolean;
   readOnlyMessage?: string;
-  showThemeToggle?: boolean;
+  showThemeSelector?: boolean;
 };
 
 export const ProfileFormCard = ({
@@ -39,7 +39,7 @@ export const ProfileFormCard = ({
   onSave,
   isSaving = false,
   readOnlyMessage,
-  showThemeToggle = false,
+  showThemeSelector = false,
 }: ProfileFormCardProps) => {
   return (
     <div className="max-w-2xl space-y-6">
@@ -76,13 +76,13 @@ export const ProfileFormCard = ({
         </CardContent>
       </Card>
 
-      {showThemeToggle && (
+      {showThemeSelector && (
         <Card>
           <CardHeader>
             <CardTitle>Appearance</CardTitle>
           </CardHeader>
           <CardContent>
-            <ThemeToggle />
+            <ThemeSelector />
           </CardContent>
         </Card>
       )}

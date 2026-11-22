@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
+import { cleanupTouchedTables, createUser, nextFactorySequenceNumber } from '@template/db/test';
 import { batchRouter } from '#/modules/batch';
 import type { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { json, jsonError, post } from '#tests/utils/request';
+import { parseErrorBody, parseSuccessBody, post } from '#tests/utils/request';
 
 type BatchExecuteResponse = z.infer<typeof batchExecuteRoute.responseSchema>;
 
@@ -49,7 +49,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(1);
@@ -72,7 +72,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(1);
@@ -83,7 +83,7 @@ describe('POST /api/v1/batch/execute', () => {
     });
 
     it('interpolates values from previous round', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await fetch(
         post('/api/v1/batch/execute', {
           requests: [
@@ -100,13 +100,70 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(2);
       expect(data.batch[0][0].status).toBe(201);
       expect(data.batch[1][0].status).toBe(200);
       expect(data.batch[1][0].body.data.slug).toBe(`test-org-${seq}`);
+    });
+
+    it('resolves a reference the SDK percent-encoded into a path', async () => {
+      const seq = nextFactorySequenceNumber();
+      const response = await fetch(
+        post('/api/v1/batch/execute', {
+          requests: [
+            [
+              {
+                method: 'POST',
+                path: '/api/v1/organization',
+                body: { name: `Encoded Org ${seq}`, slug: `encoded-org-${seq}` },
+              },
+            ],
+            [{ method: 'GET', path: '/api/v1/organization/%3C%3C0.0.body.data.id%3E%3E' }],
+          ],
+          strategy: 'allowFailures',
+        }),
+      );
+
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
+
+      expect(data.batch[1][0].status).toBe(200);
+      expect(data.batch[1][0].body.data.slug).toBe(`encoded-org-${seq}`);
+    });
+
+    it('sends escaped brackets in a body as literal text beside a live reference', async () => {
+      const seq = nextFactorySequenceNumber();
+      const response = await fetch(
+        post('/api/v1/batch/execute', {
+          requests: [
+            [
+              {
+                method: 'POST',
+                path: '/api/v1/organization',
+                body: { name: `Base ${seq}`, slug: `base-org-${seq}` },
+              },
+            ],
+            [
+              {
+                method: 'POST',
+                path: '/api/v1/organization',
+                body: {
+                  name: 'After <<0.0.body.data.slug>> \\<<kept\\>>',
+                  slug: `escaped-org-${seq}`,
+                },
+              },
+            ],
+          ],
+          strategy: 'allowFailures',
+        }),
+      );
+
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
+
+      expect(data.batch[1][0].status).toBe(201);
+      expect(data.batch[1][0].body.data.name).toBe(`After base-org-${seq} <<kept>>`);
     });
 
     it('treats 204 responses as successful empty results', async () => {
@@ -126,7 +183,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch[0][0].status).toBe(201);
@@ -145,7 +202,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch[0][0].status).toBe(200);
@@ -168,7 +225,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch[0][0].status).toBe(200);
@@ -199,7 +256,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(2);
@@ -240,7 +297,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.summary.status).toBe('failed');
@@ -277,7 +334,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(2);
@@ -313,11 +370,13 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.summary.status).toBe('partialSuccess');
       expect(data.summary.completedRounds).toBe(1);
+      expect(data.batch).toHaveLength(2);
+      expect(data.batch[1][0].error).toBeDefined();
 
       const org = await db.organization.findFirst({ where: { slug: successSlug } });
       expect(org).toBeDefined();
@@ -338,7 +397,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(4);
@@ -363,7 +422,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch[0]).toHaveLength(3);
@@ -386,7 +445,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(2);
@@ -409,7 +468,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(1);
@@ -431,13 +490,32 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(3);
       expect(data.batch[0][0].status).toBe(200);
       expect(data.batch[1][0].status).toBe(200);
       expect(data.batch[2][0].status).toBe(200);
+    });
+
+    it('reports failed (not partialSuccess) when round 0 fails with zero successes', async () => {
+      const response = await fetch(
+        post('/api/v1/batch/execute', {
+          requests: [
+            [{ method: 'GET', path: '/api/v1/organization/invalid-id' }],
+            [{ method: 'GET', path: '/api/v1/me' }],
+          ],
+          strategy: 'failOnRound',
+        }),
+      );
+
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
+
+      expect(response.status).toBe(200);
+      expect(data.summary.status).toBe('failed');
+      expect(data.summary.successfulRequests).toBe(0);
+      expect(data.summary.failedRequests).toBe(1);
     });
   });
 
@@ -452,6 +530,75 @@ describe('POST /api/v1/batch/execute', () => {
       return response.status;
     };
 
+    it('rejects anonymous callers with 401', async () => {
+      const anonymousFetch = createTestApp({ mount: routers }).fetch;
+      const response = await anonymousFetch(
+        post('/api/v1/batch/execute', {
+          requests: [[{ method: 'GET', path: '/api/v1/me' }]],
+          strategy: 'allowFailures',
+        }),
+      );
+
+      expect(response.status).toBe(401);
+    });
+
+    it('refuses nested batch calls upfront', async () => {
+      expect(await refused('/api/v1/batch/execute')).toBe(400);
+    });
+
+    it('strips authentication and spoof headers from sub-requests and sharedHeaders', async () => {
+      let seenHeaders: Record<string, string | undefined> = {};
+      const headerHarness = createTestApp({
+        mockUser: user,
+        mount: [
+          ...routers,
+          (app) =>
+            app.get('/api/v1/probe-headers', (c) => {
+              seenHeaders = {
+                authorization: c.req.header('authorization'),
+                cookie: c.req.header('cookie'),
+                spoof: c.req.header('x-spoof-user-email'),
+                forwarded: c.req.header('x-forwarded-for'),
+                custom: c.req.header('x-custom-safe'),
+              };
+              return c.json({ data: { ok: true } });
+            }),
+        ],
+      });
+
+      const response = await headerHarness.fetch(
+        post('/api/v1/batch/execute', {
+          headers: {
+            Authorization: 'Bearer stolen',
+            Cookie: 'session=stolen',
+            'X-Custom-Safe': 'kept',
+          },
+          requests: [
+            [
+              {
+                method: 'GET',
+                path: '/api/v1/probe-headers',
+                headers: {
+                  'X-Spoof-User-Email': 'victim@example.com',
+                  'X-Forwarded-For': '127.0.0.1',
+                },
+              },
+            ],
+          ],
+          strategy: 'allowFailures',
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(seenHeaders).toEqual({
+        authorization: undefined,
+        cookie: undefined,
+        spoof: undefined,
+        forwarded: undefined,
+        custom: 'kept',
+      });
+    });
+
     it('refuses the whole batch when it calls Better Auth', async () => {
       expect(await refused('/api/auth/sign-in/email')).toBe(400);
       expect(await refused('/api/%61uth/sign-in/email')).toBe(400);
@@ -465,6 +612,31 @@ describe('POST /api/v1/batch/execute', () => {
       expect(await refused('/api/<<0.0.body.data.id>>/sign-in/email')).toBe(400);
     });
 
+    it('re-checks a path after interpolation, so a resolved value cannot climb into an unbatchable route', async () => {
+      const reference = '<<0.0.body.data.name>>';
+      const secondRequestOf = async (name: string, path: string) => {
+        const { entity } = await createUser({ name });
+        const response = await createTestApp({ mockUser: entity, mount: routers }).fetch(
+          post('/api/v1/batch/execute', {
+            requests: [[{ method: 'GET', path: '/api/v1/me' }], [{ method: 'POST', path }]],
+            strategy: 'allowFailures',
+          }),
+        );
+        const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
+        const after = await db.user.findUniqueOrThrow({ where: { id: entity.id } });
+        expect(after.jwtVersion).toBe(entity.jwtVersion);
+        return data.batch[1][0];
+      };
+      for (const path of [
+        `/api/v1/token/${reference}/me/rotateJwts`,
+        `/api/v1/token/${reference}\\me\\rotateJwts`,
+        `/api/v1/token/${reference}\t/me/rotateJwts`,
+      ])
+        expect((await secondRequestOf('..', path)).error).toContain("resolved to '..'");
+      const climbed = await secondRequestOf('', `/api/v1/token/${reference}..\\me\\rotateJwts`);
+      expect(climbed.error).toContain('cannot run in a batch');
+    });
+
     it('rejects malformed interpolation syntax', async () => {
       const response = await fetch(
         post('/api/v1/batch/execute', {
@@ -476,7 +648,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(500);
       expect(data.batch[1][0].error).toContain('Malformed interpolation syntax');
@@ -493,7 +665,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(500);
       expect(data.batch[1][0].error).toContain('Nested interpolation');
@@ -510,7 +682,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(500);
       expect(data.batch[1][0].error).toContain('Invalid round reference');
@@ -527,7 +699,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(500);
       expect(data.batch[1][0].error).toContain('Invalid round reference');
@@ -551,7 +723,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(204);
       expect(data.batch[2][0].status).toBe(500);
@@ -566,7 +738,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[0][0].status).toBe(500);
       expect(data.batch[0][0].error).toContain('Absolute URLs are not allowed');
@@ -594,7 +766,7 @@ describe('POST /api/v1/batch/execute', () => {
           strategy: 'allowFailures',
         }),
       );
-      const body = await jsonError(response);
+      const body = await parseErrorBody(response);
 
       expect(response.status).toBe(422);
       expect(body).toMatchObject({
@@ -612,7 +784,7 @@ describe('POST /api/v1/batch/execute', () => {
           strategy: 'allowFailures',
         }),
       );
-      const body = await jsonError(response);
+      const body = await parseErrorBody(response);
 
       expect(response.status).toBe(422);
       expect(body).toMatchObject({

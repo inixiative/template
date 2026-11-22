@@ -5,7 +5,7 @@ import { ContactRegistry } from '@template/shared/contact';
 import { contactRouter } from '#/modules/contact';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, post } from '#tests/utils/request';
+import { get, parseSuccessBody, post } from '#tests/utils/request';
 
 type ContactTypeInfo = {
   label: string;
@@ -37,22 +37,23 @@ describe('GET /api/v1/contact/info', () => {
     await cleanupTouchedTables(db);
   });
 
-  const loadInfo = async () => {
+  const fetchInfo = async () => {
     const anonymous = createTestApp({
       mount: [(app) => app.route('/api/v1/contact', contactRouter)],
     });
     const response = await anonymous.fetch(get('/api/v1/contact/info'));
     expect(response.status).toBe(200);
-    return (await json<{ types: Record<string, ContactTypeInfo> }>(response)).data.types;
+    return (await parseSuccessBody<{ types: Record<string, ContactTypeInfo> }>(response)).data
+      .types;
   };
 
   it('answers without a session and lists every registered contact type', async () => {
-    const types = await loadInfo();
+    const types = await fetchInfo();
     expect(Object.keys(types).sort()).toEqual(Object.keys(ContactRegistry).sort());
   });
 
   it('reports subtype rules and value shapes from the registry', async () => {
-    const types = await loadInfo();
+    const types = await fetchInfo();
     expect(types.phone!.subtype.mode).toBe('optional');
     expect(types.phone!.subtype.values.length).toBeGreaterThan(0);
     expect(types.whatsapp!.subtype).toEqual({ mode: 'forbidden', values: [] });
@@ -64,7 +65,7 @@ describe('GET /api/v1/contact/info', () => {
   });
 
   it('describes an input the create route accepts and the canonical value it stores', async () => {
-    const types = await loadInfo();
+    const types = await fetchInfo();
     const [urlForm] = types.github!.input.anyOf!;
     expect(urlForm!.required).toEqual(['url']);
 
@@ -75,7 +76,7 @@ describe('GET /api/v1/contact/info', () => {
       }),
     );
     expect(response.status).toBe(201);
-    const { data } = await json<{ value: Record<string, unknown> }>(response);
+    const { data } = await parseSuccessBody<{ value: Record<string, unknown> }>(response);
     expect(Object.keys(data.value).sort()).toEqual(types.github!.value.required!.slice().sort());
   });
 });

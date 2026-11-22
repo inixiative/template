@@ -1,5 +1,5 @@
 import { updateConfigField } from '../utils/configHelpers';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import { isComplete, markComplete, setError } from '../utils/progressTracking';
 import { setSecretAsync } from './infisicalSetup';
 
@@ -9,7 +9,7 @@ import { setSecretAsync } from './infisicalSetup';
  */
 export const storeBouncerApiKey = async (apiKey: string): Promise<void> => {
   try {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const infisicalProjectId = config.infisical.projectId;
 
     if (!infisicalProjectId) {

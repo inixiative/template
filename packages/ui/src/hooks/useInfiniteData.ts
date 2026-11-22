@@ -6,18 +6,21 @@
  */
 import type { QueryKey } from '@tanstack/react-query';
 import type { InfiniteScrollProps } from '@template/ui/components/primitives/Table';
-import { type DataFilters, useDataFilters } from '@template/ui/hooks/useDataFilters';
 import {
   type InfiniteDataPage,
   useInfiniteDataQuery,
 } from '@template/ui/hooks/useInfiniteDataQuery';
+import {
+  type ListSearchFilterAndOrderState,
+  useListSearchFilterAndOrderState,
+} from '@template/ui/hooks/useListSearchFilterAndOrderState';
 import { useScrollState } from '@template/ui/hooks/useScrollState';
-import type { DataConfig } from '@template/ui/lib/makeDataConfig';
+import type { ListQueryCapabilities } from '@template/ui/lib/queryCapabilitiesFromOpenApi';
 import * as React from 'react';
 import { useRef } from 'react';
 
 export type UseInfiniteDataOptions<TItem> = {
-  config: DataConfig;
+  config: ListQueryCapabilities;
   queryKey: QueryKey;
   queryFn: (
     pageParam: number,
@@ -28,7 +31,7 @@ export type UseInfiniteDataOptions<TItem> = {
   scrollRestore?: boolean;
 };
 
-export type InfiniteDataResult<TItem> = DataFilters & {
+export type InfiniteDataResult<TItem> = ListSearchFilterAndOrderState & {
   data: TItem[];
   pageCount: number;
   isLoading: boolean;
@@ -54,7 +57,7 @@ export function useInfiniteData<TItem>(
 
   const shouldRestoreScroll = scrollRestore ?? sectionId != null;
 
-  const dataFilters = useDataFilters(config);
+  const dataFilters = useListSearchFilterAndOrderState(config);
 
   // Include filterQuery in the query key so filter changes trigger a refetch
   // from page 0 (TanStack Query treats a new key as a new query).

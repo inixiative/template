@@ -1,20 +1,20 @@
 import { type Condition, check } from '@inixiative/json-rules';
 import {
+  applyWriteDataOverPreviousRow,
   DbAction,
+  dualPolymorphismIdColumns,
+  dualPolymorphismIdConflicts,
   type HookOptions,
   HookTiming,
   isPrismaNull,
   type ModelName,
-  materializedColumns,
-  materializedIdConflicts,
   registerDbHook,
   type SingleAction,
   withDiscriminatorDefaults,
-  withMaterializedIds,
+  withDualPolymorphismIds,
 } from '@template/db';
 import { castArray, without } from 'lodash-es';
-import { getRule, RulesRegistry } from '#/hooks/rules/registry';
-import { shadowMerge } from '#/hooks/rules/shadowMerge';
+import { RulesRegistry, ruleForModel } from '#/hooks/rules/registry';
 import { makeError } from '#/lib/errors';
 
 const evaluate = (rule: Condition, row: Record<string, unknown>): boolean | string => {
@@ -27,7 +27,7 @@ const evaluate = (rule: Condition, row: Record<string, unknown>): boolean | stri
 
 const validateRules = (data: Record<string, unknown>, model: ModelName): void => {
   const result = evaluate(
-    getRule(model),
+    ruleForModel(model),
     Object.fromEntries(
       Object.entries(data).map(([field, value]) => [field, isPrismaNull(value) ? null : value]),
     ),
@@ -45,11 +45,11 @@ const processCreateArgs = (args: unknown, model: ModelName): void => {
   for (const row of castArray(data) as Record<string, unknown>[]) {
     const defaulted = withDiscriminatorDefaults(model, row);
     validateRules(defaulted, model);
-    const [conflict] = materializedIdConflicts(model, defaulted);
+    const [conflict] = dualPolymorphismIdConflicts(model, defaulted);
     if (conflict) throw makeError({ status: 422, message: conflict });
-    const materialized = withMaterializedIds(model, defaulted);
-    for (const column of materializedColumns(model))
-      if (materialized[column] != null) row[column] = materialized[column];
+    const withIds = withDualPolymorphismIds(model, defaulted);
+    for (const column of dualPolymorphismIdColumns(model))
+      if (withIds[column] != null) row[column] = withIds[column];
   }
 };
 
@@ -61,7 +61,7 @@ const processUpdateArgs = (
   const data = ((args as Record<string, unknown>)?.data ??
     (args as Record<string, unknown>)?.update) as Record<string, unknown> | undefined;
   if (data && typeof data === 'object' && !Array.isArray(data))
-    validateRules(shadowMerge(previous, data), model);
+    validateRules(applyWriteDataOverPreviousRow(previous, data, { model }), model);
 };
 
 export const registerRulesHook = () => {
@@ -96,7 +96,7 @@ export const registerRulesHook = () => {
     HookTiming.after,
     [DbAction.updateManyAndReturn],
     async ({ model, result }) => {
-      const rule = getRule(model);
+      const rule = ruleForModel(model);
       if (rule === true) return;
 
       for (const record of result as Record<string, unknown>[]) {

@@ -8,11 +8,11 @@ import { createRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   inquiryCreateBodySchema,
-  inquiryCreateSanitizeKeys,
+  inquiryCreateServerOwnedKeys,
 } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
-import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
+import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meCreateInquiryRoute = createRoute({
   model: Modules.me,
@@ -20,7 +20,7 @@ export const meCreateInquiryRoute = createRoute({
   submodel: Modules.inquiry,
   skipId: true,
   bodySchema: inquiryCreateBodySchema,
-  responseSchema: inquirySentResponseSchema,
-  sanitizeKeys: inquiryCreateSanitizeKeys,
-  tags: [Tags.me, Tags.inquiry],
+  responseSchema: inquiryResponseSchema,
+  sanitizeKeys: inquiryCreateServerOwnedKeys,
+  tags: [OpenApiTags.me, OpenApiTags.inquiry],
 });

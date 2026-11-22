@@ -4,16 +4,17 @@
  * @partOf feature:email
  * @uses none
  */
+
+import { eachMarkerAt } from '@template/email/render/conditionParser/eachMarkerAt';
 import { END, END_EACH, IF } from '@template/email/render/conditionParser/grammar';
 import {
-  type Kind,
   nextStructuralToken,
+  type StructuralBlockKind,
 } from '@template/email/render/conditionParser/nextStructuralToken';
-import { readEachMarker } from '@template/email/render/conditionParser/readEachMarker';
-import { readRuleMarker } from '@template/email/render/conditionParser/readRuleMarker';
+import { ruleMarkerAt } from '@template/email/render/conditionParser/ruleMarkerAt';
 
 export const isStructurallyBalanced = (text: string): boolean => {
-  const stack: Kind[] = [];
+  const stack: StructuralBlockKind[] = [];
   let i = 0;
 
   while (true) {
@@ -23,10 +24,10 @@ export const isStructurallyBalanced = (text: string): boolean => {
     if (!token.isClose) {
       stack.push(token.kind);
       if (token.kind === 'if') {
-        const marker = readRuleMarker(text, token.index, IF);
+        const marker = ruleMarkerAt(text, token.index, IF);
         i = marker ? marker.next : token.index + IF.length;
       } else {
-        const marker = readEachMarker(text, token.index);
+        const marker = eachMarkerAt(text, token.index);
         if (!marker) return false;
         i = marker.next;
       }

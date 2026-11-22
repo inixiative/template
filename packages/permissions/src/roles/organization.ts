@@ -14,11 +14,14 @@ export const organizationRoles = {
   viewer: { organization: { read: true } },
 } as const;
 
-export const getOrgPermissions = (role: Role, orgId: string): PermissionEntry => {
+export const permissionEntryForOrganizationRole = (
+  role: Role,
+  organizationId: string,
+): PermissionEntry => {
   const baseActions = organizationRoles[role].organization;
   return {
     resource: 'db:organization',
-    id: orgId,
+    id: organizationId,
     actions: baseActions,
   };
 };

@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
-import type { AuthStrategy } from '@template/ui/hooks/useAuthStrategy/types';
+import type { AuthStrategy } from '@template/ui/store/types/auth';
 
 export const isEmbedded = (): boolean => {
   try {

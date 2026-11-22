@@ -7,9 +7,9 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
   DbAction,
+  fetchParentRows,
   HookTiming,
   isNoOpUpdate,
-  loadParentRows,
   NOOP_FIELDS,
   type Prisma,
   registerDbHook,
@@ -22,7 +22,7 @@ const queueParentCacheClear = async (
   model: Prisma.ModelName,
   records: Record<string, unknown>[],
 ) => {
-  const parents = (await loadParentRows(model, records)).filter((parent) => parent !== null);
+  const parents = (await fetchParentRows(model, records)).filter((parent) => parent !== null);
   for (const [parentModel, group] of Object.entries(groupBy(parents, 'model')))
     await queueCacheClear(
       parentModel as Prisma.ModelName,

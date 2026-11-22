@@ -1,11 +1,11 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:sdk
  * @uses none
  */
-import type { Lens } from '@inixiative/json-rules';
-import { lensFromSchema } from '@template/sdk/lenses/lensFromSchema';
+import { fieldMapFromJsonSchema, type JsonSchema } from '@inixiative/field-map';
+import { createLens, type Lens } from '@inixiative/json-rules';
 import { resolveRef } from '@template/sdk/lenses/resolveRef';
 import type { SdkSchema } from '@template/sdk/lenses/sdkSchema';
 import openApiSpec from '@template/sdk/openapi.gen.json';
@@ -30,8 +30,10 @@ type SpecOperation = {
  * Build the filter lens for an endpoint from the OpenAPI spec: operationId → 200
  * response → `data` envelope (array → items). The lens is endpoint-derived and
  * self-naming — the response component name when the item is a `$ref`
- * (`meReceivedManyInquiries` → `InquiryReceivedItem`), the operationId otherwise —
- * so endpoints share a vocabulary exactly when they share a response shape.
+ * (`meReceivedManyInquiries` → `InquiryItem`), the operationId otherwise —
+ * so endpoints share a vocabulary exactly when they share a response shape. The map is
+ * field-map's `fieldMapFromJsonSchema` over the item schema, with the spec as the document its
+ * `#/components/schemas/…` refs resolve against.
  */
 export const lensFromOperation = (operationId: string): Lens => {
   const paths = (openApiSpec as { paths?: Record<string, Record<string, SpecOperation>> }).paths;
@@ -46,7 +48,11 @@ export const lensFromOperation = (operationId: string): Lens => {
       if (!item)
         throw new Error(`lensFromOperation: '${operationId}' has no data envelope to lens`);
       const name = item.$ref?.split('/').pop() ?? operationId;
-      return lensFromSchema(resolveRef(item) as SdkSchema, name);
+      const map = fieldMapFromJsonSchema(resolveRef(item) as JsonSchema, {
+        model: name,
+        document: openApiSpec,
+      });
+      return createLens({ maps: { sdk: map }, mapName: 'sdk', model: name });
     }
   }
   throw new Error(`lensFromOperation: unknown operationId '${operationId}'`);

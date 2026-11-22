@@ -36,7 +36,7 @@ The stack is Bun, Hono, Prisma 7 on PostgreSQL, and React/TanStack with Tailwind
 | **Structure** | 4 applications (`api`, `web`, `admin`, `superadmin`) + 6 shared packages |
 | **API surface** | 156 route modules, auto-registered, each generating OpenAPI 3.1 |
 | **Documentation** | 41 focused docs in `docs/claude/` |
-| **Building blocks** | Uses [`prisma-map`](https://github.com/inixiative/prisma-map), [`json-rules`](https://github.com/inixiative/json-rules), [`permissions`](https://github.com/inixiative/permissions) and [`rules-builder`](https://github.com/inixiative/rules-builder) |
+| **Building blocks** | Uses [`field-map`](https://github.com/inixiative/field-map), [`json-rules`](https://github.com/inixiative/json-rules), [`permissions`](https://github.com/inixiative/permissions) and [`rules-builder`](https://github.com/inixiative/rules-builder) |
 | **Developer experience** | Uses [`atlas`](https://github.com/inixiative/atlas) and [`config`](https://github.com/inixiative/config); ships worktrees (`bun run worktree:create`), init and CI rules (`bun run check`) |
 
 ## What's Here That Isn't in a Starter Kit

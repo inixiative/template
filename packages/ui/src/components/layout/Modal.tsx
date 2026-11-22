@@ -7,8 +7,8 @@
 import { Icon } from '@iconify/react';
 import { useActiveFlow } from '@template/ui/hooks/flow/useActiveFlow';
 import { currentLocation } from '@template/ui/lib/currentLocation';
-import { flowNext } from '@template/ui/lib/flows/flowNext';
-import { followFlow } from '@template/ui/lib/flows/followFlow';
+import { navigateToNextFlowStep } from '@template/ui/lib/flows/navigateToNextFlowStep';
+import { nextFlowStepLink } from '@template/ui/lib/flows/nextFlowStepLink';
 import { cn } from '@template/ui/lib/utils';
 
 export type ModalSize = 'small' | 'large';
@@ -36,11 +36,11 @@ export const Modal = ({
 }: ModalProps) => {
   const isModalOpen = open ?? isOpen ?? false;
   const flow = useActiveFlow();
-  const next = flow && flowNext(flow, currentLocation().pathname);
+  const next = flow && nextFlowStepLink(flow, currentLocation().pathname);
   const continueLabel = next?.label ?? null;
-  const close = () => {
+  const closeAndContinue = () => {
     onClose();
-    if (next) followFlow(next);
+    if (next) navigateToNextFlowStep(next);
   };
 
   if (!isModalOpen) return null;
@@ -51,7 +51,7 @@ export const Modal = ({
         type="button"
         aria-label="Close modal"
         className="absolute inset-0 bg-black/50"
-        onClick={dismissOnBackdrop ? close : undefined}
+        onClick={dismissOnBackdrop ? onClose : undefined}
       />
       <div
         role="dialog"
@@ -64,7 +64,7 @@ export const Modal = ({
         )}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
-            close();
+            onClose();
           }
         }}
       >
@@ -72,7 +72,7 @@ export const Modal = ({
           {title && <h2 className="text-lg font-semibold">{title}</h2>}
           <button
             type="button"
-            onClick={close}
+            onClick={closeAndContinue}
             className={cn(
               'p-2 hover:bg-accent rounded-md transition-colors',
               continueLabel && 'text-sm font-medium',

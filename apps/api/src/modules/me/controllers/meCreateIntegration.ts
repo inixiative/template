@@ -4,7 +4,7 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:integrations
  */
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { makeController } from '#/lib/utils/makeController';
 import { createIntegration } from '#/modules/integration/services/createIntegration';
 import { meCreateIntegrationRoute } from '#/modules/me/routes/meCreateIntegration';
@@ -12,7 +12,7 @@ import { meCreateIntegrationRoute } from '#/modules/me/routes/meCreateIntegratio
 export const meCreateIntegrationController = makeController(
   meCreateIntegrationRoute,
   async (c, respond) => {
-    const user = me(c)!;
+    const user = actingUser(c)!;
     const body = c.req.valid('json');
 
     const row = {

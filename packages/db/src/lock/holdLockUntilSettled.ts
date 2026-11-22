@@ -1,16 +1,16 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma, infrastructure:redis, mutex
  * @uses none
  */
 import type { HeldLock, OpenTransaction } from '@template/db/clientTypes';
-import { createLock } from '@template/db/lock/createLock';
 import { isTransactionOpen } from '@template/db/lock/isTransactionOpen';
 import { lockKeyOf } from '@template/db/lock/lockKeyOf';
+import { makeLock } from '@template/db/lock/makeLock';
 import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
 import { log } from '@template/shared/logger';
-import { createSerializedQueue } from '@template/shared/utils';
+import { makeSerializedQueue } from '@template/shared/utils';
 
 export type LockSetUntilSettledOptions = Omit<LockOptions, 'identifier' | 'identifiers' | 'key'> & {
   service: string;
@@ -30,7 +30,7 @@ const acquire = async (
   options: LockOptions,
   acquireOptions: AcquireOptions,
 ): Promise<() => Promise<void>> => {
-  const lock = createLock(options);
+  const lock = makeLock(options);
   try {
     if (!(await lock.acquire(acquireOptions)))
       throw new Error(`transaction lock ${label} is held by another holder`);
@@ -61,7 +61,7 @@ const holdOnce = (
   const releasing = acquire(label, options, acquireOptions);
   const acquired = releasing.then(() => undefined);
   const registered = keys.map((key) => {
-    const held: HeldLock = { acquired, holders: createSerializedQueue({ onError: () => {} }) };
+    const held: HeldLock = { acquired, holders: makeSerializedQueue({ onError: () => {} }) };
     openTransaction.heldLocks.set(key, held);
     return [key, held] as const;
   });

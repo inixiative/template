@@ -6,16 +6,16 @@
  */
 import type { Prisma } from '@template/db';
 import { emitAppEvent } from '#/appEvents/emit';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { makeController } from '#/lib/utils/makeController';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentUpdateRoute } from '#/modules/segment/routes/segmentUpdate';
-import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { attachRuleHealthToSegment } from '#/modules/segment/services/attachRuleHealthToSegments';
 
 export const segmentUpdateController = makeController(segmentUpdateRoute, async (c, respond) => {
   const db = c.get('db');
-  const segment = getResource<'segment'>(c);
+  const segment = contextResource<'segment'>(c);
   const body = c.req.valid('json');
 
   const save = () =>
@@ -38,5 +38,5 @@ export const segmentUpdateController = makeController(segmentUpdateRoute, async 
 
   await emitAppEvent('segment.updated', { segment: updated, previous: segment });
 
-  return respond.ok(await withSegmentRuleIssues(updated));
+  return respond.ok(await attachRuleHealthToSegment(updated));
 });

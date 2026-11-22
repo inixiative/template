@@ -1,18 +1,18 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses none
  */
 import type { Db } from '@template/db/clientTypes';
-import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
+import { ENCRYPTED_MODELS, encryptedColumnNamesForKey } from '@template/db/lib/encryption/registry';
 
 export const validateEncryptionVersions = async (db: Db) => {
   const errors: string[] = [];
 
   for (const [modelName, modelConfig] of Object.entries(ENCRYPTED_MODELS)) {
     for (const [keyName, keyConfig] of Object.entries(modelConfig.keys)) {
-      const fields = getFieldNames(keyName);
+      const fields = encryptedColumnNamesForKey(keyName);
       const versionStr = process.env[`${keyConfig.envPrefix}_ENCRYPTION_VERSION`];
       const currentKey = process.env[`${keyConfig.envPrefix}_ENCRYPTION_KEY_CURRENT`];
       const previousKey = process.env[`${keyConfig.envPrefix}_ENCRYPTION_KEY_PREVIOUS`];

@@ -30,5 +30,5 @@ export const DEPTH_CACHE_MS = 1000;
 export const DEPTH_PROBE_MS = 2000;
 export const SHUTDOWN_FLUSH_RETRIES = 3;
 
-export const flagKey = (lane: JobLane = JobLane.fast): string =>
+export const overflowFlagRedisKey = (lane: JobLane = JobLane.fast): string =>
   lane === JobLane.slow ? `${redisNamespace.job}:overflow:slow` : `${redisNamespace.job}:overflow`;

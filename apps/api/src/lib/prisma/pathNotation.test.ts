@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
+import { buildNestedPath, isValidPathNotation } from '#/lib/prisma/pathNotation';
 
 describe('pathNotation', () => {
   describe('buildNestedPath', () => {
@@ -32,55 +32,55 @@ describe('pathNotation', () => {
     });
   });
 
-  describe('validatePathNotation', () => {
+  describe('isValidPathNotation', () => {
     it('accepts valid single field', () => {
-      expect(validatePathNotation('name')).toBe(true);
-      expect(validatePathNotation('email')).toBe(true);
-      expect(validatePathNotation('createdAt')).toBe(true);
+      expect(isValidPathNotation('name')).toBe(true);
+      expect(isValidPathNotation('email')).toBe(true);
+      expect(isValidPathNotation('createdAt')).toBe(true);
     });
 
     it('accepts valid nested paths', () => {
-      expect(validatePathNotation('user.email')).toBe(true);
-      expect(validatePathNotation('organization.name')).toBe(true);
-      expect(validatePathNotation('a.b.c.d')).toBe(true);
+      expect(isValidPathNotation('user.email')).toBe(true);
+      expect(isValidPathNotation('organization.name')).toBe(true);
+      expect(isValidPathNotation('a.b.c.d')).toBe(true);
     });
 
     it('rejects special characters', () => {
-      expect(validatePathNotation('user$email')).toBe(false);
-      expect(validatePathNotation('user@email')).toBe(false);
-      expect(validatePathNotation('user/email')).toBe(false);
-      expect(validatePathNotation('user\\email')).toBe(false);
+      expect(isValidPathNotation('user$email')).toBe(false);
+      expect(isValidPathNotation('user@email')).toBe(false);
+      expect(isValidPathNotation('user/email')).toBe(false);
+      expect(isValidPathNotation('user\\email')).toBe(false);
     });
 
     it('rejects directory traversal attempts', () => {
-      expect(validatePathNotation('..')).toBe(false);
-      expect(validatePathNotation('user..email')).toBe(false);
-      expect(validatePathNotation('../user')).toBe(false);
+      expect(isValidPathNotation('..')).toBe(false);
+      expect(isValidPathNotation('user..email')).toBe(false);
+      expect(isValidPathNotation('../user')).toBe(false);
     });
 
     it('rejects paths exceeding max depth', () => {
-      expect(validatePathNotation('a.b.c.d.e', 4)).toBe(false);
-      expect(validatePathNotation('a.b.c.d.e', 5)).toBe(true);
+      expect(isValidPathNotation('a.b.c.d.e', 4)).toBe(false);
+      expect(isValidPathNotation('a.b.c.d.e', 5)).toBe(true);
     });
 
     it('accepts alphanumeric with dots', () => {
-      expect(validatePathNotation('user123.email456')).toBe(true);
-      expect(validatePathNotation('field1.field2.field3')).toBe(true);
+      expect(isValidPathNotation('user123.email456')).toBe(true);
+      expect(isValidPathNotation('field1.field2.field3')).toBe(true);
     });
 
     it('accepts Prisma meta-fields with leading underscore', () => {
-      expect(validatePathNotation('_count')).toBe(true);
-      expect(validatePathNotation('_max')).toBe(true);
-      expect(validatePathNotation('_min')).toBe(true);
-      expect(validatePathNotation('user._count')).toBe(true);
-      expect(validatePathNotation('organization.members._count')).toBe(true);
+      expect(isValidPathNotation('_count')).toBe(true);
+      expect(isValidPathNotation('_max')).toBe(true);
+      expect(isValidPathNotation('_min')).toBe(true);
+      expect(isValidPathNotation('user._count')).toBe(true);
+      expect(isValidPathNotation('organization.members._count')).toBe(true);
     });
 
     it('rejects snake_case (underscores in middle)', () => {
-      expect(validatePathNotation('user_name')).toBe(false);
-      expect(validatePathNotation('created_at')).toBe(false);
-      expect(validatePathNotation('organization.created_at')).toBe(false);
-      expect(validatePathNotation('user.first_name')).toBe(false);
+      expect(isValidPathNotation('user_name')).toBe(false);
+      expect(isValidPathNotation('created_at')).toBe(false);
+      expect(isValidPathNotation('organization.created_at')).toBe(false);
+      expect(isValidPathNotation('user.first_name')).toBe(false);
     });
   });
 });

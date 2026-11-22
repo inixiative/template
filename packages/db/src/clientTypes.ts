@@ -37,6 +37,7 @@ export type DbMethods = {
     callbacks: AfterCommitFn | AfterCommitFn[],
     types?: ConcurrencyType | ConcurrencyType[],
   ) => void;
+  onCommitCollect: <T>(key: string, item: T, flush: (items: T[]) => Promise<void> | void) => void;
   onFinally: (callbacks: FinallyFn | FinallyFn[]) => void;
   parallel: {
     <T>(
@@ -50,8 +51,8 @@ export type DbMethods = {
   };
   withDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
   withoutDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
-  getScopeId: () => string | null;
-  getScope: () => ScopeContext | null;
+  currentScopeId: () => string | null;
+  currentScopeContext: () => ScopeContext | null;
   isInTxn: () => boolean;
   cacheOverlay: () => CacheOverlay | null;
   findForUpdate: <T = unknown>(
@@ -90,6 +91,7 @@ export type OpenTransaction = {
   client: Db;
   prismaTransactionId: string | null;
   afterCommitBatches: CommitBatch[];
+  commitCollectors: Map<string, unknown[]>;
   // Drained once the database transaction has settled, commit or rollback, before the on-commit
   // batches run.
   finallyFns: FinallyFn[];

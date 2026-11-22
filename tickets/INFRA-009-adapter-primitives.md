@@ -130,8 +130,8 @@ Init script then: installs chosen SDK, sets env vars, removes unused provider pa
 
 ## Implementation Order
 
-- [x] Define the base adapter primitive — `makeAdapterRouter` + `makeAdapterRegistry` in `packages/shared/src/adapter/`
-- [x] Error monitoring — `apps/api/src/lib/errorReporter/` with `sentryReporter` + `consoleReporter`, wired via `makeAdapterRouter`
+- [x] Define the base adapter primitive — `resolveAdapterForEnvironmentOrThrow` + `makeAdapterRegistry` in `packages/shared/src/adapter/`
+- [x] Error monitoring — `apps/api/src/lib/errorReporter/` with `sentryReporter` + `consoleReporter`, wired via `resolveAdapterForEnvironmentOrThrow`
 - [ ] Logger — highest-value swap, most debated choice
 - [ ] File storage — removes AWS dependency for development
 - [ ] Email additions — interface exists, just add providers
@@ -148,7 +148,7 @@ Init script then: installs chosen SDK, sets env vars, removes unused provider pa
 
 ## Definition of Done
 
-- [x] Adapter pattern implemented — `makeAdapterRouter` (env-keyed) + `makeAdapterRegistry` (named map) in `@template/shared/adapter`
+- [x] Adapter pattern implemented — `resolveAdapterForEnvironmentOrThrow` (env-keyed) + `makeAdapterRegistry` (named map) in `@template/shared/adapter`
 - [ ] Logger adapter (consola + pino minimum)
 - [x] Error monitoring adapter — `sentryReporter` + `consoleReporter`; PR environments included
 - [ ] File storage adapter (s3 + local minimum)

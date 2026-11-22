@@ -9,7 +9,7 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meReadManyWebhookSubscriptionsRoute = readRoute({
   model: Modules.me,
@@ -20,5 +20,5 @@ export const meReadManyWebhookSubscriptionsRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('WebhookSubscription') },
   responseSchema: WebhookSubscriptionScalarSchema,
-  tags: [Tags.me, Tags.webhookSubscription],
+  tags: [OpenApiTags.me, OpenApiTags.webhookSubscription],
 });

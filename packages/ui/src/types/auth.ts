@@ -4,12 +4,12 @@
  * @partOf primitive:ui
  * @uses none
  */
-export type LoginCredentials = {
+export type SignInCredentials = {
   email: string;
   password: string;
 };
 
-export type SignupCredentials = {
+export type SignUpCredentials = {
   email: string;
   password: string;
   name: string;

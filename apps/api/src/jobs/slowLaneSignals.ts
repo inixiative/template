@@ -58,7 +58,7 @@ export const releaseSlowDeferral = async (
   await redis.zrem(slowDeferredKey(queueName), jobId);
 };
 
-export const readSlowDeferred = (
+export const fetchSlowDeferredJobCount = (
   redis: SignalRedis,
   queueName: string,
   now: number = Date.now(),
@@ -85,7 +85,7 @@ export const recordSlowFinished = async (
   await redis.set(slowLastFinishedKey(queueName), String(now));
 };
 
-export const readSlowIdleMs = async (
+export const recordSlowIdleStartAndFetchIdleMs = async (
   redis: SignalRedis,
   queueName: string,
   queuedSlow: number,

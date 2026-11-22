@@ -4,17 +4,25 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
+import {
+  db,
+  type RuleReferenceRow,
+  ruleReferenceTargets,
+  wherePolymorphicSideIsOneOf,
+} from '@template/db';
 import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
-import { expand, expandWith } from '@template/email/render/expand';
-import { lookupCascade } from '@template/email/render/lookupCascade';
 import {
-  lookupComponent,
-  lookupTemplate,
-  templateLens,
-} from '@template/email/render/lookupTemplate';
-import { rowOwner } from '@template/email/render/owner';
+  expandComponentTagsFromOwnerCascade,
+  expandComponentTagsWithFetcher,
+} from '@template/email/render/expandComponentTags';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
+import {
+  fetchComponentThroughOwnerCascade,
+  fetchTemplateLens,
+  fetchTemplateThroughOwnerCascade,
+} from '@template/email/render/fetchTemplateThroughOwnerCascade';
+import { ownerScopeOfRow } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 import type { RuleReference } from '@template/shared/rules';
 import { uniqBy } from 'lodash-es';
@@ -41,12 +49,10 @@ const existingTargetsOf = async (
   componentIds: string[],
 ): Promise<RuleReference[]> => {
   const edges = (await db.ruleReference.findMany({
-    where: {
-      OR: [
-        { sourceEmailTemplateId: templateId },
-        ...(componentIds.length ? [{ sourceEmailComponentId: { in: componentIds } }] : []),
-      ],
-    },
+    where: wherePolymorphicSideIsOneOf('RuleReference', 'sourceModel', [
+      { model: 'EmailTemplate', id: templateId },
+      ...componentIds.map((id) => ({ model: 'EmailComponent', id })),
+    ]),
   })) as RuleReferenceRow[];
   return uniqBy(
     ruleReferenceTargets(edges).filter((target) => target.state === 'existing'),
@@ -58,12 +64,12 @@ export const composeTemplate = async (
   slug: string,
   ctx: OwnerScope,
 ): Promise<ComposeTemplateResult> => {
-  const template = await lookupTemplate(slug, ctx);
+  const template = await fetchTemplateThroughOwnerCascade(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
   const componentResolutions: Record<string, string> = {};
-  const mjml = await expandWith(template.mjml, async (slugs) => {
-    const components = await lookupCascade(slugs, ctx);
+  const mjml = await expandComponentTagsWithFetcher(template.mjml, async (slugs) => {
+    const components = await fetchComponentsThroughOwnerCascade(slugs, ctx);
     for (const componentSlug of slugs) {
       const component = components[componentSlug];
       if (component) componentResolutions[componentSlug] = component.id;
@@ -81,8 +87,8 @@ export const composeTemplate = async (
     subject: template.subject,
     kind: template.kind,
     ownerModel: template.ownerModel,
-    owner: rowOwner(template),
-    lens: await templateLens(slug, template),
+    owner: ownerScopeOfRow(template),
+    lens: await fetchTemplateLens(slug, template),
     componentResolutions,
     existingTargets,
   };
@@ -92,10 +98,10 @@ export const composeComponent = async (
   slug: string,
   ctx: OwnerScope,
 ): Promise<ComposeComponentResult> => {
-  const component = await lookupComponent(slug, ctx);
+  const component = await fetchComponentThroughOwnerCascade(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');
 
-  const mjml = await expand(component.mjml, ctx);
+  const mjml = await expandComponentTagsFromOwnerCascade(component.mjml, ctx);
 
   return { mjml };
 };

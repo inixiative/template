@@ -27,7 +27,7 @@
 
 ## What this is for
 
-Foundry's Wardens read our docs. At each moment of a coding agent's work (the user's message, the agent's plan or action) a Warden holding one region of the docs answers two questions: *is this about my domain?* and *is there something that already exists for it?* When the answer is yes it points: "look over here: `createLock`, `packages/db/src/lock/createLock.ts`, CONCURRENCY.md § Distributed Lock".
+Foundry's Wardens read our docs. At each moment of a coding agent's work (the user's message, the agent's plan or action) a Warden holding one region of the docs answers two questions: *is this about my domain?* and *is there something that already exists for it?* When the answer is yes it points: "look over here: `makeLock`, `packages/db/src/lock/makeLock.ts`, CONCURRENCY.md § Distributed Lock".
 
 The pointer fails in a specific way when docs are written only for people who already know the names. The agent says "two jobs keep writing the same row"; the doc says `db.findForUpdate`. The Warden finds the area but not the thing. Aron (2026-10-15): "We should have broad language in the docs and good examples of function class names, function names, and systems, in whatever format the agent needs them, in order to make this task tenable."
 
@@ -41,7 +41,7 @@ Every named thing a doc introduces gets one row, in a table with these four colu
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| Exclusive access to a row, or a find-or-create race: "lock the row while I update it", "two workers grabbing the same thing", "avoid a double-apply" | **`db.findForUpdate`** · primitive `packages/db/src/client.ts` — inside `db.txn`; `upserting: true` for create-if-missing | DATABASE.md § Row Locks and Create-If-Missing | a bare `.upsert(`; a caught P2002 / unique violation then re-read; a raw `SELECT … FOR UPDATE` |
+| Exclusive access to a row, or a find-or-create race: "lock the row while I update it", "two workers grabbing the same thing", "avoid a double-apply" | **`db.findForUpdate`** · primitive `packages/db/src/client.ts` — inside `db.txn`; `upserting: true` for create-if-missing on a key no unique holds (an upsert where one does) | DATABASE.md § Row Locks and Create-If-Missing | a caught P2002 / unique violation then re-read; a raw `SELECT … FOR UPDATE` |
 
 A paragraph may introduce the thing; the table is what the Warden matches on. The shape is Grant's `docs/primitives/README.md` in Zealot, adopted for template, Kingdom and Tribe.
 
@@ -58,7 +58,7 @@ Add two to six "said as" phrasings (below) to the cell when the job has several 
 
 The Use cell names the primitive, pattern, rule or system **exactly as it is spelled in code**, bold, followed by its kind and where it lives, then when to choose it over its siblings:
 
-`**createLock** · primitive `packages/db/src/lock/createLock.ts#createLock` — first holder keeps the resource; newest-wins is claimLane`
+`**makeLock** · primitive `packages/db/src/lock/makeLock.ts#makeLock` — first holder keeps the resource; newest-wins is claimLane`
 
 One consistent form: `name · kind path#symbol — choose when`. Kinds are `primitive`, `pattern`, `rule`, `system`, `model`, `script`. A model's where is its schema file; a script's is `package.json` or the script path; a pattern's is the doc section that defines it.
 
@@ -69,8 +69,8 @@ One consistent form: `name · kind path#symbol — choose when`. Kinds are `prim
 
 The Read cell is the doc section, by path and heading, and for a pattern the code it is about:
 
-- Good: `DATABASE.md § Row Locks and Create-If-Missing; CONCURRENCY.md § Distributed Lock (createLock)`
-- Good (doc member): `COMMUNICATIONS.md § Render Pipeline · code `composeTemplate`, `interpolate`, `settle``
+- Good: `DATABASE.md § Row Locks and Create-If-Missing; CONCURRENCY.md § Distributed Lock (makeLock)`
+- Good (doc member): `COMMUNICATIONS.md § Render Pipeline · code `composeTemplate`, `interpolate`, `evaluateTemplateBlocksAndTokens``
 - Bad: `see the database docs` (which section? the Warden quotes Read verbatim in its pointer)
 
 ### Signs you're bypassing it
@@ -78,9 +78,9 @@ The Read cell is the doc section, by path and heading, and for a pattern the cod
 The Signs cell describes the code an agent writes when it rebuilds the thing instead of using it: the shape of the hand-rolled version, specific enough to recognise in a diff or a plan.
 
 - Good: `a module-level `let pending = Promise.resolve()` chain, a boolean busy flag, or an async-mutex dependency to order writes to one resource`
-- Bad: `not using createSerializedQueue` (circular; names nothing an agent would recognise in its own code)
+- Bad: `not using makeSerializedQueue` (circular; names nothing an agent would recognise in its own code)
 
-Where a CI rule or lint catches the bypass, name it: `no-create-race-machinery fails new .upsert( and P2002 catches`.
+Where a CI rule or lint catches the bypass, name it: `no-unique-violation-catches fails new P2002 and isUniqueConstraintError catches`.
 
 ---
 
@@ -91,7 +91,7 @@ Phrasings are the ways a user or an agent says the job in a message or a plan wi
 Rules:
 
 - **Both voices.** How the user asks for it or corrects toward it, and how an agent describes its plan right before hand-rolling it. Good: `"make sure this job doesn't run twice"` (user) and `"I'll add a boolean so it doesn't run twice"` (agent, the bypass shape). Bad: a list of synonyms for the name (`"distributed lock", "mutex", "lock primitive"`), which an agent that does not know the name will not say either.
-- **Distinct from the siblings.** In a sibling table each member's phrasings must separate it from the others. Good: createLock `"the first one to get it keeps it"`, claimLane `"the newest one should win, cancel the older"`, createSerializedQueue `"run these one at a time in this process"`, db.findForUpdate `"read the row, then update it, without a race"`. Bad: `"handle concurrency"` on all four.
+- **Distinct from the siblings.** In a sibling table each member's phrasings must separate it from the others. Good: makeLock `"the first one to get it keeps it"`, claimLane `"the newest one should win, cancel the older"`, makeSerializedQueue `"run these one at a time in this process"`, db.findForUpdate `"read the row, then update it, without a race"`. Bad: `"handle concurrency"` on all four.
 - **Sourced from real corrections.** Lift the words Aron or a reviewer actually used when they pointed an agent at the thing. Good: db.findForUpdate ← `"why isn't this just open a transaction, lock the row, update, commit"` (his words were "why isnt this just txn => select for update => update => close txn"). Bad: a phrasing invented to sound broad (`"ensure data consistency"`).
 - **Plain, not clever.** Good: `"return the related rows in the same call"`. Bad: `"hydrate the relational closure eagerly"`.
 
@@ -106,9 +106,9 @@ Where two or more things do neighbouring jobs (lock vs lane vs queue; readRoute 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **createLock** | one process owns a resource; first holder keeps it | newest should win (claimLane); rows read-then-written in a txn (db.findForUpdate) |
-| **claimLane / watchLane** | newest job per (handlerName, dedupeKey) wins | first holder must keep it (createLock) |
-| **db.findForUpdate** | SELECT … FOR NO KEY UPDATE inside db.txn; upserting: true for create-if-missing | non-row ownership (createLock) |
+| **makeLock** | one process owns a resource; first holder keeps it | newest should win (claimLane); rows read-then-written in a txn (db.findForUpdate) |
+| **claimLane / watchLane** | newest job per (handlerName, dedupeKey) wins | first holder must keep it (makeLock) |
+| **db.findForUpdate** | SELECT … FOR NO KEY UPDATE inside db.txn; upserting: true for create-if-missing | non-row ownership (makeLock) |
 
 - Good: every row's *Not when* names the sibling to use instead, so a wrong pick is one hop from the right one.
 - Bad: a table that lists members with a description each and no *Not when*: that is a glossary, and the Warden still cannot choose.
@@ -120,7 +120,7 @@ Where the docs say when the job needs **no** primitive, that option is a row, so
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | *plain write in db.txn* | the write does not depend on a value read first; every mutation already runs in its own transaction | read-then-update or find-then-create (db.findForUpdate) |
-| *unique constraint, let the insert fail* | a duplicate is the caller's mistake: the global handler maps P2002 to 409 | create-if-missing must return the existing row (db.findForUpdate upserting: true) |
+| *unique constraint, let the insert fail* | a duplicate is the caller's mistake: the global handler maps P2002 to 409 | create-if-missing must return the existing row (upsert on the unique; db.findForUpdate upserting: true when no unique holds the key) |
 
 - Good: the row cites the doc or rule that says the primitive is not needed (CONCURRENCY.md § Serialized Queue › When NOT to use).
 - Bad: inventing a "just do it inline" row where no doc says so; the row is a claim and needs its source.
@@ -190,7 +190,7 @@ Where the doc's own boundary says "X is the Y region", that sentence is already 
 When a region does not recognise the moments it owns, the fix is in the plain-language cells, not in more identifiers. Rewrite the region's concept, purpose and phrasings in the asker's words, sourced from the corrections that pointed at it, until a reader who does not know the names would still say "that is about this".
 
 - Good: test-harness went from recognising 0 of its 11 moments to 3 after its concept said "record the real provider once and replay it", "don't stub the API in tests, use cassettes", "move away from spying on global fetch" (Aron's words), instead of "VCR cassettes, `vcr.queue`, `vcr.capture`".
-- Bad: adding `createFactory`, `buildX` and `createX` to a region that already named them, when the moments say "seed a user for this test" and "why not use these factories".
+- Bad: adding `registerFactory`, `buildX` and `createX` to a region that already named them, when the moments say "seed a user for this test" and "why not use these factories".
 
 ---
 

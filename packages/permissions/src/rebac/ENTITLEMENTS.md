@@ -17,8 +17,16 @@ The examples use one cast: user U1, organization O1, space S1 under O1, M1 U1's 
 
 - **`resource`** is the model the action is checked on. The action is always checked on that record, never asked of the anchor.
 - **`anchor`** is the record the entitlement acts from. `path` names the relations from the entitled record up to the anchor, following the Prisma relation names (`'organization'`, `'space.organization'`, `'user'`). A record anchored at itself has no `path`. Only the anchor's id is fixed: a record that moves inside the anchor stays reached, one that moves out stops.
-- **`where`** is a positive json-rules condition over the record: no negation, `isEmpty`, `notExists`, `if`/`then`/`else`, array or aggregate rule. "No value" is `equals null`. A single row is `where: { field: 'id', … }`, never an `id` beside the anchor.
-- **`actions`** are booleans; a row stores the names of the ones held. Readers prune entries to the well-formed ones, and an entry another one already covers is dropped; the writer skips adding an entry one the holder holds already covers.
+- **`where`** is a positive json-rules condition over the record: no negation, `isEmpty`, `notExists`, `if`/`then`/`else`, array or aggregate rule. "No value" is `equals null` beside an `exists` on the row's key (`all: [id exists, spaceId equals null]`); a bare null check is refused. An action whose schema rule rests on an empty column is granted on the record the entry anchors at, never over many: name a value the records carry (a kind) for that. A single row is `where: { field: 'id', … }`, never an `id` beside the anchor.
+- **`actions`** are booleans; a row stores the names of the ones held. Readers prune entries to the well-formed ones, and an entry another one already covers is dropped; the writer skips adding an entry a held row with no lens, or the same lens, already covers.
+
+## The lens
+
+A stored row may also carry a `lens` (`Entitlement.lens`, a json-rules lens narrowing). It is not part of the entry above and the library never reads it: the check decides what the grant reaches, and the lens shapes what the holder gets from what it reaches. It is one narrowing and one surface at once: it limits the records the holder sees (root `where` filters) and the shape they come back in (picks and omits, to drop sensitive keys). No lens means the resource's full surface.
+
+**One grant holds one lens** (Aron, 2026-11-12). Two rows that are equal but for their lens (same holder, `resource`, anchor and path, `where` and `actions`) never coexist: writing one with a new lens replaces the held row, a soft delete of the old one plus a create, in the same write (the create is skipped when another held row with the new lens covers it). No lens and a lens are different lenses, so either replaces the other. Why: two lenses on one grant have no defined meaning; neither their union nor the broader one is right. A held row covers a new entry (and the new entry is skipped) when it has no lens or the same lens: no lens is the full surface, so it reaches whatever a lensed entry would.
+
+**A lens is never copied down a delegation** (Aron, 2026-11-14). Lenses narrow monotonically: a delegate's row stores only its own narrowing, and what the delegate gets is its lens composed over every lens above it in the chain. Copying the lens above would be redundant at best, and a stale copy when the one above changes. Nothing in template reads `Entitlement.lens` yet; the reader that does must compose up the chain, or a delegate escapes the narrowing above it, since the grant check never reads the lens.
 
 ## Writing one
 
@@ -46,12 +54,7 @@ Examples:
 }
 
 // the member self-grant on M1: written by the memberSelfGrant hook, never by hand
-{
-  resource: 'db:organizationUser',
-  anchor: { resource: 'db:user', id: U1, path: 'user' },
-  where: { field: 'id', operator: 'equals', value: M1 },
-  actions: { operate: true },
-}
+{ resource: 'db:organizationUser', anchor: { resource: 'db:organizationUser', id: M1 }, actions: { operate: true } }
 ```
 
 ## Who backs it
@@ -60,15 +63,15 @@ Every entitlement is installed with an owner, and holds an action on a record on
 
 - on a token or an integration, the owner is the delegate's owner table;
 - on a member row, the owner is the tenant's owner grant (`own` on O1 for M1);
-- the member self-grant alone is backed by the member's user, and only the exact entry for that row.
+- the member self-grant alone is backed by the member's user, and only the exact entry for that row: `operate` on M1 is `manage` on U1, which only U1's own table takes.
 
 ## Granting one
 
-Entitlements are read on their holder (`targetEntitlements`, the rows as stored) and change only through its sub-resource: `POST …/:id/entitlements` with an array of rows grants them, `DELETE …/:id/entitlements` with an array of row ids removes them, both through the one writer (`changeEntitlements`). Each row becomes the library's entry at this boundary (`toEntitlementEntry`, `packages/permissions/src/entitlementRows.ts`). Every added entry, and every removed row, is one check: `placeEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action, or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
+Entitlements are read on their holder (`targetEntitlements`, the rows as stored) and change only through its sub-resource: `POST …/:id/entitlements` with an array of rows grants them, `DELETE …/:id/entitlements` with an array of row ids removes them, both through the one writer (`changeEntitlements`). Each row becomes the library's entry at this boundary (`toEntitlementEntry`, `packages/permissions/src/entitlementRows.ts`). Every added entry, and every removed row, is one check: `placeEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action (counting, like a role on its record, an entitlement the writer holds with no `where` and no lens on a row above the granted one: [granting below a held row](../../../../docs/claude/PERMISSIONS.md#granting-below-a-held-row)), or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Narrowed has one form: the entry's `where` is an `all` holding every conjunct of the held `where` plus more (held `C`, granted `all: [A, B, C]`; held `all: [C1, C2]`, granted `all: [A, C1, C2]`). Anything else is refused. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
 
 ## The standard chain
 
-Roles hand out the four standard actions: `read`, `operate`, `manage`, `own`. On every resource that defines them, each one is implied by the next one up on the same resource, so holding `own` is holding everything below it there, by table or by entitlement. Build them with `chainedStandardActions` (`schemaHelpers.ts`); `ownerActions` already does.
+Roles hand out the four standard actions: `read`, `operate`, `manage`, `own`. On every resource that defines them, each one is implied by the next one up on the same resource, so holding `own` is holding everything below it there, by table or by entitlement. Build them with `chainedStandardActions` (`rebacSchemaRules.ts`); `ownerActions` already does.
 
 ```ts
 chainedStandardActions({ own, manage, operate, read })
@@ -85,7 +88,7 @@ A rule that only walks to the owner for the same action (`{ rel: 'organization',
 - **Reading.** An entitlement answers every action its held action implies through the chain, while whoever backs it can still do that action: a `manage` entitlement whose backer is down to `read` still reads. Every side of a cross-tenant chain is asked the same action.
 - **Lowering.** Whoever holds an entitlement can pass on a copy with lower actions: each granted action must reach a held one through the chain.
 - **Capping.** A delegate holds its owner's role entries capped at its own role (`capAtRole`), never its owner's entitlements: those it holds only when given them, or when it is `full`.
-- **Copying.** A copy, or a copy with a narrower `where`, is checked against what the holder holds through the same chain.
+- **Copying.** An exact copy, or a copy whose `where` is `all` of the held `where`'s conjuncts and more, is checked against what the holder holds through the same chain. The lens is never part of the copy ([the lens](#the-lens)).
 
 ## Models that are not standard
 
@@ -98,3 +101,12 @@ Not every model has all four, and not every model chains all of them. Each is de
 ## Non-standard actions
 
 `create`, `delete`, `leave`, `delegateFull`, `send`, `resolve`, `user.redact` and the like are not part of the chain. They delegate only where their rule says so (`delete: { any: ['manage', …] }`). To give one to a holder, grant it explicitly.
+
+## Lenses across paths
+
+A holder admitted along several paths gets the union of what each path's lens shows (Aron, 2026-11-14). Two things make that union well defined; the full statement is in [PERMISSIONS.md](../../../../docs/claude/PERMISSIONS.md#lenses-keep-id-paths-merge-by-id).
+
+- **A stored lens never removes `id`.** Every `Entitlement` create, whoever writes it, is refused (422) when its lens is not a valid narrowing or hides `id` at any visit, or in any `mapDefaults` model, of a model that has one (the `entitlementLens` hook, over `lensPathsThatDropId` in `src/lens`). `id` is never added for the writer.
+- **Projections merge by `id`.** `mergeProjections(sourceRows, [{ path, lens, rows }, …])` (`src/lens/mergeProjections.ts`) gives one object per `id`, every list merged by its items' `id` at every level and kept in source order, a shown relation beating a hidden `null`. `attribution` is the paths that admitted at least one object: noted as used, never charged. A path out of budget does not admit, so the caller leaves it out before projecting.
+
+Why: a merge by position glues one row's fields onto another's `id`; with `id` always kept, projections from different grants line up object by object.

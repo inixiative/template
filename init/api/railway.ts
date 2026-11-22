@@ -2,9 +2,9 @@ import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { getSecretAsync, setSecretAsync } from '../tasks/infisicalSetup';
+import { fetchSecretOrThrow, setSecretAsync } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 
 const escapeName = (str: string) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
@@ -39,16 +39,16 @@ class RailwayApi {
     service: 'railway',
     version: () => cliVersion('railway'),
     sanitizers: {
-      getRedisUrl: {
+      fetchRedisUrl: {
         fn: (s) =>
-          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s,
+          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://MASKED:MASKED@') : s,
       },
-      getPostgresUrl: {
+      fetchPostgresUrl: {
         fn: (s) =>
-          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s,
+          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://MASKED:MASKED@') : s,
       },
-      getRailwayUserToken: { fn: () => 'REDACTED' },
-      getRailwayWorkspaceToken: { fn: () => 'REDACTED' },
+      fetchRailwayUserToken: { fn: () => 'MASKED' },
+      fetchRailwayWorkspaceToken: { fn: () => 'MASKED' },
     },
   });
 
@@ -76,19 +76,19 @@ class RailwayApi {
   }
 
   async railwayGraphQLUser<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-    const token = await this.getRailwayUserToken();
+    const token = await this.fetchRailwayUserToken();
     return this.railwayGraphQLWithToken<T>(token, query, variables);
   }
 
-  async getRailwayUserToken(): Promise<string> {
-    return this.vcr.capture('getRailwayUserToken', async () => {
-      const config = await getProjectConfig();
+  async fetchRailwayUserToken(): Promise<string> {
+    return this.vcr.capture('fetchRailwayUserToken', async () => {
+      const config = await fetchProjectConfig();
       const projectId = config.infisical.projectId;
       if (!projectId)
         throw new Error('Infisical project not configured. Run Infisical setup first.');
 
       try {
-        const token = await getSecretAsync('RAILWAY_USER_TOKEN', {
+        const token = await fetchSecretOrThrow('RAILWAY_USER_TOKEN', {
           projectId,
           environment: 'root',
         });
@@ -109,15 +109,15 @@ class RailwayApi {
     });
   }
 
-  async getRailwayWorkspaceToken(): Promise<string> {
-    return this.vcr.capture('getRailwayWorkspaceToken', async () => {
-      const config = await getProjectConfig();
+  async fetchRailwayWorkspaceToken(): Promise<string> {
+    return this.vcr.capture('fetchRailwayWorkspaceToken', async () => {
+      const config = await fetchProjectConfig();
       const projectId = config.infisical.projectId;
       if (!projectId)
         throw new Error('Infisical project not configured. Run Infisical setup first.');
 
       try {
-        const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
+        const token = await fetchSecretOrThrow('RAILWAY_WORKSPACE_TOKEN', {
           projectId,
           environment: 'root',
         });
@@ -292,8 +292,8 @@ class RailwayApi {
     });
   }
 
-  async getProjectVolumes(projectId: string): Promise<Array<{ id: string; name: string }>> {
-    return this.vcr.capture('getProjectVolumes', async () => {
+  async fetchProjectVolumes(projectId: string): Promise<Array<{ id: string; name: string }>> {
+    return this.vcr.capture('fetchProjectVolumes', async () => {
       const data = await this.railwayGraphQLUser<{
         project: { volumes: { edges: Array<{ node: { id: string; name: string } }> } };
       }>(
@@ -310,12 +310,12 @@ class RailwayApi {
     });
   }
 
-  async getServiceVolume(
+  async fetchServiceVolume(
     projectId: string,
     serviceName: string,
   ): Promise<{ id: string; name: string } | null> {
-    return this.vcr.capture('getServiceVolume', async () => {
-      const volumes = await this.getProjectVolumes(projectId);
+    return this.vcr.capture('fetchServiceVolume', async () => {
+      const volumes = await this.fetchProjectVolumes(projectId);
       if (volumes.length === 0) return null;
       // Match by name first (works after volumes are renamed in earlier steps)
       const match = volumes.find((v) => v.name.includes(serviceName));
@@ -363,8 +363,8 @@ class RailwayApi {
     });
   }
 
-  async getProjectEnvironments(projectId: string): Promise<Array<{ id: string; name: string }>> {
-    return this.vcr.capture('getProjectEnvironments', async () => {
+  async fetchProjectEnvironments(projectId: string): Promise<Array<{ id: string; name: string }>> {
+    return this.vcr.capture('fetchProjectEnvironments', async () => {
       const data = await this.railwayGraphQLUser<{
         project: { environments: { edges: Array<{ node: { id: string; name: string } }> } };
       }>(
@@ -475,13 +475,13 @@ class RailwayApi {
     });
   }
 
-  async getRedisUrl(
+  async fetchRedisUrl(
     serviceId: string,
     _environmentId: string,
     environmentName: string,
     projectId: string,
   ): Promise<string> {
-    return this.vcr.capture('getRedisUrl', async () => {
+    return this.vcr.capture('fetchRedisUrl', async () => {
       try {
         const { stdout } = await execAsync(
           `railway variables list -s ${serviceId} -e ${environmentName} --json`,
@@ -536,13 +536,13 @@ class RailwayApi {
     });
   }
 
-  async getPostgresUrl(
+  async fetchPostgresUrl(
     serviceId: string,
     _environmentId: string,
     environmentName: string,
     projectId: string,
   ): Promise<string> {
-    return this.vcr.capture('getPostgresUrl', async () => {
+    return this.vcr.capture('fetchPostgresUrl', async () => {
       try {
         const { stdout } = await execAsync(
           `railway variables list -s ${serviceId} -e ${environmentName} --json`,
@@ -583,11 +583,11 @@ class RailwayApi {
     });
   }
 
-  async getLatestDeployment(
+  async fetchLatestDeployment(
     serviceId: string,
     environmentId: string,
   ): Promise<RailwayDeployment | null> {
-    return this.vcr.capture('getLatestDeployment', async () => {
+    return this.vcr.capture('fetchLatestDeployment', async () => {
       const data = await this.railwayGraphQLUser<{
         serviceInstance: { latestDeployment: RailwayDeployment | null };
       }>(
@@ -626,8 +626,8 @@ class RailwayApi {
     });
   }
 
-  async getServiceDomain(serviceId: string, environmentId: string): Promise<string | null> {
-    return this.vcr.capture('getServiceDomain', async () => {
+  async fetchServiceDomain(serviceId: string, environmentId: string): Promise<string | null> {
+    return this.vcr.capture('fetchServiceDomain', async () => {
       const data = await this.railwayGraphQLUser<{
         serviceInstance: { domains: { serviceDomains: Array<{ domain: string }> } };
       }>(
@@ -647,7 +647,7 @@ class RailwayApi {
 
   async ensureServiceDomain(serviceId: string, environmentId: string): Promise<string> {
     return this.vcr.capture('ensureServiceDomain', async () => {
-      const existing = await this.getServiceDomain(serviceId, environmentId);
+      const existing = await this.fetchServiceDomain(serviceId, environmentId);
       if (existing) return existing;
 
       const data = await this.railwayGraphQLUser<{ serviceDomainCreate: { domain: string } }>(
@@ -701,8 +701,8 @@ class RailwayApi {
     });
   }
 
-  async getProjectBuckets(projectId: string): Promise<Array<{ id: string; name: string }>> {
-    return this.vcr.capture('getProjectBuckets', async () => {
+  async fetchProjectBuckets(projectId: string): Promise<Array<{ id: string; name: string }>> {
+    return this.vcr.capture('fetchProjectBuckets', async () => {
       const data = await this.railwayGraphQLUser<{
         project: { buckets: Array<{ id: string; name: string }> };
       }>(
@@ -741,13 +741,13 @@ class RailwayApi {
 
   async ensureBucket(projectId: string, name: string): Promise<{ id: string; name: string }> {
     return this.vcr.capture('ensureBucket', async () => {
-      const existing = (await this.getProjectBuckets(projectId)).find((b) => b.name === name);
+      const existing = (await this.fetchProjectBuckets(projectId)).find((b) => b.name === name);
       if (existing) return existing;
       return this.createBucket(projectId, name);
     });
   }
 
-  async getBucketCredentials(
+  async fetchBucketCredentials(
     bucketId: string,
     environmentId: string,
     projectId: string,
@@ -759,7 +759,7 @@ class RailwayApi {
     endpoint: string;
     urlStyle: string;
   }> {
-    return this.vcr.capture('getBucketCredentials', async () => {
+    return this.vcr.capture('fetchBucketCredentials', async () => {
       const data = await this.railwayGraphQLUser<{
         bucketS3Credentials: {
           accessKeyId: string;

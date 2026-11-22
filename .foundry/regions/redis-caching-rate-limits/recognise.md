@@ -117,7 +117,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll clear the key in the service after the update
 - defer the clears to after commit
 - only trust the one hop and bucket IPv6 to a slash 64
-- subscriptions reached via customer refs shouldn't be cached
+- subscriptions reached via customer relationships shouldn't be cached
 - a single row by key, not a lens or relations
 - cache, rate limits, sessions and codes all use this one
 - I'll publish on the main client

@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses primitive:routeTemplates
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { creatorGrantFor } from '#/modules/artifact/lib/creatorGrant';
@@ -16,7 +16,7 @@ export const organizationCreateArtifactController = makeController(
   async (c, respond) => {
     const owner = {
       ownerModel: 'Organization' as const,
-      organizationId: getResource<'organization'>(c).id,
+      organizationId: contextResource<'organization'>(c).id,
     };
     const artifact = await createArtifact(artifactActorFromContext(c), {
       ...c.req.valid('json'),

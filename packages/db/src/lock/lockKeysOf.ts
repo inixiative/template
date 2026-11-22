@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:redis, mutex
  * @uses none
  */
@@ -15,6 +15,6 @@ export const lockKeysOf = (target: LockTarget | LockSetTarget): [string, ...stri
   const [first, ...rest] = [...new Set(target.identifiers)]
     .sort()
     .map((identifier) => lockKeyOf({ service: target.service, identifier }));
-  if (first === undefined) throw new Error('createLock: identifiers must name at least one key');
+  if (first === undefined) throw new Error('makeLock: identifiers must name at least one key');
   return [first, ...rest];
 };

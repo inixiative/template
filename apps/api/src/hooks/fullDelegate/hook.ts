@@ -4,7 +4,7 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { DbAction, db, HookTiming, polymorphicKeyColumn, registerDbHook } from '@template/db';
+import { DbAction, db, HookTiming, registerDbHook, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { EntitlementTargetModel } from '@template/db/generated/client/enums';
 import { castArray, groupBy } from 'lodash-es';
 import { makeError } from '#/lib/errors';
@@ -20,9 +20,8 @@ const clearRoleBesideFull = (row: Row | undefined) => {
 const isDelegateModel = (model: unknown): model is EntitlementTargetModel =>
   DELEGATE_MODELS.includes(model as EntitlementTargetModel);
 
-const targetIdOf = (model: string, row: Row): string =>
-  (row.targetId ??
-    row[polymorphicKeyColumn('Entitlement', 'targetModel', model) ?? 'targetId']) as string;
+const targetIdOf = (row: Row): string =>
+  rowPolymorphicAxisPointsAt(row, 'Entitlement', 'targetModel')?.id as string;
 
 // A full delegate is its owner whole, so no write of any kind gives it a row of its own.
 const refuseRowsOnFull = async (rows: Row[]) => {
@@ -32,14 +31,14 @@ const refuseRowsOnFull = async (rows: Row[]) => {
   );
   for (const [model, group] of Object.entries(byModel)) {
     const full = await db.delegate(model).findFirst({
-      where: { id: { in: group.map((row) => targetIdOf(model, row)) }, full: true },
+      where: { id: { in: group.map(targetIdOf) }, full: true },
       select: { id: true },
     });
     if (full) throw makeError({ status: 422, message: 'full takes no entitlements' });
   }
 };
 
-export const registerFullDelegateHook = () => {
+export const registerFullDelegateTakesNoRoleOrEntitlementsHook = () => {
   registerDbHook(
     'fullDelegate',
     DELEGATE_MODELS,

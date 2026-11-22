@@ -8,8 +8,9 @@
 import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { withDiscriminatorDefaults } from '@template/db/registries/discriminatorDefaults';
-import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
-import { withMaterializedIds } from '@template/db/registries/materializedIds';
+import { withDualPolymorphismIds } from '@template/db/registries/dualPolymorphismIds';
+import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
+import { polymorphicKeyColumns } from '@template/db/registries/polymorphicAxisPointsAt';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import {
   assertDiscriminatorsChosen,
@@ -29,7 +30,7 @@ import type {
   Serialized,
   WhereUniqueOf,
 } from '@template/db/test/factoryTypes';
-import { carryDelegatedKeys } from '@template/db/utils/carryDelegatedKeys';
+import { carryOwnerKeys } from '@template/db/utils/carryOwnerKeys';
 import { toAccessor } from '@template/db/utils/modelNames';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
@@ -81,7 +82,7 @@ const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
 const sessionOffset = Math.floor(Math.random() * 1_000_000);
 let globalSeq = sessionOffset;
 
-export const getNextSeq = () => ++globalSeq;
+export const nextFactorySequenceNumber = () => ++globalSeq;
 export const resetSequence = () => {
   globalSeq = sessionOffset;
 };
@@ -101,7 +102,10 @@ const foreignKeyGiven = (dep: DependencyConfig, scalarFields: Record<string, unk
 export const registeredDependencies = (modelName: ModelName) =>
   factoryRegistry.get(modelName)?.dependencies ?? {};
 
-export const createFactory = <K extends ModelName>(
+export const registeredDefaults = (modelName: ModelName) =>
+  factoryRegistry.get(modelName)?.defaults;
+
+export const registerFactory = <K extends ModelName>(
   modelName: K,
   config: FactoryConfig<K>,
 ): Factory<K> => {
@@ -162,7 +166,7 @@ export const createFactory = <K extends ModelName>(
         if (typeof relationValue === 'object' && relationValue !== null && 'id' in relationValue) {
           (ctx as Record<string, unknown>)[depAccessor] = relationValue;
         } else {
-          const depFactory = createFactory(dep.modelName, {
+          const depFactory = registerFactory(dep.modelName, {
             defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
           });
           await (persist
@@ -171,7 +175,7 @@ export const createFactory = <K extends ModelName>(
         }
       } else if (!ctx[depAccessor] && dep.required && !foreignKeyGiven(dep, scalarFields)) {
         assertParentFollowsAxes(modelName, merged, dep.modelName);
-        const depFactory = createFactory(dep.modelName, {
+        const depFactory = registerFactory(dep.modelName, {
           defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
         });
         await (persist ? depFactory.create(undefined, ctx) : depFactory.build(undefined, ctx));
@@ -190,14 +194,14 @@ export const createFactory = <K extends ModelName>(
         //    from incidental ctx if the discriminator forbids it (e.g.
         //    Inquiry { targetModel: 'admin' } must not gain a
         //    targetOrganizationId just because orgCtx carries one).
-        const polyConfig = getPolymorphismConfig(modelName);
+        const polyConfig = polymorphismConfigForModel(modelName);
         const fkAllowed = (fkField: string): boolean => {
           if (!polyConfig) return true;
           const axis = polyConfig.axes.find((a) => Object.values(a.fkMap).flat().includes(fkField));
           if (!axis) return true;
           const discriminator = merged[axis.field] as string | undefined;
           if (!discriminator) return true;
-          return (axis.fkMap[discriminator as keyof typeof axis.fkMap] ?? []).includes(fkField);
+          return polymorphicKeyColumns(modelName, axis.field, discriminator).includes(fkField);
         };
 
         if (typeof dep.foreignKey === 'string') {
@@ -214,10 +218,10 @@ export const createFactory = <K extends ModelName>(
       }
     }
 
-    await carryDelegatedKeys(modelName, merged);
+    await carryOwnerKeys(modelName, merged);
 
     assertSelectedForeignKeys(modelName, merged);
-    Object.assign(merged, withMaterializedIds(modelName, merged));
+    Object.assign(merged, withDualPolymorphismIds(modelName, merged));
 
     const delegate = db.delegate(modelName);
     const entity: ModelOf<K> = persist

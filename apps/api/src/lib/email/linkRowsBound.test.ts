@@ -4,7 +4,7 @@ import { CommunicationStatus } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createCommunicationLog,
-  createCustomerRef,
+  createCustomerRelationship,
   createOrganization,
   createSegment,
   createSegmentMember,
@@ -38,7 +38,7 @@ const fixture = async () => {
       { organization, tagCategory },
     );
     await createTagAttachment({ resourceModel: 'User' }, { user, tag });
-    const { entity: ref } = await createCustomerRef({
+    const { entity: customerRelationship } = await createCustomerRelationship({
       customerModel: 'User',
       providerModel: 'Organization',
       customerUserId: user.id,
@@ -49,7 +49,7 @@ const fixture = async () => {
       ownerModel: 'Organization',
       organizationId: organization.id,
     });
-    await createSegmentMember({}, { segment, customerRef: ref });
+    await createSegmentMember({}, { segment, customerRelationship });
   }
   return { mine, user };
 };
@@ -75,13 +75,13 @@ afterEach(async () => {
 });
 
 describe("an organization's email sees only its own link rows", () => {
-  it('loops and counts over tags, customer refs and segment memberships stay inside the owner', async () => {
+  it('loops and counts over tags, customer relationships and segment memberships stay inside the owner', async () => {
     const { mine, user } = await fixture();
     const body = [
       '{{#each recipient.tagAttachments as=t}}[{{t.tag.name}}]{{/each}}',
       `{{#if rule=${atLeastTwo('recipient.tagAttachments')}}}TAGS2{{else}}TAGS1{{/if}}`,
-      `{{#if rule=${atLeastTwo('recipient.providerRefs')}}}REFS2{{else}}REFS1{{/if}}`,
-      '{{#each recipient.providerRefs as=r}}{{#each r.segmentMembers as=m}}[{{m.segment.name}}]{{/each}}{{/each}}',
+      `{{#if rule=${atLeastTwo('recipient.customerRelationshipsAsCustomer')}}}REFS2{{else}}REFS1{{/if}}`,
+      '{{#each recipient.customerRelationshipsAsCustomer as=r}}{{#each r.segmentMembers as=m}}[{{m.segment.name}}]{{/each}}{{/each}}',
     ].join('|');
     await saveEmailTemplate({
       slug: 'link-rows',
@@ -94,7 +94,7 @@ describe("an organization's email sees only its own link rows", () => {
     });
     const log = (
       await createCommunicationLog(
-        { senderType: 'Organization', address: `${user.id}@example.com` },
+        { senderModel: 'Organization', address: `${user.id}@example.com` },
         { organization: mine },
       )
     ).entity;

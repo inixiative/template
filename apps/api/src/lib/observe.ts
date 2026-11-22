@@ -5,14 +5,17 @@
  * @uses primitive:appEvents, infrastructure:prisma
  */
 
-import { db, redactPayload } from '@template/db';
+import { db, maskSensitiveFieldsInPayload } from '@template/db';
 import { makeBroadcastRegistry } from '@template/shared/adapter';
 import { log } from '@template/shared/logger';
 import type { ObserveAdapter } from '#/appEvents/types';
 
 const createLogObserveAdapter = (): ObserveAdapter => ({
   record: (event) => {
-    log.info(`appEvent ${event.name}`, { actor: event.actor, data: redactPayload(event.data) });
+    log.info(`appEvent ${event.name}`, {
+      actor: event.actor,
+      data: maskSensitiveFieldsInPayload(event.data),
+    });
     return Promise.resolve();
   },
 });
@@ -43,7 +46,7 @@ const createDbObserveAdapter = (): ObserveAdapter => ({
         userAgent,
         sourceInquiryId,
         integrationId,
-        data: redactPayload(event.data) as object,
+        data: maskSensitiveFieldsInPayload(event.data) as object,
       },
     });
   },

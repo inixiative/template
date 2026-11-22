@@ -16,7 +16,7 @@ import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 export const isReconcilable = (segment: Segment): boolean =>
   !segment.deletedAt && !!segment.conditions;
 
-export const isContinuous = (segment: Segment): boolean =>
+export const isReconcilableDynamicSegment = (segment: Segment): boolean =>
   segment.type === SegmentType.dynamic && isReconcilable(segment);
 
 export const segmentNeedsReconcile = (segment: Segment, previous?: Segment): boolean => {
@@ -35,5 +35,5 @@ export const reconcileSegment = async (
   if (!isReconcilable(segment)) return { added: [], removed: [] };
   const matching = await evaluateSegment(segment);
   if (signal?.aborted) return { added: [], removed: [] };
-  return applyMembershipDiff({ segmentId: segment.id, matching });
+  return applyMembershipDiff({ segmentId: segment.id, matching, signal });
 };

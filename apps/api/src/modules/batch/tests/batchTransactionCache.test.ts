@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { cacheKey, clearKey, db } from '@template/db';
+import { cacheKey, clearCacheKeysMatchingPattern, db } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { batchRouter } from '#/modules/batch';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -22,7 +22,7 @@ const { call } = createTokenProbeApp((hono) => {
     return c.json({});
   });
   hono.post('/api/v1/probe/evict', async (c) => {
-    await clearKey(((await c.req.json()) as { key: string }).key);
+    await clearCacheKeysMatchingPattern(((await c.req.json()) as { key: string }).key);
     return c.json({});
   });
   hono.post('/api/v1/probe/fail', (c) => c.json({ message: 'forced failure' }, 400));

@@ -19,7 +19,7 @@ export const createStripeClient = async () => {
   });
 };
 
-export const getStripeClient = async () => {
+export const stripeClient = async () => {
   if (!__stripeClient) {
     if (!process.env.STRIPE_SECRET_KEY) {
       throw new Error('STRIPE_SECRET_KEY not configured');

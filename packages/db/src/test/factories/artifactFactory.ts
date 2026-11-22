@@ -6,9 +6,9 @@
  */
 import { faker } from '@faker-js/faker';
 import { ArtifactType } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const artifactFactory = createFactory('Artifact', {
+const artifactFactory = registerFactory('Artifact', {
   defaults: () => ({
     kind: 'file',
     type: ArtifactType.object,

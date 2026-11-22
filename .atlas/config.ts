@@ -18,6 +18,7 @@ export default defineConfig({
     // test setup/mocks — singular, complements **/tests/**. packages/db/src/test is mapped: it is the factory system (primitive:testFactories)
     'apps/**/test/**',
     'packages/ui/src/test/**',
+    'packages/shared/src/test/**',
     '**/*.example.tsx',
   ],
   stamp: [

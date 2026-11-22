@@ -15,6 +15,8 @@
   - [Syntax](#syntax)
   - [Examples](#examples)
   - [Security Validations](#security-validations)
+  - [Escapes](#escapes)
+  - [References in SDK-built paths](#references-in-sdk-built-paths)
 - [Status Tracking](#status-tracking)
   - [Status Values](#status-values)
   - [Strategy-Specific Behavior](#strategy-specific-behavior)
@@ -281,6 +283,26 @@ Interpolation syntax is validated to prevent:
 - Nested interpolation: `<<0.0.body.data.<<1.0.id>>>>` ❌
 - Current/future round references: `<<1.0.id>>` from round 1 ❌
 - Malformed syntax: `<<invalid>>` ❌
+- An unescaped stray `<<` or `>>` (text like `a << b`) ❌: escape it
+- Bracketed text that is not a reference (`<<x>y>>`, `<<invalid>>`) ❌: escape it. Extra leading `<` before a reference are text (`<<<0.0.id>>` → `<` plus the value).
+
+### Escapes
+
+Every string the batch interpolates (path, body values, headers) reads a backslash run directly before `<<` or `>>` as escapes: each `\\` is one literal backslash, and an odd backslash makes the bracket literal. Backslashes anywhere else are left as they are.
+
+| String value | Arrives as |
+|---|---|
+| `a \<< b \>> c` | `a << b >> c` |
+| `x \\<<0.0.body.data.id>>` | `x \` followed by the resolved id |
+| `C:\\dir\file` | unchanged |
+
+Each bracket is escaped on its own: `\<<0.0.id>>` leaves the `>>` unescaped and errors, so escape whole strings with `escapeBatchInterpolation` rather than by hand. A client that sends text it does not mean as references escapes it with `escapeBatchInterpolation` (`@template/shared/batchInterpolation`); the server parses with `tokenizeBatchInterpolation` from the same module, so the two never disagree.
+
+### References in SDK-built paths
+
+The SDK percent-encodes path and query values, so a reference written into a path param arrives as `%3C%3C0.0.body.data.id%3E%3E`. Before interpolating a path, the server decodes exactly that shape, with any encoded backslashes (`%5C`) directly before its brackets (`decodePercentEncodedBatchReferences`), and no other encoding, so `%2F`, `%20` and the rest keep their meaning. An escaped reference sent through a URL (`encodeURIComponent(escapeBatchInterpolation(text))`) therefore arrives as literal text, while an unescaped value shaped like a reference resolves: a client putting user text into a batched path escapes it first.
+
+A resolved value is encoded where it lands in the path or query (`encodeURIComponent`), so one reference fills exactly one segment or one query value: an id of `a/b`, `x?y=1` or `y#z` cannot move the request to another route or add a parameter. A value of exactly `.` or `..` is refused, since encoding leaves dots alone and the URL parser would treat it as a dot segment. Headers and the body take the value raw. After interpolation each request runs through `assertBatchable` again (`interpolateBatchableRequest`): the first check reads the path before any reference resolves, and the URL parser also reads `\` as `/` and drops tabs and newlines, so literal text around a reference could otherwise still climb into an unbatchable route. Why: a reference may point at any field of an earlier response, including text another user wrote.
 
 ---
 
@@ -497,7 +519,7 @@ const internalRequest = new Request(url, {
 Each batch sub-request gets **deep clones** of mutable context to prevent state leakage:
 
 ```typescript
-// apps/api/src/middleware/prepareRequest.ts
+// apps/api/src/middleware/prepareRequestMiddleware.ts
 if (batchContext) {
   // Read-only metadata (safe to share)
   c.set('app', batchContext.baseContext.get('app'));
@@ -536,13 +558,13 @@ interpolation) is recorded as a failed result rather than rejecting the round wh
 still run, which would let them finish outside the rolled-back transaction.
 
 `allowFailures` and `failOnRound` run each round's sub-requests through `db.parallel` (capped by
-`getConcurrency([ConcurrencyType.db])`), so each sub-request gets its own scope and its own
+`minimumConcurrencyLimitFor([ConcurrencyType.db])`), so each sub-request gets its own scope and its own
 transaction; without that, parallel sub-requests sharing the parent request's scope joined whichever
 transaction a sibling had open.
 
 **Key files:**
 - `apps/api/src/modules/batch/services/batchRegistry.ts` - In-memory storage
-- `apps/api/src/middleware/prepareRequest.ts` - Context injection + deep cloning
+- `apps/api/src/middleware/prepareRequestMiddleware.ts` - Context injection + deep cloning
 - `apps/api/src/middleware/auth/*.ts` - Auth skipping logic
 
 ---

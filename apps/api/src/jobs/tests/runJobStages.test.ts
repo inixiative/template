@@ -1,19 +1,19 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { type Job, WaitingChildrenError } from 'bullmq';
-import type { CleanStaleDataPayload } from '#/jobs/handlers/cleanStaleData';
+import type { HardDeleteRecordsPastRetentionPayload } from '#/jobs/handlers/hardDeleteRecordsPastRetention';
 import { makeJob } from '#/jobs/makeJob';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
 import { type JobData, JobLane, JobType, type WorkerContext } from '#/jobs/types';
-import { createMockJob } from '#tests/createTestWorker';
+import { mockJob } from '#tests/makeTestWorker';
 
 type FlowParent = Job<JobData> & { state: string; hasUnfinishedChildren: boolean };
 
 // A stateful stand-in for a BullMQ flow parent: `updateData` keeps the envelope, and
 // `moveToWaitingChildren` parks the job only while a child is still unfinished, as BullMQ does.
 const flowParent = (token: string | undefined): FlowParent => {
-  const job = createMockJob({
+  const job = mockJob({
     id: 'parent-job',
     name: 'stagedTest',
     data: { type: JobType.adhoc, lane: JobLane.fast, payload: {} },
@@ -121,7 +121,7 @@ describe('{ stages, finish } (runJobStages)', () => {
   });
 
   it('inline, a child that throws fails its parent', async () => {
-    const failingChild: CleanStaleDataPayload = {
+    const failingChild: HardDeleteRecordsPastRetentionPayload = {
       model: 'User',
       retentionDays: 1,
       archive: { target: 's3' },
@@ -133,7 +133,7 @@ describe('{ stages, finish } (runJobStages)', () => {
       stages: [
         async (ctx) => {
           ran.push('first');
-          await ctx.enqueueChildJob('cleanStaleData', failingChild);
+          await ctx.enqueueChildJob('hardDeleteRecordsPastRetention', failingChild);
         },
         async () => {
           ran.push('second');
@@ -176,7 +176,10 @@ describe('{ stages, finish } (runJobStages)', () => {
       {
         stages: [
           async (ctx) => {
-            await ctx.enqueueChildJob('cleanStaleData', { model: 'User', retentionDays: 1 });
+            await ctx.enqueueChildJob('hardDeleteRecordsPastRetention', {
+              model: 'User',
+              retentionDays: 1,
+            });
           },
         ],
         finish: async () => {},
@@ -185,7 +188,7 @@ describe('{ stages, finish } (runJobStages)', () => {
     );
 
     await expect(staged(contextFor(job), {})).rejects.toThrow(
-      `A superseding job's children must be superseding jobs, and "cleanStaleData" is not`,
+      `A superseding job's children must be superseding jobs, and "hardDeleteRecordsPastRetention" is not`,
     );
   });
 

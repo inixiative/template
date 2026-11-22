@@ -22,7 +22,7 @@ export const inquiryCreateBodySchema = InquiryScalarInputSchema.omit({ resolutio
   targetSpaceSlug: z.string().optional(),
 });
 
-export const inquiryCreateSanitizeKeys = [
+export const inquiryCreateServerOwnedKeys = [
   'sentAt',
   'expiresAt',
   'sourceModel',
@@ -31,4 +31,5 @@ export const inquiryCreateSanitizeKeys = [
   'sourceSpaceId',
   'sourceIntegrationId',
   'sourceTokenId',
+  'sourceProjectId',
 ] as const;

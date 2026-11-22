@@ -4,7 +4,10 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+
 import { Icon } from '@iconify/react';
+import { useQuery } from '@tanstack/react-query';
+import type { HydratedRecord } from '@template/db';
 import {
   type MeReadManyOrganizationsResponse,
   meReadManyOrganizations,
@@ -16,10 +19,10 @@ import {
 } from '@template/sdk';
 import { Button, Page, Table } from '@template/ui/components';
 import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
-import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
-import { checkPermission } from '@template/ui/hooks/usePermission';
+import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
+import { canActOnRecordIfPresent } from '@template/ui/lib/canActOnRecordIfPresent';
 import { useAppStore } from '@template/ui/store';
 import { useMemo, useState } from 'react';
 
@@ -27,7 +30,9 @@ type Organization = NonNullable<MeReadManyOrganizationsResponse>['data'][number]
 
 export const OrganizationsPage = () => {
   const permissions = useAppStore((state) => state.permissions);
-  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
+  const navigateKeepingSearchParams = useAppStore(
+    (state) => state.navigation.navigateKeepingSearchParams,
+  );
   const refreshMe = useAppStore((state) => state.auth.refreshMe);
   const spaces = useAppStore((state) => state.auth.spaces);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -115,7 +120,12 @@ export const OrganizationsPage = () => {
                   e.stopPropagation();
                   deleteMutation.mutate({ path: { id: org.id } });
                 }}
-                show={checkPermission(permissions, 'organization', org, 'own')}
+                show={canActOnRecordIfPresent(
+                  permissions,
+                  'organization',
+                  org as unknown as HydratedRecord,
+                  'own',
+                )}
               >
                 <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
               </Button>
@@ -152,7 +162,7 @@ export const OrganizationsPage = () => {
             data={organizations}
             keyExtractor={(org) => org.id}
             onRowClick={(org: Organization) =>
-              navigatePreserving(`/dashboard?org=${org.id}`, 'spoof')
+              navigateKeepingSearchParams(`/dashboard?org=${org.id}`, 'spoof')
             }
             emptyMessage="You don't belong to any organizations yet"
             empty={{

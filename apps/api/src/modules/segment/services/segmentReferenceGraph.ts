@@ -8,9 +8,9 @@ import type { Condition } from '@inixiative/json-rules';
 import { ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ReferenceMap } from '@template/shared/graph';
-import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
+import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 
-export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
+export const targetSegmentIdsBySegmentId = (segments: Segment[]): ReferenceMap => {
   const map: ReferenceMap = new Map();
   for (const segment of segments) {
     if (!segment.conditions) {
@@ -20,7 +20,7 @@ export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
     map.set(
       segment.id,
       new Set(
-        ruleReferences(customerRefLens, segment.conditions as Condition)
+        ruleReferences(customerRelationshipLens, segment.conditions as Condition)
           .filter((reference) => reference.model === 'Segment')
           .map((reference) => reference.id),
       ),
@@ -52,5 +52,5 @@ export const sortByDependency = <T extends { id: string }>(
   return ordered;
 };
 
-export const referencedBy = (references: ReferenceMap, id: string): string[] =>
+export const segmentIdsReferencingSegment = (references: ReferenceMap, id: string): string[] =>
   [...references.entries()].filter(([, targets]) => targets.has(id)).map(([owner]) => owner);

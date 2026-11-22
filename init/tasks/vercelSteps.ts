@@ -1,16 +1,16 @@
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import type { VercelAction } from '../utils/progressTracking';
 
 type VercelProgress = ProjectConfig['vercel']['progress'];
 
 type VercelProgressItem = {
   action: VercelAction;
-  getLabel: (config: ProjectConfig) => string;
+  labelFor: (config: ProjectConfig) => string;
 };
 
 type VercelProgressGroup = {
   actions: readonly VercelAction[];
-  getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
+  labelFor: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
 const countCompletedActions = (
@@ -32,173 +32,173 @@ const vercelBootstrapActions = [
 const vercelWebSteps: readonly VercelProgressItem[] = [
   {
     action: 'createWebProject',
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.vercel.webProjectId
         ? `Web: Project created (${config.vercel.webProjectId})`
         : 'Web: Project created',
   },
   {
     action: 'configureWebRootDirectory',
-    getLabel: () => 'Web: Root directory configured',
+    labelFor: () => 'Web: Root directory configured',
   },
   {
     action: 'createWebStagingEnvironment',
-    getLabel: () => 'Web: Staging environment created',
+    labelFor: () => 'Web: Staging environment created',
   },
   {
     action: 'linkWebGitHub',
-    getLabel: () => 'Web: GitHub linked',
+    labelFor: () => 'Web: GitHub linked',
   },
   {
     action: 'configureWebBranches',
-    getLabel: () => 'Web: Branches configured',
+    labelFor: () => 'Web: Branches configured',
   },
   {
     action: 'createWebInfisicalSyncProd',
-    getLabel: () => 'Web: Infisical sync → production',
+    labelFor: () => 'Web: Infisical sync → production',
   },
   {
     action: 'createWebInfisicalSyncStaging',
-    getLabel: () => 'Web: Infisical sync → staging',
+    labelFor: () => 'Web: Infisical sync → staging',
   },
   {
     action: 'createWebInfisicalSyncPreview',
-    getLabel: () => 'Web: Infisical sync → preview',
+    labelFor: () => 'Web: Infisical sync → preview',
   },
   {
     action: 'storeProdWebUrls',
-    getLabel: () => 'Web: Production URLs stored',
+    labelFor: () => 'Web: Production URLs stored',
   },
   {
     action: 'storeStagingWebUrls',
-    getLabel: () => 'Web: Staging URLs stored',
+    labelFor: () => 'Web: Staging URLs stored',
   },
 ];
 
 const vercelAdminSteps: readonly VercelProgressItem[] = [
   {
     action: 'createAdminProject',
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.vercel.adminProjectId
         ? `Admin: Project created (${config.vercel.adminProjectId})`
         : 'Admin: Project created',
   },
   {
     action: 'configureAdminRootDirectory',
-    getLabel: () => 'Admin: Root directory configured',
+    labelFor: () => 'Admin: Root directory configured',
   },
   {
     action: 'createAdminStagingEnvironment',
-    getLabel: () => 'Admin: Staging environment created',
+    labelFor: () => 'Admin: Staging environment created',
   },
   {
     action: 'linkAdminGitHub',
-    getLabel: () => 'Admin: GitHub linked',
+    labelFor: () => 'Admin: GitHub linked',
   },
   {
     action: 'configureAdminBranches',
-    getLabel: () => 'Admin: Branches configured',
+    labelFor: () => 'Admin: Branches configured',
   },
   {
     action: 'createAdminInfisicalSyncProd',
-    getLabel: () => 'Admin: Infisical sync → production',
+    labelFor: () => 'Admin: Infisical sync → production',
   },
   {
     action: 'createAdminInfisicalSyncStaging',
-    getLabel: () => 'Admin: Infisical sync → staging',
+    labelFor: () => 'Admin: Infisical sync → staging',
   },
   {
     action: 'createAdminInfisicalSyncPreview',
-    getLabel: () => 'Admin: Infisical sync → preview',
+    labelFor: () => 'Admin: Infisical sync → preview',
   },
   {
     action: 'storeProdAdminUrls',
-    getLabel: () => 'Admin: Production URLs stored',
+    labelFor: () => 'Admin: Production URLs stored',
   },
   {
     action: 'storeStagingAdminUrls',
-    getLabel: () => 'Admin: Staging URLs stored',
+    labelFor: () => 'Admin: Staging URLs stored',
   },
 ];
 
 const vercelSuperadminSteps: readonly VercelProgressItem[] = [
   {
     action: 'createSuperadminProject',
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.vercel.superadminProjectId
         ? `Superadmin: Project created (${config.vercel.superadminProjectId})`
         : 'Superadmin: Project created',
   },
   {
     action: 'configureSuperadminRootDirectory',
-    getLabel: () => 'Superadmin: Root directory configured',
+    labelFor: () => 'Superadmin: Root directory configured',
   },
   {
     action: 'createSuperadminStagingEnvironment',
-    getLabel: () => 'Superadmin: Staging environment created',
+    labelFor: () => 'Superadmin: Staging environment created',
   },
   {
     action: 'linkSuperadminGitHub',
-    getLabel: () => 'Superadmin: GitHub linked',
+    labelFor: () => 'Superadmin: GitHub linked',
   },
   {
     action: 'configureSuperadminBranches',
-    getLabel: () => 'Superadmin: Branches configured',
+    labelFor: () => 'Superadmin: Branches configured',
   },
   {
     action: 'createSuperadminInfisicalSyncProd',
-    getLabel: () => 'Superadmin: Infisical sync → production',
+    labelFor: () => 'Superadmin: Infisical sync → production',
   },
   {
     action: 'createSuperadminInfisicalSyncStaging',
-    getLabel: () => 'Superadmin: Infisical sync → staging',
+    labelFor: () => 'Superadmin: Infisical sync → staging',
   },
   {
     action: 'createSuperadminInfisicalSyncPreview',
-    getLabel: () => 'Superadmin: Infisical sync → preview',
+    labelFor: () => 'Superadmin: Infisical sync → preview',
   },
   {
     action: 'storeProdSuperadminUrls',
-    getLabel: () => 'Superadmin: Production URLs stored',
+    labelFor: () => 'Superadmin: Production URLs stored',
   },
   {
     action: 'storeStagingSuperadminUrls',
-    getLabel: () => 'Superadmin: Staging URLs stored',
+    labelFor: () => 'Superadmin: Staging URLs stored',
   },
 ];
 
 const vercelProgressGroups: readonly VercelProgressGroup[] = [
   {
     actions: vercelBootstrapActions,
-    getLabel: (config, completedCount, totalCount) =>
+    labelFor: (config, completedCount, totalCount) =>
       config.vercel.teamId || config.vercel.connectionId
         ? `Bootstrap ready (${completedCount}/${totalCount}): ${config.vercel.teamId ?? 'team selected'}`
         : `Bootstrap ready (${completedCount}/${totalCount})`,
   },
   {
     actions: vercelWebSteps.map((step) => step.action),
-    getLabel: (config, completedCount, totalCount) =>
+    labelFor: (config, completedCount, totalCount) =>
       config.vercel.webProjectId
         ? `Web ready (${completedCount}/${totalCount}): ${config.vercel.webProjectId}`
         : `Web ready (${completedCount}/${totalCount})`,
   },
   {
     actions: vercelAdminSteps.map((step) => step.action),
-    getLabel: (config, completedCount, totalCount) =>
+    labelFor: (config, completedCount, totalCount) =>
       config.vercel.adminProjectId
         ? `Admin ready (${completedCount}/${totalCount}): ${config.vercel.adminProjectId}`
         : `Admin ready (${completedCount}/${totalCount})`,
   },
   {
     actions: vercelSuperadminSteps.map((step) => step.action),
-    getLabel: (config, completedCount, totalCount) =>
+    labelFor: (config, completedCount, totalCount) =>
       config.vercel.superadminProjectId
         ? `Superadmin ready (${completedCount}/${totalCount}): ${config.vercel.superadminProjectId}`
         : `Superadmin ready (${completedCount}/${totalCount})`,
   },
   {
     actions: ['deployProduction'],
-    getLabel: () => 'Setup complete',
+    labelFor: () => 'Setup complete',
   },
 ];
 
@@ -238,10 +238,10 @@ const isVercelActionSkipped = (config: ProjectConfig, action: VercelAction): boo
   return false;
 };
 
-export const getVercelProgressItems = (
+export const vercelProgressItems = (
   config: ProjectConfig,
 ): Array<{ label: string; completed: boolean; skipped: boolean }> => {
-  const bootstrapSummary = getVercelProgressSummaries(config)[0];
+  const bootstrapSummary = vercelProgressSummaries(config)[0];
 
   return [
     {
@@ -250,17 +250,17 @@ export const getVercelProgressItems = (
       skipped: false,
     },
     ...vercelWebSteps.map((step) => ({
-      label: step.getLabel(config),
+      label: step.labelFor(config),
       completed: config.vercel.progress[step.action],
       skipped: isVercelActionSkipped(config, step.action),
     })),
     ...vercelAdminSteps.map((step) => ({
-      label: step.getLabel(config),
+      label: step.labelFor(config),
       completed: config.vercel.progress[step.action],
       skipped: isVercelActionSkipped(config, step.action),
     })),
     ...vercelSuperadminSteps.map((step) => ({
-      label: step.getLabel(config),
+      label: step.labelFor(config),
       completed: config.vercel.progress[step.action],
       skipped: isVercelActionSkipped(config, step.action),
     })),
@@ -272,12 +272,12 @@ export const getVercelProgressItems = (
   ];
 };
 
-export const getVercelProgressSummaries = (config: ProjectConfig): VercelProgressSummary[] => {
+export const vercelProgressSummaries = (config: ProjectConfig): VercelProgressSummary[] => {
   return vercelProgressGroups.map((group) => {
     const completedCount = countCompletedActions(config.vercel.progress, group.actions);
     const totalCount = group.actions.length;
     return {
-      label: group.getLabel(config, completedCount, totalCount),
+      label: group.labelFor(config, completedCount, totalCount),
       completed: completedCount === totalCount,
       completedCount,
       totalCount,

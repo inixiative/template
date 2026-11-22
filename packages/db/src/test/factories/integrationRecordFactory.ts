@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const integrationRecordFactory = createFactory('IntegrationRecord', {
+const integrationRecordFactory = registerFactory('IntegrationRecord', {
   defaults: () => ({}),
   dependencies: {
     integration: {
@@ -14,9 +14,14 @@ const integrationRecordFactory = createFactory('IntegrationRecord', {
       foreignKey: { id: 'integrationId' },
       required: true,
     },
-    customerRef: {
-      modelName: 'CustomerRef',
-      foreignKey: { id: 'customerRefId' },
+    customerRelationship: {
+      modelName: 'CustomerRelationship',
+      foreignKey: { id: 'recordCustomerRelationshipId' },
+      required: false,
+    },
+    artifact: {
+      modelName: 'Artifact',
+      foreignKey: { id: 'recordArtifactId' },
       required: false,
     },
   },

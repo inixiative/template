@@ -47,7 +47,7 @@ One mental model for authors and one code path for the engine.
 
 ## Parser
 
-`parseIfBlock`'s depth-aware scanning and `readRuleMarker` generalize to a second block type; nested each/if compose through the same depth counter. The each marker reads a path token, `as=<name>` (required), optional `index=<name>`, optional `filter=` JSON via the existing `findJsonEnd`.
+`parseIfBlock`'s depth-aware scanning and `ruleMarkerAt` generalize to a second block type; nested each/if compose through the same depth counter. The each marker reads a path token, `as=<name>` (required), optional `index=<name>`, optional `filter=` JSON via the existing `findJsonEnd`.
 
 Errors through the existing `RuleErrorSink` posture (render nothing, report): missing `as=`, non-slug identifier, collision with a reserved prefix or an enclosing loop binding, non-array / missing path at the marker.
 
@@ -65,15 +65,15 @@ Errors through the existing `RuleErrorSink` posture (render nothing, report): mi
 
 The Zealot loop build (`#1689`, ZLT-3326, reviewed 2026-07-12) and lens picker (`#1655`, ZLT-3289) surfaced pieces to port here.
 
-### 1. Single-pass `settle()` walker — the structural prerequisite for loops
+### 1. Single-pass `evaluateTemplateBlocksAndTokens()` walker — the structural prerequisite for loops
 
-`interpolate.ts` is two-pass today (`evaluateConditions(...)` → a trailing global `.replace(VARIABLE_PATTERN)`). Zealot `#1689` collapses `{{#if}}` + substitution into one recursive walker (`settle.ts`) that substitutes each text run exactly once at its emit-depth. This is **required** for `{{#each}}`: loop scope bindings must be threaded per-element through a single recursive pass — a flat global regex replace cannot express nested per-element scope. Port the walker as the foundation the rest of this ticket builds on.
+`interpolate.ts` is two-pass today (`evaluateConditions(...)` → a trailing global `.replace(VARIABLE_PATTERN)`). Zealot `#1689` collapses `{{#if}}` + substitution into one recursive walker (`evaluateTemplateBlocksAndTokens.ts`) that substitutes each text run exactly once at its emit-depth. This is **required** for `{{#each}}`: loop scope bindings must be threaded per-element through a single recursive pass — a flat global regex replace cannot express nested per-element scope. Port the walker as the foundation the rest of this ticket builds on.
 
-**Not a security fix (verified 2026-07-13).** An earlier note flagged the two-pass path as a substitution-injection hole (a `data` value containing `{{recipient.email}}` re-resolving on the second pass). Reproduced against the real module — it does **not** happen: JS `String.replace(globalRegex, cb)` scans the original string once and never re-scans inserted replacement text, so a data-borne token comes out **literally**, unresolved (`{{data.note}} = "{{recipient.email}}"` → output `"{{recipient.email}}"`, no leak). `settle()` is a correctness/loop refactor, not a hardening item — do not prioritize it as a CVE.
+**Not a security fix (verified 2026-07-13).** An earlier note flagged the two-pass path as a substitution-injection hole (a `data` value containing `{{recipient.email}}` re-resolving on the second pass). Reproduced against the real module — it does **not** happen: JS `String.replace(globalRegex, cb)` scans the original string once and never re-scans inserted replacement text, so a data-borne token comes out **literally**, unresolved (`{{data.note}} = "{{recipient.email}}"` → output `"{{recipient.email}}"`, no leak). `evaluateTemplateBlocksAndTokens()` is a correctness/loop refactor, not a hardening item — do not prioritize it as a CVE.
 
 ### 2. Loop control-flow (the `{{#each}}` body of this ticket)
 
-Port `#1689`'s loop control-flow from `settle.ts` (`as=` binding, optional `index=`, per-element `filter=` json-rules predicate, object-value-leaves-token-visible). **Do NOT port Zealot's desugar-to-absolute-paths step** — that is a workaround for json-rules being binding-free, and template already has real bindings (PR #74's declarative registry). json-rules stays binding-free; the email builder recomposes absolute paths **in its own layer**. Carry the 2026-07-12 locks: explicit bindings everywhere, reserved names = the 2 sources + the derived union, no object display.
+Port `#1689`'s loop control-flow from `evaluateTemplateBlocksAndTokens.ts` (`as=` binding, optional `index=`, per-element `filter=` json-rules predicate, object-value-leaves-token-visible). **Do NOT port Zealot's desugar-to-absolute-paths step** — that is a workaround for json-rules being binding-free, and template already has real bindings (PR #74's declarative registry). json-rules stays binding-free; the email builder recomposes absolute paths **in its own layer**. Carry the 2026-07-12 locks: explicit bindings everywhere, reserved names = the 2 sources + the derived union, no object display.
 
 ### 3. Save-time JSON-opacity WARNING (never a 422)
 
@@ -87,10 +87,10 @@ Ported as a pre-pass in `interpolate.ts` (`systemTokens.ts` is the shared list a
 
 The 2026-08-13 shape (one lens rooted at a synthetic `EmailRuleContext`) is dead: the synthetic root has no Prisma delegate, so nothing could be hydrated through it, render fell back to raw `check()` over whatever the planner sent, and a second hand-rolled recipient spec grew beside it. The email lens is now **one lens per scope root** — `sender`, `recipient`, `data`, `system` (`EmailLens`, `packages/email/src/rules/emailLens.ts`) — each a real `@inixiative/json-rules` lens over its own model with no bridges between them. Every rule operation dispatches on the path root: vocabulary (`emailRuleViolations`), references (`emailRuleReferences`), evaluation (`applyEmailLens` + `check`), the builder surface (`emailSurface`, a presentation-only composition of the four exposed surfaces under `Email`). A comparison across two lenses is a `path` into the other lens, judged as such. The earlier "compose then prune to `maxDepth`" direction stays dead.
 
-- Each slot (recipient, each `data.*` context) is a serializable `ModelNarrowing` over its declared model; `exposedSurface` prunes per slot and the composition merges the exposed surfaces under the root. A model is in the surface because a slot picked it. Per-template slot assignment is data (`EmailTemplate.lens Json?`, null = engine defaults), read from the row, with the slug's default-tier lens as fallback when the row has none (`lookupLens`). The earlier default-only authoring restriction is not a description of the current lookup behavior.
+- Each slot (recipient, each `data.*` context) is a serializable `ModelNarrowing` over its declared model; `exposedSurface` prunes per slot and the composition merges the exposed surfaces under the root. A model is in the surface because a slot picked it. Per-template slot assignment is data (`EmailTemplate.lens Json?`, null = engine defaults), read from the row, with the slug's default-tier lens as fallback when the row has none (`fetchLensThroughOwnerCascade`). The earlier default-only authoring restriction is not a description of the current lookup behavior.
 - The email `walkLensPath` wrapper delegates to json-rules `resolveLensPath` and answers both save-time questions — "descends beneath a Json column" (§3's warning) and "the surface provides this at all" — by reporting WHERE it stopped. Never two walkers over the same field maps.
 - Component expectations are derived from the body at save (`collectHydrationPaths`), stored on the row, and checked against the template lens; `collectUnprovidedPathWarnings` joins the Json-opacity warning for any composed path the surface doesn't provide (the only moment an author is looking).
 
 ## Scope
 
-`packages/email/src/render/`: `conditionParser.ts`, `evaluateConditions.ts`, `interpolate.ts`, `validateConditions.ts` + tests. Plus a new `settle.ts` (§1) and the save-time opacity warning surface (§3).
+`packages/email/src/render/`: `conditionParser.ts`, `evaluateConditions.ts`, `interpolate.ts`, `validateConditions.ts` + tests. Plus a new `evaluateTemplateBlocksAndTokens.ts` (§1) and the save-time opacity warning surface (§3).

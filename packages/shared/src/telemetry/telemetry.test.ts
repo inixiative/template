@@ -17,8 +17,8 @@ import {
 } from '@template/shared/telemetry';
 import {
   parseOtlpHeaders,
-  readTelemetryConfig,
   signalExportOptions,
+  telemetryConfigFromEnv,
 } from '@template/shared/telemetry/config';
 import { createFetchExporter } from '@template/shared/telemetry/fetchExporter';
 import { initializeTelemetry } from '@template/shared/telemetry/initialize';
@@ -256,10 +256,10 @@ describe('telemetry configuration', () => {
           OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test',
         },
         async () => {
-          expect(readTelemetryConfig('api')?.environment).toBe(environment);
-          expect(readTelemetryConfig('worker')?.role).toBe('worker');
+          expect(telemetryConfigFromEnv('api')?.environment).toBe(environment);
+          expect(telemetryConfigFromEnv('worker')?.role).toBe('worker');
           await withEnv({ OTEL_ENABLED: 'false' }, () =>
-            expect(readTelemetryConfig('api')).toBeNull(),
+            expect(telemetryConfigFromEnv('api')).toBeNull(),
           );
         },
       );
@@ -274,9 +274,9 @@ describe('telemetry configuration', () => {
           OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test',
         },
         async () => {
-          expect(readTelemetryConfig('api')).toBeNull();
+          expect(telemetryConfigFromEnv('api')).toBeNull();
           await withEnv({ OTEL_ENABLED: 'true' }, () =>
-            expect(readTelemetryConfig('api')).not.toBeNull(),
+            expect(telemetryConfigFromEnv('api')).not.toBeNull(),
           );
         },
       );
@@ -285,7 +285,7 @@ describe('telemetry configuration', () => {
   it('does not export without a configured destination', async () => {
     await withEnv(
       { ENVIRONMENT: 'prod', OTEL_ENABLED: undefined, OTEL_EXPORTER_OTLP_ENDPOINT: undefined },
-      () => expect(readTelemetryConfig('api')).toBeNull(),
+      () => expect(telemetryConfigFromEnv('api')).toBeNull(),
     );
   });
 
@@ -293,12 +293,12 @@ describe('telemetry configuration', () => {
     expect(
       await withEnv(
         { OTEL_ENABLED: 'false', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test' },
-        () => readTelemetryConfig('api'),
+        () => telemetryConfigFromEnv('api'),
       ),
     ).toBeNull();
     expect(
       withEnv({ OTEL_ENABLED: 'true', OTEL_EXPORTER_OTLP_ENDPOINT: '' }, () =>
-        readTelemetryConfig('api'),
+        telemetryConfigFromEnv('api'),
       ),
     ).rejects.toThrow();
   });

@@ -6,13 +6,18 @@
  */
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
-import { polymorphicKeyColumn } from '@template/db/registries/polymorphicIs';
-import { lockedTargetStates, type TargetState } from '@template/db/utils/lockedTargetStates';
+import { wherePolymorphicSideIsOneOf } from '@template/db/registries/wherePolymorphicSideIsOneOf';
+import {
+  fetchRuleReferenceTargetsDeletedAtForUpdate,
+  type RuleReferenceTargetDeletedState,
+} from '@template/db/utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
 import type { ModelName } from '@template/db/utils/modelNames';
+import { polymorphicArmKeys } from '@template/db/utils/polymorphicArmKeys';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 import { groupBy } from 'lodash-es';
 
-export type RuleReferenceSource = { model: ModelName; id: string };
+export type RuleReferenceSource = ModelRow<ModelName>;
 
 type Edge = {
   id: string;
@@ -21,28 +26,22 @@ type Edge = {
   targetDeletedAt: Date | null;
 };
 
-const fkColumn = (axis: 'sourceModel' | 'targetModel', model: string): string => {
-  const column = polymorphicKeyColumn('RuleReference', axis, model);
-  if (!column) {
-    throw new Error(
-      `RuleReference has no ${axis} FK for ${model} — add the column to ruleReference.prisma and PolymorphismRegistry`,
-    );
-  }
-  return column;
-};
-
 const edgeKey = (edge: Edge): string =>
   referenceKey({ model: edge.targetModel, id: edge.targetId });
 
-const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: TargetState) => ({
+const edgeData = (
+  source: RuleReferenceSource,
+  ref: RuleReference,
+  state: RuleReferenceTargetDeletedState,
+) => ({
   sourceModel: source.model,
-  [fkColumn('sourceModel', source.model)]: source.id,
+  ...polymorphicArmKeys('RuleReference', 'sourceModel', source.model, { id: source.id }),
   targetModel: ref.model,
-  [fkColumn('targetModel', ref.model)]: ref.id,
+  ...polymorphicArmKeys('RuleReference', 'targetModel', ref.model, { id: ref.id }),
   targetDeletedAt: state.deletedAt,
 });
 
-const stampOf = (state: TargetState | undefined): number | null =>
+const stampOf = (state: RuleReferenceTargetDeletedState | undefined): number | null =>
   state?.deletedAt ? state.deletedAt.getTime() : null;
 
 // Targets are locked before the edges are written, so one is never written unstamped against an uncommitted delete.
@@ -51,7 +50,9 @@ export const syncRuleReferenceEdges = async (
   references: RuleReference[],
 ): Promise<void> => {
   const existing = (await db.ruleReference.findMany({
-    where: { sourceModel: source.model, sourceId: source.id } as Prisma.RuleReferenceWhereInput,
+    where: wherePolymorphicSideIsOneOf('RuleReference', 'sourceModel', [
+      source,
+    ]) as Prisma.RuleReferenceWhereInput,
   })) as Edge[];
 
   const referenced = new Map(references.map((ref) => [referenceKey(ref), ref]));
@@ -59,7 +60,9 @@ export const syncRuleReferenceEdges = async (
     existing.filter((edge) => referenced.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
   );
   const added = [...referenced.values()].filter((ref) => !held.has(referenceKey(ref)));
-  const states = referenced.size ? await lockedTargetStates([...referenced.values()]) : new Map();
+  const states = referenced.size
+    ? await fetchRuleReferenceTargetsDeletedAtForUpdate([...referenced.values()])
+    : new Map();
 
   const toDelete = existing.filter((edge) => !referenced.has(edgeKey(edge)));
   if (toDelete.length)

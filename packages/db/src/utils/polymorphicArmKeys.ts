@@ -1,12 +1,12 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { isArmColumns } from '@template/db/registries/polymorphicIs';
+import { isArmColumns } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { getModelRelations, type RelationInfo } from '@template/db/utils/prismaMapRelations';
+import { type ModelRelation, relationsOfModel } from '@template/db/utils/prismaMapRelations';
 
 type Row = Record<string, unknown>;
 
@@ -15,8 +15,8 @@ export const polymorphicArmRelation = (
   model: ModelName,
   axisField: string,
   value: string,
-): RelationInfo => {
-  const relation = getModelRelations(model).find(
+): ModelRelation => {
+  const relation = relationsOfModel(model).find(
     ({ targetModel, foreignKey }) =>
       targetModel === value &&
       isArmColumns(
@@ -31,7 +31,12 @@ export const polymorphicArmRelation = (
   return relation;
 };
 
-const armColumns = (model: ModelName, axisField: string, value: string): Record<string, string> => {
+/** An arm's columns by the column of the row they point at: `{ id: 'targetSpaceId', organizationId: 'targetOrganizationId' }`. */
+export const polymorphicArmColumns = (
+  model: ModelName,
+  axisField: string,
+  value: string,
+): Record<string, string> => {
   const { foreignKey } = polymorphicArmRelation(model, axisField, value);
   return typeof foreignKey === 'string' ? { id: foreignKey } : (foreignKey ?? {});
 };
@@ -44,7 +49,7 @@ export const polymorphicArmKeys = (
   row: Row,
 ): Record<string, string> =>
   Object.fromEntries(
-    Object.entries(armColumns(model, axisField, value)).map(([rowColumn, armColumn]) => [
+    Object.entries(polymorphicArmColumns(model, axisField, value)).map(([rowColumn, armColumn]) => [
       armColumn,
       row[rowColumn] as string,
     ]),

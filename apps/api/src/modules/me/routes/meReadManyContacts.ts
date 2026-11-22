@@ -10,7 +10,7 @@ import { readRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { contactPicks } from '#/modules/contact/schemas/contactPicks';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meReadManyContactsRoute = readRoute({
   model: Modules.me,
@@ -24,5 +24,5 @@ export const meReadManyContactsRoute = readRoute({
     root: { picks: contactPicks },
   },
   responseSchema: ContactScalarSchema,
-  tags: [Tags.me, Tags.contact],
+  tags: [OpenApiTags.me, OpenApiTags.contact],
 });

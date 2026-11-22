@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -7,10 +6,15 @@ import type {
   SpaceUser,
   User,
 } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSpace,
+  createSpaceUser,
+} from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/v1/space/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -30,14 +34,10 @@ describe('GET /api/v1/space/:id', () => {
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
 
-    spaceUser = await db.spaceUser.create({
-      data: {
-        role: 'admin',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: user.id,
-      },
-    });
+    ({ entity: spaceUser } = await createSpaceUser(
+      { role: 'admin' },
+      { user, organization: org, space, organizationUser: orgUser },
+    ));
 
     const harness = createTestApp({
       mockUser: user,
@@ -57,7 +57,7 @@ describe('GET /api/v1/space/:id', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<Space>(response);
+    const { data } = await parseSuccessBody<Space>(response);
     expect(data.id).toBe(space.id);
     expect(data.name).toBe(space.name);
   });

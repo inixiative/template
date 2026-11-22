@@ -3,10 +3,10 @@
  * @kind controller
  * @partOf feature:project
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { projectReadRoute } from '#/modules/project/routes/projectRead';
 
 export const projectReadController = makeController(projectReadRoute, async (c, respond) =>
-  respond.ok(getResource<'project'>(c)),
+  respond.ok(contextResource<'project'>(c)),
 );

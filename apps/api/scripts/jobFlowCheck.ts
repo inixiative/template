@@ -9,7 +9,7 @@
 // - a child that fails every attempt is retried, then lets its parent finish;
 // - a staged singleton skips a second enqueue while it is parked, and its key frees once it finishes;
 // - superseding a staged job aborts its running children within two seconds, the replaced parent never
-//   runs `finish`, and the aborted children never write;
+//   runs `finish`, the aborted children never write, and no separate superseded key is written;
 // - a cron tick enqueues the real run, and a second tick while that run is going is skipped;
 // - a rolling cache's pass starts its timer while its leaf is still running; a coordinator tick after
 //   that timer has run out, with the pass still open, starts nothing; the first tick after the pass
@@ -25,9 +25,9 @@
 import {
   cacheKey,
   createRedisConnection,
-  getRedisClient,
   listRollingCaches,
   makeRollingCache,
+  redisClient,
 } from '@template/db';
 import { type Job, Worker } from 'bullmq';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
@@ -39,7 +39,7 @@ import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
-import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { makeSlowSlotPool } from '#/jobs/slowSlotPool';
 import { JobLane, JobType, type StageContext } from '#/jobs/types';
 
 type LeafPayload = { key: string; ms: number; fail?: boolean };
@@ -153,7 +153,7 @@ const main = async (): Promise<void> => {
   });
   const worker = new Worker(
     queue.name,
-    (job: Job) => processJob(job, { slowSlots: createSlowSlotPool(10) }),
+    (job: Job) => processJob(job, { slowSlots: makeSlowSlotPool(10) }),
     { connection: workerRedis, concurrency: 10 },
   );
   worker.on('failed', (job, err) => record('jobFailed', `${job?.name}:${err.message}`));
@@ -266,6 +266,12 @@ const main = async (): Promise<void> => {
       count('leafDone', 'race-old-1') + count('leafDone', 'race-old-2') === 0,
     );
     check('superseding: the new parent ran its stage', count('leafDone', 'race-new-1') === 1);
+    const supersededKeys = await queue.redis.keys('*superseded*');
+    check(
+      'superseding: no separate superseded keys were written',
+      supersededKeys.length === 0,
+      supersededKeys,
+    );
 
     const tick = {
       type: JobType.cron,
@@ -306,13 +312,13 @@ const main = async (): Promise<void> => {
       'rolling cache leaf starts',
       () => count('rollingCacheCompute', rollingCacheName) > 0,
     );
-    const timerMsWhileLeafRuns = await getRedisClient().pttl(timer);
+    const timerMsWhileLeafRuns = await redisClient().pttl(timer);
     check(
       'rolling cache: the timer runs from the pass start, while its leaf is still out',
       timerMsWhileLeafRuns > 290_000 && (await branchState()) === 'waiting-children',
       timerMsWhileLeafRuns,
     );
-    await getRedisClient().del(timer);
+    await redisClient().del(timer);
     await coordinateOnce();
     check(
       'rolling cache: a tick after the timer ran out, with the pass still open, starts nothing',

@@ -3,7 +3,7 @@ import { githubApi } from '../../api/github';
 import { infisicalVercelApi } from '../../api/infisicalVercel';
 import { vercelApi } from '../../api/vercel';
 import { createMockConfig, defaultConfig } from '../../tests/mocks';
-import type { ProjectConfig } from '../../utils/getProjectConfig';
+import type { ProjectConfig } from '../../utils/fetchProjectConfig';
 
 const config = createMockConfig();
 

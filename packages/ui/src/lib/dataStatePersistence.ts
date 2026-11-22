@@ -1,28 +1,28 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:ui
  * @uses none
  */
-export type PersistedState = {
+export type ListPageState = {
   page?: number;
   pageSize?: number;
   search?: string;
   orderBy?: string[];
 };
 
-const URL_PARAMS: Record<keyof PersistedState, string> = {
+const URL_PARAMS: Record<keyof ListPageState, string> = {
   page: 'page',
   pageSize: 'pageSize',
   search: 'search',
   orderBy: 'orderBy',
 };
 
-export function syncStateToUrl(state: PersistedState): string {
+export function currentUrlWithListStateParams(state: ListPageState): string {
   const url = new URL(window.location.href);
 
   for (const [key, param] of Object.entries(URL_PARAMS)) {
-    const value = state[key as keyof PersistedState];
+    const value = state[key as keyof ListPageState];
 
     if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) {
       url.searchParams.delete(param);
@@ -47,9 +47,9 @@ function parsePositiveInt(value: string | null): number | undefined {
   return Number.isInteger(n) && n > 0 ? n : undefined;
 }
 
-export function readStateFromUrl(searchString?: string): PersistedState {
+export function listPageStateFromUrl(searchString?: string): ListPageState {
   const params = new URLSearchParams(searchString ?? window.location.search);
-  const state: PersistedState = {};
+  const state: ListPageState = {};
 
   const page = parsePositiveInt(params.get('page'));
   if (page !== undefined) state.page = page;
@@ -66,14 +66,17 @@ export function readStateFromUrl(searchString?: string): PersistedState {
   return state;
 }
 
-export function readInitialState(stateKey: string | undefined, checkUrl: boolean): PersistedState {
+export function initialListPageState(
+  stateKey: string | undefined,
+  checkUrl: boolean,
+): ListPageState {
   if (typeof window === 'undefined') return {};
 
   if (stateKey) {
     try {
       const saved = window.history.state?.[stateKey];
       if (saved && typeof saved === 'object') {
-        return saved as PersistedState;
+        return saved as ListPageState;
       }
     } catch {
       // SSR or sandboxed iframe
@@ -81,14 +84,14 @@ export function readInitialState(stateKey: string | undefined, checkUrl: boolean
   }
 
   if (checkUrl) {
-    const fromUrl = readStateFromUrl();
+    const fromUrl = listPageStateFromUrl();
     if (Object.keys(fromUrl).length > 0) return fromUrl;
   }
 
   return {};
 }
 
-export function writeToHistoryState(key: string, state: PersistedState): void {
+export function writeToHistoryState(key: string, state: ListPageState): void {
   try {
     const historyState = { ...window.history.state, [key]: state };
     window.history.replaceState(historyState, '');
@@ -97,9 +100,9 @@ export function writeToHistoryState(key: string, state: PersistedState): void {
   }
 }
 
-export function writeToHistoryStateAndUrl(key: string | undefined, state: PersistedState): void {
+export function writeToHistoryStateAndUrl(key: string | undefined, state: ListPageState): void {
   try {
-    const url = syncStateToUrl(state);
+    const url = currentUrlWithListStateParams(state);
     const historyState = key ? { ...window.history.state, [key]: state } : window.history.state;
     window.history.replaceState(historyState, '', url);
   } catch {

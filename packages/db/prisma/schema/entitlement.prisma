@@ -26,7 +26,7 @@ model Entitlement {
   lens     Json?
 
   sourceModel                 EntitlementResourceModel
-  // True poly beside the false, materialized from the typed FK on create by the polymorphism registry.
+  // dual polymorphism id, set from the typed FK on create by the polymorphism registry.
   sourceId                    String                   @db.VarChar(36)
   sourcePath                  String?
   sourceDeletedAt             DateTime?
@@ -43,6 +43,10 @@ model Entitlement {
   sourceFlowId                String?                  @db.VarChar(36)
   sourceAuthProviderId        String?                  @db.VarChar(36)
   sourceWebhookSubscriptionId String?                  @db.VarChar(36)
+  sourceIntegrationResourceId        String? @db.VarChar(36)
+  sourceProjectIntegrationResourceId String? @db.VarChar(36)
+  sourceSettingId             String?                  @db.VarChar(36)
+  sourceProjectIntegrationId  String?                  @db.VarChar(36)
 
   targetModel              EntitlementTargetModel
   targetId                 String                 @db.VarChar(36)
@@ -68,6 +72,10 @@ model Entitlement {
   sourceFlow                Flow?                @relation("EntitlementSource", fields: [sourceFlowId], references: [id], onDelete: SetNull)
   sourceAuthProvider        AuthProvider?        @relation("EntitlementSource", fields: [sourceAuthProviderId], references: [id], onDelete: SetNull)
   sourceWebhookSubscription WebhookSubscription? @relation("EntitlementSource", fields: [sourceWebhookSubscriptionId], references: [id], onDelete: SetNull)
+  sourceIntegrationResource        IntegrationResource?        @relation("EntitlementSource", fields: [sourceIntegrationResourceId], references: [id], onDelete: SetNull)
+  sourceProjectIntegrationResource ProjectIntegrationResource? @relation("EntitlementSource", fields: [sourceProjectIntegrationResourceId], references: [id], onDelete: SetNull)
+  sourceSetting             Setting?             @relation("EntitlementSource", fields: [sourceSettingId], references: [id], onDelete: SetNull)
+  sourceProjectIntegration  ProjectIntegration?  @relation("EntitlementSource", fields: [sourceProjectIntegrationId], references: [id], onDelete: SetNull)
 
   targetToken            Token?            @relation("EntitlementTarget", fields: [targetTokenId], references: [id], onDelete: Cascade)
   targetIntegration      Integration?      @relation("EntitlementTarget", fields: [targetIntegrationId], references: [id], onDelete: Cascade)
@@ -99,6 +107,10 @@ model Entitlement {
   @@index([sourceFlowId])
   @@index([sourceAuthProviderId])
   @@index([sourceWebhookSubscriptionId])
+  @@index([sourceIntegrationResourceId])
+  @@index([sourceProjectIntegrationResourceId])
+  @@index([sourceSettingId])
+  @@index([sourceProjectIntegrationId])
   @@index([targetTokenId])
   @@index([targetIntegrationId])
   @@index([targetOrganizationId, targetUserId, targetSpaceId])
@@ -121,6 +133,10 @@ enum EntitlementResourceModel {
   Flow
   AuthProvider
   WebhookSubscription
+  IntegrationResource
+  ProjectIntegrationResource
+  Setting
+  ProjectIntegration
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific rebac resources below

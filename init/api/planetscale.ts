@@ -1,9 +1,9 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { getSecretAsync } from '../tasks/infisicalSetup';
+import { fetchSecretOrThrow } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 
 const PLANETSCALE_API = 'https://api.planetscale.com/v1';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/planetscale');
@@ -77,15 +77,15 @@ class PlanetScaleApi {
   });
 
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const projectId = config.infisical.projectId;
     if (!projectId) throw new Error('Infisical project not configured. Run Infisical setup first.');
 
-    const tokenId = await getSecretAsync('PLANETSCALE_TOKEN_ID', {
+    const tokenId = await fetchSecretOrThrow('PLANETSCALE_TOKEN_ID', {
       projectId,
       environment: 'root',
     });
-    const token = await getSecretAsync('PLANETSCALE_TOKEN', { projectId, environment: 'root' });
+    const token = await fetchSecretOrThrow('PLANETSCALE_TOKEN', { projectId, environment: 'root' });
 
     const response = await fetch(`${PLANETSCALE_API}${endpoint}`, {
       ...options,
@@ -136,8 +136,8 @@ class PlanetScaleApi {
     });
   }
 
-  async getOrganization(orgName: string): Promise<PlanetScaleOrganization> {
-    return this.vcr.capture('getOrganization', () =>
+  async fetchOrganization(orgName: string): Promise<PlanetScaleOrganization> {
+    return this.vcr.capture('fetchOrganization', () =>
       this.request<PlanetScaleOrganization>(`/organizations/${orgName}`),
     );
   }
@@ -166,8 +166,11 @@ class PlanetScaleApi {
     });
   }
 
-  async getDatabase(organizationName: string, databaseName: string): Promise<PlanetScaleDatabase> {
-    return this.vcr.capture('getDatabase', async () => {
+  async fetchDatabase(
+    organizationName: string,
+    databaseName: string,
+  ): Promise<PlanetScaleDatabase> {
+    return this.vcr.capture('fetchDatabase', async () => {
       const { stdout } = await execAsync(
         `pscale database show ${databaseName} --org ${organizationName} --format json`,
         withCliEnv({ encoding: 'utf-8' }),
@@ -222,12 +225,12 @@ class PlanetScaleApi {
     });
   }
 
-  async getBranch(
+  async fetchBranch(
     organizationName: string,
     databaseName: string,
     branchName: string,
   ): Promise<PlanetScaleBranch> {
-    return this.vcr.capture('getBranch', async () => {
+    return this.vcr.capture('fetchBranch', async () => {
       const { stdout } = await execAsync(
         `pscale branch show ${databaseName} ${branchName} --org ${organizationName} --format json`,
         withCliEnv({ encoding: 'utf-8' }),

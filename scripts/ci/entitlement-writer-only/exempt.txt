@@ -1,0 +1,4 @@
+# Entitlement writes outside changeEntitlements: <file>:<key>\t<reason>. Only writes the system makes from the schema, never one a caller asks for.
+apps/api/src/hooks/fullDelegate/hook.ts:entitlement.updateManyAndReturn	A delegate made full is its owner whole: the update that set full was checked (validateFullGrant), and this only tombstones the rows it held beside that.
+apps/api/src/hooks/memberSelfGrant/hook.ts:entitlement.createManyAndReturn	The member self-grant is written with the member it belongs to, from the schema (memberSelfGrant); no caller supplies it. Goes when the self-grant becomes a schema grant.
+apps/api/src/hooks/ruleReference/targetHook.ts:model: 'Entitlement'	Stamps sourceDeletedAt, a copy of the anchor's deletedAt, when the anchor is tombstoned or revived; no caller supplies it and no grant changes.

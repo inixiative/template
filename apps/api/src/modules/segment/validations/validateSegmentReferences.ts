@@ -9,15 +9,18 @@ import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { findReferenceCycle } from '@template/shared/graph';
 import { makeError } from '#/lib/errors';
-import { ownedSegments } from '#/modules/customerRef/lib/ownedSegments';
+import { ownedSegments } from '#/modules/customerRelationship/lib/ownedSegments';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
-import { buildReferenceMap } from '#/modules/segment/services/segmentReferenceGraph';
+import { targetSegmentIdsBySegmentId } from '#/modules/segment/services/segmentReferenceGraph';
 
 type Owner = { ownerModel: ProviderModel } & Record<string, unknown>;
 
 const assertNoReferenceCycle = (candidate: Segment, owned: Segment[]): void => {
   const others = owned.filter((segment) => segment.id !== candidate.id);
-  const cycle = findReferenceCycle(buildReferenceMap([candidate, ...others]), candidate.id);
+  const cycle = findReferenceCycle(
+    targetSegmentIdsBySegmentId([candidate, ...others]),
+    candidate.id,
+  );
   if (cycle) {
     throw makeError({
       status: 422,

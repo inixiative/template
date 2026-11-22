@@ -7,8 +7,8 @@
 import type { Condition } from '@inixiative/json-rules';
 import { assertRuleReferencesExist, ruleReferences } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
+import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
+import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
 
 type Candidate = {
   ownerModel: ProviderModel;
@@ -22,8 +22,8 @@ export const assertSegmentReferencesOwned = async ({
   ownerId,
   conditions,
 }: Candidate): Promise<void> => {
-  const references = ruleReferences(customerRefLens, conditions);
+  const references = ruleReferences(customerRelationshipLens, conditions);
   await assertRuleReferencesExist([
-    { lens: resolvedCustomerRefLens(ownerModel, ownerId), references },
+    { lens: resolvedCustomerRelationshipLens(ownerModel, ownerId), references },
   ]);
 };

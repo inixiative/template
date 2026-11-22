@@ -23,25 +23,27 @@ export { Prisma } from './generated/client/client';
 export * from './generated/zod/enums.gen';
 // Scalar schemas (model schemas without relations)
 export * from './generated/zod/scalarSchemas.gen';
-export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
+export type { HydratedRecord, HydrateInclude } from './hydrate';
 // Hydration
-export { fetchOne, hydrate } from './hydrate';
+export { fetchCachedRecordWithTargetEntitlements, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
 export {
   claimLane,
-  getJobSupersededBy,
+  claimLaneUnlessNewerHolder,
+  fetchSupersededBy,
   holdLaneWhileParked,
+  type LaneClaim,
+  type LaneStore,
   laneKey,
-  reclaimLane,
-  releaseLane,
-  supersededKey,
-  tombstoneJob,
+  markDisplacedHolder,
+  type WatchedLane,
   watchLane,
 } from './lanes';
+// Attribute model capability (registry, DMMF/index validation, typed codec, operators, hook, utils)
+export * from './lib/attributes';
 // Distributed lock
 export {
   type AcquireOptions,
-  createLock,
   FindForUpdateLockTimeoutError,
   type Lock,
   LockLostError,
@@ -49,6 +51,7 @@ export {
   type LockRedis,
   type LockReleaseResult,
   type LockSetTarget,
+  makeLock,
   maxSafeHeartbeatMs,
   singleFlightLock,
 } from './lock';
@@ -58,16 +61,12 @@ export {
   type CacheCheck,
   type CacheState,
   COMMAND_TIMEOUT_MS,
-  cache,
   cacheKey,
   checkCache,
-  clearKey,
+  clearCacheKeysMatchingPattern,
   createRedisConnection,
+  fetchThroughCache,
   flushRedis,
-  getRedisClient,
-  getRedisPub,
-  getRedisSub,
-  getRollingCache,
   listRollingCaches,
   MAX_ROLLING_CACHE_TARGETS,
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
@@ -89,7 +88,11 @@ export {
   type RollingCacheTargets,
   type RollingCacheValue,
   type RollingCacheWrite,
+  redisClient,
   redisNamespace,
+  redisPublisher,
+  redisSubscriber,
+  rollingCacheByNameOrThrow,
   unregisterRollingCache,
   upsertCache,
 } from './redis';
@@ -97,25 +100,19 @@ export {
 export * from './registries';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
-export {
-  type EnumField,
-  isScalarField,
-  type ModelField,
-  type RelationField,
-  type ScalarField,
-} from '@inixiative/prisma-map';
 export { equalsSuppliedBind } from './registries/equalsSuppliedBind';
 export {
+  BIND_NAME_BY_OWNER_MODEL,
+  type BindableOwnerModel,
+  conditionPolymorphicAxisPointsAtBoundRow,
   isArmColumns,
-  isOwnerKind,
-  POLYMORPHIC_BINDS,
-  type PolymorphicKind,
+  isBindableOwnerModel,
   polymorphicBindings,
-  polymorphicIs,
   polymorphicKeyColumn,
+  polymorphicKeyColumnOrThrow,
   polymorphicKeyColumns,
-  polymorphicTarget,
-} from './registries/polymorphicIs';
+  rowPolymorphicAxisPointsAt,
+} from './registries/polymorphicAxisPointsAt';
 export { polymorphicSchema } from './registries/polymorphicSchema';
 export type {
   PolymorphicAxisField,
@@ -134,7 +131,11 @@ export type {
 } from './types/userWithRelations';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
-export { carryDelegatedKeys } from './utils/carryDelegatedKeys';
+export {
+  type ApplyWriteDataOptions,
+  applyWriteDataOverPreviousRow,
+} from './utils/applyWriteDataOverPreviousRow';
+export { carryOwnerKeys } from './utils/carryOwnerKeys';
 // Type-safe delegate helpers (pass-the-delegate pattern)
 export {
   type AnyCrudDelegate,
@@ -142,7 +143,6 @@ export {
   type Args,
   count,
   create,
-  del,
   findFirst,
   findMany,
   findUnique,
@@ -151,13 +151,17 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
-export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './utils/fieldMetadata';
+// Rule references: the rows a stored rule names, as edges
+export { fetchParentRows } from './utils/fetchParentRows';
+export {
+  fetchRuleReferenceTargetsDeletedAtForUpdate,
+  type RuleReferenceTargetDeletedState,
+} from './utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
+export { hasDeletedAt } from './utils/fieldMetadata';
+export { isTombstoneOnlyUpdate } from './utils/isTombstoneOnlyUpdate';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
-// Rule references: the rows a stored rule names, as edges
-export { loadParentRows } from './utils/loadParentRows';
-export { lockedTargetStates, type TargetState } from './utils/lockedTargetStates';
 // Model name utilities
 export {
   type AccessorName,
@@ -173,8 +177,12 @@ export {
   toModelName,
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
-export { polymorphicArmRelation } from './utils/polymorphicArmKeys';
-export { getModelRelations } from './utils/prismaMapRelations';
+export {
+  polymorphicArmColumns,
+  polymorphicArmKeys,
+  polymorphicArmRelation,
+} from './utils/polymorphicArmKeys';
+export { relationsOfModel } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';
 export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
@@ -196,6 +204,11 @@ export {
 } from './utils/sourceQueryValues';
 export { sourceQueryWhere } from './utils/sourceQueryWhere';
 export { type RuleReferenceSource, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
+export {
+  modelsHeldUnderTenant,
+  TENANT_COLUMNS,
+  tenantRowsAbove,
+} from './utils/tenantRowsAbove';
 export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
 export { assertRuleReferencesExist } from './validations/assertRuleReferencesExist';
 export {
@@ -208,8 +221,6 @@ export {
   type ValidateRuleForLensOptions,
   validateRuleForLens,
 } from './validations/validateRuleForLens';
-
-// Hook shared utilities (ignore fields, redact fields)
 
 // For model types: import from @template/db/client or @template/db/models
 // For runtime enum values: import from @template/db/enums

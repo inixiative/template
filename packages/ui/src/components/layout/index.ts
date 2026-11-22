@@ -1,5 +1,4 @@
 export * from './AppShell';
-export * from './ContextSelector';
 export * from './DetailPanel';
 export * from './FullscreenLayout';
 export * from './Header';
@@ -9,4 +8,5 @@ export * from './navigationTypes';
 export * from './Page';
 export * from './ResponsiveDrawer';
 export * from './Sidebar';
+export * from './TenantContextSelector';
 export * from './UserMenu';

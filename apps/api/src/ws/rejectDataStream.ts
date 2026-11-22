@@ -1,10 +1,14 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:websockets
  * @uses primitive:shared
  */
-import type { WSFrameErrorFrame, WSStreamAckFrame } from '@template/shared/ws';
+import {
+  retryableErrorFrame,
+  type WSFrameErrorFrame,
+  type WSStreamAckFrame,
+} from '@template/shared/ws';
 import { sendTo } from '#/ws/delivery';
 import type { RouteAccess } from '#/ws/routeAccess';
 import { unsubscribeFromStream } from '#/ws/streamSubscriptions';
@@ -19,6 +23,6 @@ export const rejectDataStream = (
   const frame: WSStreamAckFrame | WSFrameErrorFrame =
     access === 'rejected'
       ? { type: 'openRejected', stream }
-      : { type: 'error', action: 'open', stream, retryable: true };
+      : retryableErrorFrame({ action: 'open', stream });
   sendTo(ws, frame);
 };

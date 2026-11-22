@@ -8,12 +8,12 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
 import { makeError } from '#/lib/errors';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import type { Inquiry } from '#/modules/inquiry/handlers/types';
-import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
+import { inquiryServices } from '#/modules/inquiry/services';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
-import { resolveInquiry } from '#/modules/inquiry/services/resolution';
+import { resolveInquiry } from '#/modules/inquiry/services/resolveInquiry';
+import type { Inquiry } from '#/modules/inquiry/services/types';
 import { validateInquiryIsSendable } from '#/modules/inquiry/validations/validateInquiryStatus';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -28,7 +28,10 @@ export const sendInquiry = async (
     const fresh = await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt);
 
     if (fresh.status === InquiryStatus.sent)
-      return db.inquiry.findUniqueOrThrow({ where: { id: fresh.id }, include: includeInquirySent });
+      return db.inquiry.findUniqueOrThrow({
+        where: { id: fresh.id },
+        include: includeInquiryResponse,
+      });
 
     validateInquiryIsSendable(fresh);
 
@@ -42,26 +45,28 @@ export const sendInquiry = async (
         sentAt: fresh.sentAt ?? new Date(),
         expiresAt: computeExpiresAt(fresh.type),
       },
-      include: includeInquirySent,
+      include: includeInquiryResponse,
     });
 
-    const handler = inquiryHandlers[fresh.type];
+    const handler = inquiryServices[fresh.type];
     const autoApproved = await handler.autoApprove(sent);
 
-    if (autoApproved) {
-      await resolveInquiry(c, sent, InquiryStatus.approved, {}, sent.updatedAt);
-
-      const approved = await db.inquiry.findUniqueOrThrow({
-        where: { id: sent.id },
-        include: includeInquirySent,
-      });
-
-      await emitAppEvent('inquiry.sent', approved);
-
-      return approved;
-    }
-
     await emitAppEvent('inquiry.sent', sent);
+
+    if (autoApproved) {
+      await resolveInquiry(
+        c,
+        sent,
+        InquiryStatus.approved,
+        sent.content as Record<string, unknown>,
+        sent.updatedAt,
+      );
+
+      return db.inquiry.findUniqueOrThrow({
+        where: { id: sent.id },
+        include: includeInquiryResponse,
+      });
+    }
 
     return sent;
   });

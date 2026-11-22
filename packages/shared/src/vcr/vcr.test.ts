@@ -26,12 +26,12 @@ describe('VCR', () => {
 
       const result = await vcr.capture('fetch', async () => ({ secret: 'shh', visible: 'hi' }));
 
-      expect(result).toEqual({ secret: 'REDACTED', visible: 'hi' });
+      expect(result).toEqual({ secret: 'MASKED', visible: 'hi' });
       const saved = JSON.parse(readFileSync(join(dir, 'fetch.default.json'), 'utf-8')) as Fixture;
       expect(saved).toEqual({
         version: '1.0.0',
         status: 200,
-        body: { secret: 'REDACTED', visible: 'hi' },
+        body: { secret: 'MASKED', visible: 'hi' },
       });
     });
 
@@ -232,7 +232,7 @@ describe('VCR', () => {
   });
 
   describe('structured sanitizers', () => {
-    it('applies a structured transform before fixed-key redaction', async () => {
+    it('applies a structured transform before fixed-key masking', async () => {
       const vcr = new VCR(dir, {
         service: 'svc',
         version: () => '1.0.0',
@@ -249,7 +249,7 @@ describe('VCR', () => {
         body: { visible: 'kept', secret: 'sensitive' },
       }));
 
-      expect(response.body).toEqual({ visible: 'kept', secret: 'REDACTED', transformed: true });
+      expect(response.body).toEqual({ visible: 'kept', secret: 'MASKED', transformed: true });
     });
 
     it('applies fn to non-string capture results and to each item of an isArray rule', async () => {
@@ -296,7 +296,7 @@ describe('VCR', () => {
 
       expect(first.status).toBe(201);
       expect(first.headers).toEqual(headers);
-      expect(first.body).toEqual({ token: 'REDACTED', id: 'abc' });
+      expect(first.body).toEqual({ token: 'MASKED', id: 'abc' });
 
       const second = await new VCR(dir, opts)
         .queue('fetch', 'default')

@@ -5,12 +5,12 @@
  * @uses infrastructure:redis
  */
 import { LogScope, log } from '@template/shared/logger';
-import { heartbeat } from '@template/shared/utils';
+import { startHeartbeat } from '@template/shared/utils';
 import {
   DEPTH_PROBE_MS,
-  flagKey,
   laneDepthCap,
   lowWater,
+  overflowFlagRedisKey,
   overflowStuckMs,
   overflowTtlSec,
 } from '#/jobs/outbox/config';
@@ -21,23 +21,23 @@ import { JobLane } from '#/jobs/types';
 const LANES = [JobLane.fast, JobLane.slow] as const;
 
 // --- one overflow flag per lane. Value = epoch ms when overflow began. ---
-export const isOverflowing = async (lane: JobLane = JobLane.fast): Promise<boolean> =>
-  (await queue.redis.get(flagKey(lane))) !== null;
+export const isOverflowFlagSet = async (lane: JobLane = JobLane.fast): Promise<boolean> =>
+  (await queue.redis.get(overflowFlagRedisKey(lane))) !== null;
 
 // A slow job spills when its own share is full or when the whole budget is.
 export const isLaneOverflowing = async (lane: JobLane): Promise<boolean> =>
   lane === JobLane.slow
-    ? (await isOverflowing(JobLane.slow)) || (await isOverflowing(JobLane.fast))
-    : isOverflowing(JobLane.fast);
+    ? (await isOverflowFlagSet(JobLane.slow)) || (await isOverflowFlagSet(JobLane.fast))
+    : isOverflowFlagSet(JobLane.fast);
 
-// Set-once via NX so re-trips keep the original start time (used by the stuck-overflow alert),
+// Set-once via NX so a repeated set keeps the original start time (used by the stuck-overflow alert),
 // with a TTL the drain renews each tick — survives between ticks, self-clears if the drain dies.
 const setOverflow = (lane: JobLane): Promise<unknown> =>
-  queue.redis.set(flagKey(lane), String(Date.now()), 'EX', overflowTtlSec(), 'NX');
-export const renewOverflow = (lane: JobLane = JobLane.fast): Promise<unknown> =>
-  queue.redis.expire(flagKey(lane), overflowTtlSec());
-export const clearOverflow = (lane: JobLane = JobLane.fast): Promise<unknown> =>
-  queue.redis.del(flagKey(lane));
+  queue.redis.set(overflowFlagRedisKey(lane), String(Date.now()), 'EX', overflowTtlSec(), 'NX');
+export const renewOverflowFlagTtl = (lane: JobLane = JobLane.fast): Promise<unknown> =>
+  queue.redis.expire(overflowFlagRedisKey(lane), overflowTtlSec());
+export const clearOverflowFlag = (lane: JobLane = JobLane.fast): Promise<unknown> =>
+  queue.redis.del(overflowFlagRedisKey(lane));
 
 const isLaneAtCap = (depths: QueueDepths, lane: JobLane): boolean =>
   laneDepth(depths, lane) >= laneDepthCap(lane);
@@ -52,25 +52,26 @@ const hasReachedCap = (depths: QueueDepths, isSlow: boolean): boolean =>
 // Trip each lane's flag whose depth has reached its cap, from depths the caller already holds: the
 // enqueue-side probe, or the drain pass's per-tick read (so the flag turns itself on within a tick
 // even when no single process saw the wave).
-export const tripFromDepths = async (depths: QueueDepths): Promise<void> => {
+export const setOverflowFlagForLanesAtCap = async (depths: QueueDepths): Promise<void> => {
   for (const lane of LANES)
     if (laneDepth(depths, lane) >= laneDepthCap(lane)) await setOverflow(lane);
 };
 
-// Probe fresh and trip from the result. Several Redis commands, so the enqueue path doesn't call this
+// Probe fresh and set the flag from the result. Several Redis commands, so the enqueue path doesn't call this
 // per job — it goes through the depth estimate below.
-export const tripIfFull = async (): Promise<void> => tripFromDepths(await queueDepths(true));
+export const probeDepthsAndSetOverflowFlagForLanesAtCap = async (): Promise<void> =>
+  setOverflowFlagForLanesAtCap(await queueDepths(true));
 
 // A rough, per-process queue depth: the last probe plus every add this process made since. An add that
 // finds the probe older than `probeMs` re-probes (one shared in-flight probe) and the add count resets.
-// The estimate only decides when to look: reaching a cap forces a fresh probe, and the flag trips on the
+// The estimate only decides when to look: reaching a cap forces a fresh probe, and the flag is set from the
 // depths that probe returned, never on the estimate, so neither stale counts nor adds recorded around the
-// probe trip it falsely. A wave of 20k or 100k adds therefore turns
+// probe set it falsely. A wave of 20k or 100k adds therefore turns
 // spilling on part-way through instead of overfilling Redis. Deliberately approximate — it sees only this
 // process's adds, and adds made during a probe are dropped by the reset. It guards against catastrophic
-// overfill, not exact admission: the drain tick trips from the real depth, and the cap sits well below
+// overfill, not exact admission: the drain tick sets it from the real depth, and the cap sits well below
 // Redis memory, so a small overshoot is harmless.
-export const createDepthEstimator = (
+export const makeDepthEstimator = (
   probeDepths: () => Promise<QueueDepths> = () => queueDepths(true),
   probeMs: number = DEPTH_PROBE_MS,
 ) => {
@@ -104,22 +105,22 @@ export const createDepthEstimator = (
     const rough = estimate();
     const isFresh = probed !== null && Date.now() - probed.at < probeMs;
     if (isFresh && rough && !hasReachedCap(rough, isSlow)) return;
-    await tripFromDepths(await probe());
+    await setOverflowFlagForLanesAtCap(await probe());
   };
 
   return { recordAdd };
 };
 
-let depthEstimator: ReturnType<typeof createDepthEstimator> | null = null;
+let depthEstimator: ReturnType<typeof makeDepthEstimator> | null = null;
 // The enqueue path's entry: one estimator over the jobs queue, created on first use.
-export const recordAddAndTripIfFull = (isSlow: boolean): Promise<void> => {
-  depthEstimator ??= createDepthEstimator();
+export const recordEnqueueAndSetOverflowFlagForLanesAtCap = (isSlow: boolean): Promise<void> => {
+  depthEstimator ??= makeDepthEstimator();
   return depthEstimator.recordAdd(isSlow);
 };
 
 // Operational alert: overflow that won't clear means the drain can't keep up with arrivals.
 export const warnIfOverflowStuck = async (lane: JobLane, depth: number): Promise<void> => {
-  const startedAt = await queue.redis.get(flagKey(lane));
+  const startedAt = await queue.redis.get(overflowFlagRedisKey(lane));
   if (startedAt === null) return;
   const ageMs = Date.now() - Number(startedAt);
   if (ageMs > overflowStuckMs()) {
@@ -131,14 +132,14 @@ export const warnIfOverflowStuck = async (lane: JobLane, depth: number): Promise
 };
 
 // Hold both flags' TTLs open for the duration of `fn` via a heartbeat, so a long drain pass can't let
-// one lapse mid-tick regardless of how long it runs. renewOverflow (EXPIRE) no-ops on an absent key,
+// one lapse mid-tick regardless of how long it runs. renewOverflowFlagTtl (EXPIRE) no-ops on an absent key,
 // so the final renew never resurrects a flag the pass cleared.
 export const withOverflowRenew = async <T>(fn: () => Promise<T>): Promise<T> => {
   const renewAll = async () => {
-    for (const lane of LANES) await renewOverflow(lane);
+    for (const lane of LANES) await renewOverflowFlagTtl(lane);
   };
   const renewMs = Math.floor((overflowTtlSec() * 1000) / 3); // a third of the TTL — always below it by construction
-  const stop = heartbeat(renewAll, renewMs);
+  const stop = startHeartbeat(renewAll, renewMs);
   try {
     return await fn();
   } finally {

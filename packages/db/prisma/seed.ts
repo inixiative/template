@@ -9,7 +9,11 @@
 import { type AccessorName, db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import { LogScope, log } from '@template/shared/logger';
-import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import {
+  ConcurrencyType,
+  minimumConcurrencyLimitFor,
+  runAllWithConcurrencyLimit,
+} from '@template/shared/utils';
 import { isUuidV7 } from '@template/shared/utils/isUuidV7';
 import { omit } from 'lodash-es';
 import { seeds } from './seeds';
@@ -94,9 +98,9 @@ export const seedTable = async (seedFile: SeedFile, savers: SeedSavers = {}): Pr
     return;
   }
 
-  const concurrency = getConcurrency([ConcurrencyType.db]) || 10;
+  const concurrency = minimumConcurrencyLimitFor([ConcurrencyType.db]) || 10;
 
-  await resolveAll(
+  await runAllWithConcurrencyLimit(
     eligibleRecords.map((record) => async () => {
       const { prime, ...data } = record;
       const id = data.id as string;

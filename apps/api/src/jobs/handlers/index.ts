@@ -1,14 +1,22 @@
-import { type CleanStaleDataPayload, cleanStaleData } from '#/jobs/handlers/cleanStaleData';
 import { coordinateRollingCaches } from '#/jobs/handlers/coordinateRollingCaches';
 import { type DeliverEmailPayload, deliverEmail } from '#/jobs/handlers/deliverEmail';
+import {
+  type HardDeleteRecordsPastRetentionPayload,
+  hardDeleteRecordsPastRetention,
+} from '#/jobs/handlers/hardDeleteRecordsPastRetention';
+import {
+  type PlanEmailDeliveriesPayload,
+  planEmailDeliveries,
+} from '#/jobs/handlers/planEmailDeliveries';
 import {
   type RecomputeEmailDependentsPayload,
   recomputeEmailDependents,
 } from '#/jobs/handlers/recomputeEmailDependents';
 import {
-  type ReconcileCustomerRefSegmentsPayload,
-  reconcileCustomerRefSegments,
-} from '#/jobs/handlers/reconcileCustomerRefSegments';
+  type ReconcileCustomerRelationshipSegmentsPayload,
+  reconcileCustomerRelationshipSegments,
+} from '#/jobs/handlers/reconcileCustomerRelationshipSegments';
+import { reconcileEveryHealthyDynamicSegment } from '#/jobs/handlers/reconcileEveryHealthyDynamicSegment';
 import { type ReconcileSegmentPayload, reconcileSegment } from '#/jobs/handlers/reconcileSegment';
 import {
   type RefreshRollingCachePayload,
@@ -19,20 +27,18 @@ import {
   refreshRollingCacheTarget,
 } from '#/jobs/handlers/refreshRollingCacheTarget';
 import { rotateEncryptionKeys } from '#/jobs/handlers/rotateEncryptionKeys';
-import { type SendEmailPayload, sendEmail } from '#/jobs/handlers/sendEmail';
 import { type SendWebhookPayload, sendWebhook } from '#/jobs/handlers/sendWebhook';
-import { sweepSegments } from '#/jobs/handlers/sweepSegments';
 import type { JobHandler } from '#/jobs/types';
 
 export const JobHandlerName = {
-  sendEmail: 'sendEmail',
+  planEmailDeliveries: 'planEmailDeliveries',
   deliverEmail: 'deliverEmail',
   sendWebhook: 'sendWebhook',
   rotateEncryptionKeys: 'rotateEncryptionKeys',
-  cleanStaleData: 'cleanStaleData',
+  hardDeleteRecordsPastRetention: 'hardDeleteRecordsPastRetention',
   reconcileSegment: 'reconcileSegment',
-  reconcileCustomerRefSegments: 'reconcileCustomerRefSegments',
-  sweepSegments: 'sweepSegments',
+  reconcileCustomerRelationshipSegments: 'reconcileCustomerRelationshipSegments',
+  reconcileEveryHealthyDynamicSegment: 'reconcileEveryHealthyDynamicSegment',
   recomputeEmailDependents: 'recomputeEmailDependents',
   coordinateRollingCaches: 'coordinateRollingCaches',
   refreshRollingCache: 'refreshRollingCache',
@@ -42,14 +48,14 @@ export const JobHandlerName = {
 export type JobHandlerName = (typeof JobHandlerName)[keyof typeof JobHandlerName];
 
 export type JobPayloads = {
-  sendEmail: SendEmailPayload;
+  planEmailDeliveries: PlanEmailDeliveriesPayload;
   deliverEmail: DeliverEmailPayload;
   sendWebhook: SendWebhookPayload;
   rotateEncryptionKeys: undefined;
-  cleanStaleData: CleanStaleDataPayload;
+  hardDeleteRecordsPastRetention: HardDeleteRecordsPastRetentionPayload;
   reconcileSegment: ReconcileSegmentPayload;
-  reconcileCustomerRefSegments: ReconcileCustomerRefSegmentsPayload;
-  sweepSegments: undefined;
+  reconcileCustomerRelationshipSegments: ReconcileCustomerRelationshipSegmentsPayload;
+  reconcileEveryHealthyDynamicSegment: undefined;
   recomputeEmailDependents: RecomputeEmailDependentsPayload;
   coordinateRollingCaches: undefined;
   refreshRollingCache: RefreshRollingCachePayload;
@@ -61,14 +67,14 @@ export type JobHandlers = {
 };
 
 export const jobHandlers: JobHandlers = {
-  sendEmail,
+  planEmailDeliveries,
   deliverEmail,
   sendWebhook,
   rotateEncryptionKeys,
-  cleanStaleData,
+  hardDeleteRecordsPastRetention,
   reconcileSegment,
-  reconcileCustomerRefSegments,
-  sweepSegments,
+  reconcileCustomerRelationshipSegments,
+  reconcileEveryHealthyDynamicSegment,
   recomputeEmailDependents,
   coordinateRollingCaches,
   refreshRollingCache,

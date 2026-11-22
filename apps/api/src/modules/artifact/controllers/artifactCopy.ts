@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates
  */
 import { db } from '@template/db';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { creatorGrantFor } from '#/modules/artifact/lib/creatorGrant';
@@ -16,7 +16,7 @@ export const artifactCopyController = makeController(artifactCopyRoute, async (c
   const { containerArtifactId, name } = c.req.valid('json');
   const container = await db.artifact.findUniqueOrThrow({ where: { id: containerArtifactId } });
   const copy = await copyArtifact(artifactActorFromContext(c), {
-    artifactId: getResource<'artifact'>(c).id,
+    artifactId: contextResource<'artifact'>(c).id,
     containerArtifactId,
     name,
     creatorGrant: creatorGrantFor(c, container),

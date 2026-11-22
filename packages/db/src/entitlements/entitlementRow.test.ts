@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
 import {
-  loadEntitlementAnchors,
+  fetchEntitlementAnchors,
   missingAnchors,
 } from '@template/db/entitlements/entitlementAnchors';
 import {
@@ -10,7 +10,7 @@ import {
   toEntitlementCreateData,
 } from '@template/db/entitlements/entitlementRow';
 import type { Entitlement } from '@template/db/generated/client/client';
-import { fetchOne } from '@template/db/hydrate/fetchOne';
+import { fetchCachedRecordWithTargetEntitlements } from '@template/db/hydrate/fetchCachedRecordWithTargetEntitlements';
 import {
   cleanupTouchedTables,
   createOrganization,
@@ -35,7 +35,7 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     await cleanupTouchedTables(db);
   });
 
-  it('a holder read through fetchOne carries its live rows, in the order granted', async () => {
+  it('a holder read through fetchCachedRecordWithTargetEntitlements carries its live rows, in the order granted', async () => {
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
     const inputs: EntitlementInput[] = [
@@ -54,10 +54,10 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
       { organization },
     );
 
-    const loaded = await fetchOne<{ id: string; targetEntitlements: Entitlement[] }>(
-      'token',
-      token.id,
-    );
+    const loaded = await fetchCachedRecordWithTargetEntitlements<{
+      id: string;
+      targetEntitlements: Entitlement[];
+    }>('token', token.id);
     expect(loaded?.targetEntitlements.map(stored)).toEqual([
       { ...inputs[0], where: null, sourcePath: null },
       inputs[1],
@@ -84,7 +84,7 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     });
   });
 
-  it("a member arm carries the member's whole owner chain, its id materialized", async () => {
+  it("a member arm carries the member's whole owner chain, its dual polymorphism id set", async () => {
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
     const { entity: spaceUser } = await createSpaceUser({}, { organization, space });
@@ -101,7 +101,7 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     const [row] = toEntitlementCreateData(
       inputs,
       { model: 'SpaceUser', row: spaceUser },
-      await loadEntitlementAnchors(inputs),
+      await fetchEntitlementAnchors(inputs),
     );
     expect(row).toMatchObject({
       sourceModel: 'OrganizationUser',
@@ -150,7 +150,7 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
         sourceId: 'no-such-member',
       },
     ];
-    expect(missingAnchors(inputs, await loadEntitlementAnchors(inputs))).toEqual(inputs);
+    expect(missingAnchors(inputs, await fetchEntitlementAnchors(inputs))).toEqual(inputs);
   });
 
   it('a target with no rows holds none', async () => {
@@ -158,8 +158,12 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     const { entity: token } = await createToken({ ownerModel: 'Organization' }, { organization });
     expect(await storeEntitlements({ model: 'Token', row: token }, [])).toEqual([]);
     expect(
-      (await fetchOne<{ id: string; targetEntitlements: Entitlement[] }>('token', token.id))
-        ?.targetEntitlements,
+      (
+        await fetchCachedRecordWithTargetEntitlements<{
+          id: string;
+          targetEntitlements: Entitlement[];
+        }>('token', token.id)
+      )?.targetEntitlements,
     ).toEqual([]);
   });
 });

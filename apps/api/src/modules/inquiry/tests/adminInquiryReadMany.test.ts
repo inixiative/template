@@ -16,7 +16,7 @@ import {
 } from '@template/db/test';
 import { adminInquiryRouter } from '#/modules/inquiry';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type ReadManyResponse = {
   data: Array<{ id: string; expiresAt: string | null }>;
@@ -90,7 +90,7 @@ describe('GET /api/admin/inquiry', () => {
         `/api/admin/inquiry?searchFields[expiresAt][gte]=${encodeURIComponent(now.toISOString())}`,
       ),
     );
-    const { data } = await json<ReadManyResponse['data']>(response);
+    const { data } = await parseSuccessBody<ReadManyResponse['data']>(response);
 
     expect(response.status).toBe(200);
     expect(data.map((inq) => inq.id)).toContain(futureInquiry.id);

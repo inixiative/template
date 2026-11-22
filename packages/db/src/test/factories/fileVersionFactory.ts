@@ -6,12 +6,12 @@
  */
 import { faker } from '@faker-js/faker';
 import { FileVersionStatus } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const fileVersionFactory = createFactory('FileVersion', {
+const fileVersionFactory = registerFactory('FileVersion', {
   defaults: () => ({
-    version: 1,
-    key: `${faker.string.uuid()}-${faker.system.fileName()}`,
+    version: nextFactorySequenceNumber(),
+    key: `${nextFactorySequenceNumber()}-${faker.string.uuid()}-${faker.system.fileName()}`,
     contentType: 'image/png',
     size: faker.number.int({ min: 1_000, max: 5_000_000 }),
     status: FileVersionStatus.active,

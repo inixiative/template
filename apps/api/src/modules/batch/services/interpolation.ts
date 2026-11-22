@@ -2,51 +2,24 @@
  * @atlas
  * @kind service
  * @partOf primitive:batch
- * @uses none
+ * @uses primitive:shared
  */
-import { validatePathNotation } from '#/lib/prisma/pathNotation';
-import type { BatchRequest } from '#/modules/batch/services/strategies/types';
 
-const INTERPOLATION_PATTERN = /<<(\d+)\.(\d+)\.([a-zA-Z0-9_.]+)>>/;
-const INTERPOLATION_PATTERN_GLOBAL = /<<(\d+)\.(\d+)\.([a-zA-Z0-9_.]+)>>/g;
-const MALFORMED_PATTERN_REGEX = /<<[^>]*>>/g;
+import type { OpenAPIHono } from '@hono/zod-openapi';
+import {
+  type BatchInterpolationReference,
+  type BatchInterpolationToken,
+  decodePercentEncodedBatchReferences,
+  tokenizeBatchInterpolation,
+} from '@template/shared/batchInterpolation';
+import { isValidPathNotation } from '#/lib/prisma/pathNotation';
+import { assertBatchable } from '#/modules/batch/services/assertBatchable';
+import type { BatchRequest } from '#/modules/batch/services/strategies/types';
+import type { AppEnv } from '#/types/appEnv';
 
 type InterpolationContext = {
   results: unknown[][];
   currentRound?: number;
-};
-
-const validateInterpolationSyntax = (value: string): void => {
-  let depth = 0;
-  for (let i = 0; i < value.length; i++) {
-    if (value[i] === '<' && value[i + 1] === '<') {
-      depth++;
-      if (depth > 1) {
-        throw new Error('Nested interpolation is not allowed');
-      }
-      i++;
-    } else if (value[i] === '>' && value[i + 1] === '>') {
-      depth--;
-      if (depth < 0) {
-        throw new Error('Unbalanced interpolation brackets: closing >> without opening <<');
-      }
-      i++;
-    }
-  }
-  if (depth !== 0) {
-    throw new Error('Unbalanced interpolation brackets: unclosed <<');
-  }
-
-  const malformedPatterns = value.match(MALFORMED_PATTERN_REGEX);
-  if (!malformedPatterns) return;
-
-  for (const pattern of malformedPatterns) {
-    if (!INTERPOLATION_PATTERN.test(pattern)) {
-      throw new Error(
-        `Malformed interpolation syntax: ${pattern}. Expected format: <<roundIndex.requestIndex.field.path>>`,
-      );
-    }
-  }
 };
 
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
@@ -70,57 +43,83 @@ const navigateFieldPath = (value: unknown, path: string): unknown => {
   return result;
 };
 
-const interpolateString = (value: string, context: InterpolationContext): string => {
-  validateInterpolationSyntax(value);
+const referenceValue = (
+  { raw, round, request, fieldPath }: BatchInterpolationReference,
+  context: InterpolationContext,
+): unknown => {
+  if (!isValidPathNotation(fieldPath)) {
+    throw new Error(`Invalid interpolation path: ${raw}`);
+  }
 
-  return value.replace(
-    INTERPOLATION_PATTERN_GLOBAL,
-    (match: string, roundIdx: string, reqIdx: string, fieldPath: string) => {
-      if (!validatePathNotation(fieldPath)) {
-        throw new Error(`Invalid interpolation path: ${match}`);
-      }
+  if (context.currentRound !== undefined && round >= context.currentRound) {
+    throw new Error(
+      `Invalid round reference in ${raw}: cannot reference round ${round} from round ${context.currentRound}. Interpolation can only reference previous rounds (0-${context.currentRound - 1})`,
+    );
+  }
 
-      const round = parseInt(roundIdx, 10);
-      const request = parseInt(reqIdx, 10);
+  if (round >= context.results.length) {
+    throw new Error(
+      `Round index out of bounds in ${raw}: round ${round} does not exist (only ${context.results.length} rounds completed)`,
+    );
+  }
 
-      if (context.currentRound !== undefined && round >= context.currentRound) {
-        throw new Error(
-          `Invalid round reference in ${match}: cannot reference round ${round} from round ${context.currentRound}. Interpolation can only reference previous rounds (0-${context.currentRound - 1})`,
-        );
-      }
+  if (!context.results[round]) {
+    throw new Error(`Round ${round} has no results in ${raw}`);
+  }
 
-      if (round >= context.results.length) {
-        throw new Error(
-          `Round index out of bounds in ${match}: round ${round} does not exist (only ${context.results.length} rounds completed)`,
-        );
-      }
+  if (request >= context.results[round].length) {
+    throw new Error(
+      `Request index out of bounds in ${raw}: request ${request} does not exist in round ${round} (only ${context.results[round].length} requests completed)`,
+    );
+  }
 
-      if (!context.results[round]) {
-        throw new Error(`Round ${round} has no results in ${match}`);
-      }
+  if (!context.results[round][request]) {
+    throw new Error(`Request ${request} in round ${round} has no result in ${raw}`);
+  }
 
-      if (request >= context.results[round].length) {
-        throw new Error(
-          `Request index out of bounds in ${match}: request ${request} does not exist in round ${round} (only ${context.results[round].length} requests completed)`,
-        );
-      }
+  const result = navigateFieldPath(context.results[round][request], fieldPath);
 
-      if (!context.results[round][request]) {
-        throw new Error(`Request ${request} in round ${round} has no result in ${match}`);
-      }
+  if (result === undefined) {
+    throw new Error(
+      `Field not found in interpolation: ${raw} - field '${fieldPath}' does not exist in the result`,
+    );
+  }
 
-      const result = navigateFieldPath(context.results[round][request], fieldPath);
-
-      if (result === undefined) {
-        throw new Error(
-          `Field not found in interpolation: ${match} - field '${fieldPath}' does not exist in the result`,
-        );
-      }
-
-      return String(result);
-    },
-  );
+  return result;
 };
+
+const referenceString = (
+  reference: BatchInterpolationReference,
+  context: InterpolationContext,
+): string => String(referenceValue(reference, context));
+
+const renderTokens = (
+  tokens: BatchInterpolationToken[],
+  context: InterpolationContext,
+  encodeResolved: (resolved: string) => string = (resolved) => resolved,
+): string =>
+  tokens
+    .map((token) =>
+      token.kind === 'text' ? token.value : encodeResolved(referenceString(token, context)),
+    )
+    .join('');
+
+const interpolateString = (
+  value: string,
+  context: InterpolationContext,
+  encodeResolved?: (resolved: string) => string,
+): string => renderTokens(tokenizeBatchInterpolation(value), context, encodeResolved);
+
+const DOT_SEGMENTS = ['.', '..'];
+
+const encodeResolvedPathValue = (resolved: string): string => {
+  if (DOT_SEGMENTS.includes(resolved))
+    throw new Error(`Batch reference resolved to '${resolved}', which cannot fill a path`);
+  return encodeURIComponent(resolved);
+};
+
+const interpolatePath = (path: string, context: InterpolationContext): string =>
+  interpolateString(decodePercentEncodedBatchReferences(path), context, encodeResolvedPathValue);
 
 const interpolateHeaders = (
   headers: Record<string, string>,
@@ -132,7 +131,11 @@ const interpolateHeaders = (
 
 export const interpolateValue = (value: unknown, context: InterpolationContext): unknown => {
   if (typeof value === 'string') {
-    return interpolateString(value, context);
+    const tokens = tokenizeBatchInterpolation(value);
+    if (tokens.length === 1 && tokens[0]?.kind === 'reference') {
+      return referenceValue(tokens[0], context);
+    }
+    return renderTokens(tokens, context);
   }
 
   if (Array.isArray(value)) {
@@ -156,8 +159,18 @@ export const interpolateRequest = (
 ): BatchRequest => {
   return {
     ...request,
-    path: interpolateString(request.path, context),
-    body: request.body ? interpolateValue(request.body, context) : undefined,
+    path: interpolatePath(request.path, context),
+    body: request.body !== undefined ? interpolateValue(request.body, context) : undefined,
     headers: request.headers ? interpolateHeaders(request.headers, context) : undefined,
   };
+};
+
+export const interpolateBatchableRequest = (
+  app: OpenAPIHono<AppEnv>,
+  request: BatchRequest,
+  context: InterpolationContext,
+): BatchRequest => {
+  const interpolatedRequest = interpolateRequest(request, context);
+  assertBatchable(app, [[interpolatedRequest]]);
+  return interpolatedRequest;
 };

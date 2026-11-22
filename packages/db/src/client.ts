@@ -6,6 +6,7 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { columnName, fieldOf, hasColumn, modelOf, tableName } from '@inixiative/field-map';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type {
   AfterCommitFn,
@@ -45,6 +46,7 @@ import {
 import { publishKey } from '@template/db/redis/cache/transactionOverlay/publishKey';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import { hasDeletedAt } from '@template/db/utils/fieldMetadata';
 import {
   type AccessorName,
   isAccessorName,
@@ -53,7 +55,11 @@ import {
 } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { incrementCounter } from '@template/shared/telemetry';
-import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import {
+  ConcurrencyType,
+  minimumConcurrencyLimitFor,
+  runAllWithConcurrencyLimit,
+} from '@template/shared/utils';
 import { castArray } from 'lodash-es';
 import { uuidv7 } from 'uuidv7';
 
@@ -88,7 +94,7 @@ const publishKeys = (
 ): Promise<PromiseSettledResult<void>[]> =>
   db.parallel(
     keys.map((key) => () => publishKey(overlay, key)),
-    { concurrency: getConcurrency([ConcurrencyType.redis]), resolution: 'allSettled' },
+    { concurrency: minimumConcurrencyLimitFor([ConcurrencyType.redis]), resolution: 'allSettled' },
   );
 
 const drainFinally = async (openTransaction: OpenTransaction | null): Promise<void> => {
@@ -153,6 +159,7 @@ const dbMethods = {
               client: transactionClient as Db,
               prismaTransactionId: null,
               afterCommitBatches: [],
+              commitCollectors: new Map(),
               finallyFns: [],
               heldLocks: new Map(),
               settled: false,
@@ -245,9 +252,22 @@ const dbMethods = {
     const typeList = types ? castArray(types) : undefined;
     openTransaction.afterCommitBatches.push({
       fns: callbackList,
-      concurrency: getConcurrency(typeList),
+      concurrency: minimumConcurrencyLimitFor(typeList),
       types: typeList,
     });
+  },
+
+  onCommitCollect: <T>(key: string, item: T, flush: (items: T[]) => Promise<void> | void): void => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.onCommitCollect() requires db.txn()');
+    const held = openTransaction.commitCollectors.get(key);
+    if (held) {
+      held.push(item);
+      return;
+    }
+    const items: unknown[] = [item];
+    openTransaction.commitCollectors.set(key, items);
+    db.onCommit(() => flush(items as T[]));
   },
 
   onFinally: (callbacks: FinallyFn | FinallyFn[]): void => {
@@ -269,7 +289,7 @@ const dbMethods = {
     const inOwnScope = (thunk: () => Promise<T>) =>
       store.run(newScope(uuidv7(), parent?.scopeContext ?? null), thunk);
     if (options?.resolution === 'allSettled') {
-      return resolveAll(
+      return runAllWithConcurrencyLimit(
         thunks.map((thunk) => async (): Promise<PromiseSettledResult<T>> => {
           try {
             return { status: 'fulfilled', value: await inOwnScope(thunk) };
@@ -280,7 +300,7 @@ const dbMethods = {
         options.concurrency,
       );
     }
-    return resolveAll(
+    return runAllWithConcurrencyLimit(
       thunks.map((thunk) => () => inOwnScope(thunk)),
       options?.concurrency,
     );
@@ -292,9 +312,9 @@ const dbMethods = {
   withoutDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
     auditActorContext.withoutDeleted(fn),
 
-  getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
+  currentScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 
-  getScope: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
+  currentScopeContext: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
 
   isInTxn: (): boolean => !!store.getStore()?.openTransaction,
 
@@ -306,7 +326,8 @@ const dbMethods = {
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
   // the where-key itself (see acquireFindForUpdateLock) and returns the rows it currently names. One
   // field may list values as `{ in: [...] }` to fence a batch of such rows, each under the key a
-  // single-row fence on it takes.
+  // single-row fence on it takes. On a soft-delete model tombstones are locked but only live rows
+  // return, unless inside db.withDeleted or the where names deletedAt.
   findForUpdate: async <T = unknown>(
     model: string,
     where: Record<string, unknown>,
@@ -317,16 +338,15 @@ const dbMethods = {
     const keys = Object.keys(where);
     if (!keys.length) throw new Error('db.findForUpdate() requires at least one predicate');
     const modelName = toModelName(model);
-    const meta = prismaMap.models[modelName];
-    const table = meta.dbName ?? modelName;
-    // why: prismaMap carries no per-field dbName, so a predicate on an @map'd column would build
-    // why: SQL against a name that does not exist. No column in this schema is mapped; the field
-    // why: check is what keeps that true, by refusing any predicate the map cannot account for.
+    const meta = modelOf(prismaMap, modelName);
+    if (!meta) throw new Error(`db.findForUpdate(): unknown model '${model}'`);
+    const table = tableName(meta, modelName);
+    // A predicate names a column (`@map` resolved); a relation or an unknown field is refused.
     const columnFor = (key: string): string => {
-      const fields = meta.fields as Record<string, unknown>;
-      if (!fields[key])
+      const field = fieldOf(prismaMap, modelName, key);
+      if (!field || !hasColumn(field))
         throw new Error(`db.findForUpdate(): unknown field '${key}' on model '${model}'`);
-      return key;
+      return columnName(field, key);
     };
     const conds = keys.map((key) => {
       const column = Prisma.raw(`"${columnFor(key)}"`);
@@ -344,13 +364,21 @@ const dbMethods = {
         if (!list.length) return Prisma.sql`1 = 0`;
         return Prisma.sql`${column} IN (${Prisma.join(list)})`;
       }
-      return Prisma.sql`${column} = ${value}`;
+      return value === null ? Prisma.sql`${column} IS NULL` : Prisma.sql`${column} = ${value}`;
     });
+    const liveOnly =
+      hasDeletedAt(modelName) &&
+      !('deletedAt' in where) &&
+      !auditActorContext.isSoftDeleteBypassed();
     if (options?.upserting)
       await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
-    return db.$queryRaw<T[]>(
+    const locked = await db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} ${Prisma.raw(options?.changesKey ? 'FOR UPDATE' : 'FOR NO KEY UPDATE')}`,
     );
+    // why: tombstones are locked too, so a revive in flight on the key is waited on, not raced
+    if (!liveOnly) return locked;
+    const deletedAtColumn = columnFor('deletedAt');
+    return locked.filter((row) => (row as Record<string, unknown>)[deletedAtColumn] == null);
   },
 
   withLockUntilSettled: async <T>(

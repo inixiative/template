@@ -44,10 +44,11 @@
 - [Query Building Utilities](#query-building-utilities)
   - [buildWhereClause](#buildwhereclause)
   - [Soft-delete read scoping](#soft-delete-read-scoping)
+  - [Soft-delete cascade: every child is classified](#soft-delete-cascade-every-child-is-classified)
   - [Path Notation Utilities](#path-notation-utilities)
 - [False Polymorphism](#false-polymorphism)
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
-  - [Delegated Keys](#delegated-keys)
+  - [Carried Owner Keys](#carried-owner-keys)
   - [Back-Relations Over Shared Key Columns](#back-relations-over-shared-key-columns)
 - [Entitlement](#entitlement)
   - [Tokens](#tokens)
@@ -110,7 +111,7 @@ packages/db/prisma/
 ```
 packages/db/src/generated/
 ├── client/           # Prisma client
-├── prismaMap.gen.ts  # Runtime model map (@inixiative/prisma-map)
+├── prismaMap.gen.ts  # The field map, with literal types (`field-map generate`, @inixiative/field-map)
 └── zod/              # Zod schemas (prisma-zod-generator)
 ```
 
@@ -228,7 +229,7 @@ export const userSeeds: SeedFile = {
 
 **Features:**
 - **ID-based upsert** - Always upserts by `id` field (create or update)
-- **Concurrent processing** - Uses `resolveAll` with concurrency: 10
+- **Concurrent processing** - Uses `runAllWithConcurrencyLimit` with concurrency: 10
 - **UUIDv7 validation** - Validates all IDs are valid UUIDv7 format
 - **UUID uniqueness check** - Ensures no duplicate IDs across all seed files
 - **FK-safe ordering** - Tables seeded sequentially, records concurrently
@@ -494,11 +495,12 @@ db.raw.user.findMany()  // Always raw, bypasses txn
 db.scope(id, fn)        // Create AsyncLocalStorage context
 db.txn(fn)              // Start transaction
 db.onCommit(fns)        // Queue callbacks for after commit
+db.onCommitCollect(key, item, flush) // Gather items under a key; flush(items) runs once after commit
 db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or rollback
 db.findForUpdate(model, where, opts?) // SELECT ... FOR NO KEY UPDATE; { upserting: true } fences a missing row
 db.withLockUntilSettled(lockOptions, fn, acquireOptions?) // Redis lock held until the txn ends
 db.cacheOverlay()       // The open transaction's cache overlay, or null outside one
-db.getScopeId()         // Get current scope ID
+db.currentScopeId()         // Get current scope ID
 db.isInTxn()            // Check if in transaction
 ```
 
@@ -526,13 +528,29 @@ db.onCommit(async () => {
 });
 ```
 
+### Collecting Work for One Commit
+
+```typescript
+db.onCommitCollect('recomputeTotals', orderId, (orderIds) =>
+  enqueueJob('recomputeTotals', { orderIds }),
+);
+```
+
+Every call with the same key inside one transaction adds its item to one list, and `flush` runs once with
+that list after commit, as an `onCommit` batch (the first call's `flush` is the one that runs, so one key
+belongs to one caller). Use it in code that runs inside the transaction, such as a DB hook, when each
+write would otherwise schedule its own job: the transaction then schedules one job for the whole list.
+App-event callbacks run after commit, outside the transaction, so they cannot collect this way. A nested
+`db.txn` collects into the outer one, a rollback flushes nothing, and calling it outside a transaction
+throws.
+
 ### What Runs at Commit
 
 The outermost `db.txn` runs its end-of-transaction work in this order:
 
 1. Prisma commits or rolls back the transaction.
 2. On commit, the cache keys the transaction wrote are cleared through `db.parallel(..., { resolution: 'allSettled' })`, so every key runs (see
-   [REDIS.md § cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)). A failure is
+   [REDIS.md § fetchThroughCache() inside a transaction](./REDIS.md#fetchthroughcache-inside-a-transaction)). A failure is
    kept, not thrown yet.
 3. The transaction is marked settled and its finally queue drains, commit or rollback. This releases
    every lock held until the transaction settles.
@@ -554,7 +572,7 @@ throws outside `db.txn()`, and a nested `db.txn()` registers on the outermost tr
 
 A lock taken inside a transaction must outlive the code that took it: the writes made under it are
 invisible to everyone else until the commit, so releasing when `fn` returns lets the next holder read
-the state before them. `db.withLockUntilSettled(lockOptions, fn, acquireOptions?)` takes a `createLock`
+the state before them. `db.withLockUntilSettled(lockOptions, fn, acquireOptions?)` takes a `makeLock`
 lock (same options; `acquireOptions` is `{ waitMs, pollMs, onTimeout }`), runs `fn`, and releases the
 lock on the transaction's finally queue (the one `db.onFinally` feeds) once the transaction settles,
 commit or rollback. The release is queued before the wait starts, so an acquisition that finishes
@@ -567,7 +585,7 @@ or throws (`isTransactionOpen`), so a take that starts after that throws at once
   waiting for, joins it instead of waiting on itself: a nested `db.txn()`, later rounds of a
   `transactionAll` batch, parallel sub-requests of one round.
 - **Holders inside the transaction still run one at a time**, in call order (a per-key
-  `createSerializedQueue` on the transaction), so parallel branches each see what the one before
+  `makeSerializedQueue` on the transaction), so parallel branches each see what the one before
   wrote. A take from inside a holder's own `fn` runs straight through. A holder whose turn comes
   after the transaction settled throws instead of running `fn`, so its writes cannot escape the
   rolled-back transaction and the released lock. The queue wait has no
@@ -578,13 +596,13 @@ or throws (`isTransactionOpen`), so a take that starts after that throws at once
   heartbeat-renewed, so a long transaction keeps it.
 
 `withOwnerLock` (`apps/api/src/lib/locks/withOwnerLock.ts`) uses it whenever it is called inside a
-transaction; outside one it takes and releases a plain `createLock` lock around `fn`. Upserting
+transaction; outside one it takes and releases a plain `makeLock` lock around `fn`. Upserting
 `findForUpdate` holds its keys the same way, through `holdLockSetUntilSettled`: one lock set over
 the keys the transaction does not hold yet, every key registered against that one acquisition and
 released once when the transaction settles. The keys are the ones `withLockUntilSettled` computes,
 so either one joins a key the other already holds in the same transaction.
 
-A lock set is `createLock({ service, identifiers: [...] })`: one token, one heartbeat and one release
+A lock set is `makeLock({ service, identifiers: [...] })`: one token, one heartbeat and one release
 over `lock:<service>:<identifier>` per identifier, deduplicated and sorted, so a set and a
 single-identifier lock contend on the same key and two sets take their shared keys in the same
 order. Each step is one Lua call over the whole set (`fencedSetPrefix` per poll, `fencedRefreshAll`
@@ -600,7 +618,7 @@ turns it locally false.
 
 `db.findForUpdate(model, where)` runs `SELECT * ... FOR NO KEY UPDATE` inside `db.txn()` (`changesKey: true` takes `FOR UPDATE`; see [CONCURRENCY.md § Row Locks](./CONCURRENCY.md#row-locks-dbfindforupdate)). A row that does
 not exist yet locks nothing, so find-then-create races: two callers both see nothing and both
-insert. Do not answer that with a bare `upsert` or a caught unique violation — fence the key:
+insert. Never answer that by catching the unique violation. When a plain unique holds the key, the write is an `upsert`: Prisma runs it as one `INSERT ... ON CONFLICT` when its `where` is that unique alone and `create` repeats the key's values (on a soft-delete model that means inside `db.withDeleted`, since the scope adds `deletedAt` to the `where`). When no unique holds the key, or the write branches on what it finds, fence the key:
 
 ```typescript
 await db.txn(async () => {
@@ -609,7 +627,9 @@ await db.txn(async () => {
 });
 ```
 
-`upserting: true` takes a Redis lock (`createLock`, service `find-for-update`, keyed on the model
+`findForUpdate` is scoped like every other read: on a model with `deletedAt` it returns live rows only, unless it runs inside `db.withDeleted` or its `where` names `deletedAt` (`deletedAt: null` is `IS NULL`; `fetchRuleReferenceTargetsDeletedAtForUpdate` reads tombstones through `withDeleted`). Tombstones on the key are still locked, so a revive in flight is waited on rather than raced into the unique. Inside `withDeleted`, `[existing]` may be a tombstone: a find-or-create there picks the live row itself. The `upserting` fence is keyed on the `where` alone.
+
+`upserting: true` takes a Redis lock (`makeLock`, service `find-for-update`, keyed on the model
 plus the where entries sorted by key, hashed) **before** the `SELECT`, and holds it until the
 transaction ends, the same way `db.withLockUntilSettled` does. The where must be scalar
 equalities (no arrays, operator objects, `null` or `undefined`), except that one field may list
@@ -622,8 +642,8 @@ error carries `model`, `waitMs` and `identifier` (`Model:hash`, or `Model:hash (
 naming the first pending key and the count of the rest); the API answers it with a 409, *Another
 request is writing this record; please retry*. Fencing the same key twice in one transaction does
 not wait on itself. Keys taken by separate `findForUpdate` calls in one transaction are separate
-lock sets, ordered by call order, so writers that fence several keys fence them in one fixed order. The `no-create-race-machinery` CI rule fails a change that
-adds a bare `.upsert(` or a unique-violation catch to a file.
+lock sets, ordered by call order, so writers that fence several keys fence them in one fixed order. The `no-unique-violation-catches` CI rule fails a change that
+adds a `P2002` or `isUniqueConstraintError` catch to a file.
 
 ---
 
@@ -656,7 +676,7 @@ const users = await db.user.findMany({ where });
 5. Merges with `filters` object
 6. Returns combined `where` clause
 
-**Security:** Uses `validatePathNotation()` to prevent injection attacks on nested field paths.
+**Security:** Uses `isValidPathNotation()` to prevent injection attacks on nested field paths.
 
 **Example output:**
 ```typescript
@@ -685,16 +705,22 @@ A Prisma client extension (`packages/db/src/extensions/softDeleteScopeExtension.
 
 One bypass, `db.withDeleted(fn)`: it runs `fn` with scoping off (revive, redaction/GDPR, inspecting tombstones). Must be `await`ed inside the callback. Who the caller is never unscopes anything — **the endpoint decides**. `validateSuperadmin`, mounted on `adminRouter`, runs the rest of the request inside `db.withDeleted`, so superadmin endpoints read and write tombstones; every other route is scoped for every caller, superadmin included.
 
-The extension is the only soft-delete scoping layer — no middleware, `paginate` or lens code adds `deletedAt: null` by hand. It covers the root `where` (including relation filters like `some`/`every`/`is`), nested `include`/`select` trees, `_count` relation counts, `count`/`aggregate`/`groupBy` (the lens count plans). Its engine (`liveWhere` / `liveIncludes`, `packages/db/src/extensions/softDeleteScope.ts`) lives beside it in `packages/db`. It is not a mutation-lifecycle hook and needs no registration: the client composes it (`client.ts`, `.$extends(softDeleteScopeExtension())`), so every process and every test sees what production sees. A test that inspects a tombstone wraps the read in `db.withDeleted`.
+The extension is the only soft-delete scoping layer for Prisma reads (`db.findForUpdate`, raw SQL, applies the same rule itself) — no middleware, `paginate` or lens code adds `deletedAt: null` by hand. It covers the root `where` (including relation filters like `some`/`every`/`is`), nested `include`/`select` trees, `_count` relation counts, `count`/`aggregate`/`groupBy` (the lens count plans). Its engine (`liveWhere` / `liveIncludes`, `packages/db/src/extensions/softDeleteScope.ts`) lives beside it in `packages/db`. It is not a mutation-lifecycle hook and needs no registration: the client composes it (`client.ts`, `.$extends(softDeleteScopeExtension())`), so every process and every test sees what production sees. A test that inspects a tombstone wraps the read in `db.withDeleted`.
 
-Write `where`s are scoped too, so a soft-deleted row can't be mutated without a bypass. Cascade revive is exempt automatically: it matches on an explicit `deletedAt` value, and an explicit `deletedAt` mention in a `where` opts that query out of injection.
+Write `where`s are scoped too, so a soft-deleted row can't be mutated without a bypass. An `upsert` is scoped the same way, so on a soft-delete model it sees only live rows; inside `db.withDeleted`, on a plain unique, it finds a tombstone on the key and `update: { deletedAt: null }` revives it through the cascade. A unique that excludes tombstones (`where: raw("... \"deletedAt\" IS NULL")`, Project's and Integration's names) frees a deleted row's key for a new row, so an upsert there stays outside `withDeleted` and creates. Cascade revive is exempt automatically: it matches on an explicit `deletedAt` value, and an explicit `deletedAt` mention in a `where` opts that query out of injection.
+
+### Soft-delete cascade: every child is classified
+
+When a soft-deletable parent is tombstoned, `softDeleteCascade` (`apps/api/src/hooks/softDeleteCascade/cascade.ts`) does one of four things to each child relation (`childRelations`): closes it (`CLOSE_ON_PARENT_DELETE`), hard-deletes it (`HARD_DELETE_ON_TOMBSTONE`), tombstones it with the parent's stamp (the child has `deletedAt`), or leaves it alone because the relation only points at the parent (`CASCADE_EXEMPT`). A child that fits none of these used to be skipped silently and stayed live under a dead parent; worse, `ruleReference:target` only fires when a row's `deletedAt` flips, so the entitlements anchored at it (`sourceDeletedAt`) and the rules naming it (`targetDeletedAt`) were never degraded. A deleted thing degrades the grants and rules that name it, it does not revoke them: the rest of the grant keeps working (Aron, 2026-11-19).
+
+So `IntegrationResource`, `ProjectIntegrationResource`, `SegmentMember` and `IntegrationRecord` carry `deletedAt` (the first two audited, as `Project` is; `SegmentMember` and `IntegrationRecord` are `SOFT_DELETE_ONLY`, written by reconcile and webhook jobs), and each unique is plain, so a tombstone keeps its key and adding it again revives it (Aron, 2026-11-22: "revive should revive the train normally w normal exemptions"). Registering a resource (`POST /integration/:id/integrationResources`) and linking it to a project are upserts inside `db.withDeleted` with `update: { deletedAt: null }`: registering a live key refreshes its name and metadata, and a revived resource brings back the links that died with it. A record poisoned again is revived poisoned as it was, and a returning segment member is revived (`revive`), with the grants anchored at it healing. Deleting is not the only way to stop caring about a resource: `IntegrationResource.status` is `tracked`, `missing` (the provider does not show it, set by the app's sync) or `untracked` (the owner stopped listening, `PATCH /integrationResource/:id`). An untracked resource keeps its row and its grants but leaves the main flows: the resource list omits it (`/integration/:id/integrationResources/untracked` lists it, and filtering the main list by it is a 400) and the link rule refuses linking it to a project (`db:projectIntegrationResource` create needs it tracked or missing); an app that syncs or delivers events from a provider skips it too (template has neither). A deleted one is gone until its key is added again (Aron, 2026-11-20). An untracked one is never revived: it is not deleted, so registering it again only refreshes its fields and leaves it untracked. `unclassifiedChildViolations` (`validateDeleteBehavior.ts`) lists every child relation of a soft-delete parent that has none of the four behaviours; its test holds the list to the history and log rows still awaiting Aron's call (`AuditLog`, `CommunicationLog`, `CommunicationComponentVersion`, `AppEvent`, `CronJob`), and fails on any new one. Once that list is empty the check joins `validateDeleteBehavior` at boot.
 
 ### Path Notation Utilities
 
 Support for dot-notation field access in queries:
 
 ```typescript
-import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
+import { buildNestedPath, isValidPathNotation } from '#/lib/prisma/pathNotation';
 
 // Build nested query structure
 buildNestedPath('user.email', { contains: 'example.com' });
@@ -704,11 +730,11 @@ buildNestedPath('organization.user.email', { contains: 'test' });
 // Returns: { organization: { user: { email: { contains: 'test' } } } }
 
 // Validate path safety
-validatePathNotation('user.email');        // true
-validatePathNotation('user..email');       // false (double dots)
-validatePathNotation('user;email');        // false (invalid chars)
-validatePathNotation('a.b.c.d.e.f');       // false (exceeds max depth of 5)
-validatePathNotation('_private.field');    // false (starts with underscore)
+isValidPathNotation('user.email');        // true
+isValidPathNotation('user..email');       // false (double dots)
+isValidPathNotation('user;email');        // false (invalid chars)
+isValidPathNotation('a.b.c.d.e.f');       // false (exceeds max depth of 5)
+isValidPathNotation('_private.field');    // false (starts with underscore)
 ```
 
 **Use cases:**
@@ -740,7 +766,16 @@ const where = buildWhereClause({
 
 ## False Polymorphism
 
-Instead of true polymorphism (type + id), use type enum + optional FKs:
+A row that points at one of several models uses one of two shapes, never a third.
+
+| Kind | Columns | Use when |
+|---|---|---|
+| **False polymorphism** (the default) | an enum naming the model + one typed, optional FK per arm | the target always outlives the row, or the row goes with it (`onDelete: Cascade`) |
+| **Dual polymorphism** | the same, + one plain id column the typed FK fills on create (`dualPolymorphismId` on the registry axis) | the row must keep naming its target after the typed FK goes null: an arm is `onDelete: SetNull` (CI rule `set-null-arm-requires-dual-polymorphism-id`), or the target can be hard-deleted (`RuleReference`). Also when an arm is composite and the row still needs one id for lookups (parent edges, audit history): a member arm keys on its owner chain, so the writer gives the id (`Entitlement` `sourceId`, `targetId`); an arm whose relation has its own id column fills it from there (`Inquiry`'s Space arm, `organizationId + spaceId`, fills `sourceId` from `sourceSpaceId`) |
+
+**Never Rails-style polymorphism:** an enum plus a bare id with no FKs. Why: no FK constraint, no typed include, no cascade, and nothing stops the id naming a row that is gone. A hard-deletable target that a row must keep naming takes dual polymorphism instead (Aron, 2026-11-17: "If we need a hard delete, then you probably should move to dual polymorphism").
+
+False polymorphism, the type enum + optional FKs:
 
 ```prisma
 ownerModel         WebhookOwnerModel
@@ -784,9 +819,11 @@ enum EmailOwnerModel {
 2. Admin override (if super admin has customized)
 3. Default (seeded baseline)
 
-### Delegated Keys
+### Carried Owner Keys
 
-An axis value can name a parent in `delegates`: the row carries the parent's own owner keys beside its own. A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:delegatedKeys` hook copies them from the parent on create and upsert through `carryDelegatedKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
+An axis can list values in `carriesOwnerKeysOf`: a row whose axis names one of those records carries that record's own owner keys beside its own. This is about where a row is filed, not about authority: Project is listed though it is no permission delegate (those are `DELEGATE_MODELS`, PERMISSIONS.md). A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. Every arm of an owner axis, or of an axis that already carries keys, that names a record with an owner of its own must be listed (`registries/carriedOwnerKeys.test.ts`, Aron 2026-11-19), so a row filed under such a record always carries its whole owner chain. The `falsePolymorphism:carriedOwnerKeys` hook copies them from that record on create and upsert through `carryOwnerKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
+
+The parent's keys come from its `ownerModel` axis, and the chain needs no config: the record already holds what its own axis carried, so one copy brings the whole chain (a token gives an inquiry its integration and that integration's owner). Which column holds which parent key is read from the Prisma relations, never from column names (`registries/carriedOwnerKeys.ts`, through `polymorphicArmColumns` in `utils/polymorphicArmKeys.ts`): for each owner kind both axes point at, the arm relations name the same field of that kind's row (`Token.space` on `organizationId` + `spaceId`, `Inquiry.targetSpace` on `targetOrganizationId` + `targetSpaceId`), so those columns pair. `wherePolymorphicSideIsOneOf(model, side, [{ ownerKeys }])` (`registries/wherePolymorphicSideIsOneOf.ts`) is "this owner's rows, and those of what it holds" as one flat filter on those columns, the owner given by the models it is keyed on (`{ Organization: id, Space: null, User: null }`); the inquiry lists use it, since an inquiry is not a submodel and has no permission placement. A submodel's list under an owner uses `submodelOwnerWhere` instead, the same placement its permission check made, so the list and the check can't drift (PERMISSIONS.md § Lists under an owner).
 
 ### Back-Relations Over Shared Key Columns
 
@@ -811,25 +848,25 @@ A row is a directed edge in the standard names ([NAMING.md](NAMING.md)):
 
 | Column | Holds |
 |---|---|
-| `sourceModel`, `sourceId`, `sourcePath` | the **anchor**: the record the entitlement acts from, reached from the entitled record along `sourcePath`. `sourceModel` is any of the 15 rebac resources (`EntitlementResourceModel`), each with a typed FK (`sourceUserId`, `sourceOrganizationId`, …, `sourceWebhookSubscriptionId`); a member anchor keys on its owner chain (`OrganizationUser` → `sourceOrganizationId` + `sourceUserId`, `SpaceUser` → `sourceOrganizationId` + `sourceSpaceId` + `sourceUserId`). |
+| `sourceModel`, `sourceId`, `sourcePath` | the **anchor**: the record the entitlement acts from, reached from the entitled record along `sourcePath`. `sourceModel` is any of the 17 rebac resources (`EntitlementResourceModel`), each with a typed FK (`sourceUserId`, `sourceOrganizationId`, …, `sourceWebhookSubscriptionId`, `sourceIntegrationResourceId`, `sourceProjectIntegrationResourceId`); a member anchor keys on its owner chain (`OrganizationUser` → `sourceOrganizationId` + `sourceUserId`, `SpaceUser` → `sourceOrganizationId` + `sourceSpaceId` + `sourceUserId`). |
 | `sourceDeletedAt` | a copy of the anchor's `deletedAt`, stamped by `ruleReference:target` |
 | `targetModel`, `targetId` | the **holder**: `Token`, `Integration`, `OrganizationUser` or `SpaceUser` (`EntitlementTargetModel`). A delegate by its id (`targetTokenId`, `targetIntegrationId`); a member by its owner chain (`targetOrganizationId` + `targetUserId`, plus `targetSpaceId` for a `SpaceUser`) |
 | `resource` | the model the actions apply to (`EntitlementResourceModel`) |
 | `actions` | `String[]`, the actions held, GIN-indexed |
 | `where` | `Json?`, a positive json-rules condition over the entitled record |
-| `lens` | `Json?`, a lens narrowing; kept abstract, unused so far |
+| `lens` | `Json?`, a json-rules lens narrowing: what the holder sees of what the grant reaches (records and their shape). One per grant: an equal row with a new lens replaces the held one ([building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md#the-lens)) |
 | `deletedAt` | the row's tombstone |
 
 - **No grantor column.** The grantor is the target's owner, re-walked live by the permissions library.
-- **Both ends are false-polymorphic with a materialized id** (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names, and the API reads and writes the rows as stored: a writer gives `EntitlementInput` (`resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`) and `toEntitlementCreateData(inputs, holder, anchors)` (`packages/db/src/entitlements`) fills in each arm's keys off rows the writer already holds: the holder as read, and the anchors from `loadEntitlementAnchors` (one read per anchor model, tombstones included). It copies each anchor's `deletedAt` into `sourceDeletedAt`, so a row written on a tombstoned anchor (a factory, a hook; the grant check refuses one on the route) is born stamped. The writer refuses an anchor that does not exist with a 422 (`missingAnchors`). Arm keys come from `polymorphicArmKeys` (`packages/db/src/utils/polymorphicArmKeys.ts`). The library's entry shape (`resource: 'db:integration'`, `anchor: { resource, id, path? }`, actions as a map) exists only at the permissions boundary: `toEntitlementEntry`, `toEntitlementInput` and `entitlementsOf` in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`).
-- **A member arm carries the member's whole owner chain** (Aron, 2026-11-11), as `Inquiry`'s and the owner axes' do. Why: the row then carries its tenant, so tenant filters and the audit hook read it, and a space transfer re-keys a moved member's rows by `ON UPDATE CASCADE` with the member ([Foreign Keys](#foreign-keys), the `spaceKeyColumns` test). A composite arm holds no single id, so its `sourceId` / `targetId` is the member's id as the writer gives it, and `materializedIdConflicts` requires every key beside it. The keys of an `OrganizationUser` arm are a prefix of a `SpaceUser` arm's, so the relation `OrganizationUser.targetEntitlements` also reaches the member's `SpaceUser` rows: a holder read names its model (`includeTargetEntitlements(model)`), and the soft-delete cascade keeps each relation to its own arm (`childRelations`, the `arm` discriminator).
+- **Both ends are dual-polymorphic** (`dualPolymorphismId`) (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names, and the API reads and writes the rows as stored: a writer gives `EntitlementInput` (`resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`, `lens?`) and `toEntitlementCreateData(inputs, holder, anchors)` (`packages/db/src/entitlements`) fills in each arm's keys off rows the writer already holds: the holder as read, and the anchors from `fetchEntitlementAnchors` (one read per anchor model, tombstones included). It copies each anchor's `deletedAt` into `sourceDeletedAt`, so a row written on a tombstoned anchor (a factory, a hook; the grant check refuses one on the route) is born stamped. The writer refuses an anchor that does not exist with a 422 (`missingAnchors`). Arm keys come from `polymorphicArmKeys` (`packages/db/src/utils/polymorphicArmKeys.ts`). The library's entry shape (`resource: 'db:integration'`, `anchor: { resource, id, path? }`, actions as a map) exists only at the permissions boundary: `toEntitlementEntry`, `toEntitlementInput` and `entitlementEntriesOfHolder` in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`).
+- **A member arm carries the member's whole owner chain** (Aron, 2026-11-11), as `Inquiry`'s and the owner axes' do. Why: the row then carries its tenant, so tenant filters and the audit hook read it, and a space transfer re-keys a moved member's rows by `ON UPDATE CASCADE` with the member ([Foreign Keys](#foreign-keys), the `spaceKeyColumns` test). A composite arm holds no single id, so its `sourceId` / `targetId` is the member's id as the writer gives it, and `dualPolymorphismIdConflicts` requires every key beside it. The keys of an `OrganizationUser` arm are a prefix of a `SpaceUser` arm's, so the relation `OrganizationUser.targetEntitlements` also reaches the member's `SpaceUser` rows: a holder read names its model (`includeTargetEntitlements(model)`), and the soft-delete cascade keeps each relation to its own arm (`childRelations`, the `arm` discriminator).
 - **The target owns the row.** Target FKs cascade at the database; `softDeleteCascade` tombstones a target's rows with it and revives them with it. A target that never revives (a `Token`, `SKIP_REVIVE`) keeps its rows dead.
-- **The source only names the row.** Source FKs are `onDelete: SetNull`, and every source relation is in `CASCADE_EXEMPT`: an anchor's tombstone lands in `sourceDeletedAt`, and a hard-deleted anchor (a `SegmentMember`, `Flow` or `WebhookSubscription`, which have no `deletedAt`) nulls the typed FK and leaves `sourceId` naming what went. The polymorphism rule on a materialized axis accepts that state (FK null, plain id set), so the row can still be tombstoned with its target; a create must set the FK, never the plain id alone (`materializedIdConflicts`).
+- **The source only names the row.** Source FKs are `onDelete: SetNull`, and every source relation is in `CASCADE_EXEMPT`: an anchor's tombstone lands in `sourceDeletedAt`, and a hard-deleted anchor (a `Flow` or `WebhookSubscription`, which have no `deletedAt`) nulls the typed FK and leaves `sourceId` naming what went. The polymorphism rule on a dual-polymorphic axis accepts that state (FK null, plain id set), so the row can still be tombstoned with its target; a create must set the FK, never the plain id alone (`dualPolymorphismIdConflicts`).
 - **Audited and soft-deleted** (`AUDIT_ENABLED_MODELS`): every created and every removed row is its own audit entry. Rows are immutable (`immutableFields` refuses a change to any column but the tombstones); a change is a removal plus a create.
 - **Indexes.** (target) is a full index: live reads filter `deletedAt` on it, and the audit history read joins a target's tombstoned rows through it. One full index costs less than a live one plus a full one. The alternative was filtering the history through each arm's own key column, but a member arm would then need its owner chain read first. (source) and (resource) are partial on live rows (`deletedAt IS NULL`). Tombstones are kept, never purged.
 - **Its `where` is a rule surface.** `Entitlement` is a `RuleReference` source (the `ruleReference` hook, [HOOKS.md](HOOKS.md#application-hooks)), so the rows a `where` names by id get edges.
 
-- **A set-null arm keeps a plain id (CI rule `set-null-polymorphism-materialized`).** Any relation on a false-polymorphic axis with `onDelete: SetNull` requires that axis to be registered with a `materialized` plain id column in `packages/db/src/registries/falsePolymorphism.ts` (as Entitlement's `sourceId`); `Cascade` arms are exempt, since their row goes with the target. Why: when the target is hard-deleted, SetNull nulls the typed key, and without a plain id the row no longer says what it pointed at; the required-FK rule (`requiredForeignKey`, `apps/api/src/hooks/falsePolymorphism/toRules.ts`) accepts that plain id in the key's place, so the row stays valid and can still be tombstoned with its target.
+- **A set-null arm keeps a dual polymorphism id (CI rule `set-null-arm-requires-dual-polymorphism-id`).** Any relation on a false-polymorphic axis with `onDelete: SetNull`, to a model that can be hard-deleted, requires that axis to be registered with a `dualPolymorphismId` plain id column in `packages/db/src/registries/falsePolymorphism.ts` (as Entitlement's `sourceId`, AuditLog's `subjectId`); `Cascade` arms are exempt, since their row goes with the target, and so are relations to a soft-delete model (`registries/softDeleteModels.ts`), which is never hard-deleted, so SetNull never fires (CommunicationLog's senders). Why: when the target is hard-deleted, SetNull nulls the typed key, and without a plain id the row no longer says what it pointed at; the required-FK rule (`requiredForeignKey`, `apps/api/src/hooks/falsePolymorphism/toRules.ts`) accepts that plain id in the key's place, so the row stays valid and can still be tombstoned with its target.
 
 Why a table and not the JSON column the holders had: "who holds what on this record?" becomes a query, and each grant and revocation is audited on its own.
 
@@ -839,7 +876,7 @@ A `Token` is soft-deleted and audited, and never revived (`SKIP_REVIVE`; it is n
 
 ### Inquiries and rule references
 
-Every `Inquiry` party relation (source and target, each kind) is in `CASCADE_EXEMPT`: an inquiry never tombstones because a party did, and shows that party as deleted. `RuleReference` gained `Entitlement` as a source and 12 more target models (`User`, `OrganizationUser`, `SpaceUser`, `Integration`, `Project`, `Token`, `Contact`, `SegmentMember`, `Inquiry`, `Flow`, `AuthProvider`, `WebhookSubscription`), so an entitlement's `where` naming any rebac resource by id has a target column. The email lens declares an id source for every referenceable model (`emailLens.ts`, labelled by `name` where the model has one), so the widening reaches email rules too: an email rule naming a recipient by id (`recipient.id equals …`) is now a `User` reference, gets an edge, and must name a live row when saved.
+When a party of an inquiry (source or target, each kind) is soft-deleted, its open inquiries (not approved, denied or canceled) are canceled in the same cascade: `status: canceled`, never tombstoned (`CLOSE_ON_PARENT_DELETE`, `apps/api/src/hooks/softDeleteCascade/closeOnParentDelete.ts`). Every inquiry stays live as the record, so the side still there sees its request canceled instead of missing, and the party shows as deleted. Reviving the party leaves a canceled inquiry canceled. No party can be hard-deleted: every party model is soft-delete (`preventHardDelete`), and `validateDeleteBehavior` refuses at boot a closed model with a hard-deletable parent; a party that had to be hard-deleted would be named by a true-polymorphic pair (model + id, as `RuleReference` targets are), not a foreign key. Why: an inquiry whose party is gone can no longer be answered, and the record of it should not vanish (Aron, 2026-11-16, 2026-11-17). `RuleReference` gained `Entitlement` as a source and 12 more target models (`User`, `OrganizationUser`, `SpaceUser`, `Integration`, `Project`, `Token`, `Contact`, `SegmentMember`, `Inquiry`, `Flow`, `AuthProvider`, `WebhookSubscription`), so an entitlement's `where` naming any rebac resource by id has a target column. The email lens declares an id source for every referenceable model (`emailLens.ts`, labelled by `name` where the model has one), so the widening reaches email rules too: an email rule naming a recipient by id (`recipient.id equals …`) is now a `User` reference, gets an edge, and must name a live row when saved.
 
 ## Registries
 
@@ -848,22 +885,26 @@ Schema-level configuration in `packages/db/src/registries/`:
 | Registry | Purpose | Used By |
 |----------|---------|---------|
 | `PolymorphismRegistry` | Axis value → required FK columns | Constraints, validation hooks, immutable fields, the helpers below |
+| `ATTRIBUTE_MODELS` | 5-column typed Attribute models (`packages/db/src/lib/attributes/registry.ts`) | `validateAttributeModels`, `registerAttributeValidationHook`, typed codec/operators, immutable `locatorField` ([SETTINGS.md](SETTINGS.md)) |
 
 | Helper (`@template/db`) | Derives |
 |---|---|
 | `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
-| `delegatedKeys(axis, value)` / `carryDelegatedKeys(model, row)` | The parent keys a delegating value carries; copy them from the parent row (the hook and the test factory both call it) |
-| `polymorphicKeyColumns` / `polymorphicKeyColumn` / `polymorphicTarget` / `isArmColumns` | Every key column for a value (a member arm has two or three); the one column of a single-key arm (throws on a composite arm); the `{ kind, id }` a row points at (throws likewise); whether a relation's columns are exactly an arm's |
+| `modelWhoseOwnerKeysAreCarried(axis, value)` / `carriedOwnerKeyColumns(model, axis, value)` / `carriedOwnerKeyPairs` / `keysHeldOnAxis(model, axis, value)` / `carryOwnerKeys(model, row)` | The record a value carries owner keys from; the columns it carries, paired with that record's keys through the arm relations; every key column a row holds for a value (its arm's and those it carries: the write rule, the factory and the carry all read it); copy them from that record (the hook and the test factory both call it) |
+| `polymorphicKeyColumn(model, axisField, value)` / `polymorphicKeyColumnOrThrow` / `axisTargetIdColumn(model, axis, value)` | The column holding the id of the row a value points at (a composite arm answers through its relation; a member arm has none), or that and throw when there is none; that, or the axis's `dualPolymorphismId` |
+| `sideKeyColumns(axis)` / `emptySideKeyColumns(axis)` | Every key column a side uses, once each; the same as `{ column: null }`, the base a writer sets one value's keys over (`polymorphicArmKeys`) |
+| `wherePolymorphicSideIsOneOf(model, sides, matches)` | Rows where any of the given sides points at one of the matches: a `ModelRow` (the side's discriminator plus its id column, the dual id on a dual side, one `in` per model), or `{ ownerKeys }` (an owner's rows and those of what it holds, as one flat filter on the side's columns). One arm comes back as it is; several as `{ OR }` |
+| `polymorphicKeyColumns` / `rowPolymorphicAxisPointsAt` / `isArmColumns` | Every key column for a value (a member arm has two or three); the `{ model, id }` a row points at (a dual axis by its dual polymorphism id, else the typed FK); whether a relation's columns are exactly an arm's |
 | `polymorphicArmRelation` / `polymorphicArmKeys` | The relation an arm's key columns form (matched by `isArmColumns`, as `childRelations` matches); the columns an arm sets to point at a row (its id, or a composite arm's owner chain off the row) |
-| `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
-| `polymorphicBindings(ownerModel, ownerId)` | The bind map `polymorphicIs` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`POLYMORPHIC_BINDS`, `isOwnerKind`) |
+| `conditionPolymorphicAxisPointsAtBoundRow(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
+| `polymorphicBindings(ownerModel, ownerId)` | The bind map `conditionPolymorphicAxisPointsAtBoundRow` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`BIND_NAME_BY_OWNER_MODEL`, `isBindableOwnerModel`) |
 | `isFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart (its column is `polymorphicKeyColumn(ref.model, ref.axis, ref.value)`) |
 | `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |
 
 ```typescript
-import { PolymorphismRegistry, getPolymorphismConfig } from '@template/db';
+import { PolymorphismRegistry, polymorphismConfigForModel } from '@template/db';
 
-const config = getPolymorphismConfig('Token');
+const config = polymorphismConfigForModel('Token');
 // { axes: [{ field: 'ownerModel', fkMap: { User: ['userId'], ... } }] } | null
 ```
 
@@ -871,12 +912,12 @@ See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.
 
 ### Parent Edges
 
-`ParentEdgeRegistry` (`packages/db/src/registries/parentEdges.ts`, Aron, 2026-11-11): a child model names its path to its parent once, either a false-polymorphic axis (`Entitlement: { axis: 'targetModel' }`, the parent read off the axis's materialized id) or one foreign key (`{ parent, foreignKey }`). Three consumers read it:
+`ParentEdgeRegistry` (`packages/db/src/registries/parentEdges.ts`, Aron, 2026-11-11): a child model names its path to its parent once, either a false-polymorphic axis (`Entitlement: { axis: 'targetModel' }`, the parent read off the axis's dual polymorphism id) or one foreign key (`{ parent, foreignKey }`). Three consumers read it:
 
 | Consumer | Reads |
 |---|---|
-| Cache hook (`apps/api/src/hooks/cache/hook.ts`) | `loadParentRows`: a child's write clears its parent's keys ([HOOKS.md](HOOKS.md#parent-edges)) |
-| Audit hook (`contextRows`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
+| Cache hook (`apps/api/src/hooks/cache/hook.ts`) | `fetchParentRows`: a child's write clears its parent's keys ([HOOKS.md](HOOKS.md#parent-edges)) |
+| Audit hook (`fetchRowsCarryingTenantColumns`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
 | Audit history read (`auditHistoryWhere`) | `childrenOf(record)`: a record's entries and its children's in one stream ([HOOKS.md](HOOKS.md#reading-the-log)) |
 
 Why one registry: the cache traversal, the audit tenancy and the history read are the same fact ("this row's change is a change to that row"), and stating it once keeps them from drifting. Register a child only when a consumer would otherwise special-case it; a model with its own tenant columns and its own cache keys needs no edge.
@@ -902,11 +943,14 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `webhookSubscription.prisma` - Webhook configurations
 - `project.prisma` - `Project`: a unit of work an owner organizes things around (name, optional description). False-polymorphic over all five owners (User, OrganizationUser, Organization, Space, SpaceUser); names are unique per owner among live rows, so one repo can be a project in several tenants. Taggable (`TagResource.Project`). Routes: `/me/projects` and `/{organization,organizationUser,space,spaceUser}/:id/projects` to create and list, `/project/:id` to read, update and delete
 - `inquiry.prisma` - False polymorphic inquiry system
-- `integrationRecord.prisma` - One record's standing in one integration (false-polymorphic over `WebhookModel`); `poisonedAt` makes sendWebhook skip the record
-- `customerRef.prisma` - Customer references (false-polymorphic customer User/Organization/Space → provider)
-- `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic over `ProviderModel`) named set of its customer references. Every segment has json-rules `conditions` over the segment lens; `static` is computed when created or its conditions change, `dynamic` is recomputed continuously by the reconcile jobs. A hand-picked audience is a static segment whose rule is `id in [...]`. Members are written only by reconcile. See [SEGMENTS.md](SEGMENTS.md) for rules, reconciliation, API routes and the Owned/Memberships pages
+- `integrationRecord.prisma` - One record's standing in one integration (false-polymorphic over `WebhookModel`); `poisonedAt` makes sendWebhook skip the record. Soft-deleted with its integration and its record
+- `integrationResource.prisma` / `projectIntegrationResource.prisma` - `IntegrationResource`: one thing in the external system an integration reaches (`kind` + the provider's `externalId`, unique per integration with tombstones included so registering it again revives it, plus `metadata`); `ProjectIntegrationResource` links one to a `Project`. Both are entitlement anchors and rule-reference targets, soft-deleted with their parents or on their own ([Soft-delete cascade](#soft-delete-cascade-every-child-is-classified)); a resource's `status` is `tracked`, `missing` or `untracked`. Routes: `POST /integration/:id/integrationResources` (registers one, and links it to `projectId` when named: `manage` on the project, `operate` on the resource), `GET /integration/:id/integrationResources` (tracked and missing) and `.../integrationResources/untracked`, `PATCH /integrationResource/:id` (track or untrack: `manage`) and `DELETE /integrationResource/:id` (soft delete: `manage` on the resource or `delete` on its integration)
+- `customerRelationship.prisma` - Customer relationships (false-polymorphic customer User/Organization/Space → provider)
+- `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic over `ProviderModel`) named set of its customer relationships. Every segment has json-rules `conditions` over the segment lens; `static` is computed when created or its conditions change, `dynamic` is recomputed continuously by the reconcile jobs. A hand-picked audience is a static segment whose rule is `id in [...]`. Members are written only by reconcile, and soft-deleted: a member that leaves is tombstoned and one that comes back is revived. See [SEGMENTS.md](SEGMENTS.md) for rules, reconciliation, API routes and the Owned/Memberships pages
 - `flow.prisma` - `Flow`: one user's short-lived walk through a registered flow (`flowKey`, resolved `steps`, optional `returnUrl`); deleted after 15 idle minutes. See [FLOWS.md](FLOWS.md)
 - `contact.prisma` - Unified contact-info entries (phone/email/social handles), false-polymorphic owner (User/Organization/Space), per-type validation registry, per-owner uniqueness on `(ownerModel, …, type, valueKey)`, optional row-level `permissionRules` for sharing
+- `setting.prisma` - `Setting`: dual-polymorphic typed key/value settings across `User`, `Organization`, `Space`, `OrganizationUser`, `SpaceUser`, `Project`, `Integration`, and `ProjectIntegration`, backed by the reusable 5-column Attribute model capability (`ATTRIBUTE_MODELS`), code-first `SETTING_DEFINITIONS`, Postgres `GIN` index on `valueJson`, and per-key compiled ReBAC (`settingResourcePermission`). See [SETTINGS.md](SETTINGS.md)
+- `projectIntegration.prisma` - `ProjectIntegration`: links a `Project` to an `Integration` within the same tenant boundary (`projectIntegrationOwner` hook + cross-org space transfer tombstoning), parent-edged to `Project`, audited and soft-deleted; a plain unique on `(projectId, integrationId)`, so linking again revives the link (upsert inside `db.withDeleted`). See [SETTINGS.md](SETTINGS.md)
 
 **Communications:**
 - See [COMMUNICATIONS.md](COMMUNICATIONS.md#database-models) for email template models

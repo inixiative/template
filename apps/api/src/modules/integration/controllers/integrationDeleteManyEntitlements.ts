@@ -5,25 +5,20 @@
  * @uses primitive:authz, infrastructure:prisma
  */
 
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
+import { validateEntitlementWriter } from '#/lib/permissions/validateEntitlementWriter';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationDeleteManyEntitlementsRoute } from '#/modules/integration/routes/integrationDeleteManyEntitlements';
-import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
 
 export const integrationDeleteManyEntitlementsController = makeController(
   integrationDeleteManyEntitlementsRoute,
   async (c, respond) => {
     const permix = c.get('permix');
-    const integration = getResource<'integration'>(c);
-    await validateIntegrationRole(permix, integration);
-    await changeEntitlements(
-      permix,
-      { model: 'Integration', id: integration.id },
-      {
-        remove: c.req.valid('json'),
-      },
-    );
+    const integration = contextResource<'integration'>(c);
+    const changes = { remove: c.req.valid('json') };
+    await validateEntitlementWriter(permix, 'Integration', integration, changes);
+    await changeEntitlements(permix, { model: 'Integration', id: integration.id }, changes);
     return respond.noContent();
   },
 );

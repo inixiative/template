@@ -68,7 +68,7 @@ One deliberate deviation from the plan above:
 
 `withTotalOrder` derives the keyset anchor from prismaMap (the model's single `isId && isRequired` field) rather than assuming a column name, and refuses composite primary keys with a message telling the caller to pin the chain via `options.orderBy`. Zealot's copy hardcodes a `uuid` fallback on purpose - its legacy models carry integer `@id` columns that v2 routes must not sort on - so that difference stays.
 
-Tests: `keysetCursor.test.ts` covers round-tripping, Date/BigInt serialization, and every rejection path (bad version, malformed, count mismatch, null, non-scalar, duplicate key), plus `assertChainMatches` and the composite OR-chain expansion of `buildKeysetWhere`. 17 tests. Suite: 997 pass / 2 fail, the two being pre-existing `lensWhere` count-operator failures on main.
+Tests: `keysetCursor.test.ts` covers round-tripping, Date/BigInt serialization, and every rejection path (bad version, malformed, count mismatch, null, non-scalar, duplicate key), plus `assertChainMatches` and the composite OR-chain expansion of `buildKeysetWhere`. 17 tests. Suite: 997 pass / 2 fail, the two being pre-existing `applyFilterLensWheresToPrismaWhere` count-operator failures on main.
 
 ## Still open
 

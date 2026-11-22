@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 import {
-  getDefaultOperator,
-  getValidOperators,
+  defaultOperatorForField,
   isValidOperatorForField,
+  validOperatorsForField,
 } from '#/lib/prisma/scalarOperators';
 import { enumField, relationField, scalarField } from '#tests/utils/modelFields';
 
-describe('getValidOperators', () => {
+describe('validOperatorsForField', () => {
   it('returns string ops for String fields', () => {
-    expect(getValidOperators(scalarField('String'))).toEqual([
+    expect(validOperatorsForField(scalarField('String'))).toEqual([
       'contains',
       'startsWith',
       'endsWith',
@@ -20,7 +20,7 @@ describe('getValidOperators', () => {
   });
 
   it('returns enum ops for enum fields (no fuzzy match, no inequality)', () => {
-    expect(getValidOperators(enumField('PlatformRole', ['user', 'superadmin']))).toEqual([
+    expect(validOperatorsForField(enumField('PlatformRole', ['user', 'superadmin']))).toEqual([
       'equals',
       'in',
       'notIn',
@@ -29,7 +29,7 @@ describe('getValidOperators', () => {
   });
 
   it('returns numeric ops for Int (no contains/startsWith)', () => {
-    const ops = getValidOperators(scalarField('Int'));
+    const ops = validOperatorsForField(scalarField('Int'));
     expect(ops).toContain('gt');
     expect(ops).toContain('gte');
     expect(ops).toContain('lt');
@@ -39,38 +39,40 @@ describe('getValidOperators', () => {
   });
 
   it('returns date ops for DateTime (no in/notIn)', () => {
-    const ops = getValidOperators(scalarField('DateTime'));
+    const ops = validOperatorsForField(scalarField('DateTime'));
     expect(ops).toEqual(['equals', 'gt', 'gte', 'lt', 'lte', 'not']);
     expect(ops).not.toContain('in');
   });
 
   it('returns boolean ops for Boolean (equals + not only)', () => {
-    expect(getValidOperators(scalarField('Boolean'))).toEqual(['equals', 'not']);
+    expect(validOperatorsForField(scalarField('Boolean'))).toEqual(['equals', 'not']);
   });
 
   it('returns empty list for Json (any operator on json is invalid)', () => {
-    expect(getValidOperators(scalarField('Json'))).toEqual([]);
+    expect(validOperatorsForField(scalarField('Json'))).toEqual([]);
   });
 
   it('returns empty list for relations', () => {
-    expect(getValidOperators(relationField('User'))).toEqual([]);
+    expect(validOperatorsForField(relationField('User'))).toEqual([]);
   });
 
   it('returns empty list for unknown scalar types', () => {
-    expect(getValidOperators(scalarField('Bytes'))).toEqual([]);
+    expect(validOperatorsForField(scalarField('Bytes'))).toEqual([]);
   });
 });
 
-describe('getDefaultOperator', () => {
+describe('defaultOperatorForField', () => {
   it("returns 'contains' for String (fuzzy match default)", () => {
-    expect(getDefaultOperator(scalarField('String'))).toBe('contains');
+    expect(defaultOperatorForField(scalarField('String'))).toBe('contains');
   });
 
   it("returns 'equals' for enums + non-string scalars", () => {
-    expect(getDefaultOperator(enumField('PlatformRole', ['user', 'superadmin']))).toBe('equals');
-    expect(getDefaultOperator(scalarField('Int'))).toBe('equals');
-    expect(getDefaultOperator(scalarField('Boolean'))).toBe('equals');
-    expect(getDefaultOperator(scalarField('DateTime'))).toBe('equals');
+    expect(defaultOperatorForField(enumField('PlatformRole', ['user', 'superadmin']))).toBe(
+      'equals',
+    );
+    expect(defaultOperatorForField(scalarField('Int'))).toBe('equals');
+    expect(defaultOperatorForField(scalarField('Boolean'))).toBe('equals');
+    expect(defaultOperatorForField(scalarField('DateTime'))).toBe('equals');
   });
 });
 

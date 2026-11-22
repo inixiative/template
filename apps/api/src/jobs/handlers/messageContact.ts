@@ -9,9 +9,9 @@ import type { CommunicationKind } from '@template/db/generated/client/enums';
 import { makeJob } from '#/jobs/makeJob';
 import { canDeliver } from '#/lib/messaging/canDeliver';
 import {
-  getMessageProviderAdapter,
   type MessageContent,
   type MessageDispatchOptions,
+  messageProviderAdapterForContactType,
 } from '#/lib/messaging/providers';
 
 export type MessageContactPayload = {
@@ -30,7 +30,7 @@ export const messageContact = makeJob<MessageContactPayload>(async (_ctx, payloa
 
   if (!canDeliver(kind, contact)) return;
 
-  const adapter = getMessageProviderAdapter(contact.type);
+  const adapter = messageProviderAdapterForContactType(contact.type);
   if (!adapter) throw new Error(`No message provider adapter for contact.type=${contact.type}`);
 
   await adapter(contact, content, kind, { replyTo });

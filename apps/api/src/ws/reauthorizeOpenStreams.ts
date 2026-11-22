@@ -1,0 +1,46 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:websockets
+ * @uses feature:auth
+ */
+import { LogScope, log } from '@template/shared/logger';
+import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
+import { reauthorizeStreams } from '#/ws/reauthorizeStreams';
+import { connectionsById, removeConnection } from '#/ws/registry';
+import type { WSSocket } from '#/ws/types';
+
+const REAUTHORIZE_INTERVAL_MS = 45_000;
+
+const pending = new WeakSet<WSSocket>();
+
+const reauthorizeQueued = async (ws: WSSocket): Promise<void> => {
+  pending.add(ws);
+  try {
+    await ws.data.queue.run(() => reauthorizeStreams(ws));
+  } catch (err) {
+    log.error(
+      `ws stream re-authorization failed: ${err instanceof Error ? err.message : String(err)}`,
+      LogScope.ws,
+    );
+    if (ws.readyState === WebSocket.OPEN) ws.close(1011, 're-authorization failed');
+    removeConnection(ws);
+  } finally {
+    pending.delete(ws);
+  }
+};
+
+export const reauthorizeOpenStreams = async (): Promise<void> => {
+  const sockets = [...connectionsById.values()].filter(
+    (ws) => ws.data.streams.size > 0 && !pending.has(ws),
+  );
+  await Promise.all(sockets.map(reauthorizeQueued));
+};
+
+const reauthorizeOpenStreamsInterval = makeUnrefInterval({
+  intervalMs: REAUTHORIZE_INTERVAL_MS,
+  tick: () => void reauthorizeOpenStreams(),
+});
+
+export const startReauthorizeOpenStreamsInterval = reauthorizeOpenStreamsInterval.start;
+export const stopReauthorizeOpenStreamsInterval = reauthorizeOpenStreamsInterval.stop;

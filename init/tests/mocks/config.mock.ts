@@ -1,5 +1,5 @@
 import { mock } from 'bun:test';
-import type { ProjectConfig } from '../../utils/getProjectConfig';
+import type { ProjectConfig } from '../../utils/fetchProjectConfig';
 
 // Force test mode — with-init-env.sh may pull NODE_ENV=production from Infisical secrets
 process.env.NODE_ENV = 'test';
@@ -368,11 +368,11 @@ export const createMockConfig = (overrides?: Partial<ProjectConfig>) => {
 
   return {
     mocks: {
-      getProjectConfig: mockGetProjectConfig,
+      fetchProjectConfig: mockGetProjectConfig,
       ...configHelperMocks,
       ...progressTrackingMocks,
     },
-    /** Update the config that getProjectConfig returns */
+    /** Update the config that fetchProjectConfig returns */
     setConfig: (config: ProjectConfig) => {
       currentConfig = config;
     },
@@ -382,8 +382,8 @@ export const createMockConfig = (overrides?: Partial<ProjectConfig>) => {
       for (const action of actions) progressState.get(section)!.add(action);
     },
     install: () => {
-      mock.module('../../utils/getProjectConfig', () => ({
-        getProjectConfig: mockGetProjectConfig,
+      mock.module('../../utils/fetchProjectConfig', () => ({
+        fetchProjectConfig: mockGetProjectConfig,
       }));
       mock.module('../../utils/configHelpers', () => configHelperMocks);
       mock.module('../../utils/progressTracking', () => progressTrackingMocks);

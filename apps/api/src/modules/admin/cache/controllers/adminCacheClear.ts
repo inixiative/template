@@ -4,7 +4,7 @@
  * @partOf primitive:caching, superadmin
  * @uses primitive:routeTemplates, infrastructure:redis
  */
-import { cacheKey, clearKey, redisNamespace } from '@template/db';
+import { cacheKey, clearCacheKeysMatchingPattern, redisNamespace } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';
 import { adminCacheClearRoute } from '#/modules/admin/cache/routes/adminCacheClear';
 
@@ -23,7 +23,7 @@ export const adminCacheClearController = makeController(
       pattern = cacheKey(model, identifier, tags, wildcard);
     }
 
-    const deleted = await clearKey(pattern);
+    const deleted = await clearCacheKeysMatchingPattern(pattern);
 
     return respond.ok({ pattern, deleted });
   },

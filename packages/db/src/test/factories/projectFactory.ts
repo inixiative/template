@@ -5,11 +5,11 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory, getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const projectFactory = createFactory('Project', {
+const projectFactory = registerFactory('Project', {
   defaults: () => ({
-    name: `${faker.commerce.productName()} ${getNextSeq()}`,
+    name: `${faker.commerce.productName()} ${nextFactorySequenceNumber()}`,
   }),
 });
 

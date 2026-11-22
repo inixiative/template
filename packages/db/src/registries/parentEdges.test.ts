@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import {
   childrenOf,
-  childWhereAlong,
-  parentAlong,
+  childWhereForParentAlongEdge,
   parentOf,
+  parentRowAlongEdge,
 } from '@template/db/registries/parentEdges';
 
 describe('parent edges', () => {
-  it('an entitlement names its target as its parent, by the materialized id', () => {
+  it('an entitlement names its target as its parent, by its dual polymorphism id', () => {
     expect(
       parentOf('Entitlement', {
         targetModel: 'SpaceUser',
@@ -23,28 +23,44 @@ describe('parent edges', () => {
     expect(parentOf('Token', { id: 't-1', organizationId: 'o-1' })).toBeNull();
   });
 
+  it('a setting names its resource as its parent, by its dual polymorphism id', () => {
+    expect(
+      parentOf('Setting', {
+        resourceModel: 'OrganizationUser',
+        resourceId: 'ou-1',
+        resourceOrganizationId: 'o-1',
+        resourceUserId: 'u-1',
+      }),
+    ).toEqual({ model: 'OrganizationUser', id: 'ou-1' });
+  });
+
   it('a record finds its children by the edge that reaches its model', () => {
     expect(childrenOf({ model: 'Token', id: 't-1' })).toEqual([
       { child: 'Entitlement', where: { targetModel: 'Token', targetId: 't-1' } },
     ]);
-    expect(childrenOf({ model: 'Organization', id: 'o-1' })).toEqual([]);
+    expect(childrenOf({ model: 'Organization', id: 'o-1' })).toEqual([
+      { child: 'Setting', where: { resourceModel: 'Organization', resourceId: 'o-1' } },
+    ]);
+    expect(childrenOf({ model: 'Contact', id: 'c-1' })).toEqual([]);
   });
 
   it('a foreign-key edge points at one model by one column', () => {
     const edge = { parent: 'Organization' as const, foreignKey: 'organizationId' };
-    expect(parentAlong('OrganizationUser', edge, { organizationId: 'o-1' })).toEqual({
+    expect(parentRowAlongEdge('OrganizationUser', edge, { organizationId: 'o-1' })).toEqual({
       model: 'Organization',
       id: 'o-1',
     });
-    expect(childWhereAlong('OrganizationUser', edge, { model: 'Organization', id: 'o-1' })).toEqual(
-      { organizationId: 'o-1' },
-    );
-    expect(childWhereAlong('OrganizationUser', edge, { model: 'Space', id: 's-1' })).toBeNull();
+    expect(
+      childWhereForParentAlongEdge('OrganizationUser', edge, { model: 'Organization', id: 'o-1' }),
+    ).toEqual({ organizationId: 'o-1' });
+    expect(
+      childWhereForParentAlongEdge('OrganizationUser', edge, { model: 'Space', id: 's-1' }),
+    ).toBeNull();
   });
 
-  it('a composite arm with no materialized id has no single parent id', () => {
+  it('a composite arm with no dual polymorphism id has no single parent id', () => {
     expect(() =>
-      parentAlong('Inquiry', { axis: 'targetModel' }, { targetModel: 'SpaceUser' }),
-    ).toThrow('materialize its id');
+      parentRowAlongEdge('Inquiry', { axis: 'targetModel' }, { targetModel: 'SpaceUser' }),
+    ).toThrow('give the axis a dualPolymorphismId');
   });
 });

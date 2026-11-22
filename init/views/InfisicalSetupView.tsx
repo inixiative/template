@@ -6,10 +6,10 @@ import { infisicalApi } from '../api/infisical';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
 import { setupInfisical } from '../tasks/infisicalSetup';
-import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
+import { infisicalProgressSummaries } from '../tasks/infisicalSteps';
 import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import { clearError, clearProgress } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
@@ -206,7 +206,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
     );
   }
 
-  const progressItems = getInfisicalProgressSummaries(config).map(({ label, completed }) => ({
+  const progressItems = infisicalProgressSummaries(config).map(({ label, completed }) => ({
     label,
     completed,
   }));

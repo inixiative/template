@@ -4,8 +4,8 @@ import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StepProgress } from '../components/StepProgress';
-import { getCurrentConfig, renameProject, updateProjectConfig } from '../tasks/projectConfig';
-import { getProjectProgressItems } from '../tasks/projectSteps';
+import { fetchCurrentConfig, renameProject, updateProjectConfig } from '../tasks/projectConfig';
+import { projectProgressItems } from '../tasks/projectSteps';
 import { useConfig } from '../utils/configState';
 import { execAsync } from '../utils/exec';
 import { clearProgress, markComplete } from '../utils/progressTracking';
@@ -29,7 +29,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 
   const progressItems = useMemo(() => {
     if (!config) return [];
-    return getProjectProgressItems(config);
+    return projectProgressItems(config);
   }, [config]);
 
   useInput((_input, key) => {
@@ -41,9 +41,9 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
   });
 
   useEffect(() => {
-    const loadConfig = async () => {
+    const fetchConfig = async () => {
       try {
-        const cfg = await getCurrentConfig();
+        const cfg = await fetchCurrentConfig();
         setCurrentConfig(cfg);
         setNewName(cfg.name);
         setNewOrg(cfg.organization);
@@ -53,7 +53,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
       }
     };
 
-    setTimeout(() => loadConfig(), 100);
+    setTimeout(() => fetchConfig(), 100);
   }, []);
 
   // Sanitize on entry so downstream consumers (docker container names like

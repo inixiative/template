@@ -10,7 +10,7 @@ import {
 import { adminRouter } from '#/routes/admin';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 useRealJobsQueue();
 
@@ -62,7 +62,7 @@ describe('adminRouter', () => {
     it('resolves the resource for a superadmin', async () => {
       const response = await superadminFetch(get(`/api/admin/cronJob/${cronJob.id}`));
       expect(response.status).toBe(200);
-      const { data } = await json<CronJob>(response);
+      const { data } = await parseSuccessBody<CronJob>(response);
       expect(data.id).toBe(cronJob.id);
     });
 
@@ -80,7 +80,7 @@ describe('adminRouter', () => {
         ),
       );
       expect(response.status).toBe(200);
-      const { data } = await json<Organization[]>(response);
+      const { data } = await parseSuccessBody<Organization[]>(response);
       return data.map((organization) => organization.id);
     };
 

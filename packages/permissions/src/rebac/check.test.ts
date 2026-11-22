@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { type Bridge, Operator } from '@inixiative/json-rules';
+import { type JoinedBridge, Operator } from '@inixiative/json-rules';
 import { createRebacCheck } from '@inixiative/permissions';
 import type { AccessorName } from '@template/db';
 import { createPermissions, type Permix } from '@template/permissions/client';
@@ -145,7 +145,7 @@ describe('rebac check', () => {
         'db:space': {
           actions: { own: null, manage: 'own', read: 'manage' },
         },
-        'db:customerRef': {
+        'db:customerRelationship': {
           actions: {
             read: {
               any: [
@@ -169,7 +169,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
     });
 
     it('grants access when second condition matches', async () => {
@@ -179,7 +179,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
     });
 
     it('denies access when no conditions match', async () => {
@@ -189,7 +189,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(false);
     });
   });
 
@@ -202,7 +202,7 @@ describe('rebac check', () => {
         'db:space': {
           actions: { own: null },
         },
-        'db:customerRef': {
+        'db:customerRelationship': {
           actions: {
             admin: {
               all: [
@@ -225,7 +225,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'admin')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'admin')).toBe(true);
     });
 
     it('denies access when only first condition matches', async () => {
@@ -239,7 +239,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'admin')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'admin')).toBe(false);
     });
 
     it('denies access when only second condition matches', async () => {
@@ -249,7 +249,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'admin')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'admin')).toBe(false);
     });
   });
 
@@ -258,11 +258,11 @@ describe('rebac check', () => {
       permissions: {
         'db:inquiry': {
           actions: {
-            read: { rule: { field: 'isPublic', operator: Operator.equals, value: true } },
+            read: { rule: { field: 'status', operator: Operator.equals, value: 'sent' } },
             edit: {
               all: [
                 { rule: { field: 'status', operator: Operator.equals, value: 'draft' } },
-                { rule: { field: 'isLocked', operator: Operator.equals, value: false } },
+                { rule: { field: 'content.locked', operator: Operator.equals, value: false } },
               ],
             },
           },
@@ -270,28 +270,28 @@ describe('rebac check', () => {
       },
     };
 
-    it('grants read when isPublic is true', () => {
-      const record = { id: 'inq-1', isPublic: true };
+    it('grants read when the inquiry is sent', () => {
+      const record = { id: 'inq-1', status: 'sent' };
       expect(check(permix, schema, 'inquiry', record, 'read')).toBe(true);
     });
 
-    it('denies read when isPublic is false', () => {
-      const record = { id: 'inq-1', isPublic: false };
+    it('denies read when the inquiry is not sent', () => {
+      const record = { id: 'inq-1', status: 'draft' };
       expect(check(permix, schema, 'inquiry', record, 'read')).toBe(false);
     });
 
     it('grants edit when all attribute conditions match', () => {
-      const record = { id: 'inq-1', status: 'draft', isLocked: false };
+      const record = { id: 'inq-1', status: 'draft', content: { locked: false } };
       expect(check(permix, schema, 'inquiry', record, 'edit')).toBe(true);
     });
 
     it('denies edit when status is not draft', () => {
-      const record = { id: 'inq-1', status: 'published', isLocked: false };
+      const record = { id: 'inq-1', status: 'sent', content: { locked: false } };
       expect(check(permix, schema, 'inquiry', record, 'edit')).toBe(false);
     });
 
-    it('denies edit when inquiry is locked', () => {
-      const record = { id: 'inq-1', status: 'draft', isLocked: true };
+    it('denies edit when the inquiry content is locked', () => {
+      const record = { id: 'inq-1', status: 'draft', content: { locked: true } };
       expect(check(permix, schema, 'inquiry', record, 'edit')).toBe(false);
     });
   });
@@ -306,15 +306,22 @@ describe('rebac check', () => {
           actions: {
             // Can only access if parent org has enterprise plan
             access: {
-              rule: { field: 'organization.plan', operator: Operator.equals, value: 'enterprise' },
+              rule: { field: 'organization.slug', operator: Operator.equals, value: 'enterprise' },
             },
-            // Check deeply nested entitlement
+          },
+        },
+        'db:inquiry': {
+          actions: {
+            // A Json column reads on by dotted path
             useFeature: {
               rule: {
-                field: 'organization.entitlements.advancedFeatures',
+                field: 'sourceOrganization.slug',
                 operator: Operator.equals,
-                value: true,
+                value: 'enterprise',
               },
+            },
+            readContent: {
+              rule: { field: 'content.advancedFeatures', operator: Operator.equals, value: true },
             },
           },
         },
@@ -323,7 +330,7 @@ describe('rebac check', () => {
             // Check 3 levels deep
             accessPremium: {
               rule: {
-                field: 'space.organization.plan',
+                field: 'space.organization.slug',
                 operator: Operator.equals,
                 value: 'enterprise',
               },
@@ -333,10 +340,10 @@ describe('rebac check', () => {
       },
     };
 
-    it('accesses parent relation attribute (organization.plan)', () => {
+    it('accesses parent relation attribute (organization.slug)', () => {
       const record = {
         id: 'space-1',
-        organization: { id: 'org-1', plan: 'enterprise' },
+        organization: { id: 'org-1', slug: 'enterprise' },
       };
       expect(check(permix, schema, 'space', record, 'access')).toBe(true);
     });
@@ -344,25 +351,22 @@ describe('rebac check', () => {
     it('denies when parent attribute does not match', () => {
       const record = {
         id: 'space-1',
-        organization: { id: 'org-1', plan: 'free' },
+        organization: { id: 'org-1', slug: 'free' },
       };
       expect(check(permix, schema, 'space', record, 'access')).toBe(false);
     });
 
-    it('accesses nested object property (organization.entitlements.advancedFeatures)', () => {
-      const record = {
-        id: 'space-1',
-        organization: { id: 'org-1', entitlements: { advancedFeatures: true } },
-      };
-      expect(check(permix, schema, 'space', record, 'useFeature')).toBe(true);
+    it('reads into a Json column by dotted path (content.advancedFeatures)', () => {
+      const record = { id: 'inq-1', content: { advancedFeatures: true } };
+      expect(check(permix, schema, 'inquiry', record, 'readContent')).toBe(true);
     });
 
-    it('accesses 3 levels deep (space.organization.plan)', () => {
+    it('accesses 3 levels deep (space.organization.slug)', () => {
       const record = {
         id: 'su-1',
         space: {
           id: 'space-1',
-          organization: { id: 'org-1', plan: 'enterprise' },
+          organization: { id: 'org-1', slug: 'enterprise' },
         },
       };
       expect(check(permix, schema, 'spaceUser', record, 'accessPremium')).toBe(true);
@@ -377,9 +381,9 @@ describe('rebac check', () => {
     });
   });
 
-  describe('polymorphic CustomerRef - full example', () => {
-    // CustomerRef has customer side (user/org/space) and provider side (space)
-    // Customer can read their refs, provider can manage them
+  describe('polymorphic CustomerRelationship - full example', () => {
+    // CustomerRelationship has customer side (user/org/space) and provider side (space)
+    // Customer can read their relationships, provider can manage them
     const schema: RebacSchema = {
       permissions: {
         'db:user': {
@@ -401,9 +405,9 @@ describe('rebac check', () => {
             read: 'operate',
           },
         },
-        'db:customerRef': {
+        'db:customerRelationship': {
           actions: {
-            // Provider owns the ref
+            // Provider owns the relationship
             own: { rel: 'providerSpace', action: 'own' },
             manage: 'own',
             // Both customer and provider can read
@@ -420,7 +424,7 @@ describe('rebac check', () => {
       },
     };
 
-    it('provider org owner can manage customerRef', async () => {
+    it('provider org owner can manage customerRelationship', async () => {
       await permix.setup({
         resource: 'db:organization',
         id: 'provider-org',
@@ -431,12 +435,12 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space', organization: { id: 'provider-org' } },
       };
-      expect(check(permix, schema, 'customerRef', record, 'own')).toBe(true);
-      expect(check(permix, schema, 'customerRef', record, 'manage')).toBe(true);
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'own')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'manage')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
     });
 
-    it('customer org member can read but not manage customerRef', async () => {
+    it('customer org member can read but not manage customerRelationship', async () => {
       await permix.setup({
         resource: 'db:organization',
         id: 'customer-org',
@@ -447,35 +451,35 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space', organization: { id: 'provider-org' } },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
-      expect(check(permix, schema, 'customerRef', record, 'manage')).toBe(false);
-      expect(check(permix, schema, 'customerRef', record, 'own')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'manage')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'own')).toBe(false);
     });
 
-    it('unrelated user cannot access customerRef', async () => {
+    it('unrelated user cannot access customerRelationship', async () => {
       await permix.setup({ resource: 'db:organization', id: 'other-org', actions: { own: true } });
       const record = {
         id: 'ref-1',
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space', organization: { id: 'provider-org' } },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(false);
     });
 
-    it('customer user can read their own ref', async () => {
+    it('customer user can read their own relationship', async () => {
       await permix.setup({ resource: 'db:user', id: 'user-1', actions: { own: true } });
       const record = {
         id: 'ref-1',
         customerUser: { id: 'user-1' },
         providerSpace: { id: 'provider-space', organization: { id: 'provider-org' } },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
     });
   });
 
-  describe('a rule on __actor and the user relation', () => {
+  describe('a rule on who is acting and the user relation', () => {
     const isUser: ActionRule = {
-      rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
+      rule: { field: 'actor:Acting.model', operator: Operator.equals, value: 'User' },
     };
     const schema: RebacSchema = {
       permissions: {
@@ -731,12 +735,12 @@ describe('rebac check', () => {
       expect(check(permix, schema, 'organization', record, 'own')).toBe(false);
     });
 
-    it('returns false when relation field missing from Prisma schema', () => {
+    it('throws when a rule names a relation the schema map does not declare', () => {
       const badSchema: RebacSchema = {
         permissions: { 'db:space': { actions: { own: { rel: 'fakeRelation', action: 'own' } } } },
       };
       const record = { id: 'space-1', fakeRelation: { id: 'fake-1' } };
-      expect(check(permix, badSchema, 'space', record, 'own')).toBe(false);
+      expect(() => check(permix, badSchema, 'space', record, 'own')).toThrow('has no relation');
     });
 
     it('handles deeply nested delegation chains', async () => {
@@ -760,14 +764,20 @@ describe('rebac check', () => {
       expect(check(permix, deepSchema, 'organization', record, 'd')).toBe(false);
     });
 
-    it('throws on cycle in permission graph', () => {
+    it('a loop made by data denies (permissions 0.23)', () => {
       // The prisma map template bakes into `check` has no cycle, so generate a relation map with a
       // real space <-> organization cycle and drive the imported engine with it directly.
       const relations: Record<string, Record<string, string>> = {
         space: { organization: 'organization' },
         organization: { parentSpace: 'space' },
       };
-      const toOne = (type: string) => ({ kind: 'object' as const, type, isList: false });
+      const toOne = (type: string, segment: string) => ({
+        kind: 'object' as const,
+        type,
+        isList: false,
+        fromFields: [`${segment}Id`],
+        toFields: ['id'],
+      });
       const cyclicCheck = createRebacCheck({
         resources: { space: 'space', organization: 'organization' },
         fieldMap: {
@@ -776,7 +786,7 @@ describe('rebac check', () => {
               model,
               {
                 fields: Object.fromEntries(
-                  Object.entries(fields).map(([segment, type]) => [segment, toOne(type)]),
+                  Object.entries(fields).map(([segment, type]) => [segment, toOne(type, segment)]),
                 ),
               },
             ]),
@@ -795,9 +805,9 @@ describe('rebac check', () => {
 
       // No grants — forces schema evaluation down the cyclic relation walk.
       const noGrants = { check: () => false, isSuperadmin: () => false, getActor: () => null };
-      expect(() =>
-        cyclicCheck(noGrants, cyclicSchema, { resource: 'space', record: space }, 'own'),
-      ).toThrow(/Cycle detected/);
+      expect(cyclicCheck(noGrants, cyclicSchema, { resource: 'space', record: space }, 'own')).toBe(
+        false,
+      );
     });
   });
 
@@ -911,7 +921,7 @@ describe('rebac check', () => {
           read: {
             any: [
               { rel: 'user', action: 'read' },
-              { rule: { field: 'shareToken', operator: Operator.equals, value: 'public' } },
+              { rule: { field: 'label', operator: Operator.equals, value: 'public' } },
             ],
           },
         },
@@ -947,7 +957,7 @@ describe('rebac check', () => {
 
   describe('cross-source bridge walks', () => {
     // crm:account (the "one") ↔ db:user (the "many"); db:user.accountId joins crm:account.id.
-    const bridges: Bridge[] = [
+    const bridges: JoinedBridge[] = [
       {
         endpoints: [
           { fieldMap: 'crm', model: 'account', on: 'id' },

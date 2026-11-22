@@ -6,7 +6,7 @@
 
 - [Request Lifecycle](#request-lifecycle)
 - [AppEnv Types](#appenv-types)
-- [prepareRequest](#preparerequest)
+- [prepareRequestMiddleware](#preparerequestmiddleware)
   - [What It Does](#what-it-does)
 - [Context Setters](#context-setters)
   - [setUserContext](#setusercontext)
@@ -19,8 +19,8 @@
   - [Context Types](#context-types)
     - [TokenWithRelations](#tokenwithrelations)
   - [Complex Getters](#complex-getters)
-    - [getResource / getResourceType](#getresource--getresourcetype)
-    - [getValidatedBody / getValidatedQuery](#getvalidatedbody--getvalidatedquery)
+    - [contextResource / contextResourceType](#contextresource--contextresourcetype)
+    - [validatedBody / validatedQuery](#validatedbody--validatedquery)
     - [isSuperadmin](#issuperadmin)
 - [Refreshing Context](#refreshing-context)
   - [refreshUserContext](#refreshusercontext)
@@ -54,7 +54,7 @@ Request arrives
 corsMiddleware
   - Handles CORS headers and preflight
     ↓
-prepareRequest
+prepareRequestMiddleware
   - Sets db, requestId, permix (fresh instance)
   - Initializes all context vars to null
   - Wraps request in db.scope(requestId)
@@ -138,12 +138,12 @@ type AppEnv = { Variables: AppVars };
 
 ---
 
-## prepareRequest
+## prepareRequestMiddleware
 
-Located in `apps/api/src/middleware/prepareRequest.ts`. Runs first on every request.
+Located in `apps/api/src/middleware/prepareRequestMiddleware.ts`. Runs first on every request.
 
 ```typescript
-export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
+export const prepareRequestMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const isBatch = c.req.path === '/api/batch';
 
   // Batch requests: minimal context setup (full setup happens per sub-request)
@@ -185,7 +185,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   c.set('filterLens', null);  // Set by prepareMiddleware (from route's filterLens)
 
   // Wrap in database scope for logging/tracing
-  await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
+  await withLogScope('api', () => withLogScope(requestId, () => db.scope(requestId, next)));
 };
 ```
 
@@ -194,7 +194,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 1. **Creates request ID** - UUID for correlating logs and responses
 2. **Initializes permix** - Fresh permission instance (no permissions until auth runs)
 3. **Nulls all auth vars** - Ensures clean slate for auth middleware (user, token, spoofedBy, organizationUsers, organizations, spaceUsers, spaces)
-4. **Wraps in scopes** - Enables `db.getScopeId()` and log correlation throughout request
+4. **Wraps in scopes** - Enables `db.currentScopeId()` and log correlation throughout request
 
 ---
 
@@ -214,11 +214,11 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
   c.set('spaceUsers', spaceUsers);
   c.set('spaces', spaces);
 
-  await installPermissions(c);
+  await installPermissionsFromRequestContext(c);
 };
 ```
 
-`installPermissions` (`apps/api/src/lib/context/installPermissions.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's user, or the user behind a User, OrganizationUser or SpaceUser token), and installs either the user's table or the token's permissions over its owner. Every token goes through `setTokenContext`, which never sets a user: a User token carries its user's members as context, any other token none.
+`installPermissionsFromRequestContext` (`apps/api/src/lib/context/installPermissionsFromRequestContext.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's user, or the user behind a User, OrganizationUser or SpaceUser token), and installs either the user's table or the token's permissions over its owner. Every token goes through `setTokenContext`, which never sets a user: a User token carries its user's members as context, any other token none.
 
 ### What It Does
 
@@ -312,7 +312,7 @@ export const usersReadMany = readRoute({
 
 // Controller — supplies the lens's bind tokens; paginate() refuses a missing one
 const { data, pagination } = await paginate(c, db.user, {
-  bindings: { organizationId: getResource<'organization'>(c).id },
+  bindings: { organizationId: contextResource<'organization'>(c).id },
 });
 ```
 
@@ -345,7 +345,7 @@ type TokenWithRelations = WithTargetEntitlements<Token> & {
 };
 ```
 
-Every holder carries `targetEntitlements: Entitlement[]`, its live rows as stored (`includeTargetEntitlements(model)`, `packages/db/src/entitlements`, which names the holder's model because a member arm keys on the owner chain and an `OrganizationUser`'s relation also reaches its `SpaceUser` rows). `loadTokenContext` reads the token with them, and `hydrate` loads the member and integration through `fetchOne`, which includes them for every holder. The rows become library entries only where a holder is handed to the permissions library (`entitlementsOf`, `@template/permissions`). The resource context loads the plain row; the read controllers include its rows.
+Every holder carries `targetEntitlements: Entitlement[]`, its live rows as stored (`includeTargetEntitlements(model)`, `packages/db/src/entitlements`, which names the holder's model because a member arm keys on the owner chain and an `OrganizationUser`'s relation also reaches its `SpaceUser` rows). `fetchTokenContext` reads the token with them, and `hydrate` loads the member and integration through `fetchCachedRecordWithTargetEntitlements`, which includes them for every holder. The rows become library entries only where a holder is handed to the permissions library (`entitlementEntriesOfHolder`, `@template/permissions`). The resource context loads the plain row; the read controllers include its rows.
 
 Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 
@@ -353,24 +353,24 @@ Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 
 Some getters have logic and remain as functions in `apps/api/src/lib/context/`.
 
-#### getResource / getResourceType
+#### contextResource / contextResourceType
 
 ```typescript
-import { getResource, getResourceType } from '#/lib/context/getResource';
+import { contextResource, contextResourceType } from '#/lib/context/contextResource';
 
-const org = getResource<'organization'>(c);  // Typed based on generic
-const modelName = getResourceType(c);        // AccessorName | null
+const org = contextResource<'organization'>(c);  // Typed based on generic
+const modelName = contextResourceType(c);        // AccessorName | null
 ```
 
 Accesses resources loaded by middleware for routes with `:id` parameter.
 
-#### getValidatedBody / getValidatedQuery
+#### validatedBody / validatedQuery
 
 ```typescript
-import { getValidatedBody, getValidatedQuery } from '#/lib/context/getValidatedData';
+import { validatedBody, validatedQuery } from '#/lib/context/validatedRequestData';
 
-const body = getValidatedBody<MyBodyType>(c);   // typed validated JSON body
-const query = getValidatedQuery<MyQueryType>(c); // typed validated query params
+const body = validatedBody<MyBodyType>(c);   // typed validated JSON body
+const query = validatedQuery<MyQueryType>(c); // typed validated query params
 ```
 
 Use in services and middleware that receive a generic `Context<AppEnv>` rather than the fully-typed route context from `makeController`. Avoids repeating the `(c.req as unknown as { valid: ... }).valid('json')` cast.
@@ -404,7 +404,7 @@ await refreshUserContext(c);
 ```
 
 **What it does:**
-1. With a token: re-runs the token sign-in (`loadTokenContext` with the token's `keyHash`) and rebuilds through `setTokenContext`, so a member's token keeps exactly its own member row and a revoked token stops with a 401
+1. With a token: re-runs the token sign-in (`fetchTokenContext` with the token's `keyHash`) and rebuilds through `setTokenContext`, so a member's token keeps exactly its own member row and a revoked token stops with a 401
 2. With a user: reloads the user with all relations via cached `findUserWithRelations` and rebuilds through `setUserContext`
 3. Either way the table is replaced, never added to
 
@@ -485,14 +485,11 @@ soft-delete extension scopes it (see DATABASE.md → Soft-delete read scoping). 
 decides visibility, not the actor.** On every ordinary route a soft-deleted resource 404s for
 everyone — a superadmin calling `/api/v1/organization/:id` included. Superadmin endpoints (mounted
 on `adminRouter`, behind `validateSuperadmin`) run inside `db.withDeleted`, so there the lookup
-resolves tombstones too. Revival is a create path, never load-the-deleted-row-by-id: inside
-`db.txn`, `db.findForUpdate(model, where, { upserting: true })` on the unique key fences it and
-returns the tombstone if there is one (raw SQL, so the soft-delete scope doesn't hide it); then an
-update whose `where` names `deletedAt` clears it, or a create follows (DATABASE.md → Row Locks and
-Create-If-Missing). No bare `upsert` and no caught unique violation: the `no-create-race-machinery`
-rule ratchets both down per file. The JobOutbox flush (`apps/api/src/jobs/outbox/accumulator.ts`,
-superseding lanes keyed on `handlerName_dedupeKey`) is the standing pre-rule upsert the ratchet
-grandfathers. Models without `deletedAt` are unaffected.
+resolves tombstones too. Revival is a create path, never load-the-deleted-row-by-id: an `upsert` on the plain unique inside
+`db.withDeleted` finds the tombstone and `update: { deletedAt: null }` revives it, or `revive` on
+the key followed by a create (DATABASE.md → Row Locks and Create-If-Missing). No caught unique
+violation: the `no-unique-violation-catches` rule ratchets them down per file. Models without
+`deletedAt` are unaffected.
 
 ### Lookup Parameter
 
@@ -524,7 +521,7 @@ export const resourceContextArgs: Partial<Record<AccessorName, object>> = {
   },
 };
 
-// Type the payload for getResource<T>
+// Type the payload for contextResource<T>
 export type ResourcePayloadMap = {
   webhookSubscription: Prisma.WebhookSubscriptionGetPayload<{
     include: { webhookEvents: { take: 10; orderBy: { createdAt: 'desc' } } };
@@ -546,10 +543,10 @@ The database uses AsyncLocalStorage for request-scoped context.
 import { db } from '@template/db';
 
 // Get current scope ID (request UUID or job ID)
-const scopeId = db.getScopeId();
+const scopeId = db.currentScopeId();
 
 // Get context type
-const context = db.getScopeContext();  // 'api' | 'worker' | undefined
+const context = db.currentScopeContext();  // 'api' | 'worker' | undefined
 
 // Check if inside a transaction
 const inTxn = db.isInTxn();

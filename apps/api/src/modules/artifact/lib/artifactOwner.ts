@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses infrastructure:prisma
  */
-import { polymorphicTarget } from '@template/db';
+import { rowPolymorphicAxisPointsAt } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 
 export type OwnedArtifact = Pick<Artifact, 'ownerModel' | 'userId' | 'organizationId' | 'spaceId'>;
@@ -16,9 +16,9 @@ export const sameArtifactOwner = (a: OwnedArtifact, b: OwnedArtifact): boolean =
   a.spaceId === b.spaceId;
 
 export const artifactOwner = (artifact: OwnedArtifact) => {
-  const owner = polymorphicTarget(artifact, 'Artifact', 'ownerModel');
+  const owner = rowPolymorphicAxisPointsAt(artifact, 'Artifact', 'ownerModel');
   if (!owner) throw new Error('Artifact has no owner');
-  return { ownerModel: owner.kind, ownerId: owner.id };
+  return { ownerModel: owner.model, ownerId: owner.id };
 };
 
 export type OwnerRef = Pick<OwnedArtifact, 'ownerModel'> & Partial<OwnedArtifact>;

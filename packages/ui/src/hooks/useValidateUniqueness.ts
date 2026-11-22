@@ -4,9 +4,9 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+import { useQuery } from '@tanstack/react-query';
 import { organizationRead, spaceRead } from '@template/sdk';
-import { useQuery } from '@template/ui/hooks/useQuery';
-import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
+import { makeAuthenticatedApiFetch } from '@template/ui/lib/makeAuthenticatedApiFetch';
 import { useAppStore } from '@template/ui/store';
 
 type Model = 'organization' | 'space';
@@ -44,7 +44,7 @@ export const useValidateUniqueness = (
 
       // Use throwOnError: false so we can inspect response.status
       // (throwOnError: true throws the parsed JSON body which has no .status field)
-      const result = (await apiFetchInternal(
+      const result = (await makeAuthenticatedApiFetch(
         (requestOptions: LookupOptions) => reader({ ...params, ...requestOptions }),
         { spoofUserEmail: auth.spoofUserEmail, throwOnError: false },
       )()) as {

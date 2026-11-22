@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses primitive:routeTemplates
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { artifactReadManyArtifactPlacementsRoute } from '#/modules/artifact/routes/artifactReadManyArtifactPlacements';
@@ -14,7 +14,7 @@ export const artifactReadManyArtifactPlacementsController = makeController(
   artifactReadManyArtifactPlacementsRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const artifact = getResource<'artifact'>(c);
+    const artifact = contextResource<'artifact'>(c);
     const edges = await db.artifactPlacement.findMany({ where: { artifactId: artifact.id } });
     const verdicts = await checkArtifactAccess(
       artifactActorFromContext(c),

@@ -21,7 +21,7 @@ React apps on TanStack Router, one shared Zustand store, and ReBAC checks on the
 | File routes, layouts, guards, nav config, page access, navigating | [FRONTEND/ROUTING_NAVIGATION.md](FRONTEND/ROUTING_NAVIGATION.md) |
 | Generated SDK, `apiQuery` / `apiMutation`, optimistic mutations, data hooks | [FRONTEND/API_CLIENT.md](FRONTEND/API_CLIENT.md) |
 | UI primitives, settings, modals, pages | [FRONTEND/COMPONENTS.md](FRONTEND/COMPONENTS.md) |
-| AppShell, ContextSelector, Sidebar, overlays, theme | [FRONTEND/THEME_LAYOUT.md](FRONTEND/THEME_LAYOUT.md) |
+| AppShell, TenantContextSelector, Sidebar, overlays, theme | [FRONTEND/THEME_LAYOUT.md](FRONTEND/THEME_LAYOUT.md) |
 | Sign-in, OAuth callback, auth slice | [FRONTEND/AUTH.md](FRONTEND/AUTH.md) |
 | Permission checks in components and nav | [PERMISSIONS.md](PERMISSIONS.md#frontend-checks) |
 | Store slices | [ZUSTAND.md](ZUSTAND.md) |
@@ -59,7 +59,7 @@ React apps on TanStack Router, one shared Zustand store, and ReBAC checks on the
 - **auth** - User, organizations, spaces, spoof, sign-in / sign-up / logout
 - **tenant** - Current context (`public` / `user` / `organization` / `space`) and page records
 - **permissions** - Permix instance and `check(model, record, action)`
-- **navigation** - Router `navigate`, nav config, current route match, `navigatePreserving`, active flow
+- **navigation** - Router `navigate`, nav config, current route match, `navigateKeepingSearchParams`, active flow
 - **ui** - Theme, loading, app identity (name, logo, description)
 - **client** - TanStack Query client and the API websocket
 
@@ -77,7 +77,7 @@ Full slice reference: [ZUSTAND.md](ZUSTAND.md).
 
 | Feature | Web | Admin | Superadmin |
 |---------|-----|-------|------------|
-| **ContextSelector** | ✅ Yes | ✅ Yes | Locked |
+| **TenantContextSelector** | ✅ Yes | ✅ Yes | Locked |
 | **Multi-tenant** | ✅ Yes | ✅ Yes | ❌ No (user + public contexts only) |
 | **Spoof controls** | ✅ Yes | ✅ Yes | ❌ No |
 | **Navigation** | Consumer actions | Operator actions | Platform management |
@@ -97,5 +97,5 @@ More on the apps: [APPS.md](APPS.md).
 - Compose state as store slices; never add a per-app store ([ZUSTAND.md](ZUSTAND.md)).
 - Web and admin are tenant-context aware; superadmin is user-context first and never forces a tenant.
 - Gate pages through the nav config's `access` and actions through `permissions.check`; don't hand-roll role checks. Platform `superadmin` bypasses checks in the permissions slice.
-- Protect layouts with `requireAuth` / `requirePublic` from `@template/ui/guards`.
+- Protect layouts with `redirectToLoginUnlessAuthenticated` / `redirectAuthenticatedUserAwayFromPublicPage` from `@template/ui/guards`.
 - Put shared UI and pages in `@template/ui`; app routes stay thin.

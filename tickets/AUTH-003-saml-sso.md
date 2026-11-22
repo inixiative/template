@@ -15,7 +15,7 @@ Implement SAML 2.0 Single Sign-On (SSO) support using BetterAuth SSO plugin, ena
 **Current State:**
 - ✅ AuthProvider database model with SAML type and encrypted secrets
 - ✅ Frontend stubs exist (`signInWithSaml` throws "not implemented")
-- ✅ UI components ready (LoginForm/SignupForm with SAML icon)
+- ✅ UI components ready (LoginForm/SignUpForm with SAML icon)
 - ✅ Unified auth system (AUTH-002) complete
 
 **Why This Matters:**
@@ -200,7 +200,7 @@ provisionUser: async ({ userInfo }) => {
 - ✅ signInWithSaml and signUpWithSaml implemented (stubs replaced)
 - ✅ SAML callback routes in all 3 apps
 - ✅ Bearer token extraction from SAML session working
-- ✅ LoginForm/SignupForm detect and route SAML providers
+- ✅ LoginForm/SignUpForm detect and route SAML providers
 
 **UI:**
 - ✅ SAML provider configuration modal with all fields

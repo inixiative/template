@@ -3,7 +3,7 @@ import { Operator } from '@inixiative/json-rules';
 import { segmentRouter } from '#/modules/segment';
 import { validateSegmentConditions } from '#/modules/segment/validations/validateSegmentConditions';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type SegmentInfo = {
   conditions: string;
@@ -21,21 +21,22 @@ const { fetch } = createTestApp({
   mount: [(app) => app.route('/api/v1/segment', segmentRouter)],
 });
 
-const loadInfo = async () => {
+const fetchInfo = async () => {
   const response = await fetch(get('/api/v1/segment/info'));
   expect(response.status).toBe(200);
-  return (await json<{ guide: Record<string, string>; types: SegmentInfo }>(response)).data.types;
+  return (await parseSuccessBody<{ guide: Record<string, string>; types: SegmentInfo }>(response))
+    .data.types;
 };
 
 describe('GET /api/v1/segment/info', () => {
   it('answers without a session and tags conditions as a rule', async () => {
-    const info = await loadInfo();
-    expect(info.root).toBe('CustomerRef');
+    const info = await fetchInfo();
+    expect(info.root).toBe('CustomerRelationship');
     expect(info.conditions).toBe('rule');
   });
 
   it('lists fields every one of which the save gate accepts', async () => {
-    const info = await loadInfo();
+    const info = await fetchInfo();
     const byPath = new Map(info.fields.map((field) => [field.path, field]));
     expect(byPath.get('customerUser.contacts')).toMatchObject({ kind: 'relation', isList: true });
     expect(byPath.get('segmentMembers.segment.id')?.sourced).toBe(true);

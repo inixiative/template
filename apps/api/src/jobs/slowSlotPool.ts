@@ -16,7 +16,7 @@ export type SlowSlotPool = {
 export const slowSlotCapacity = (concurrency: number): number =>
   Math.max(1, Math.floor(concurrency * process.env.JOBS_SLOW_SLOT_FRACTION));
 
-export const createSlowSlotPool = (
+export const makeSlowSlotPool = (
   concurrency: number = process.env.JOBS_WORKER_CONCURRENCY,
 ): SlowSlotPool => {
   const capacity = slowSlotCapacity(concurrency);

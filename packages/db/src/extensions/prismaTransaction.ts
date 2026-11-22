@@ -10,6 +10,6 @@
 // storage it survives the interceptor's continuation. Pinned by test/managedTransactions.test.ts.
 export type PrismaTransaction = { kind: string; id: string | number };
 
-export const readPrismaTransaction = (params: unknown): PrismaTransaction | undefined =>
+export const prismaTransactionOf = (params: unknown): PrismaTransaction | undefined =>
   (params as { __internalParams?: { transaction?: PrismaTransaction } }).__internalParams
     ?.transaction;

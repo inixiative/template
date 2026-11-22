@@ -4,13 +4,13 @@
  * @partOf feature:auth
  * @uses infrastructure:prisma, infrastructure:redis, primitive:appEvents
  */
-import { db, getRedisClient, redisNamespace } from '@template/db';
+import { db, redisClient, redisNamespace } from '@template/db';
 import { passwordLength } from '@template/shared/auth/passwordLength';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emitAppEvent } from '#/appEvents/emit';
 import { authPlugins } from '#/lib/auth/authPlugins';
-import { getAllowedOrigins } from '#/middleware/corsMiddleware';
+import { allowedCorsOrigins } from '#/middleware/corsMiddleware';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
 export const auth = betterAuth({
@@ -45,7 +45,7 @@ export const auth = betterAuth({
         : undefined,
   },
 
-  // Sessions exist only for the sign-in handshake; jwtHandoff swaps each one for a JWT.
+  // Sessions exist only for the sign-in handshake; jwtHandoffPlugin swaps each one for a JWT.
   session: {
     expiresIn: 10 * 60,
   },
@@ -106,28 +106,28 @@ export const auth = betterAuth({
     '/one-time-token/generate',
   ],
 
-  trustedOrigins: getAllowedOrigins(),
+  trustedOrigins: allowedCorsOrigins(),
 
   // Failures before the flow's own errorCallbackURL is known (e.g. state_mismatch) land on web login, not the API.
   onAPIError: process.env.WEB_URL ? { errorURL: `${process.env.WEB_URL}/login` } : undefined,
 
   secondaryStorage: {
     get: async (key) => {
-      const value = await getRedisClient().get(`${redisNamespace.session}:${key}`);
+      const value = await redisClient().get(`${redisNamespace.session}:${key}`);
       return value ? JSON.parse(value) : null;
     },
     set: async (key, value, ttl) => {
-      await getRedisClient().setex(
+      await redisClient().setex(
         `${redisNamespace.session}:${key}`,
         ttl ?? 86400,
         JSON.stringify(value),
       );
     },
     delete: async (key) => {
-      await getRedisClient().del(`${redisNamespace.session}:${key}`);
+      await redisClient().del(`${redisNamespace.session}:${key}`);
     },
     getAndDelete: async (key) => {
-      const value = await getRedisClient().getdel(`${redisNamespace.session}:${key}`);
+      const value = await redisClient().getdel(`${redisNamespace.session}:${key}`);
       return value ? JSON.parse(value) : null;
     },
   },

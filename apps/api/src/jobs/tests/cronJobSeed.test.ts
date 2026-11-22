@@ -7,7 +7,9 @@ import { isValidJobId } from '#/jobs/validateJobId';
 import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 
 const cronJobSeeds = seeds.find((file) => file.model === 'cronJob')!;
-const systemSeed = cronJobSeeds.records.find((record) => record.handler === 'sweepSegments')!;
+const systemSeed = cronJobSeeds.records.find(
+  (record) => record.handler === 'reconcileEveryHealthyDynamicSegment',
+)!;
 const seedFile: SeedFile = { ...cronJobSeeds, records: [systemSeed] };
 
 describe('cron job seeds sync system rows', () => {
@@ -26,14 +28,14 @@ describe('cron job seeds sync system rows', () => {
   it('renames a system row on re-seed and moves its scheduler', async () => {
     await createCronJob({
       id: systemSeed.id,
-      name: 'sweepSegmentsLegacy',
-      jobId: 'sweepSegmentsLegacy',
-      handler: 'cleanStaleData',
+      name: 'reconcileEveryHealthyDynamicSegmentLegacy',
+      jobId: 'reconcileEveryHealthyDynamicSegmentLegacy',
+      handler: 'hardDeleteRecordsPastRetention',
       description: 'Legacy description.',
       pattern: '0 4 * * *',
     });
-    expect(await jobs().schedulerOf('sweepSegmentsLegacy')).toEqual({
-      name: 'cleanStaleData',
+    expect(await jobs().schedulerOf('reconcileEveryHealthyDynamicSegmentLegacy')).toEqual({
+      name: 'hardDeleteRecordsPastRetention',
       pattern: '0 4 * * *',
     });
 
@@ -41,14 +43,14 @@ describe('cron job seeds sync system rows', () => {
 
     const row = await db.cronJob.findUniqueOrThrow({ where: { id: systemSeed.id } });
     expect(row).toMatchObject({
-      name: 'sweepSegments',
-      jobId: 'sweepSegments',
-      handler: 'sweepSegments',
+      name: 'reconcileEveryHealthyDynamicSegment',
+      jobId: 'reconcileEveryHealthyDynamicSegment',
+      handler: 'reconcileEveryHealthyDynamicSegment',
       description: systemSeed.description,
     });
-    expect(await jobs().schedulerOf('sweepSegmentsLegacy')).toBeNull();
-    expect(await jobs().schedulerOf('sweepSegments')).toEqual({
-      name: 'sweepSegments',
+    expect(await jobs().schedulerOf('reconcileEveryHealthyDynamicSegmentLegacy')).toBeNull();
+    expect(await jobs().schedulerOf('reconcileEveryHealthyDynamicSegment')).toEqual({
+      name: 'reconcileEveryHealthyDynamicSegment',
       pattern: '0 4 * * *',
     });
   });
@@ -56,9 +58,9 @@ describe('cron job seeds sync system rows', () => {
   it('keeps the fields an admin edited', async () => {
     await createCronJob({
       id: systemSeed.id,
-      name: 'sweepSegmentsLegacy',
-      jobId: 'sweepSegmentsLegacy',
-      handler: 'cleanStaleData',
+      name: 'reconcileEveryHealthyDynamicSegmentLegacy',
+      jobId: 'reconcileEveryHealthyDynamicSegmentLegacy',
+      handler: 'hardDeleteRecordsPastRetention',
       pattern: '*/5 * * * *',
       enabled: false,
       payload: { batch: 10 },
@@ -70,14 +72,14 @@ describe('cron job seeds sync system rows', () => {
 
     const row = await db.cronJob.findUniqueOrThrow({ where: { id: systemSeed.id } });
     expect(row).toMatchObject({
-      handler: 'sweepSegments',
+      handler: 'reconcileEveryHealthyDynamicSegment',
       pattern: '*/5 * * * *',
       enabled: false,
       payload: { batch: 10 },
       maxAttempts: 7,
       backoffMs: 1234,
     });
-    expect(await jobs().schedulerOf('sweepSegments')).toBeNull();
+    expect(await jobs().schedulerOf('reconcileEveryHealthyDynamicSegment')).toBeNull();
   });
 
   it('inserts a missing row and leaves one scheduler on an unchanged re-seed', async () => {
@@ -86,7 +88,7 @@ describe('cron job seeds sync system rows', () => {
 
     const schedulers = await jobs().realQueue.getJobSchedulers();
     expect(schedulers.map(({ key, pattern }) => ({ key, pattern }))).toEqual([
-      { key: 'sweepSegments', pattern: systemSeed.pattern as string },
+      { key: 'reconcileEveryHealthyDynamicSegment', pattern: systemSeed.pattern as string },
     ]);
   });
 });

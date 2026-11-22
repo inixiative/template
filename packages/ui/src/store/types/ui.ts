@@ -9,14 +9,11 @@ export type Theme = 'light' | 'dark' | 'system';
 export type UISlice = {
   ui: {
     theme: Theme;
-    isLoading: boolean;
     projectName: string;
     appName: string;
     shortName: string;
     logo: string;
     description: string;
     setTheme: (theme: Theme) => void;
-    setLoading: (loading: boolean) => void;
-    updateTheme: (theme: Theme) => Promise<void>;
   };
 };

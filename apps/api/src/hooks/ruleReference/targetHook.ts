@@ -8,11 +8,11 @@
 import {
   DbAction,
   db,
-  getPolymorphismConfig,
   type HookOptions,
   HookTiming,
   type ModelName,
   polymorphicKeyColumns,
+  polymorphismConfigForModel,
   registerDbHook,
 } from '@template/db';
 import { castArray, groupBy, keyBy, map, uniq } from 'lodash-es';
@@ -29,7 +29,8 @@ const NAMING_EDGES: readonly NamingEdge[] = [
 
 const namedModels = (edge: NamingEdge): string[] =>
   Object.keys(
-    getPolymorphismConfig(edge.model)?.axes.find((axis) => axis.field === edge.axis)?.fkMap ?? {},
+    polymorphismConfigForModel(edge.model)?.axes.find((axis) => axis.field === edge.axis)?.fkMap ??
+      {},
   );
 
 const isLive = (row: HookRow): boolean => row.deletedAt == null;

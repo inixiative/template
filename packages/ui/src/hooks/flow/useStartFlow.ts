@@ -7,7 +7,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type Flow, type MeCreateFlowData, meCreateFlow } from '@template/sdk';
 import { apiMutation } from '@template/ui/lib/apiMutation';
-import { flowReadQueryKeyFor } from '@template/ui/lib/flows/flowReadQuery';
+import { flowReadQueryKeyFor } from '@template/ui/lib/flows/flowReadQueryOptions';
 import { useAppStore } from '@template/ui/store';
 
 export type StartedFlow = { started: boolean; flow: Flow };
@@ -26,7 +26,7 @@ export const useStartFlow = () => {
       queryClient.setQueryData(flowReadQueryKeyFor(flow.id), flow);
       const { navigation } = useAppStore.getState();
       navigation.setFlowId(flow.id);
-      if (step.to) navigation.navigatePreserving(step.to, 'context');
+      if (step.to) navigation.navigateKeepingSearchParams(step.to, 'context');
       return { started: true, flow };
     },
     meta: { skipFlowInvalidate: true },

@@ -4,42 +4,31 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
-import { Badge, Page, Table } from '@template/ui/components';
-import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
-import { useQuery } from '@template/ui/hooks';
+import { useQuery } from '@tanstack/react-query';
+import type { InquiryItem } from '@template/sdk';
+import { Page, Table } from '@template/ui/components';
+import {
+  InquirySourceControls,
+  InquiryStatusBadge,
+  InquiryTargetControls,
+} from '@template/ui/components/inquiries';
 import {
   receivedInquiryContextQueries,
   sentInquiryContextQueries,
 } from '@template/ui/lib/inquiries/contextQueries';
+import { inquiryPartyDisplayName } from '@template/ui/lib/inquiries/inquiryPartyDisplayName';
 import {
-  INQUIRY_STATUS_COLORS,
   INQUIRY_TYPE_LABELS,
   type InquiryFilters,
   type InquiryStatus,
   inquiryFiltersToSearchFields,
-  mergeInquiryFilters,
+  narrowInquiryFiltersWithinPageBounds,
 } from '@template/ui/lib/inquiries/queryKeys';
-import { getInquiryInterface } from '@template/ui/lib/inquiries/registry';
+import { inquiryTypeComponentsFor } from '@template/ui/lib/inquiries/registry';
 import { useAppStore } from '@template/ui/store';
 import { useMemo, useState } from 'react';
 
-type Row = InquirySentItem | InquiryReceivedItem;
-
-const getEntityLabel = (inq: Row, direction: 'sent' | 'received'): string => {
-  if (direction === 'received') {
-    const r = inq as InquiryReceivedItem;
-    if (r.sourceUser) return r.sourceUser.name || r.sourceUser.email;
-    if (r.sourceOrganization) return r.sourceOrganization.name;
-    if (r.sourceSpace) return r.sourceSpace.name;
-    return r.sourceModel;
-  }
-  const s = inq as InquirySentItem;
-  if (s.targetUser) return s.targetUser.name || s.targetUser.email;
-  if (s.targetOrganization) return s.targetOrganization.name;
-  if (s.targetSpace) return s.targetSpace.name;
-  return s.targetModel;
-};
+type Row = InquiryItem;
 
 type InquiriesPageProps = {
   direction: 'sent' | 'received';
@@ -60,7 +49,7 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
   const expiredCutoff = useMemo(() => (hideExpired ? new Date() : undefined), [hideExpired]);
 
   // hideExpired drives includeExpired in the merged filters → translates to expiresAt[gte]=now server-side
-  const merged = mergeInquiryFilters(filters, {
+  const merged = narrowInquiryFiltersWithinPageBounds(filters, {
     statuses: statusFilter ? [statusFilter] : undefined,
     includeExpired:
       filters?.includeExpired !== undefined ? undefined : hideExpired ? false : undefined,
@@ -81,7 +70,7 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
 
   // Derive page title: registry label for single-type filter, else prop title, else default
   const singleType = filters?.types?.length === 1 ? filters.types[0] : undefined;
-  const registryLabel = singleType ? getInquiryInterface(singleType)?.label : undefined;
+  const registryLabel = singleType ? inquiryTypeComponentsFor(singleType)?.label : undefined;
   const pageTitle =
     title ?? registryLabel ?? (direction === 'sent' ? 'Sent inquiries' : 'Received inquiries');
 
@@ -91,15 +80,15 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
       label: direction === 'sent' ? 'To' : 'From',
       render: (inq: Row) => {
         if (direction === 'sent') {
-          const entry = getInquiryInterface(inq.type);
+          const entry = inquiryTypeComponentsFor(inq.type);
           const Summary = entry?.source?.summary;
-          if (Summary) return <Summary inquiry={inq as InquirySentItem} />;
+          if (Summary) return <Summary inquiry={inq as InquiryItem} />;
         } else {
-          const entry = getInquiryInterface(inq.type);
+          const entry = inquiryTypeComponentsFor(inq.type);
           const Summary = entry?.target?.summary;
-          if (Summary) return <Summary inquiry={inq as InquiryReceivedItem} />;
+          if (Summary) return <Summary inquiry={inq as InquiryItem} />;
         }
-        return getEntityLabel(inq, direction);
+        return inquiryPartyDisplayName(inq, direction === 'sent' ? 'target' : 'source');
       },
     },
     // Type column only shown when not filtered to a single type
@@ -115,16 +104,7 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
     {
       key: 'status',
       label: 'Status',
-      render: (inq: Row) => {
-        const isExpired = inq.expiresAt && new Date(inq.expiresAt) < new Date();
-        const label = isExpired ? 'expired' : inq.status;
-        const color = isExpired ? INQUIRY_STATUS_COLORS.expired : INQUIRY_STATUS_COLORS[inq.status];
-        return (
-          <Badge className={color}>
-            <span className="capitalize">{label}</span>
-          </Badge>
-        );
-      },
+      render: (inq: Row) => <InquiryStatusBadge inquiry={inq} />,
     },
     {
       key: 'sentAt',
@@ -141,9 +121,9 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
       label: '',
       render: (inq: Row) =>
         direction === 'sent' ? (
-          <InquirySourceControls inquiry={inq as InquirySentItem} />
+          <InquirySourceControls inquiry={inq as InquiryItem} />
         ) : (
-          <InquiryTargetControls inquiry={inq as InquiryReceivedItem} />
+          <InquiryTargetControls inquiry={inq as InquiryItem} />
         ),
     },
   ];

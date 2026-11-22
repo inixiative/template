@@ -26,7 +26,7 @@
   - [Retries](#retries)
   - [Circuit Breaker](#circuit-breaker)
   - [Poisoned Records](#poisoned-records)
-  - [Ignored Fields](#ignored-fields)
+  - [No-op Fields](#no-op-fields)
   - [Related Models](#related-models)
 - [Cache Invalidation](#cache-invalidation)
   - [How It Works](#how-it-works)
@@ -40,7 +40,7 @@
 - [Contact Rules](#contact-rules)
   - [Adding a Contact Type](#adding-a-contact-type)
 - [Rules Registry](#rules-registry)
-  - [shadowMerge for Updates](#shadowmerge-for-updates)
+  - [applyWriteDataOverPreviousRow for Updates](#applywritedataoverpreviousrow-for-updates)
   - [Recursive Validation](#recursive-validation)
 - [Ordered List](#ordered-list)
   - [Registry](#registry)
@@ -80,7 +80,7 @@ All Prisma mutations wrapped with before/after hooks via `mutationLifeCycle` ext
 | `result` | object/array | Mutation result projected onto the model's columns (after only). An `include` on the write never reaches hooks, so `result` and `previous` have the same shape |
 | `previous` | object/array | Previous state (if fetched) |
 
-To read what a write sets, call `writeData({ action, args })` (`apps/api/src/hooks/shared/hookRows.ts`): it returns the rows as an array, coalesced across single and bulk `create`/`update` and both arms of an `upsert` (`isManyAction(action)` tells single from bulk). Hooks that need the written values read them there, not `args.data` by hand, which misses the bulk and upsert shapes.
+To read what a write sets, call `rowsBeingWritten({ action, args })` (`apps/api/src/hooks/shared/hookRows.ts`): it returns the rows as an array, coalesced across single and bulk `create`/`update` and both arms of an `upsert` (`isManyAction(action)` tells single from bulk). Hooks that need the written values read them there, not `args.data` by hand, which misses the bulk and upsert shapes.
 
 ### Action Types
 
@@ -120,21 +120,24 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | Hook | Purpose |
 |------|---------|
 | `artifactAccess` | An Artifact's `type` is set from its kind and its `access` at creation is its kind's default when it is `inherit` or unset; refuses a kind the catalog does not know ([ARTIFACTS.md](ARTIFACTS.md)) |
-| `organizationUserFolder` | Creates a member's `organizationUserFolder` when an OrganizationUser is created (`ensureOrganizationUserFolder`; the invite `sent` callback creates it earlier) |
+| `attributes` | Enforces the 5-column Attribute write invariant, definition schema, and canonical sorted `multiSelect` deduplication on every model in `ATTRIBUTE_MODELS` (`registerAttributeValidationHook`, `packages/db/src/lib/attributes/hook.ts`; skips tombstone-only `{ deletedAt }` updates; see [SETTINGS.md](SETTINGS.md)) |
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
 | `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
+| `entitlementLens` | On `Entitlement` (`create`, `createManyAndReturn`, `upsert`'s create): a `lens` must be a valid json-rules narrowing over the resource's base lens that never hides `id` (422 otherwise), whoever writes it ([PERMISSIONS.md](PERMISSIONS.md#lenses-keep-id-paths-merge-by-id)) |
 | `fullDelegate` | On `Token` and `Integration`: a row written `full` gets `role: null` before the write, and its live entitlement rows are tombstoned after it. On `Entitlement`, a create whose target is a `full` delegate is refused (422 `full takes no entitlements`), whoever writes it |
 | `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
 | `memberSelfGrant` | After an `OrganizationUser` or `SpaceUser` is created (`create`, `createManyAndReturn`, an `upsert` that creates), writes its self-grant as an `Entitlement` row, tombstoned with the member's own `deletedAt` when the member is created tombstoned. `memberSelfGrant:kept` refuses (422) tombstoning a live member's self-grant; only the member's own tombstone takes it ([PERMISSIONS.md](PERMISSIONS.md#the-member-self-grant)) |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
+| `organizationUserFolder` | Creates a member's `organizationUserFolder` when an OrganizationUser is created (`ensureOrganizationUserFolder`; the invite `sent` callback creates it earlier) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
+| `projectIntegrationOwner` | Enforces tenant-boundary ownership (same organization, same user for personal, same space for space-scoped integrations) on `ProjectIntegration` creates and upserts (`apps/api/src/hooks/projectIntegrationOwner/hook.ts`) |
 | `ruleReference` | Keeps `RuleReference` edges in step with each rule-bearing column (`RULE_REFERENCE_SURFACES`, `apps/api/src/hooks/ruleReference/surfaces.ts`: email templates and components, segment `conditions`, `Entitlement.where` read through `entitlementWhereLens`, which names the entitled record by id) |
 | `ruleReference:target` | Copies a named row's `deletedAt` onto the edges that name it, for every edge in `NAMING_EDGES` (`targetHook.ts`): `RuleReference.targetDeletedAt` and `Entitlement.sourceDeletedAt`. A purged row is left to the null FK |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
-| `segmentConditions` | Segment `conditions` required, validated by `validateSegmentConditions` (against `customerRefLens`, compiled with `resolvedCustomerRefLens(ownerModel, …)`) + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
-| `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
-| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). Each delete behavior has its own registry, keyed by the child model: `HARD_DELETE_ON_TOMBSTONE` (`@template/db` registries) hard-deletes ephemeral rows that must not survive a revive — `Session`, `WebhookSubscription`, `WebhookEvent`, `RuleReference`, `Flow`; `REGENERATE_ON_REVIVE` rebuilds the derived ones (`RuleReference`) when the parent is revived; `SKIP_REVIVE` (`@template/db` registries: `Token`) tombstones a grant with its parent and never revives it, so a new one has to be issued, and the cascade never reaches its children (a token's entitlement rows stay dead); `CASCADE_EXEMPT` lists the reference relations that never cascade (every `Entitlement` source, every `Inquiry` party, every `RuleReference` target); `validateDeleteBehavior` refuses an inconsistent registry at boot |
+| `segmentConditions` | Segment `conditions` required, validated by `validateSegmentConditions` (against `customerRelationshipLens`, compiled with `resolvedCustomerRelationshipLens(ownerModel, …)`) + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
+| `segmentMemberOwner` | A SegmentMember's customer relationship must belong to the segment's owner as its provider |
+| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). Each delete behavior has its own registry, keyed by the child model: `HARD_DELETE_ON_TOMBSTONE` (`@template/db` registries) hard-deletes ephemeral rows that must not survive a revive — `Session`, `WebhookSubscription`, `WebhookEvent`, `RuleReference`, `Flow`; `REGENERATE_ON_REVIVE` rebuilds the derived ones (`RuleReference`) when the parent is revived; `SKIP_REVIVE` (`@template/db` registries: `Token`) tombstones a row with its parent and never revives it (a grant has to be issued again), and the cascade never reaches its children (a token's entitlement rows stay dead); `CLOSE_ON_PARENT_DELETE` closes a child instead of burying it: its open rows get the close written and nothing is tombstoned, so every row stays as the record (an `Inquiry` whose party is tombstoned is canceled unless already decided), and every parent of such a model must be soft-delete; `CASCADE_EXEMPT` lists the reference relations that never cascade (every `Entitlement` source, every `RuleReference` target); `validateDeleteBehavior` refuses an inconsistent registry at boot; `unclassifiedChildViolations` names a child of a soft-delete parent with none of these behaviours, which the cascade would leave live under a dead parent ([DATABASE.md](DATABASE.md#soft-delete-cascade-every-child-is-classified)) |
 | `tagOwnerCategory` | A created Tag's ownerModel + FK must match its TagCategory's owner. A tag never moves: `tagCategoryId` is refused on update (422) and the owner fields are stripped |
 | `webhooks` | Webhook delivery on mutations (post-commit) |
 
@@ -163,29 +166,29 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 |-------|-------------|
 | `action` | `create`, `update`, or `delete` |
 | `subjectModel` | Which model was mutated |
-| `before` / `after` | The record's own columns (filtered + redacted). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
+| `before` / `after` | The record's own columns (filtered + masked). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
 | `changes` | Field-level diff for updates only |
-| `actorUserId` | `me(c)`: the JWT's or spoofed user, or the user of an acting User token (a member's, organization's, space's or integration's token names none) |
+| `actorUserId` | `actingUser(c)`: the JWT's or spoofed user, or the user of an acting User token (a member's, organization's, space's or integration's token names none) |
 | `actorSpoofUserId` | The superadmin spoofing, when spoofing |
 | `actorTokenId` | The acting token (nulled when the token is deleted) |
 | `actorJobName` | Background job name (if triggered by a job) |
 | `actorIntegrationId` | The integration the actor acted through (its token's owner key, or a job's payload) |
-| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorOf` sanitized (redact fields removed); survives the token's deletion |
+| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorFromRecordOmittingSensitiveFields` sanitized (sensitive fields removed); survives the token's deletion |
 | `ipAddress` / `userAgent` | Request metadata |
 | `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
-| `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's tenancy, for filtering the log: its own `organizationId` / `spaceId` / `userId`, or, for a child with none ([parent edges](DATABASE.md#parent-edges)), its parent's (`contextRows`, `apps/api/src/hooks/auditLog/contextRows.ts`). An entitlement row is filed under its holder's tenancy, so an organization's audit view shows the entitlements its members' tokens gained and lost |
+| `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's tenancy, for filtering the log: its own `organizationId` / `spaceId` / `userId`, or, for a child with none ([parent edges](DATABASE.md#parent-edges)), its parent's (`fetchRowsCarryingTenantColumns`, `apps/api/src/hooks/auditLog/fetchRowsCarryingTenantColumns.ts`). An entitlement row is filed under its holder's tenancy, so an organization's audit view shows the entitlements its members' tokens gained and lost |
 | `subject*Id` | The mutated record, by `subjectModel` |
 
 ### Field Processing Pipeline
 
 `buildAuditEntry` (`apps/api/src/hooks/auditLog/hook.ts`) runs each record through:
 
-1. **Filter** (`filterForAudit` → `filterFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
-2. **Diff** — for updates, `computeDiff` compares the filtered, **unredacted** before/after, so a change to a sensitive column is still detected.
+1. **Filter** (`omitNoopFieldsForAudit` → `omitRegisteredFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
+2. **Diff** — for updates, `computeDiff` compares the filtered, **unmasked** before/after, so a change to a sensitive column is still detected.
 3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
-4. **Redact** — `redactSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `redactChangeDiff` masks both sides of a changed sensitive field in `changes`.
+4. **Mask** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[MASKED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
-`processAuditData` (filter + redact) builds the same column-only snapshot for the email-versioning hook.
+`maskSensitiveAndOmitNoopFieldsForAudit` (omit + mask) builds the same column-only snapshot for the email-versioning hook.
 
 ### Reading the Log
 
@@ -199,8 +202,8 @@ If a mutation transitions `deletedAt` from `null` to a timestamp, it is recorded
 
 ```typescript
 // packages/db/src/registries/auditEnabledModels.ts — opt-in models
-// packages/db/src/registries/redactFields.ts — sensitive fields per model
-// packages/db/src/registries/ignoreFields.ts — noise fields per model (shared with webhooks/cache)
+// packages/db/src/registries/sensitiveFields.ts — sensitive fields per model
+// packages/db/src/registries/noopFields.ts — noise fields per model (shared with webhooks/cache)
 ```
 
 ### Actor Context
@@ -239,7 +242,7 @@ Automatic webhook delivery on database mutations.
 ```typescript
 // packages/db/src/registries/webhook/enabledModels.ts
 export const webhookEnabledModels: WebhookModel[] = [
-  WebhookModel.CustomerRef,
+  WebhookModel.CustomerRelationship,
   WebhookModel.Artifact,
 ];
 ```
@@ -247,13 +250,13 @@ export const webhookEnabledModels: WebhookModel[] = [
 ### How It Works
 
 1. A mutation runs the `webhookDelivery` hook (after the write; jobs are scheduled with `db.onCommit`). It acts when the model is webhook-enabled, or when `webhookRelatedModels` lists it as a party of one or as a child of one
-2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRef's parties are its customer and its provider. A related row (a User, Organization or Space) takes the counterparty of every live CustomerRef it sits on, on either axis. A model listed in `webhookGrantedAudiences` (`apps/api/src/hooks/webhooks/audiences.ts`) takes its parties from that resolver instead of its axes: an Artifact reaches its owner and its grantees, through its containers, and owners-only org-user content reaches no org-level subscription
+2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRelationship's parties are its customer and its provider. A related row (a User, Organization or Space) takes the counterparty of every live CustomerRelationship it sits on, on either axis. A model listed in `webhookGrantedAudiences` (`apps/api/src/hooks/webhooks/audiences.ts`) takes its parties from that resolver instead of its axes: an Artifact reaches its owner and its grantees, through its containers, and owners-only org-user content reaches no org-level subscription
 3. It loads only the active subscriptions owned by those parties, and enqueues one `sendWebhook` job per (subscription, changed row), skipping the write's origin integration and no-op updates
 4. The job signs the payload with RSA-SHA256 and delivers it
 
 ### Tenancy (AUTH-006 stopgap)
 
-A subscription receives a CustomerRef change when its owner (User, Organization or Space) is one of its two parties. It receives a party's own change when its owner is that party's counterparty on a live CustomerRef: a provider hears its customers, a customer hears its providers. The changed party does not hear its own change, and nothing travels past one CustomerRef. A row that sits on several CustomerRefs, or on both axes, reaches each subscription once. A soft delete (`deletedAt` set) is delivered as `delete`. When a party is soft-deleted, its counterparties still hear it through CustomerRefs the cascade tombstoned with the same `deletedAt`; CustomerRefs deleted earlier stay silent. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
+A subscription receives a CustomerRelationship change when its owner (User, Organization or Space) is one of its two parties. It receives a party's own change when its owner is that party's counterparty on a live CustomerRelationship: a provider hears its customers, a customer hears its providers. The changed party does not hear its own change, and nothing travels past one CustomerRelationship. A row that sits on several CustomerRelationships, or on both axes, reaches each subscription once. A soft delete (`deletedAt` set) is delivered as `delete`. When a party is soft-deleted, its counterparties still hear it through CustomerRelationships the cascade tombstoned with the same `deletedAt`; CustomerRelationships deleted earlier stay silent. An organization does not yet hear about the CustomerRelationships of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
 
 ### Webhook Payload
 
@@ -275,8 +278,8 @@ Headers: `Content-Type: application/json`, `X-Webhook-Signature: <base64>`
 A delivery is one `sendWebhook` job, and its BullMQ attempts (the queue default: 3, exponential
 backoff from 5 s) are its retry cycle. A failure that says the receiver could not take it right now —
 a network error or timeout, any 5xx, 404 or 429 — is recorded as a `retrying` event and rethrown, so
-BullMQ retries the job. The last attempt (`isFinalAttempt(ctx.job)` in `jobs/`) settles the delivery
-as `unreachable` (or `error` for a 429) and the job completes. Every other failure settles on its
+BullMQ retries the job. The last attempt (`isFinalAttempt(ctx.job)` in `jobs/`) records the final outcome
+as `unreachable` (or `error` for a 429) and the job completes. Every other failure is final on its
 first attempt and is not retried: a blocked redirect, 401 and 403 are configuration the receiver has
 to change, and 400 / 422 are about the record's content, so resending the same bytes gets the same
 answer (see [Poisoned Records](#poisoned-records)).
@@ -284,7 +287,7 @@ answer (see [Poisoned Records](#poisoned-records)).
 ### Circuit Breaker
 
 After 5 consecutive failed deliveries, the subscription auto-disables (`isActive = false`). Only
-settled events count: `retrying` attempts are left out, so a retry cycle counts once, as its outcome.
+final events count: `retrying` attempts are left out, so a retry cycle counts once, as its outcome.
 
 ### Poisoned Records
 
@@ -294,56 +297,59 @@ instead of tripping the circuit. A rejection is an `error` event with `httpStatu
 Other failures such as redirects, 401, 403 or 429 do not count, and neither do `unreachable` or
 `retrying`. When a record has 3 rejections since its own last
 success, and some other record has delivered since the first of them, `poisonIntegrationRecord`
-stamps `IntegrationRecord.poisonedAt`. `isIntegrationRecordPoisoned({ integrationId, model, resourceId })`
+stamps `IntegrationRecord.poisonedAt`. `isIntegrationRecordPoisoned({ integrationId, recordModel, recordId })`
 (`apps/api/src/modules/integration/services/isIntegrationRecordPoisoned.ts`) is the check: `sendWebhook`
 calls it first, and later deliveries of that record are skipped before signing,
 with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp yet. See
 `tickets/INFRA-032-webhook-poisoned-records.md`.
 
-### Ignored Fields
+### No-op Fields
 
-`HOOK_IGNORE_FIELDS` is the **shared** ignore registry — used by audit, cache, webhooks, and the generic `isNoOpUpdate`. Any field listed here is:
+`NOOP_FIELDS` (`packages/db/src/registries/noopFields.ts`) lists the fields whose change is not worth recording or firing. Audit, cache, webhooks and `isNoOpUpdate` share it. A field listed here is:
 
-1. **Excluded from payload** - never sent to webhook subscribers
-2. **Stripped before audit diff** - changes don't produce AuditLog entries
-3. **Treated as a no-op** - updates that only touch ignored fields skip the cache/webhook/audit hooks
+1. **Left out of webhook payloads** - with the sensitive and internal fields (`WEBHOOK_EXCLUDED_FIELDS`)
+2. **Omitted before the audit diff** - changing only it writes no AuditLog entry
+3. **Treated as a no-op** - an update that touches only no-op fields skips the cache, webhook and audit hooks
 
 ```typescript
-// packages/db/src/registries/ignoreFields.ts
-const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
-  _global: ['updatedAt'],      // Always ignored for all models
-  User: ['lastLoginAt'],       // Login timestamp not meaningful
-  Token: ['lastUsedAt'],       // Token usage timestamp not meaningful
+// packages/db/src/registries/noopFields.ts
+const NOOP_FIELDS_BASE: FieldRegistry = {
+  _global: ['updatedAt'],
+  User: ['lastLoginAt'],
+  Token: ['lastUsedAt'],
+  EmailTemplate: ['missingComponentSlugs'],
+  EmailComponent: ['missingComponentSlugs'],
 };
 
-// Auto-composes from encryption + orderedList registries so encrypted column
-// triplets (encryptedX / encryptedXMetadata / encryptedXKeyVersion) and
-// ordered-list position fields don't need to be re-listed per model.
-export const HOOK_IGNORE_FIELDS = buildHookIgnoreFields();
+export const NOOP_FIELDS: FieldRegistry = unionRegistries(
+  NOOP_FIELDS_BASE,
+  orderedListFieldsByModel(),
+);
 ```
 
 Use cases:
-- **Timestamps** (`updatedAt`, `lastUsedAt`) - noisy, not meaningful
-- **Sensitive data** (encrypted blobs) - auto-composed from encryption registry
-- **Presentation-only state** (ordered-list `position`) - auto-composed from orderedList registry; the `orderedList` hook owns cache invalidation for ordering cascades (see [Ordered List](#ordered-list))
+- **Timestamps** (`updatedAt`, `lastUsedAt`) - change on every write, carry no meaning
+- **Presentation-only state** (ordered-list `position`) - folded in from the orderedList registry; the `orderedList` hook owns cache invalidation for ordering cascades (see [Ordered List](#ordered-list))
+
+Sensitive columns are not no-op fields: they are `SENSITIVE_FIELDS`, which audit masks and webhooks leave out.
 
 ### Related Models
 
-A party's own row changes reach its counterparties on its CustomerRefs, and a child row's change fires its parent's webhook. Party models are registered on both axes; a child names its parent model:
+A party's own row changes reach its counterparties on its CustomerRelationships, and a child row's change fires its parent's webhook. Party models are registered on both axes; a child names its parent model:
 
 ```typescript
 // packages/db/src/registries/webhook/relatedModels.ts
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
   User: [
-    { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
-    { model: 'CustomerRef', axis: 'providerModel', value: 'User' },
+    { model: 'CustomerRelationship', axis: 'customerModel', value: 'User' },
+    { model: 'CustomerRelationship', axis: 'providerModel', value: 'User' },
   ],
   ArtifactPermission: ['Artifact'],
   ArtifactPlacement: ['Artifact'],
 };
 ```
 
-Private fields of a party stay off the row (a settings or config table that is not related), or are dropped from webhooks in `WEBHOOK_NOOP_FIELDS` (`User.platformRole`). A change that touches only dropped fields emits nothing.
+Private fields of a party stay off the row (a settings or config table that is not related), or are listed in `INTERNAL_FIELDS` (`User.platformRole`), which `WEBHOOK_EXCLUDED_FIELDS` drops from webhooks. A change that touches only dropped fields emits nothing.
 
 - A **direct model ref** (`'Artifact'`) is a child → parent edge. The hook follows the child's foreign keys to that model (an `ArtifactPlacement` has two, so both ends fire), loads the parents and delivers an `update` of each parent to the parent's audience: the event is the **parent** record, not the child row.
 - `webhookRelatedRowAudiences` adds the parties a child row names that the parent's audience may no longer hold: a deleted `ArtifactPermission`'s grantee still hears its revocation.
@@ -353,26 +359,26 @@ Private fields of a party stay off the row (a settings or config table that is n
 
 ## Cache Invalidation
 
-Automatic cache clearing on mutations via `cacheReference`.
+Automatic cache clearing on mutations via `cacheKeysByModel`.
 
-**Note**: Cache invalidation shares the same no-op detection logic as webhooks (`isNoOpUpdate`). If only ignored fields changed (see [Ignored Fields](#ignored-fields)), cache clearing is skipped.
+**Note**: Cache invalidation shares the same no-op detection logic as webhooks (`isNoOpUpdate`). If only no-op fields changed (see [No-op Fields](#no-op-fields)), cache clearing is skipped.
 
 ### How It Works
 
 ```typescript
-// hooks/cache/constants/cacheReference.ts
-export const cacheReference: CacheReference = {
+// hooks/cache/constants/cacheKeysByModel.ts
+export const cacheKeysByModel: CacheKeysByModel = {
   User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
   Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
   // ...
 };
 ```
 
-On mutation, the hook marks the keys of both the previous and the resulting row in the transaction's cache overlay (`queueCacheClear` → `markCacheWritten`). They are cleared when the transaction commits, before its held locks are released and before its `db.onCommit` batches; a failed clear makes `db.txn` throw after those batches run ([REDIS.md - cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)).
+On mutation, the hook marks the keys of both the previous and the resulting row in the transaction's cache overlay (`queueCacheClear` → `markCacheWritten`). They are cleared when the transaction commits, before its held locks are released and before its `db.onCommit` batches; a failed clear makes `db.txn` throw after those batches run ([REDIS.md - fetchThroughCache() inside a transaction](./REDIS.md#fetchthroughcache-inside-a-transaction)).
 
 ### Parent edges
 
-A child whose change is a change to its parent names that parent once, in the parent edge registry (`packages/db/src/registries/parentEdges.ts`, [DATABASE.md](DATABASE.md#parent-edges)). `Entitlement`'s parent is its target: the hook loads the parent rows (`loadParentRows` (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheReference` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
+A child whose change is a change to its parent names that parent once, in the parent edge registry (`packages/db/src/registries/parentEdges.ts`, [DATABASE.md](DATABASE.md#parent-edges)). `Entitlement`'s parent is its target: the hook loads the parent rows (`fetchParentRows` (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheKeysByModel` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
 
 ### Wildcard Keys
 
@@ -380,7 +386,7 @@ A child whose change is a change to its parent names that parent once, in the pa
 cacheKey('user', userId, [], true)  // → cache:user:id:abc:*
 ```
 
-A wildcard clear cancels the `cache()` computes in flight under its pattern (found by their
+A wildcard clear cancels the `fetchThroughCache()` computes in flight under its pattern (found by their
 single-flight locks), then scans and deletes. Prefer exact keys in the reference map: an exact clear
 is one Lua call, a wildcard clear is two scans.
 
@@ -612,9 +618,9 @@ export const RulesRegistry = {
 };
 ```
 
-### shadowMerge for Updates
+### applyWriteDataOverPreviousRow for Updates
 
-Updates are validated by merging `previous` record with update `data` using `shadowMerge`. This handles Prisma's atomic operations:
+Updates are validated by merging `previous` record with update `data` using `applyWriteDataOverPreviousRow`. This handles Prisma's atomic operations:
 
 ```typescript
 // Prisma update with atomic ops
@@ -626,8 +632,8 @@ await db.user.update({
   },
 });
 
-// shadowMerge computes final state for validation
-shadowMerge(
+// applyWriteDataOverPreviousRow computes final state for validation
+applyWriteDataOverPreviousRow(
   { balance: 500, tags: ['a', 'b'] },           // previous
   { balance: { increment: 100 }, tags: { push: 'new-tag' } }  // update data
 );
@@ -679,7 +685,7 @@ export const orderedListRegistry: OrderedListRegistry = {
 };
 ```
 
-Lives in `packages/db/src/registries/` alongside the encryption and false-polymorphism registries so it can be composed into other db-level registries (notably `HOOK_IGNORE_FIELDS` — see [Ignored Fields](#ignored-fields)). The hook implementations and SQL primitives still live in `apps/api/src/hooks/orderedList/` and `apps/api/src/lib/prisma/orderedList.ts`.
+Lives in `packages/db/src/registries/` alongside the encryption and false-polymorphism registries so it can be composed into other db-level registries (notably `NOOP_FIELDS` — see [No-op Fields](#no-op-fields)). The hook implementations and SQL primitives still live in `apps/api/src/hooks/orderedList/` and `apps/api/src/lib/prisma/orderedList.ts`.
 
 The key is the Prisma model name. The value maps each ordered field to its scope: an array of column names that partition rows into independent lists. For Contact, every `(userId|orgId|spaceId, type)` combination is its own list — `position` resets to 1 for each scope.
 
@@ -705,7 +711,7 @@ Every bulk hook is O(scopes), not O(rows). Importing a 1000-row CSV of Contacts 
 
 ### Cache invalidation
 
-Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `HOOK_IGNORE_FIELDS` (auto-composed from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook marks the affected rows' keys in the transaction's cache overlay through `queueCacheClear` (`apps/api/src/hooks/cache/queueCacheClear.ts`), the same call the cache hook makes, and they are cleared at commit. Anything else that changes rows outside the lifecycle (a key change that reaches rows by `ON UPDATE CASCADE`) uses it too. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
+Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `NOOP_FIELDS` (folded in from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook marks the affected rows' keys in the transaction's cache overlay through `queueCacheClear` (`apps/api/src/hooks/cache/queueCacheClear.ts`), the same call the cache hook makes, and they are cleared at commit. Anything else that changes rows outside the lifecycle (a key change that reaches rows by `ON UPDATE CASCADE`) uses it too. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
 
 ### Scope strictness
 
@@ -760,7 +766,7 @@ Supports dot notation for JSON paths: `'payload.canInvite'` on a `CronJob` locks
 
 `Entitlement` rows are immutable: an update naming `resource`, `actions`, `where`, `lens`, `sourcePath` or either axis is a 422; only `deletedAt` and `sourceDeletedAt` move.
 
-`getImmutableFields(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with materialized columns, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`getRefusedFields`).
+`immutableFieldsForModel(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with dual polymorphism ids, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`fieldsRefusedAfterCreate`).
 
 ### Why Strip Instead of Throw?
 

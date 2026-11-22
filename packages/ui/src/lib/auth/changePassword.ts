@@ -5,12 +5,12 @@
  * @uses primitive:sdk
  */
 import { meChangePassword } from '@template/sdk';
-import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
+import { makeAuthenticatedApiFetch } from '@template/ui/lib/makeAuthenticatedApiFetch';
 
 export type ChangePasswordInput = { currentPassword: string; newPassword: string };
 
 export const changePassword = async (body: ChangePasswordInput) => {
-  const { data } = await apiFetchInternal((requestOptions) =>
+  const { data } = await makeAuthenticatedApiFetch((requestOptions) =>
     meChangePassword({ ...requestOptions, body, throwOnError: true }),
   )();
   return data;

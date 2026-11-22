@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { DivergentDuplicateSlugError } from '@template/email/errors/DivergentDuplicateSlugError';
-import { collectSlugs, decompose, serialize } from '@template/email/render/decompose';
+import { collectSlugs, decompose, serializeNodesToMjml } from '@template/email/render/decompose';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 
 describe('collectSlugs', () => {
@@ -20,8 +20,8 @@ describe('collectSlugs', () => {
 // A cascade resolver that knows nothing (every component is new).
 const noCascade = () => undefined;
 
-describe('serialize (parseBlocks inverse)', () => {
-  const roundtrip = (s: string) => serialize(parseBlocks(s));
+describe('serializeNodesToMjml (parseBlocks inverse)', () => {
+  const roundtrip = (s: string) => serializeNodesToMjml(parseBlocks(s));
 
   test('round-trips text', () => {
     expect(roundtrip('<mj-text>hi</mj-text>')).toBe('<mj-text>hi</mj-text>');

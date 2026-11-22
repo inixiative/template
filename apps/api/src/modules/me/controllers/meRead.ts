@@ -5,12 +5,12 @@
  * @uses primitive:routeTemplates
  */
 
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadRoute } from '#/modules/me/routes/meRead';
 
 export const meReadController = makeController(meReadRoute, async (c, respond) => {
-  const user = me(c)!;
+  const user = actingUser(c)!;
   const organizationUsers = c.get('organizationUsers');
   const organizations = c.get('organizations');
   const spaceUsers = c.get('spaceUsers');

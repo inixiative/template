@@ -7,17 +7,17 @@
 import { createRoute } from '#/lib/routeTemplates';
 import {
   inquiryCreateBodySchema,
-  inquiryCreateSanitizeKeys,
+  inquiryCreateServerOwnedKeys,
 } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
-import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
+import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const spaceCreateInquiryRoute = createRoute({
   model: Modules.space,
   submodel: Modules.inquiry,
   bodySchema: inquiryCreateBodySchema,
-  responseSchema: inquirySentResponseSchema,
-  sanitizeKeys: inquiryCreateSanitizeKeys,
-  tags: [Tags.space, Tags.inquiry],
+  responseSchema: inquiryResponseSchema,
+  sanitizeKeys: inquiryCreateServerOwnedKeys,
+  tags: [OpenApiTags.space, OpenApiTags.inquiry],
 });

@@ -14,7 +14,7 @@ import {
   jwtVerify,
 } from 'jose';
 import { onSigningKeyCreated, publicJwks } from '#/lib/auth/jwksStore';
-import { selfIssuer, USER_JWT_TTL_SECONDS } from '#/lib/auth/userJwt';
+import { USER_JWT_TTL_SECONDS, userJwtIssuerUrlOrThrow } from '#/lib/auth/userJwt';
 
 type TrustedIssuer = { issuer: string; audience: string; keySet: JWTVerifyGetKey };
 
@@ -35,7 +35,7 @@ onSigningKeyCreated(() => {
   selfKeys = null;
 });
 
-const loadSelfKeys = async (): Promise<JWTVerifyGetKey> => {
+const fetchSelfKeys = async (): Promise<JWTVerifyGetKey> => {
   const keySet = createLocalJWKSet(await publicJwks());
   selfKeys = { keySet, loadedAt: Date.now() };
   return keySet;
@@ -44,18 +44,18 @@ const loadSelfKeys = async (): Promise<JWTVerifyGetKey> => {
 // An unknown kid reloads the keys (another instance rotated), at most once a second.
 const selfKeySet: JWTVerifyGetKey = async (protectedHeader, token) => {
   const age = selfKeys ? Date.now() - selfKeys.loadedAt : Number.POSITIVE_INFINITY;
-  const keySet = selfKeys && age < SELF_KEYS_MAX_AGE_MS ? selfKeys.keySet : await loadSelfKeys();
+  const keySet = selfKeys && age < SELF_KEYS_MAX_AGE_MS ? selfKeys.keySet : await fetchSelfKeys();
   try {
     return await keySet(protectedHeader, token);
   } catch (err) {
     const reloadable = selfKeys && Date.now() - selfKeys.loadedAt >= SELF_KEYS_MIN_RELOAD_MS;
     if (!(err instanceof errors.JWKSNoMatchingKey) || !reloadable) throw err;
-    return (await loadSelfKeys())(protectedHeader, token);
+    return (await fetchSelfKeys())(protectedHeader, token);
   }
 };
 
 const trustedIssuers = (): TrustedIssuer[] => {
-  const self = selfIssuer();
+  const self = userJwtIssuerUrlOrThrow();
   const issuers: TrustedIssuer[] = [{ issuer: self, audience: self, keySet: selfKeySet }];
   const { AUTH_ISSUER, AUTH_JWKS_URL, AUTH_AUDIENCE } = process.env;
   if (AUTH_ISSUER && AUTH_JWKS_URL && AUTH_AUDIENCE && AUTH_ISSUER !== self)

@@ -5,10 +5,10 @@
  * @uses primitive:ui
  */
 import { createFileRoute } from '@tanstack/react-router';
-import { requirePublic } from '@template/ui/guards';
-import { SignupPage } from '@template/ui/pages';
+import { redirectAuthenticatedUserAwayFromPublicPage } from '@template/ui/guards';
+import { SignUpPage } from '@template/ui/pages';
 
 export const Route = createFileRoute('/_public/signup')({
-  beforeLoad: (ctx) => requirePublic(ctx),
-  component: () => <SignupPage />,
+  beforeLoad: (ctx) => redirectAuthenticatedUserAwayFromPublicPage(ctx),
+  component: () => <SignUpPage />,
 });

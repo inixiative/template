@@ -9,7 +9,7 @@ import {
   includeTargetEntitlements,
   type Prisma,
 } from '@template/db';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationReadManyUsersRoute } from '#/modules/organization/routes/organizationReadManyUsers';
@@ -22,7 +22,7 @@ export const organizationReadManyUsersController = makeController(
   organizationReadManyUsersRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const org = getResource<'organization'>(c);
+    const org = contextResource<'organization'>(c);
 
     const { data: users, pagination } = await paginate<typeof db.user, UserWithOrgUsers>(
       c,

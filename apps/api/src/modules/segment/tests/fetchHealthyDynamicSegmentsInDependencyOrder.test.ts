@@ -1,0 +1,63 @@
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { Operator } from '@inixiative/json-rules';
+import { db } from '@template/db';
+import type { Space } from '@template/db/generated/client/client';
+import { SegmentType } from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSegment,
+  createSpace,
+} from '@template/db/test';
+import { fetchHealthyDynamicSegmentsInDependencyOrder } from '#/modules/segment/services/fetchHealthyDynamicSegmentsInDependencyOrder';
+
+const acmeEmailDomainRule = {
+  field: 'customerUser.email',
+  operator: Operator.endsWith,
+  value: '@acme.test',
+};
+
+const membersOf = (segmentId: string) => ({
+  field: 'segmentMembers',
+  arrayOperator: 'any',
+  condition: { field: 'segment.id', operator: Operator.equals, value: segmentId },
+});
+
+describe('fetchHealthyDynamicSegmentsInDependencyOrder: what the nightly reconcile enqueues', () => {
+  let space: Space;
+
+  beforeEach(async () => {
+    const { context } = await createOrganizationUser({ role: 'admin' });
+    space = (await createSpace({}, { organization: context.organization })).entity;
+  });
+
+  afterEach(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('enqueues healthy dynamic segments only: a degraded one is skipped, not warned about by its job', async () => {
+    const { entity: target } = await createSegment(
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeEmailDomainRule },
+      { space },
+    );
+    const { entity: sound } = await createSegment(
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeEmailDomainRule },
+      { space },
+    );
+    const { entity: degraded } = await createSegment(
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: membersOf(target.id) },
+      { space },
+    );
+    const { entity: pinned } = await createSegment(
+      { ownerModel: 'Space', type: SegmentType.static, conditions: acmeEmailDomainRule },
+      { space },
+    );
+    await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
+
+    const ids = (await fetchHealthyDynamicSegmentsInDependencyOrder()).map((segment) => segment.id);
+    expect(ids).toContain(sound.id);
+    expect(ids).not.toContain(degraded.id);
+    expect(ids).not.toContain(pinned.id);
+    expect(ids).not.toContain(target.id);
+  });
+});

@@ -4,11 +4,18 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+import { useQuery } from '@tanstack/react-query';
 import { meRead, meReadQueryKey } from '@template/sdk';
 import { Page } from '@template/ui/components';
-import { ChangePasswordCard, ProfileFormCard } from '@template/ui/components/settings';
-import { useQuery } from '@template/ui/hooks';
+import {
+  ChangePasswordCard,
+  ProfileFormCard,
+  ResourceSettingsSection,
+} from '@template/ui/components/settings';
 import { apiQuery } from '@template/ui/lib/apiQuery';
+import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
+
+const personalContext: AuthenticatedContext = { type: 'user' };
 
 export const UserProfilePage = () => {
   const { data, isLoading } = useQuery({
@@ -28,8 +35,9 @@ export const UserProfilePage = () => {
             name={profile?.name ?? ''}
             canEditName={false}
             readOnlyMessage="User profile editing coming soon"
-            showThemeToggle
+            showThemeSelector
           />
+          <ResourceSettingsSection context={personalContext} category="general" />
           <ChangePasswordCard />
         </div>
       )}

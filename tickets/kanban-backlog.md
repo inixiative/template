@@ -14,6 +14,7 @@ kanban
     FEAT-017-audit-log-hardening-lineage-and-explorer
     FEAT-019-extensible-actor-attribution
     FEAT-016-inquiry-lineage-and-nesting
+    FEAT-026-settings-primitive
     API-001-idempotency-and-safe-retries
     API-003-cursor-pagination-mode
     API-005-route-permission-tags
@@ -43,6 +44,8 @@ kanban
     INFRA-036-clock-sensitive-rule-tick
     INFRA-038-ws-channel-tenancy
     INFRA-040-ws-content-channels
+    INFRA-050-signet-kcp-init
+    INFRA-051-attribute-json-rules-and-lens-filtering
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
@@ -85,12 +88,16 @@ kanban
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
 - [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) - Swappable external service pattern (in progress)
 - [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
-- [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) ✅ - slow lane as lowest priority + per-worker slot share, createLock refresh fix, row-state claim policy
+- [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) ✅ - slow lane as lowest priority + per-worker slot share, makeLock refresh fix, row-state claim policy
 - [INFRA-046: Cache primitives from Zealot after INFRA-037](./archived/INFRA-046-cache-primitives-from-zealot.md) ✅ - clears cancel in-flight computes, queued marker, abort releases the refresh lock, single-flight under lock/, cache telemetry and options, warm on boot
-- [INFRA-047: cache() inside a transaction](./archived/INFRA-047-transaction-cache-overlay.md) ✅ - a per-transaction overlay: reads its own writes, a rollback leaves nothing cached, published at commit behind the generation fence
+- [INFRA-047: fetchThroughCache() inside a transaction](./archived/INFRA-047-transaction-cache-overlay.md) ✅ - a per-transaction overlay: reads its own writes, a rollback leaves nothing cached, published at commit behind the generation fence
 - [INFRA-048: Lock sets from Zealot ZLT-5949](./archived/INFRA-048-lock-sets-from-zealot.md) ✅ - one token, one heartbeat, one release over many keys; findForUpdate takes one lock set; verify() answers from Redis; the key-lock timeout is a 409
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
+- [INFRA-049: Version Sequence Primitives](./INFRA-049-version-sequence-primitives.md) - generation, sequence and version as named styles in one module, existing callers moved onto it
+- [INFRA-050: Signet and KCP-Backed Init Provisioning](./INFRA-050-signet-kcp-init.md) - optional Kingdom Signet / KCP transport for `init/` over shared `@inixiative/infra` drivers; standalone direct token mode stays default
+- [INFRA-051: Attribute json-rules Support, Postgres JSONB array_contains, and Paginated Lens Filtering](./INFRA-051-attribute-json-rules-and-lens-filtering.md) - unify `ATTRIBUTE_MODELS` operators with `@inixiative/json-rules` + `filterLens` (including Postgres `GIN` `array_contains` and Zealot-style paginated relation filtering)
+- [FEAT-026: Settings Primitive](./FEAT-026-settings-primitive.md) - lightweight false-polymorphic `Setting` model, code-first registry, typed value columns, and `/api/v1/setting/info` discovery for app-owned configuration dials
 - [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - json-rules `clockUnit` with the `clock.finestUnit` engine floor; `Segment.clockUnit` derived at save, `lastComputedAt` on what was computed; one cron row per unit, looking one unit ahead
 - [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
 - [INFRA-040: WS Content Channels](./INFRA-040-ws-content-channels.md) - Every delivery is a channel named by content and authorized by its route; drops per-user addressing
@@ -98,6 +105,7 @@ kanban
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
 - [FEAT-019: Extensible Actor Attribution](./FEAT-019-extensible-actor-attribution.md) - actorMeta extension point + on-behalf-of for integration tokens; attribution-only, never authz
+- [FEAT-024: Backfilled Audit History](./FEAT-024-backfilled-audit-history.md) - Sketch, discuss before starting: imported, reconstructed and backdated history with provenance
 
 **Security & Encryption:**
 - [AUTH-006: Webhook Tenant Isolation](./AUTH-006-webhook-tenant-isolation.md) - High-priority confirmed defect: scope recipients and payloads to the subscription owner's authorized records
@@ -183,4 +191,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-11-10_
+_Last Updated: 2026-11-21_

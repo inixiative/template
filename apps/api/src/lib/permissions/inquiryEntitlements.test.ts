@@ -1,18 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { Operator } from '@inixiative/json-rules';
+import type { EntitlementInput } from '@template/db';
 import { db } from '@template/db';
 import type { Organization, Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createInquiry,
+  createIntegration,
   createOrganization,
   createOrganizationUser,
   createSpace,
+  createToken,
 } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { patch, post } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
@@ -31,7 +35,7 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-const entitledKey = async (entitlements: Entry[]) => {
+const entitledKey = async (entitlements: EntitlementInput[]) => {
   const { entity: organizationUser } = await createOrganizationUser(
     { role: 'viewer', entitlements },
     { organization },
@@ -44,8 +48,15 @@ const entitledKey = async (entitlements: Entry[]) => {
   ).rawKey;
 };
 
-const inquiries = (path: string, actions: string[] = ['read']) =>
-  entry('db:inquiry', ['db:organization', organization.id, path], actions);
+// why: a path admits every kind that carries its keys (R81); the where keeps the grant to the tenant's own side
+const inquiries = (path: string, actions: string[] = ['read']) => {
+  const side = path.startsWith('source') ? 'source' : 'target';
+  return entitlementInputFor('db:inquiry', ['db:organization', organization.id, path], actions, {
+    field: `${side}Model`,
+    operator: Operator.equals,
+    value: path.includes('Space') ? 'Space' : 'Organization',
+  });
+};
 
 const fromOrganization = (
   source: Organization,
@@ -55,7 +66,11 @@ const fromOrganization = (
     sourceModel: 'Organization',
     sourceOrganizationId: source.id,
     ...(target.space
-      ? { targetModel: 'Space', targetSpaceId: target.space.id }
+      ? {
+          targetModel: 'Space',
+          targetOrganizationId: target.space.organizationId,
+          targetSpaceId: target.space.id,
+        }
       : { targetModel: 'Organization', targetOrganizationId: target.organization?.id }),
   });
 
@@ -114,7 +129,7 @@ describe('an inquiry entitlement names a side and its kind (R74/R76)', () => {
 });
 
 describe('granting inquiry entitlements: the writer could act on the side named', () => {
-  const grant = async (role: 'owner' | 'admin', granted: Entry) => {
+  const grant = async (role: 'owner' | 'admin', granted: EntitlementInput) => {
     const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
     const { entity: target } = await createOrganizationUser({ role: 'member' }, { organization });
     const { app } = createTestApp({
@@ -137,5 +152,90 @@ describe('granting inquiry entitlements: the writer could act on the side named'
 
   it('a side that does not lead to the anchor is a malformed grant', async () => {
     expect(await grant('owner', inquiries('targetSpace'))).toBe(422);
+  });
+});
+
+describe('reading by role: an organization reads the sides that name no person (Aron, 2026-11-16)', () => {
+  const keyOf = async (organizationUser: Awaited<ReturnType<typeof createOrganizationUser>>) =>
+    (
+      await createKeyedToken(
+        { ownerModel: 'OrganizationUser', full: true, role: null },
+        { organizationUser: organizationUser.entity },
+      )
+    ).rawKey;
+
+  it("an admin reads what the organization, its space and its integration token received; a member's own stay the member's", async () => {
+    const admin = await createOrganizationUser({ role: 'admin' }, { organization });
+    const member = await createOrganizationUser({ role: 'member' }, { organization });
+    const tokenOf = async (owner: Parameters<typeof createIntegration>[0]) => {
+      const { entity: integration } = await createIntegration(owner);
+      const { entity: token } = await createToken({ ownerModel: 'Integration' }, { integration });
+      return { integration, token };
+    };
+    const shared = await tokenOf({ ownerModel: 'Organization', organizationId: organization.id });
+    const personal = await tokenOf({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: member.entity.userId,
+    });
+    const to = async (target: Record<string, unknown>) =>
+      (
+        await createInquiry({
+          sourceModel: 'Organization',
+          sourceOrganizationId: other.id,
+          ...target,
+        } as Parameters<typeof createInquiry>[0])
+      ).entity.id;
+    const inquiryIds = {
+      organization: await to({
+        targetModel: 'Organization',
+        targetOrganizationId: organization.id,
+      }),
+      space: await to({
+        targetModel: 'Space',
+        targetOrganizationId: organization.id,
+        targetSpaceId: space.id,
+      }),
+      sharedToken: await to({ targetModel: 'Token', targetTokenId: shared.token.id }),
+      member: await to({
+        targetModel: 'OrganizationUser',
+        targetOrganizationId: organization.id,
+        targetUserId: member.entity.userId,
+      }),
+      personalIntegration: await to({
+        targetModel: 'Integration',
+        targetIntegrationId: personal.integration.id,
+      }),
+      personalToken: await to({ targetModel: 'Token', targetTokenId: personal.token.id }),
+    };
+    const reads = async (key: string) =>
+      Object.fromEntries(
+        await Promise.all(
+          Object.entries(inquiryIds).map(async ([name, id]) => [
+            name,
+            await holds(key, 'inquiry', id, 'read'),
+          ]),
+        ),
+      );
+    expect(await reads(await keyOf(admin))).toEqual({
+      organization: true,
+      space: false,
+      sharedToken: true,
+      member: false,
+      personalIntegration: false,
+      personalToken: false,
+    });
+    const { rawKey: personKey } = await createKeyedToken(
+      { ownerModel: 'User', full: true, role: null },
+      { user: member.context.user },
+    );
+    expect(await reads(personKey)).toEqual({
+      organization: false,
+      space: false,
+      sharedToken: false,
+      member: true,
+      personalIntegration: true,
+      personalToken: true,
+    });
   });
 });

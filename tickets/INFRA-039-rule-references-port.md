@@ -20,10 +20,10 @@ template level with it.
 1. **Plain ids beside the false polymorphism.** `RuleReference` keeps its typed FKs and relations
    on both axes, and also carries plain `sourceId` and `targetId`. Edge identity is one unique,
    `(sourceModel, sourceId, targetModel, targetId)`. The false-polymorphism primitive writes the
-   plain ids, not the edge writer. An axis declares `materialized` (the column holding the one id
+   plain ids, not the edge writer. An axis declares `dualPolymorphismId` (the column holding the one id
    its set typed FK points at). The rules hook writes that column on create, createMany and an
    upsert's create arm, and refuses a row where they disagree.
-2. **An edge's ends never change.** The typed FKs and materialized ids are immutable after
+2. **An edge's ends never change.** The typed FKs and dual polymorphism ids are immutable after
    create. The immutable-fields hook refuses an update that touches them. The only updatable
    column on an edge is the `targetDeletedAt` stamp. A different target is a different edge.
 3. **The sync mirrors the rule; the save path checks.** `syncRuleReferenceEdges` writes exactly
@@ -69,10 +69,10 @@ template level with it.
 - [x] Reads carry the edge rows.
 - [x] Agreement test (`hooks/ruleReference/registryAgreement.test.ts`), no edge-free list.
 - [x] Names; admission deleted; health over edges; labels deleted.
-- [x] Materialized ids in the polymorphism registry; immutable edge ends.
+- [x] Dual polymorphism ids in the polymorphism registry; immutable edge ends.
 - [x] Static email scopes; `ownedSegments` without a caller where.
 - [x] One sync entry for save and revive; save-gate helpers in `validations/`; one edge reader.
-- [x] Static lens files: `customerRef/lib/lenses/` (`customerRefLens`, `customerRefsByIdLens`),
+- [x] Static lens files: `customerRelationship/lib/lenses/` (`customerRelationshipLens`, `customerRelationshipsByIdLens`),
   `lib/email/lenses/` (one sender row lens per sender model); the email registry's user entity.
 - [x] Email scopes: four static declarations in `packages/email/src/rules/scopes/`, picked by
   `emailScopeFor(owner, sender)` and bound; `clampByKind`, `EMAIL_OWNER_SCOPES`,
@@ -87,13 +87,13 @@ template level with it.
   references through id sources, and the id sources it reads at evaluation.
 - `ruleReferenceTargets(edges)`: each edge's target with its state (`existing`, `deleted`,
   `purged`). The one edge reader.
-- `lockedTargetStates(references)`: each referenced row's `deletedAt`, read `FOR UPDATE`.
+- `fetchRuleReferenceTargetsDeletedAtForUpdate(references)`: each referenced row's `deletedAt`, read `FOR UPDATE`.
 - `validations/deadRuleReferences(scopes, references?)`: the references whose row is deleted or
   outside its scope's owner scope, as `{ model, id, state }`.
 - `validations/assertRuleReferencesExist(scopes, references?)`: throws a `RuleReferenceError` with
   those as `details`, which the API answers with a 422.
-- `materializedIdConflicts`, `withMaterializedIds`, `materializedColumns`: the polymorphism
-  registry's materialized-id step, applied by the rules hook and the factories.
+- `dualPolymorphismIdConflicts`, `withDualPolymorphismIds`, `dualPolymorphismIdColumns`: the polymorphism
+  registry's dual-polymorphism-id step, applied by the rules hook and the factories.
 - `snapshotHookRegistry()`: for tests; restores the hook registry to the snapshot.
 
 `apps/api/src/hooks/ruleReference/` (edge code only):
@@ -111,13 +111,13 @@ Segment and email callers:
 - `assertSegmentReferencesOwned` (reach).
 - `segmentRuleStates` / `segmentRuleIssuesFromEdges`, which build the rule's health from
   `ruleReferenceTargets` in a local adapter.
-- `withSegmentsRuleIssues`, whose reads carry the edge rows.
+- `attachRuleHealthToSegments`, whose reads carry the edge rows.
 - `dynamicSegmentsOf`.
 - `TENANT_EMAIL_SCOPE` / `OWNER_EMAIL_SCOPE` / `PLATFORM_OWNER_EMAIL_SCOPE` / `PLATFORM_EMAIL_SCOPE`,
   `emailScopeFor`, `emailLensBindings`, `scopeEmailLens(input, owner, sender)`; `equalsSuppliedBind`
   (`packages/db`), the branch shape for an owner id that a kind may not supply.
-- `customerRef/lib/lenses/customerRefLens`, `customerRef/lib/lenses/customerRefsByIdLens`: static;
-  `resolvedCustomerRefLens`, `ownedSegments` and `customerRefReachedModels` each in their own file
+- `customerRelationship/lib/lenses/customerRelationshipLens`, `customerRelationship/lib/lenses/customerRelationshipsByIdLens`: static;
+  `resolvedCustomerRelationshipLens`, `ownedSegments` and `customerRelationshipReachedModels` each in their own file
   beside them.
 
 ## Notes
@@ -125,7 +125,7 @@ Segment and email callers:
 - **The degraded signal is read from edges, not published.** `ruleReference.stale` had no consumer.
   A reader asks the edges (`ruleReferenceTargets`), and an alert or a job counts those rows.
 - **Lens use left in health.** Segment health still extracts which ids the stored tree
-  references through the static `customerRefLens`. That is a pure walk with no query, and it is
+  references through the static `customerRelationshipLens`. That is a pure walk with no query, and it is
   how a reference with no edge is seen. `ruleIssues` also checks the tree's vocabulary against that
   lens. Removing both would mean health cannot see a missing edge.
 - **A save that races a target's delete.** The edge writer still locks the target rows. With no
@@ -135,7 +135,7 @@ Segment and email callers:
 - **Source values are read live.** `deadRuleReferences` reads each scope's owner-scope id set
   through `sourceQueryValues`, which queries on every call. Nothing on the server caches a lens
   source's option set: the rolling-cache registry (`apps/api/src/lib/rollingCaches.ts`) is empty and
-  `cacheReference` has no lens source entries. The only cache is the admin client's React Query entry
+  `cacheKeysByModel` has no lens source entries. The only cache is the admin client's React Query entry
   for the email rule surface (`useEmailRuleSurface`, `staleTime: Infinity`).
 - **Email scopes (Aron, 2026-10-26, option b).** One static scope cannot cover a platform owner:
   an unsupplied optional bind reads `equals null`, so a platform lens would reach no tenant rows,

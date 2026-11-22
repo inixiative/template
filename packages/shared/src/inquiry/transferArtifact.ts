@@ -19,3 +19,5 @@ export type TransferArtifactContent = z.infer<typeof transferArtifactContentSche
 export const transferArtifactResolutionInputSchema = baseResolutionInputSchema.extend({
   allowTracking: z.boolean().optional(),
 });
+
+export type TransferArtifactResolutionInput = z.infer<typeof transferArtifactResolutionInputSchema>;

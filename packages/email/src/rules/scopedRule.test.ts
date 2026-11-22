@@ -12,8 +12,8 @@ const eq = (field: string, value: unknown, extra: Record<string, unknown> = {}):
 
 const oneLoop: BindingChain = new Map([['item', 'recipient.tagAttachments']]);
 const nested: BindingChain = new Map([
-  ['ref', 'recipient.providerRefs'],
-  ['member', 'recipient.providerRefs.segmentMembers'],
+  ['ref', 'recipient.customerRelationshipsAsCustomer'],
+  ['member', 'recipient.customerRelationshipsAsCustomer.segmentMembers'],
 ]);
 
 describe('scopedRule — a loop-bound rule becomes the array rule it always was', () => {
@@ -80,7 +80,7 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
       scopedRule({ all: [eq('member.segment.id', 's1'), eq('ref.customerModel', 'User')] }, nested)
         .rule,
     ).toEqual({
-      field: 'recipient.providerRefs',
+      field: 'recipient.customerRelationshipsAsCustomer',
       arrayOperator: 'any',
       condition: {
         field: 'segmentMembers',
@@ -93,13 +93,13 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
   it('an inner loop over a root path iterates the root collection from inside the outer element', () => {
     const chain: BindingChain = new Map([
       ['item', 'recipient.tagAttachments'],
-      ['ref', 'recipient.providerRefs'],
+      ['ref', 'recipient.customerRelationshipsAsCustomer'],
     ]);
     expect(scopedRule(eq('ref.customerModel', 'User'), chain).rule).toEqual({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: {
-        field: '$$.providerRefs',
+        field: '$$.customerRelationshipsAsCustomer',
         arrayOperator: 'any',
         condition: eq('customerModel', 'User'),
       },
@@ -177,8 +177,8 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
 
   it('loopFrames keeps loop order and drops index bindings', () => {
     expect(loopFrames(new Map([...nested, ['i', undefined]]))).toEqual([
-      { as: 'ref', path: 'recipient.providerRefs' },
-      { as: 'member', path: 'recipient.providerRefs.segmentMembers' },
+      { as: 'ref', path: 'recipient.customerRelationshipsAsCustomer' },
+      { as: 'member', path: 'recipient.customerRelationshipsAsCustomer.segmentMembers' },
     ]);
   });
 
@@ -187,18 +187,18 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
     const ref = { customerModel: 'User', segmentMembers: [member, { segment: { id: 's2' } }] };
     const recipient = {
       name: 'Ann',
-      providerRefs: [ref, { customerModel: 'Space', segmentMembers: [] }],
+      customerRelationshipsAsCustomer: [ref, { customerModel: 'Space', segmentMembers: [] }],
     };
     const scope = { recipient, sender: { id: 'o1' }, ref, member };
     const narrowed = narrowToElements(scope, loopFrames(nested));
     expect(narrowed).toEqual({
       recipient: {
         name: 'Ann',
-        providerRefs: [{ customerModel: 'User', segmentMembers: [member] }],
+        customerRelationshipsAsCustomer: [{ customerModel: 'User', segmentMembers: [member] }],
       },
       sender: { id: 'o1' },
     });
-    expect(recipient.providerRefs).toHaveLength(2);
+    expect(recipient.customerRelationshipsAsCustomer).toHaveLength(2);
     expect(ref.segmentMembers).toHaveLength(2);
   });
 });

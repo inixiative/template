@@ -1,22 +1,20 @@
 import { describe, expect, test } from 'bun:test';
 import { projectLens } from '@inixiative/json-rules';
-import { getPolymorphismConfig, RULE_REFERENCEABLE_MODELS } from '@template/db';
+import { polymorphismConfigForModel, RULE_REFERENCEABLE_MODELS } from '@template/db';
 import type { EmailOwnerModel } from '@template/db/generated/client/enums';
 import {
   EntitlementResourceModel,
   RuleReferenceTargetModel,
 } from '@template/db/generated/client/enums';
-import { prismaMap } from '@template/db/generated/prismaMap';
+import { isRowIdSource } from '@template/db/utils/ruleReferences';
 import type { EmailOwnerRef } from '@template/email/render';
 import { emailSlotLenses } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
 import type { RULE_REFERENCE_SURFACES } from '#/hooks/ruleReference/surfaces';
 import { emailLensFor } from '#/lib/email/emailLensFor';
-import { registry } from '#/lib/email/registry';
+import { emailTemplateRegistry } from '#/lib/email/emailTemplateRegistry';
 import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
-import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
-
-type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
+import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 
 const ORG = '00000000-0000-7000-8000-000000000001';
 const SPACE = '00000000-0000-7000-8000-000000000002';
@@ -34,9 +32,9 @@ const emailLenses = (slugs: (string | undefined)[]): RuleLens[] =>
   );
 
 const AUTHORED_UNDER = {
-  EmailTemplate: emailLenses(Object.keys(registry)),
+  EmailTemplate: emailLenses(Object.keys(emailTemplateRegistry)),
   EmailComponent: emailLenses([undefined]),
-  Segment: [customerRefLens],
+  Segment: [customerRelationshipLens],
   Entitlement: Object.values(EntitlementResourceModel).map(entitlementWhereLens),
 } satisfies Record<keyof typeof RULE_REFERENCE_SURFACES, RuleLens[]>;
 
@@ -44,11 +42,7 @@ const idSourceModels = (lens: RuleLens): Set<string> => {
   const models = new Set<string>();
   for (const visit of Object.values(projectLens(lens)))
     for (const field of Object.keys(visit.sources))
-      if (
-        visit.fields[field] &&
-        (prismaMap.models as unknown as IdFields)[visit.model]?.fields[field]?.isId
-      )
-        models.add(visit.model);
+      if (visit.fields[field] && isRowIdSource(visit.model, field)) models.add(visit.model);
   return models;
 };
 
@@ -76,7 +70,7 @@ describe('lens and registry agree on what a rule can reference', () => {
   });
 
   test('the targetModel enum and the registry carry the same models, one column each', () => {
-    const targetAxis = getPolymorphismConfig('RuleReference')?.axes.find(
+    const targetAxis = polymorphismConfigForModel('RuleReference')?.axes.find(
       (axis) => axis.field === 'targetModel',
     );
     expect(Object.keys(targetAxis?.fkMap ?? {}).sort()).toEqual(

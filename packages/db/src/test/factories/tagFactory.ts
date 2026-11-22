@@ -5,11 +5,11 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const tagFactory = createFactory('Tag', {
+const tagFactory = registerFactory('Tag', {
   defaults: () => ({
-    name: `${faker.word.adjective()}-${faker.string.alphanumeric(6).toLowerCase()}`,
+    name: `${faker.word.adjective()}-${faker.string.alphanumeric(6).toLowerCase()}-${nextFactorySequenceNumber()}`,
     resources: [],
   }),
   dependencies: {

@@ -14,7 +14,7 @@ export const spaceRoles = {
   viewer: { space: { read: true } },
 } as const;
 
-export const getSpacePermissions = (role: Role, spaceId: string): PermissionEntry => {
+export const permissionEntryForSpaceRole = (role: Role, spaceId: string): PermissionEntry => {
   const baseActions = spaceRoles[role].space;
   return {
     resource: 'db:space',

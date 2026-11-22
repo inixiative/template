@@ -15,15 +15,13 @@ import {
 import { WS_CHANNELS } from '@template/shared/ws';
 import { websocketHandler } from '#/ws/handler';
 import { meChannel } from '#/ws/meChannel';
-import { byChannel, byId, clearRegistry } from '#/ws/registry';
+import { clearRegistry, connectionIdsByChannel, connectionsById } from '#/ws/registry';
 import { subscribeToChannel } from '#/ws/subscriptions';
-import { createTestSocket } from '#tests/createTestSocket';
+import { createTestSocket, sentFrames } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 
 // Transport tests against the REAL app — probes are requests. Credentialed acceptance
 // and spoof authority live in probe.test.ts.
-
-const lastFrame = (sent: string[]) => JSON.parse(sent[sent.length - 1]);
 
 const createAdminBearer = async () => {
   const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
@@ -54,15 +52,15 @@ describe('websocketHandler', () => {
   it('open registers the connection and sends a connected frame', () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
-    expect(byId.has('c1')).toBe(true);
-    expect(lastFrame(sent)).toEqual({ type: 'connected', connectionId: 'c1' });
+    expect(connectionsById.has('c1')).toBe(true);
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'connected', connectionId: 'c1' });
   });
 
   it('close removes the connection', () => {
     const { socket } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
     websocketHandler.close(socket);
-    expect(byId.has('c1')).toBe(false);
+    expect(connectionsById.has('c1')).toBe(false);
   });
 
   it('subscribe indexes a probe-approved channel and confirms', async () => {
@@ -73,8 +71,8 @@ describe('websocketHandler', () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1', headers: { authorization } });
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
-    expect([...(byChannel.get(channel) ?? [])]).toEqual(['c1']);
-    expect(lastFrame(sent)).toEqual({ type: 'subscribed', channel });
+    expect([...(connectionIdsByChannel.get(channel) ?? [])]).toEqual(['c1']);
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'subscribed', channel });
   });
 
   it("a /me channel is filed under the subscriber's user and confirmed by its own name", async () => {
@@ -89,9 +87,9 @@ describe('websocketHandler', () => {
     });
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
-    expect([...(byChannel.get(meChannel(channel, user.id)) ?? [])]).toEqual(['c1']);
-    expect(byChannel.has(channel)).toBe(false);
-    expect(lastFrame(sent)).toEqual({ type: 'subscribed', channel });
+    expect([...(connectionIdsByChannel.get(meChannel(channel, user.id)) ?? [])]).toEqual(['c1']);
+    expect(connectionIdsByChannel.has(channel)).toBe(false);
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'subscribed', channel });
   });
 
   it('rejects a subscribe from a connection without a credential', async () => {
@@ -101,8 +99,8 @@ describe('websocketHandler', () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
-    expect(byChannel.has(channel)).toBe(false);
-    expect(lastFrame(sent)).toEqual({ type: 'subscribeRejected', channel });
+    expect(connectionIdsByChannel.has(channel)).toBe(false);
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'subscribeRejected', channel });
   });
 
   it('rejects a subscribe to a channel outside the registry', async () => {
@@ -112,8 +110,8 @@ describe('websocketHandler', () => {
       socket,
       JSON.stringify({ action: 'subscribe', channel: 'nope:id:x' }),
     );
-    expect(byChannel.has('nope:id:x')).toBe(false);
-    expect(lastFrame(sent)).toEqual({ type: 'subscribeRejected', channel: 'nope:id:x' });
+    expect(connectionIdsByChannel.has('nope:id:x')).toBe(false);
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'subscribeRejected', channel: 'nope:id:x' });
   });
 
   it('unsubscribe removes the channel and confirms', async () => {
@@ -124,8 +122,8 @@ describe('websocketHandler', () => {
       socket,
       JSON.stringify({ action: 'unsubscribe', channel: 'ch1' }),
     );
-    expect(byChannel.has('ch1')).toBe(false);
-    expect(lastFrame(sent)).toEqual({ type: 'unsubscribed', channel: 'ch1' });
+    expect(connectionIdsByChannel.has('ch1')).toBe(false);
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'unsubscribed', channel: 'ch1' });
   });
 
   it('ping bumps lastPing and pongs', async () => {
@@ -133,7 +131,7 @@ describe('websocketHandler', () => {
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'ping' }));
     expect(socket.data.lastPing).toBeGreaterThan(0);
-    expect(lastFrame(sent)).toEqual({ type: 'pong' });
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'pong' });
   });
 
   it('answers ping even while the connection queue is blocked', async () => {
@@ -143,7 +141,7 @@ describe('websocketHandler', () => {
 
     await websocketHandler.message(socket, JSON.stringify({ action: 'ping' }));
 
-    expect(lastFrame(sent)).toEqual({ type: 'pong' });
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'pong' });
   });
 
   it("authenticate keeps a user's token as its credential, acting for its user (/identify)", async () => {
@@ -158,7 +156,7 @@ describe('websocketHandler', () => {
     );
     expect(socket.data.userId).toBe(user.id);
     expect(socket.data.headers.authorization).toBe(authorization);
-    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: user.id });
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'identity', userId: user.id });
   });
 
   it('authenticate with a rejected token resolves to a null identity', async () => {
@@ -169,7 +167,7 @@ describe('websocketHandler', () => {
       JSON.stringify({ action: 'authenticate', headers: { authorization: 'Bearer not-a-token' } }),
     );
     expect(socket.data.userId).toBeNull();
-    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: null });
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'identity', userId: null });
   });
 
   it('rejects a spoof the API does not honor, keeping the previous state', async () => {
@@ -187,7 +185,7 @@ describe('websocketHandler', () => {
       }),
     );
     expect(socket.data.userId).toBe(user.id);
-    expect(lastFrame(sent)).toEqual({ type: 'spoofRejected' });
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'spoofRejected' });
   });
 
   it('logout clears identity to anonymous', async () => {
@@ -195,7 +193,7 @@ describe('websocketHandler', () => {
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'logout' }));
     expect(socket.data.userId).toBeNull();
-    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: null });
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'identity', userId: null });
   });
 
   it('an authenticate resolving after close does not re-index the dead connection', async () => {
@@ -211,7 +209,7 @@ describe('websocketHandler', () => {
     websocketHandler.close(socket);
     await pending;
 
-    expect(byId.has('c1')).toBe(false);
+    expect(connectionsById.has('c1')).toBe(false);
   });
 
   it('a subscribe resolving after close does not re-index the dead connection', async () => {
@@ -228,8 +226,8 @@ describe('websocketHandler', () => {
     websocketHandler.close(socket);
     await pending;
 
-    expect(byId.has('c1')).toBe(false);
-    expect(byChannel.has(channel)).toBe(false);
+    expect(connectionsById.has('c1')).toBe(false);
+    expect(connectionIdsByChannel.has(channel)).toBe(false);
   });
 
   it('drops a malformed frame without throwing or sending', async () => {

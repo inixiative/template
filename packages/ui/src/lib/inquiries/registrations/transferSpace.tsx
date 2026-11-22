@@ -4,17 +4,17 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
+import type { InquiryItem } from '@template/sdk';
 import { Button, Label, Modal, SlugInput } from '@template/ui/components';
 import { useResolveInquiryMutation } from '@template/ui/hooks/inquiry';
 import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 import { useState } from 'react';
 
-const TransferSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => (
+const TransferSourceSummary = ({ inquiry }: { inquiry: InquiryItem }) => (
   <span>{inquiry.targetOrganization?.name ?? '—'}</span>
 );
 
-const TransferTargetSummary = ({ inquiry }: { inquiry: InquiryReceivedItem }) => (
+const TransferTargetSummary = ({ inquiry }: { inquiry: InquiryItem }) => (
   <span>{inquiry.sourceSpace?.name ?? '—'}</span>
 );
 
@@ -22,7 +22,7 @@ const TransferTargetReview = ({
   inquiry,
   onClose,
 }: {
-  inquiry: InquiryReceivedItem;
+  inquiry: InquiryItem;
   onClose: () => void;
 }) => {
   const resolveMutation = useResolveInquiryMutation();
