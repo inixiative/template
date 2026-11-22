@@ -63,6 +63,8 @@ scripts/
 │   ├── deploy.sh           # Deploy to environment
 │   ├── with-env.sh         # Run command with env vars
 │   └── wait-for-api.sh     # Health check wait
+├── cleanup-scan/
+│   └── record.sh           # cleanup-scan:record — full check on a clean HEAD, then records HEAD as scanned for the push gate
 └── worktree/
     ├── create.sh           # Provision an isolated worktree on a slot (DBs, buckets, env, deps, artifacts)
     ├── destroy.sh          # Tear a worktree down and free its slot
