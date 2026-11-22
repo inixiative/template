@@ -105,45 +105,50 @@ const mergeDiffs = (diffs: MembershipDiff[]): MembershipDiff => {
   return { added, removed };
 };
 
-export const applyMembershipDiff = async ({
+const fetchScopedCurrentMemberIds = async ({
   segmentId,
-  matching,
   within,
   signal,
-}: DiffScope): Promise<MembershipDiff> => {
-  const matchingSet = new Set(matching);
+}: Pick<DiffScope, 'segmentId' | 'within' | 'signal'>): Promise<Set<string>> => {
+  if (!within) return fetchCurrentMemberIds(segmentId, signal);
+  const rows = await db.segmentMember.findMany({
+    where: { segmentId, customerRelationshipId: { in: within } },
+    select: { customerRelationshipId: true },
+  });
+  return new Set(rows.map((member) => member.customerRelationshipId));
+};
 
-  if (within || db.isInTxn()) {
-    let diff: MembershipDiff = { added: [], removed: [] };
-    await db.txn(async () => {
-      const currentIds = within
-        ? new Set(
-            (
-              await db.segmentMember.findMany({
-                where: { segmentId, customerRelationshipId: { in: within } },
-                select: { customerRelationshipId: true },
-              })
-            ).map((member) => member.customerRelationshipId),
-          )
-        : await fetchCurrentMemberIds(segmentId, signal);
-      if (signal?.aborted) return;
-      const { toAdd, toRemove } = membershipDiff(matchingSet, currentIds);
-      if (!within) warnIfMassEviction(segmentId, currentIds.size, toRemove.length);
-      const completed: MembershipDiff[] = [];
-      for (const write of makeSegmentMemberWrites(segmentId, toAdd, toRemove, signal)) {
-        completed.push(await write());
-      }
-      diff = mergeDiffs(completed);
-    });
-    return diff;
-  }
-
-  const currentIds = await fetchCurrentMemberIds(segmentId, signal);
-  if (signal?.aborted) return { added: [], removed: [] };
+const planMembershipWrites = async (
+  segmentId: string,
+  matchingSet: Set<string>,
+  within?: string[],
+  signal?: AbortSignal,
+): Promise<Array<() => Promise<MembershipDiff>>> => {
+  const currentIds = await fetchScopedCurrentMemberIds({ segmentId, within, signal });
+  if (signal?.aborted) return [];
   const { toAdd, toRemove } = membershipDiff(matchingSet, currentIds);
-  warnIfMassEviction(segmentId, currentIds.size, toRemove.length);
+  if (!within) warnIfMassEviction(segmentId, currentIds.size, toRemove.length);
+  return makeSegmentMemberWrites(segmentId, toAdd, toRemove, signal);
+};
 
-  const writes = makeSegmentMemberWrites(segmentId, toAdd, toRemove, signal);
+const applySerial = async (
+  segmentId: string,
+  matchingSet: Set<string>,
+  within?: string[],
+  signal?: AbortSignal,
+): Promise<MembershipDiff> => {
+  const writes = await planMembershipWrites(segmentId, matchingSet, within, signal);
+  const completed: MembershipDiff[] = [];
+  for (const write of writes) completed.push(await write());
+  return mergeDiffs(completed);
+};
+
+const applyParallel = async (
+  segmentId: string,
+  matchingSet: Set<string>,
+  signal?: AbortSignal,
+): Promise<MembershipDiff> => {
+  const writes = await planMembershipWrites(segmentId, matchingSet, undefined, signal);
   if (!writes.length) return { added: [], removed: [] };
 
   const settled = await db.parallel(writes, {
@@ -174,4 +179,19 @@ export const applyMembershipDiff = async ({
   }
 
   return committed;
+};
+
+export const applyMembershipDiff = async ({
+  segmentId,
+  matching,
+  within,
+  signal,
+}: DiffScope): Promise<MembershipDiff> => {
+  const matchingSet = new Set(matching);
+
+  if (within) return db.txn(() => applySerial(segmentId, matchingSet, within, signal));
+  // why: db.parallel throws inside an open transaction
+  if (db.isInTxn()) return applySerial(segmentId, matchingSet, undefined, signal);
+
+  return applyParallel(segmentId, matchingSet, signal);
 };

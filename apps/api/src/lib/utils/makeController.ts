@@ -22,12 +22,12 @@ type ResponseSchemaFor<TRoute extends RouteConfig, S extends number> = TRoute ex
   responses: Record<S, { content: { 'application/json': { schema: infer Schema } } }>;
 }
   ? Schema
-  : never;
+  : unknown;
 
 type ResponseDataFor<TRoute extends RouteConfig, S extends number> =
   ResponseSchemaFor<TRoute, S> extends z.ZodObject<{ data: infer D extends ZodType }>
     ? z.input<D>
-    : unknown;
+    : never;
 
 type PaginationMetadataFor<TRoute extends RouteConfig> =
   ResponseSchemaFor<TRoute, 200> extends z.ZodObject<{ pagination: infer P extends ZodType }>

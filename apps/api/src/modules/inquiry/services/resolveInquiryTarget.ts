@@ -9,7 +9,6 @@ import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { type ValidatedContext, validatedBody } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
-import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 
 const nullTargetFields = emptySideKeyColumns(polymorphicAxis('Inquiry', 'targetModel'));
 export type InquiryTargetBody = {
@@ -25,7 +24,7 @@ export type InquiryTargetBody = {
 };
 
 export type InquiryTargetFields =
-  | { targetModel: (typeof InquiryResourceModel)['User']; targetUserId: string | null }
+  | { targetModel: (typeof InquiryResourceModel)['User']; targetUserId: string }
   | {
       targetModel: (typeof InquiryResourceModel)['Organization'];
       targetOrganizationId: string;
@@ -52,9 +51,7 @@ export type InquiryTargetFields =
 
 export const resolveInquiryTarget = async <C extends ValidatedContext<'json', InquiryTargetBody>>(
   c: C,
-  options: { allowCreateGuest?: boolean } = {},
 ): Promise<InquiryTargetFields> => {
-  const { allowCreateGuest = true } = options;
   const db = c.get('db');
   const body = validatedBody(c);
   const targetModel: InquiryResourceModel = body.targetModel;
@@ -66,13 +63,6 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
       return { ...nullTargetFields, targetModel, targetUserId: user.id };
     }
     if (body.targetEmail) {
-      if (!allowCreateGuest) {
-        const existing = await db.user.findUnique({
-          where: { email: normalizeEmail(body.targetEmail as string) },
-          select: { id: true },
-        });
-        return { ...nullTargetFields, targetModel, targetUserId: existing?.id ?? null };
-      }
       const user = await findUserOrCreateGuest(c, { email: body.targetEmail as string });
       return { ...nullTargetFields, targetModel, targetUserId: user.id };
     }

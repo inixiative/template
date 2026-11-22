@@ -51,9 +51,9 @@ export const sendInquiry = async (
     const handler = inquiryServices[fresh.type];
     const autoApproved = await handler.autoApprove(sent);
 
-    if (autoApproved) {
-      await emitAppEvent('inquiry.sent', sent);
+    await emitAppEvent('inquiry.sent', sent);
 
+    if (autoApproved) {
       await resolveInquiry(
         c,
         sent,
@@ -67,8 +67,6 @@ export const sendInquiry = async (
         include: includeInquiryResponse,
       });
     }
-
-    await emitAppEvent('inquiry.sent', sent);
 
     return sent;
   });

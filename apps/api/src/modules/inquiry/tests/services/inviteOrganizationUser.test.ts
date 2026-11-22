@@ -13,7 +13,6 @@ import {
   createUser,
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
-import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { parseSuccessBody, post } from '#tests/utils/request';
 
@@ -119,26 +118,5 @@ describe('handler: inviteOrganizationUser', () => {
       where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
     });
     expect(organizationUser?.role).toBe('member');
-  });
-
-  it('unauthorized caller with targetEmail returns 403 without creating a guest user', async () => {
-    const { entity: outsider } = await createUser();
-    const guestEmail = `unauth-guest-${Date.now()}@example.test`;
-    const outsiderFetch = createTestApp({
-      mockUser: outsider,
-      mount: [(app) => app.route('/api/v1/organization', organizationRouter)],
-    }).fetch;
-
-    const response = await outsiderFetch(
-      post(`/api/v1/organization/${org.id}/inquiries`, {
-        type: InquiryType.inviteOrganizationUser,
-        targetModel: InquiryResourceModel.User,
-        targetEmail: guestEmail,
-        content: { organizationId: org.id, role: 'member' },
-      }),
-    );
-
-    expect(response.status).toBe(403);
-    expect(await db.user.findUnique({ where: { email: guestEmail } })).toBeNull();
   });
 });

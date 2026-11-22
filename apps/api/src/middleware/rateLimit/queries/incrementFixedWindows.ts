@@ -7,8 +7,19 @@
 import type { RedisEval } from '@template/db';
 
 // Atomic check + INCRBY + first-hit PEXPIRE: rejected requests do not burn remaining budget, and a crash cannot strand a TTL-less key.
-const INCR_WINDOW =
-  "local cost = tonumber(ARGV[2]) local max = tonumber(ARGV[3]) local cur = tonumber(redis.call('GET', KEYS[1]) or '0') if max and cur + cost > max then return {cur + cost, redis.call('PTTL', KEYS[1])} end local c = redis.call('INCRBY', KEYS[1], cost) if redis.call('PTTL', KEYS[1]) < 0 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end return {c, redis.call('PTTL', KEYS[1])}";
+const INCR_WINDOW = `
+local cost = tonumber(ARGV[2])
+local max = tonumber(ARGV[3])
+local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
+if max and cur + cost > max then
+  return {cur + cost, redis.call('PTTL', KEYS[1])}
+end
+local c = redis.call('INCRBY', KEYS[1], cost)
+if redis.call('PTTL', KEYS[1]) < 0 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+return {c, redis.call('PTTL', KEYS[1])}
+`;
 
 export type FixedWindow = { key: string; windowMs: number; cost?: number; max?: number };
 export type WindowState = { count: number; ttlMs: number };

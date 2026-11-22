@@ -33,7 +33,7 @@ const validateMembersBelongToOwners = async (rows: MemberRow[]): Promise<void> =
     {
       ownerModel: ProviderModel;
       ownerId: string;
-      rows: { segmentId: string; customerRelationshipId: string }[];
+      customerRelationshipIds: Set<string>;
     }
   >();
 
@@ -44,16 +44,14 @@ const validateMembersBelongToOwners = async (rows: MemberRow[]): Promise<void> =
     const key = `${segment.ownerModel}:${ownerId}`;
     let group = groups.get(key);
     if (!group) {
-      group = { ownerModel: segment.ownerModel, ownerId, rows: [] };
+      group = { ownerModel: segment.ownerModel, ownerId, customerRelationshipIds: new Set() };
       groups.set(key, group);
     }
-    group.rows.push(row);
+    group.customerRelationshipIds.add(row.customerRelationshipId);
   }
 
   for (const group of groups.values()) {
-    const uniqueCustomerRelationshipIds = [
-      ...new Set(group.rows.map((row) => row.customerRelationshipId)),
-    ];
+    const uniqueCustomerRelationshipIds = [...group.customerRelationshipIds];
     const matchedIds = new Set<string>();
     const fk = customerRelationshipProviderFk(group.ownerModel);
 
@@ -69,11 +67,11 @@ const validateMembersBelongToOwners = async (rows: MemberRow[]): Promise<void> =
       for (const relationship of matched) matchedIds.add(relationship.id);
     }
 
-    for (const row of group.rows) {
-      if (!matchedIds.has(row.customerRelationshipId)) {
+    for (const customerRelationshipId of uniqueCustomerRelationshipIds) {
+      if (!matchedIds.has(customerRelationshipId)) {
         throw makeError({
           status: 422,
-          message: `CustomerRelationship ${row.customerRelationshipId} is not a customer of the segment's ${group.ownerModel}`,
+          message: `CustomerRelationship ${customerRelationshipId} is not a customer of the segment's ${group.ownerModel}`,
         });
       }
     }

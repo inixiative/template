@@ -59,7 +59,7 @@ export const reconcileSegment = makeSupersedingJob<ReconcileSegmentPayload>(
     const segment = await db.segment.findUnique({ where: { id: segmentId } });
     if (!segment || !isReconcilable(segment)) return;
 
-    let diff: Awaited<ReturnType<typeof reconcile>>;
+    let diff: MembershipDiff;
     try {
       diff = await reconcile(segment, ctx.signal);
     } catch (error) {
