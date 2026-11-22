@@ -14,6 +14,7 @@ import {
   closeOnParentDeleteViolations,
   hardDeleteOnTombstoneViolations,
   skipReviveViolations,
+  unclassifiedChildViolations,
 } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
 
 const tokenStamp = async (id: string) =>
@@ -163,6 +164,68 @@ describe('CLOSE_ON_PARENT_DELETE validation', () => {
   it('refuses a model that is not in the schema', () => {
     expect(closeOnParentDeleteViolations(['NotAModel']).join('\n')).toContain(
       'is not a model in the schema',
+    );
+  });
+});
+
+// why: history and log rows Aron has not yet classified (2026-11-19); the list only shrinks.
+const awaitingClassification = [
+  'AuditLog.actorSpoofUserId belongs to User',
+  'AuditLog.actorUserId belongs to User',
+  'AuditLog.contextUserId belongs to User',
+  'AuditLog.subjectUserId belongs to User',
+  'CommunicationLog.recipientUserId belongs to User',
+  'CommunicationLog.senderUserId belongs to User',
+  'CronJob.createdById belongs to User',
+  'AuditLog.contextOrganizationId belongs to Organization',
+  'AuditLog.subjectOrganizationId belongs to Organization',
+  'CommunicationLog.senderOrganizationId belongs to Organization',
+  'AuditLog.subjectOrganizationId+subjectUserId belongs to OrganizationUser',
+  'CommunicationLog.senderOrganizationId+senderUserId belongs to OrganizationUser',
+  'AuditLog.contextSpaceId belongs to Space',
+  'AuditLog.subjectSpaceId belongs to Space',
+  'CommunicationLog.senderOrganizationId+senderSpaceId belongs to Space',
+  'AuditLog.subjectOrganizationId+subjectSpaceId+subjectUserId belongs to SpaceUser',
+  'CommunicationLog.senderOrganizationId+senderSpaceId+senderUserId belongs to SpaceUser',
+  'AuditLog.subjectAuthProviderId belongs to AuthProvider',
+  'AuditLog.sourceInquiryId belongs to Inquiry',
+  'AuditLog.subjectInquiryId belongs to Inquiry',
+  'AuditLog.subjectCustomerRelationshipId belongs to CustomerRelationship',
+  'AuditLog.subjectEmailTemplateId belongs to EmailTemplate',
+  'CommunicationLog.emailTemplateId belongs to EmailTemplate',
+  'AuditLog.subjectEmailComponentId belongs to EmailComponent',
+  'CommunicationComponentVersion.emailComponentId belongs to EmailComponent',
+  'AppEvent.integrationId belongs to Integration',
+  'AuditLog.actorIntegrationId belongs to Integration',
+  'AuditLog.subjectIntegrationId belongs to Integration',
+  'AuditLog.subjectSegmentId belongs to Segment',
+  'AuditLog.actorTokenId belongs to Token',
+  'AuditLog.subjectTokenId belongs to Token',
+  'AuditLog.subjectEntitlementId belongs to Entitlement',
+  'AuditLog.subjectProjectId belongs to Project',
+  'AuditLog.subjectIntegrationResourceId belongs to IntegrationResource',
+  'AuditLog.subjectProjectIntegrationResourceId belongs to ProjectIntegrationResource',
+  'AuditLog.subjectSettingId belongs to Setting',
+  'AuditLog.subjectProjectIntegrationId belongs to ProjectIntegration',
+  'CommunicationLog.recipientContactId belongs to Contact',
+];
+
+const unclassifiedRelation = (violation: string) => violation.split(', which is soft-deleted')[0];
+
+describe('every child of a soft-deleted parent is classified', () => {
+  it('finds no child the cascade would leave live under a tombstoned parent beyond those awaiting classification', () => {
+    expect(unclassifiedChildViolations().map(unclassifiedRelation)).toEqual(awaitingClassification);
+  });
+
+  it('accepts a child that is hard-deleted, closed or tombstoned with its parent', () => {
+    expect(
+      unclassifiedChildViolations(['TagCategory', 'WebhookSubscription', 'SegmentMember']),
+    ).toEqual([]);
+  });
+
+  it('names a child with no deletedAt and no policy', () => {
+    expect(unclassifiedChildViolations(['Segment']).join('\n')).toContain(
+      'AuditLog.subjectSegmentId belongs to Segment, which is soft-deleted',
     );
   });
 });

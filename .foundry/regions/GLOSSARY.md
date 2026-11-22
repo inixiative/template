@@ -2521,11 +2521,11 @@ Env files and secret values are never committed; examples carry placeholders. *R
 **No TS enum**  
 Use an `as const` object or a Prisma enum instead of the enum keyword. *Region:* [Naming and code style](conventions/knowledge.md)
 
-**find-or-create-uses-find-for-update-upserting**  
-CI rule that fails a change adding a bare .upsert( or a unique-violation catch. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
+**no-unique-violation-catches**  
+CI rule that fails a change adding a unique-violation catch (P2002 or isUniqueConstraintError). *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
-**find-or-create-uses-find-for-update-upserting**  
-CI rule: blocks new bare `.upsert(` and unique-violation catches; use db.findForUpdate with `upserting: true`. *Region:* [Database client and transactions](database-client/knowledge.md)
+**no-unique-violation-catches**  
+CI rule: blocks new unique-violation catches; upsert on a unique key, or db.findForUpdate with `upserting: true` when no unique holds it. *Region:* [Database client and transactions](database-client/knowledge.md)
 
 **no-inline-env-coercion**  
 CI rule forbidding casting or defaulting process.env outside the central env schema. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)

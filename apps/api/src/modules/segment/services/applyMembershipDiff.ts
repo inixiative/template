@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma, primitive:shared
  */
-import { db } from '@template/db';
+import { db, revive } from '@template/db';
 import { log } from '@template/shared/logger';
 import { ConcurrencyType, minimumConcurrencyLimitFor } from '@template/shared/utils';
 import { chunk } from 'lodash-es';
@@ -69,16 +69,24 @@ const makeSegmentMemberWrites = (
 ): Array<() => Promise<MembershipDiff>> => [
   ...chunk(toAdd, CHUNK_SIZE).map((batch) => async (): Promise<MembershipDiff> => {
     if (signal?.aborted) return { added: [], removed: [] };
+    const revived = await revive(db.segmentMember, {
+      segmentId,
+      customerRelationshipId: { in: batch },
+    });
     const written = await db.segmentMember.createManyAndReturn({
       data: batch.map((customerRelationshipId) => ({ segmentId, customerRelationshipId })),
       skipDuplicates: true,
     });
-    return { added: written.map((member) => member.customerRelationshipId), removed: [] };
+    return {
+      added: [...revived, ...written].map((member) => member.customerRelationshipId),
+      removed: [],
+    };
   }),
   ...chunk(toRemove, CHUNK_SIZE).map((batch) => async (): Promise<MembershipDiff> => {
     if (signal?.aborted) return { added: [], removed: [] };
-    await db.segmentMember.deleteMany({
+    await db.segmentMember.updateManyAndReturn({
       where: { segmentId, customerRelationshipId: { in: batch } },
+      data: { deletedAt: new Date() },
     });
     return { added: [], removed: batch };
   }),

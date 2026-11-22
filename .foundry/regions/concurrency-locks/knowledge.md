@@ -77,8 +77,8 @@ Job wrapper that takes a makeLock before running so only one run happens at a ti
 **makeSupersedingJob**  
 Job wrapper where a newer job with the same dedupe key supersedes older runs.
 
-**find-or-create-uses-find-for-update-upserting**  
-CI rule that fails a change adding a bare .upsert( or a unique-violation catch.
+**no-unique-violation-catches**  
+CI rule that fails a change adding a unique-violation catch (P2002 or isUniqueConstraintError).
 
 **onLockLost**  
 makeLock callback fired when the lease is lost so the holder can stop its critical work.
@@ -116,7 +116,7 @@ The template's coordination primitives, one per concern: cross-process mutual ex
 
 ## 2. The domain
 
-Pick by concern and scope (docs/claude/CONCURRENCY.md table). Cross-process: `makeLock` keeps the first holder of a resource (heartbeated TTL, fenced release, `onLockLost`) and backs `makeSingletonJob`; `claimLane` / `watchLane` are its inverse, handing the baton to the newest claimant of `(handlerName, dedupeKey)` and telling the older job to bow out, which backs `makeSupersedingJob` (cooperative `ctx.signal`, `SupersededError`, superseded runs never write). Inside a transaction, `db.findForUpdate(model, where)` takes `SELECT … FOR UPDATE`; for create-if-missing pass `upserting: true`, which fences the key with a Redis lock before the select (scalar-equality where only; `FindForUpdateLockTimeoutError` after `waitMs`). A bare `.upsert(` or a caught unique violation is the bypass, and the `find-or-create-uses-find-for-update-upserting` CI rule fails it. `withOwnerLock` serializes writes that collide across rows of one owner (e.g. segment cycle checks) before the transaction opens; it is not re-entrant. Optimistic per-row claims (a compare-and-set status update, a version precondition in `updateManyAndReturn`) cover at-most-once row transitions without a lock.
+Pick by concern and scope (docs/claude/CONCURRENCY.md table). Cross-process: `makeLock` keeps the first holder of a resource (heartbeated TTL, fenced release, `onLockLost`) and backs `makeSingletonJob`; `claimLane` / `watchLane` are its inverse, handing the baton to the newest claimant of `(handlerName, dedupeKey)` and telling the older job to bow out, which backs `makeSupersedingJob` (cooperative `ctx.signal`, `SupersededError`, superseded runs never write). Inside a transaction, `db.findForUpdate(model, where)` takes `SELECT … FOR UPDATE`; for create-if-missing pass `upserting: true`, which fences the key with a Redis lock before the select (scalar-equality where only; `FindForUpdateLockTimeoutError` after `waitMs`). A key a unique holds is an upsert instead; a caught unique violation is the bypass, and the `no-unique-violation-catches` CI rule fails it. `withOwnerLock` serializes writes that collide across rows of one owner (e.g. segment cycle checks) before the transaction opens; it is not re-entrant. Optimistic per-row claims (a compare-and-set status update, a version precondition in `updateManyAndReturn`) cover at-most-once row transitions without a lock.
 
 In-process: `makeSerializedQueue` orders read-modify-write calls on one shared resource (errors propagate, the chain never poisons); `minimumConcurrencyLimitFor([ConcurrencyType.db, …])` gives the tightest cap for the resources touched; `runAllWithConcurrencyLimit(thunks, cap)` runs a bounded batch with ordered results. A lock plus a serialized queue is the canonical pair for "one instance owns this and serializes its own writes". `heartbeat` is the non-overlapping recurring timer under both `makeLock` and `watchLane`; prefer it over `setInterval`. In the UI, `useDebounce` / `useDebouncedCallback` debounce only inputs that hit the backend, never in-memory filtering of a loaded list.
 
@@ -141,8 +141,8 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | *plain write in db.txn* | the write does not depend on a value read first: every mutation already runs in its own transaction (mutationLifeCycle); wrap several in db.txn only when they must commit together (DATABASE.md § Transactions) | read-then-update or find-then-create (db.findForUpdate; a read-then-update in a txn with no row lock is the bypass sign) |
-| *unique constraint, let the insert fail* | a duplicate is the caller's mistake: plain create, the unique index rejects it and the global handler maps P2002 to 409 'Resource already exists' (ERRORS.md § The global handler; addUniqueWhereNotNull for nullable columns) | create-if-missing must return the existing row (db.findForUpdate upserting: true); never catch the violation and re-read: find-or-create-uses-find-for-update-upserting fails new P2002 / isUniqueConstraintError( catches |
-| *bare upsert* | only where the rule does not reach: seed files (ID-based upsert by id, DATABASE.md § Seeding; seed, test and factory paths are excluded) and the existing JobOutbox flush (superseding lanes via upsert, last-writer-wins, JOBS.md § Accumulator) | any new create-if-missing in apps/ or packages/: find-or-create-uses-find-for-update-upserting fails a file whose .upsert( count rises against the merge base; fence with db.findForUpdate upserting: true |
+| *unique constraint, let the insert fail* | a duplicate is the caller's mistake: plain create, the unique index rejects it and the global handler maps P2002 to 409 'Resource already exists' (ERRORS.md § The global handler; addUniqueWhereNotNull for nullable columns) | create-if-missing must return the existing row (an upsert on the unique, db.findForUpdate upserting: true when no unique holds the key); never catch the violation and re-read: no-unique-violation-catches fails new P2002 / isUniqueConstraintError( catches |
+| *upsert* | create-if-missing on a unique key: one INSERT ... ON CONFLICT when the where is that unique alone; on a soft-delete model it finds the tombstone, and update: { deletedAt: null } revives it (DATABASE.md § Row Locks and Create-If-Missing) | a key no unique holds, or a write that branches on what it finds: fence with db.findForUpdate upserting: true |
 
 **Job: serialize or bound work inside one process** (In-process serialization: makeSerializedQueue vs Outbox mutex vs inStreamOrder vs minimumConcurrencyLimitFor vs runAllWithConcurrencyLimit) — CONCURRENCY.md (Serialized Queue; Concurrency Limits; Bounded Batch); JOBS.md § Queue Depth Probe
 
@@ -380,7 +380,7 @@ transaction; outside one it takes and releases a plain `makeLock` lock around `f
 
 `db.findForUpdate(model, where)` runs `SELECT * ... FOR UPDATE` inside `db.txn()`. A row that does
 not exist yet locks nothing, so find-then-create races: two callers both see nothing and both
-insert. Do not answer that with a bare `upsert` or a caught unique violation — fence the key:
+insert. Never answer that by catching the unique violation. When a plain unique holds the key, the write is an `upsert`: Prisma runs it as one `INSERT ... ON CONFLICT` when its `where` is that unique alone and `create` repeats the key's values (on a soft-delete model that means inside `db.withDeleted`, since the scope adds `deletedAt` to the `where`). When no unique holds the key, or the write branches on what it finds, fence the key:
 
 ```typescript
 await db.txn(async () => {
@@ -396,8 +396,8 @@ equalities (no arrays, operator objects, `null` or `undefined`), except that one
 values as `{ in: [...] }`, fencing each value under the key a single-row fence on it takes. A caller that cannot get the lock waits up to
 `waitMs` (default 3000ms, inside Prisma's 5000ms interactive default) and then throws
 `FindForUpdateLockTimeoutError`, rolling its transaction back. Fencing the same key twice in one
-transaction does not wait on itself. The `find-or-create-uses-find-for-update-upserting` CI rule fails a change that
-adds a bare `.upsert(` or a unique-violation catch to a file.
+transaction does not wait on itself. The `no-unique-violation-catches` CI rule fails a change that
+adds a `P2002` or `isUniqueConstraintError` catch to a file.
 
 ---
 

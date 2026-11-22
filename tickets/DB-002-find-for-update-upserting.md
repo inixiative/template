@@ -55,6 +55,9 @@ Each patch is a per-call-site answer to a primitive's gap.
 - CI: `scripts/ci/rules/find-or-create-uses-find-for-update-upserting.sh` — per-file ratchet vs the merge base on
   `.upsert(`, `P2002` and `isUniqueConstraintError(` (tests, factories, seeds, generated code and
   the helper's definition exempt; comment lines not counted).
+  Since 2026-11-22 (Aron: "yes change ci") the rule is `no-unique-violation-catches.sh` and counts
+  only `P2002` and `isUniqueConstraintError(`: create-if-missing on a unique key is an upsert, and
+  soft-delete models keep plain uniques so an upsert revives a tombstone.
 - Docs: `docs/claude/DATABASE.md` — finally callbacks, create-if-missing.
 
 ## Tests

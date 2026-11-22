@@ -1,0 +1,29 @@
+// ============================================================================
+// PROJECT INTEGRATION RESOURCE - One integration resource linked to one project
+// ============================================================================
+// Soft-deleted with either end and revived with it. Unlinking is a soft delete too; linking the
+// pair again revives the row (the unique holds tombstones too, so `upsert` finds it).
+
+model ProjectIntegrationResource {
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  deletedAt            DateTime?
+
+  projectId String  @db.VarChar(36)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  integrationResourceId String              @db.VarChar(36)
+  integrationResource   IntegrationResource @relation(fields: [integrationResourceId], references: [id], onDelete: Cascade)
+
+  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProjectIntegrationResource")
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([projectId, integrationResourceId], map: "ProjectIntegrationResource_project_integrationResource_key")
+  @@index([projectId])
+  @@index([integrationResourceId])
+}

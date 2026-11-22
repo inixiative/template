@@ -13,10 +13,14 @@ import {
   modelNames,
   SKIP_REVIVE,
   SOFT_DELETE_MODEL_SET,
+  SOFT_DELETE_MODELS,
 } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { childRelations } from '#/hooks/softDeleteCascade/childRelations';
-import { CLOSE_ON_PARENT_DELETE } from '#/hooks/softDeleteCascade/closeOnParentDelete';
+import {
+  CLOSE_ON_PARENT_DELETE,
+  isClosedOnParentDelete,
+} from '#/hooks/softDeleteCascade/closeOnParentDelete';
 
 const optionalForeignKey = (model: string, fromFields: readonly string[]): boolean => {
   return fromFields.every((name) => fieldOf(prismaMap, model, name)?.isRequired !== true);
@@ -87,6 +91,23 @@ export const closeOnParentDeleteViolations = (
           `${model} is closed on its parent's delete and kept as the record, but its parent ${parent} can be hard-deleted and would take it along. Make ${parent} soft-delete, or point at it with a true-polymorphic pair (model + id, as RuleReference does) instead of a foreign key.`,
       );
   });
+
+export const unclassifiedChildViolations = (
+  parents: readonly string[] = SOFT_DELETE_MODELS,
+): string[] =>
+  parents.flatMap((parent) =>
+    childRelations(parent)
+      .filter(
+        (child) =>
+          !child.hasDeletedAt &&
+          !isHardDeletedOnTombstone(child.model) &&
+          !isClosedOnParentDelete(child.model),
+      )
+      .map(
+        (child) =>
+          `${child.model}.${child.fromFields.join('+')} belongs to ${parent}, which is soft-deleted, but ${child.model} has no deletedAt and is in neither HARD_DELETE_ON_TOMBSTONE nor CLOSE_ON_PARENT_DELETE: tombstoning ${parent} would leave it live under a dead parent. Give it deletedAt, list it in one of those, or exempt the relation in CASCADE_EXEMPT.`,
+      ),
+  );
 
 export const validateDeleteBehavior = () => {
   const violations = [
