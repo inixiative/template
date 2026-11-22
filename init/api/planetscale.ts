@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { fetchCliVersion, VCR } from '../../packages/shared/src/vcr';
 import { fetchSecretOrThrow } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
 import { fetchProjectConfig } from '../utils/fetchProjectConfig';
@@ -68,7 +68,7 @@ type ServiceToken = { id: string; token: string };
 class PlanetScaleApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
     service: 'planetscale',
-    version: () => cliVersion('pscale'),
+    version: () => fetchCliVersion('pscale'),
     sanitizers: {
       createPassword: { keys: SANITIZE_KEYS },
       createRole: { keys: SANITIZE_KEYS },

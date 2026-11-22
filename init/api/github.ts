@@ -1,11 +1,11 @@
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { fetchCliVersion, VCR } from '../../packages/shared/src/vcr';
 import { execAsync } from '../utils/exec';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/github');
 
 class GitHubApi {
-  readonly vcr = new VCR(FIXTURES_DIR, { service: 'github', version: () => cliVersion('gh') });
+  readonly vcr = new VCR(FIXTURES_DIR, { service: 'github', version: () => fetchCliVersion('gh') });
 
   async isAppInstalled(org: string, appSlug: string): Promise<boolean> {
     return this.vcr.capture('isAppInstalled', async () => {

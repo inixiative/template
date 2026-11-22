@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { fetchCliVersion, VCR } from '../../packages/shared/src/vcr';
 import { execAsync, execFileAsync, execFileWithInput } from '../utils/exec';
 
 export const infisicalSecretArgument = (key: string) => {
@@ -56,10 +56,10 @@ const maskSecrets = (s: unknown) =>
 class InfisicalApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
     service: 'infisical',
-    version: () => cliVersion('infisical'),
+    version: () => fetchCliVersion('infisical'),
     sanitizers: {
-      fetchSecret: { fn: maskSecrets },
-      setSecret: { fn: maskSecrets },
+      fetchSecret: { transform: maskSecrets },
+      setSecret: { transform: maskSecrets },
     },
   });
 

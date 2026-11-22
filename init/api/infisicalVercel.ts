@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { fetchCliVersion, VCR } from '../../packages/shared/src/vcr';
 import { fetchInfisicalTokenOrThrow } from './infisical';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisicalVercel');
@@ -36,9 +36,9 @@ class InfisicalVercelApi {
     // Composite: either CLI bumping should invalidate cassettes since
     // both shape the Infisical-Vercel connection payload.
     version: async () =>
-      (await Promise.all([cliVersion('infisical'), cliVersion('vercel')])).join('|'),
+      (await Promise.all([fetchCliVersion('infisical'), fetchCliVersion('vercel')])).join('|'),
     sanitizers: {
-      createVercelConnection: { fn: () => 'MASKED' },
+      createVercelConnection: { transform: () => 'MASKED' },
     },
   });
 

@@ -1,7 +1,7 @@
 import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { fetchCliVersion, VCR } from '../../packages/shared/src/vcr';
 import { fetchSecretOrThrow, setSecretAsync } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
 import { fetchProjectConfig } from '../utils/fetchProjectConfig';
@@ -37,18 +37,18 @@ export type RailwayDeployment = {
 class RailwayApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
     service: 'railway',
-    version: () => cliVersion('railway'),
+    version: () => fetchCliVersion('railway'),
     sanitizers: {
       fetchRedisUrl: {
-        fn: (s) =>
+        transform: (s) =>
           typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://MASKED:MASKED@') : s,
       },
       fetchPostgresUrl: {
-        fn: (s) =>
+        transform: (s) =>
           typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://MASKED:MASKED@') : s,
       },
-      fetchRailwayUserToken: { fn: () => 'MASKED' },
-      fetchRailwayWorkspaceToken: { fn: () => 'MASKED' },
+      fetchRailwayUserToken: { transform: () => 'MASKED' },
+      fetchRailwayWorkspaceToken: { transform: () => 'MASKED' },
     },
   });
 

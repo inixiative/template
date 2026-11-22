@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { fetchCliVersion, VCR } from '../../packages/shared/src/vcr';
 import { execAsync, execFileWithInput } from '../utils/exec';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/vercel');
@@ -8,7 +8,10 @@ export type VercelTeam = { id: string; name: string; slug: string };
 export type VercelProject = { id: string; name: string; framework: string | null };
 
 class VercelApi {
-  readonly vcr = new VCR(FIXTURES_DIR, { service: 'vercel', version: () => cliVersion('vercel') });
+  readonly vcr = new VCR(FIXTURES_DIR, {
+    service: 'vercel',
+    version: () => fetchCliVersion('vercel'),
+  });
 
   async fetchVercelToken(): Promise<string> {
     const { homedir } = await import('node:os');

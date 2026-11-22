@@ -1,4 +1,32 @@
-export { cliVersion } from './cliVersion';
+export {
+  assertCassettesFresh,
+  assertScrubbed,
+  clearVcrVersionCache,
+  createHttpTransport,
+  createScrubber,
+  createVcrFetch,
+  createVcrRecorder,
+  createVcrSession,
+  defineVcrTransport,
+  fetchCliVersion,
+  fetchHttpVersion,
+  type HttpCassette,
+  type HttpCassetteOptions,
+  isVcrError,
+  type RecordedHttpRequest,
+  resetDefaultVcrSession,
+  type Scrubber,
+  type ScrubOptions,
+  seedVcrServiceVersion,
+  type VcrCassette,
+  VcrError,
+  type VcrMethodSanitizer,
+  type VcrMode,
+  VcrRecorder,
+  type VcrRecorderOptions,
+  type VcrResponse,
+  type VcrSession,
+  type VcrTransport,
+} from '@inixiative/vcr';
 export { emitFromCassette } from './emitFromCassette';
-export { fetchVersion } from './fetchVersion';
-export { type Fixture, VCR } from './vcr';
+export { VCR } from './vcr';

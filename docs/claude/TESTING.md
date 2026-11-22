@@ -450,7 +450,7 @@ export const createModel = modelFactory.create;
 
 ## VCR (external services)
 
-Tests never call a live provider. A client that talks to an external service wraps each call in `VCR` from `@template/shared/vcr`:
+Tests never call a live provider. `@template/shared/vcr` is a thin wrapper around `@inixiative/vcr` (`VCR`, `createVcrRecorder`, `createVcrFetch`, `createScrubber`, `fetchCliVersion`, `fetchHttpVersion`, `assertCassettesFresh`). A client that talks to an external service wraps each call in `VCR`:
 
 ```typescript
 readonly vcr = new VCR(FIXTURES_DIR, { service: 'resend', version: () => '…', sanitizers });
@@ -460,10 +460,11 @@ send(options) {
 }
 ```
 
-- Outside tests `capture` calls straight through.
-- In tests the test queues a cassette per call (`client.vcr.queue('send', 'accepted')`); `capture` replays it, or records a sanitized one when the file is missing or its `version` differs from the service's current version.
+- Outside tests (`ENVIRONMENT !== 'test'`), `VCR.capture` and `VCR.captureResponse` call straight through.
+- In tests, the test queues a cassette per call (`client.vcr.queue('send', 'accepted')`). Mode resolves via `VCR_MODE` (`replay` by default — fails closed on missing cassettes without hitting the network; `auto` records missing cassettes; `record` re-records live and holds back structural drift to `*.pending.json`).
 - A recorded `status >= 400` replays as a thrown error.
-- Sanitizers mask keys before a cassette is written; commit only sanitized cassettes.
+- Per-method sanitizers (`{ keys, transform, isArray, binaryExtension }`) and `@inixiative/vcr`'s built-in scrubber redact secrets, headers, URL credentials, and emails before writing, and `assertScrubbed` gates every cassette write.
+- For HTTP clients that take a `fetch` implementation, pass `client.vcr.recorder` (or `createVcrRecorder`) to `createVcrFetch` for request-matched HTTP record/replay.
 
 Used by `packages/email` (Resend, Bouncer) and the `init/api/*` clients (all but `cloudflare` and `resend`).
 

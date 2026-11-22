@@ -10,7 +10,7 @@ import type {
   VerificationResult,
   VerificationStatus,
 } from '@template/email/client/verification/types';
-import { fetchVersion, VCR } from '@template/shared/vcr';
+import { fetchHttpVersion, VCR } from '@template/shared/vcr';
 
 type BouncerResponse = {
   email: string;
@@ -40,7 +40,7 @@ class BouncerVerifierClient implements EmailVerifier {
   readonly vcr = new VCR(FIXTURES_DIR, {
     service: 'bouncer',
     version: () =>
-      fetchVersion('https://docs.usebouncer.com/api-reference/real-time/verify-email.md'),
+      fetchHttpVersion('https://docs.usebouncer.com/api-reference/real-time/verify-email.md'),
     sanitizers: { verify: { keys: SANITIZE_KEYS } },
   });
   private readonly apiKey: string;

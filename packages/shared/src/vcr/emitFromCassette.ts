@@ -5,7 +5,7 @@
  * @uses none
  */
 import { readFileSync } from 'node:fs';
-import type { Fixture } from '@template/shared/vcr/vcr';
+import type { VcrCassette } from '@inixiative/vcr';
 
 // Like ev.emit, but awaits async listeners. ev.emit is sync — async handlers' promises
 // would be discarded and tests would assert before handlers settle.
@@ -16,6 +16,6 @@ export const emitFromCassette = async (
   eventName: string,
   cassettePath: string,
 ): Promise<void> => {
-  const fixture = JSON.parse(readFileSync(cassettePath, 'utf-8')) as Fixture;
-  await Promise.all(ev.listeners(eventName).map((fn) => fn(fixture.body)));
+  const cassette = JSON.parse(readFileSync(cassettePath, 'utf-8')) as VcrCassette;
+  await Promise.all(ev.listeners(eventName).map((fn) => fn(cassette.body)));
 };
