@@ -97,3 +97,13 @@ What that does to each part:
 - **Caching the compiled predicate** now depends on the tenant rows: a write to `tenantPermissionRules` has to clear it.
 
 Possible routes, none chosen: compile per tenant and `OR` the branches where the tenant set is small and known; fall back to `check()` per row for a tenant that has stored rules (as bridges do); or materialise a tenant's rules into rows the query can join.
+
+## A typed error for a refused stored rule
+
+Added 2026-11-22 (Aron: "Yes, please add it to the permissions ticket"). A note for permissions 1.0.
+
+Since 0.26 a row's `permissionRules` or an `additionalRules` entry the gate refuses throws on every check that reaches it. The library throws a plain `Error`, so an app can only recognise it by its message text: template's `rethrowingARefusedStoredRule` (`packages/permissions/src/rebac/storedPermissionRuleRefusedError.ts`) matches "beside the schema's is refused" to answer 409 with how to fix the rule. A reworded message would turn that 409 back into a 500, and only a test would notice.
+
+What the library should give: a typed error (as `PathLimitError` is) carrying the resource, the action, whether the rule came from the row or from `additionalRules`, and the issues. Then the app catches by class, and can say which tenant's rule it was.
+
+Why it matters: a stored rule goes bad after a schema change (a renamed column a tenant's rule reads), and the people who hit it are not the ones who can fix it. The message is the only help they get.
