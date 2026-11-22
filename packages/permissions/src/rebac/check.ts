@@ -20,6 +20,13 @@ const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> 
     : {};
 };
 
+const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> => {
+  const actor = permix.getActor();
+  return actor
+    ? { 'actor:Acting': [{ model: actor.model }], [`actor:${actor.model}`]: [actor.record] }
+    : {};
+};
+
 export const check = (
   permix: Permix,
   schema: RebacSchema,
