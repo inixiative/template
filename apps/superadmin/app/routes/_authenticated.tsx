@@ -7,6 +7,7 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { AppShell, ErrorBoundary, RouteError, Unauthorized } from '@template/ui/components';
 import { redirectToLoginUnlessAuthenticated } from '@template/ui/guards';
+import { MasterDataPreloader } from '@template/ui/lib';
 import { useAppStore } from '@template/ui/store';
 
 const AuthenticatedLayout = () => {
@@ -19,6 +20,7 @@ const AuthenticatedLayout = () => {
 
   return (
     <AppShell lockedContext={true} showSpoofControls={false}>
+      <MasterDataPreloader />
       <ErrorBoundary>
         <Outlet />
       </ErrorBoundary>
