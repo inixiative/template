@@ -4,17 +4,19 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { validateActionRule } from '@inixiative/permissions';
+import { issuesForRuleReadsOutsideLens, validateActionRule } from '@inixiative/permissions';
 import {
   type AccessorName,
   type BindableOwnerModel,
   type ModelName,
   relationsToTenantOnSides,
+  toAccessor,
 } from '@template/db';
 import { schemaMap } from '@template/db/schemaMap';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { ruleAsksStandardActionThroughRelation } from '@template/permissions/rebac/tenantPermissionRules';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
+import type { ActionRule } from '@template/permissions/rebac/types';
 import { z } from 'zod';
 
 const actionRuleBase: z.ZodType = z.lazy(() =>
@@ -50,12 +52,10 @@ export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly 
     .partialRecord(z.enum(allowed as [string, ...string[]]), actionRuleSchema)
     .superRefine((rowRules, ctx) => {
       for (const [action, rule] of Object.entries(rowRules))
-        for (const issue of validateActionRule(rule, {
-          schema: rebacSchema,
-          resource,
-          action,
-          rowRules,
-        }).errors)
+        for (const issue of [
+          ...validateActionRule(rule, { schema: rebacSchema, resource, action, rowRules }).errors,
+          ...issuesForRuleReadsOutsideLens(schemaMap, rebacSchema, resource, rule as ActionRule),
+        ])
           ctx.addIssue({
             code: 'custom',
             path: [action],
@@ -85,10 +85,8 @@ export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) =>
             message: `not something a ${tenantModel} may extend`,
           });
         if (hidden.length) continue;
-        const ownSides = relationsToTenantOnSides(
-          schemaMap.resources[resource] as ModelName,
-          tenantModel,
-        );
+        const model = schemaMap.resources[resource] as ModelName;
+        const ownSides = relationsToTenantOnSides(model, tenantModel);
         const offItsSide = ownSides.length
           ? Object.keys(rules).filter(
               (action) =>
@@ -104,8 +102,7 @@ export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) =>
             message: `a ${tenantModel}'s rule here asks read, operate, manage or own through its own side: ${ownSides.map((relation) => `{ rel: '${relation}', action }`).join(' or ')}`,
           });
         if (offItsSide.length) continue;
-        const model = resource.slice('db:'.length) as AccessorName;
-        const parsed = buildPermissionRulesSchema(model).safeParse(rules);
+        const parsed = buildPermissionRulesSchema(toAccessor(model)).safeParse(rules);
         if (!parsed.success)
           for (const issue of parsed.error.issues)
             ctx.addIssue({

@@ -11,7 +11,10 @@ import {
   isBindableOwnerModel,
 } from '@template/db/registries/polymorphicAxisPointsAt';
 import { type ModelName, modelNames } from '@template/db/utils/modelNames';
-import { namedSideAxesOf, relationToKindOnSide } from '@template/db/utils/polymorphicSides';
+import {
+  axesOtherThanOwnerOf,
+  relationToKindOnAxis,
+} from '@template/db/utils/polymorphicAxesOtherThanOwner';
 
 type Row = Record<string, unknown>;
 
@@ -39,15 +42,18 @@ export const tenantRowsAbove = (record: Row): { model: BindableOwnerModel; row: 
   return user ? [{ model: 'User', row: user }] : [];
 };
 
-/** The relations of a two-sided model that reach a tenant of this kind, one per side that can be one (`sourceOrganization`, `targetOrganization`). */
+/** The relations of a model that reach a tenant of this kind on its axes other than the owner, one per axis that can be one (`sourceOrganization`, `targetOrganization`). */
 export const relationsToTenantOnSides = (
   model: ModelName,
   tenantModel: BindableOwnerModel,
 ): string[] =>
-  namedSideAxesOf(model).flatMap((axis) => relationToKindOnSide(model, axis, tenantModel) ?? []);
+  axesOtherThanOwnerOf(model).flatMap(
+    (axis) => relationToKindOnAxis(model, axis, tenantModel) ?? [],
+  );
 
 /**
- * The tenants on each side of a two-sided record, with the relation that reaches each: the party
+ * The tenants on each side of a record (its axes other than the owner), with the relation that
+ * reaches each: the party
  * when it is itself a user, organization or space, and a space's organization above it. A side
  * that is a member, or something a tenant holds, names none: what is addressed to a member is the
  * member's.
@@ -56,13 +62,13 @@ export const tenantRowsOnSides = (
   model: ModelName,
   record: Row,
 ): { model: BindableOwnerModel; row: Row; relation: string }[] =>
-  namedSideAxesOf(model).flatMap((axis) => {
+  axesOtherThanOwnerOf(model).flatMap((axis) => {
     const party = record[axis.field];
     if (typeof party !== 'string' || !isBindableOwnerModel(party)) return [];
     const tenantModels: BindableOwnerModel[] =
       party === 'Space' ? ['Space', 'Organization'] : [party];
     return tenantModels.flatMap((tenantModel) => {
-      const relation = relationToKindOnSide(model, axis, tenantModel);
+      const relation = relationToKindOnAxis(model, axis, tenantModel);
       const row = relation ? loaded(record[relation]) : undefined;
       return relation && row ? [{ model: tenantModel, row, relation }] : [];
     });

@@ -200,8 +200,8 @@ describe('tenantPermissionRules', () => {
     const response = await asStranger(get(`/api/v1/contact/${contact.id}`));
     expect(response.status).toBe(409);
     const { message } = (await response.json()) as { message: string };
-    expect(message).toContain('columnThatWasRenamed');
     expect(message).toContain('setTenantPermissionRules');
+    expect(message).not.toContain('columnThatWasRenamed');
 
     expect((await open(null)).status).toBe(200);
     expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(403);

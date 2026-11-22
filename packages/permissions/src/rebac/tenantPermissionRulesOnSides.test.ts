@@ -2,9 +2,11 @@ import { describe, expect, it } from 'bun:test';
 import type { HydratedRecord } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import { ActorModel, createPermissions, installPermissions } from '@template/permissions/client';
+import { canGrantEntitlement } from '@template/permissions/rebac/canGrantEntitlement';
 import { check } from '@template/permissions/rebac/check';
 import { tenantPermissionRulesSchema } from '@template/permissions/rebac/permissionRulesSchema';
 import { rebacSchema } from '@template/permissions/rebac/schema';
+import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
 import type { ActionRule } from '@template/permissions/rebac/types';
 import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
 
@@ -164,5 +166,45 @@ describe('a tenant rule on a two-sided record', () => {
     expect(await reads({ o2: 'viewer' }, toSpace)).toBe(true);
     expect(await reads({ o1: 'viewer' }, toSpace)).toBe(false);
     expect(await reads({ o2: 'viewer' }, toMember)).toBe(false);
+  });
+
+  it('a rule that reads what the record does not have is refused on write, on a side and off one', () => {
+    const readsNothingThere = { rule: { field: 'noSuchColumn', operator: 'equals', value: 'x' } };
+    const accepts = (rules: unknown) =>
+      tenantPermissionRulesSchema('Organization').safeParse(rules).success;
+    expect(accepts({ 'db:contact': { read: readsNothingThere } })).toBe(false);
+    expect(
+      accepts({
+        'db:inquiry': { read: { all: [whoeverReads('targetOrganization'), readsNothingThere] } },
+      }),
+    ).toBe(false);
+  });
+
+  it('a stored rule the library refuses is a StoredPermissionRuleRefusedError, from the check and from the grant check', async () => {
+    const refused = receiver({
+      'db:inquiry': {
+        read: {
+          all: [
+            whoeverReads('targetOrganization'),
+            { rule: { field: 'noSuchColumn', operator: 'equals', value: 'x' } },
+          ],
+        },
+      },
+    });
+    const inquiry = between(sender(), refused);
+    await expect(reads({ o2: 'viewer' }, inquiry)).rejects.toBeInstanceOf(
+      StoredPermissionRuleRefusedError,
+    );
+    expect(() =>
+      canGrantEntitlement(
+        createPermissions(),
+        {
+          resource: 'db:inquiry',
+          anchor: { resource: 'db:inquiry', id: 'i1' },
+          actions: { read: true },
+        },
+        inquiry as HydratedRecord,
+      ),
+    ).toThrow(StoredPermissionRuleRefusedError);
   });
 });
