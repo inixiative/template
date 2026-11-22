@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fetchCliVersion, VCR } from '../../packages/shared/src/vcr';
-import { execAsync, execFileAsync, execFileWithInput } from '../utils/exec';
+import { execAsync, execFileWithInput } from '../utils/exec';
 
 export const infisicalSecretArgument = (key: string) => {
   if (!/^[A-Z][A-Z0-9_]*$/.test(key)) throw new Error(`Invalid secret name: ${key}`);

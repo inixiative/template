@@ -29,7 +29,11 @@ describe('VCR', () => {
   describe('capture', () => {
     it('fails closed in default replay mode when cassette is missing', async () => {
       const realFn = mock(async () => ({ visible: 'hi' }));
-      const vcr = new VCR(dir, { service: 'svc', version: () => '1.0.0' }).queue('fetch', 'absent');
+      const vcr = new VCR(dir, {
+        service: 'svc',
+        version: () => '1.0.0',
+        modeEnvVar: '__VCR_TEST_UNSET_MODE__',
+      }).queue('fetch', 'absent');
 
       await expect(vcr.capture('fetch', realFn)).rejects.toThrow('cassette "fetch.absent.json"');
       expect(realFn).not.toHaveBeenCalled();

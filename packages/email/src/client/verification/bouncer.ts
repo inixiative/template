@@ -35,8 +35,8 @@ const toResult = (data: BouncerResponse): VerificationResult => ({
 
 class BouncerVerifierClient implements EmailVerifier {
   // No SDK + no CLI — derive version from the docs page for this specific
-  // endpoint. When their contract changes, the doc updates, the body hash
-  // shifts, cassettes auto-refresh.
+  // endpoint so `assertCassettesFresh` and `VCR_MODE=record` track contract
+  // shifts via the docs body hash.
   readonly vcr = new VCR(FIXTURES_DIR, {
     service: 'bouncer',
     version: () =>

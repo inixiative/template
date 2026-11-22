@@ -21,6 +21,8 @@ if [ -f "$ROOT_DIR/.env.init" ]; then
     set +a
 fi
 
+export ENVIRONMENT="${ENVIRONMENT:-test}"
+
 # Clear fixtures if requested
 if [ "$CLEAR_FIXTURES" = "1" ]; then
     echo "Clearing existing fixtures..."
