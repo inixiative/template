@@ -53,7 +53,7 @@ Every cross-cutting behavior in `template` (soft delete, auditing, polymorphism,
 
 ## Model Capabilities Matrix
 
-Generated from `prismaMap` and the live registries above via `bun scripts/docs/generateModelCapabilities.ts` (verify with `--check`).
+Generated from `prismaMap` and the live registries above via `bun docs/scripts/modelCapabilities.ts` (verify with `--check`).
 
 <!-- capabilities:start -->
 
@@ -128,6 +128,6 @@ Keep registries flat, explicit, and owned by their capability rather than collap
 5. **Keep this directory current:**
    When adding a new capability registry or Prisma model, add its link to the directory table above and run:
    ```bash
-   bun scripts/docs/generateModelCapabilities.ts
+   bun docs/scripts/modelCapabilities.ts
    bun scripts/docs/regenToc.ts docs/claude/MODEL_CAPABILITIES.md
    ```

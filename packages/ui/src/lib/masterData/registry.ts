@@ -10,15 +10,12 @@ import {
   segmentInfoQueryKey,
   webhookSubscriptionInfoQueryKey,
 } from '@template/sdk';
+import type { BatchQueryDescriptor } from '@template/ui/lib/batch/executeBatchQueries';
 
 export const MASTER_DATA_STALE_TIME = Number.POSITIVE_INFINITY;
 export const MASTER_DATA_GC_TIME = Number.POSITIVE_INFINITY;
 
-export type MasterDataEntry = {
-  readonly key: string;
-  readonly path: string;
-  readonly queryKey: readonly unknown[];
-};
+export type MasterDataEntry = BatchQueryDescriptor;
 
 /**
  * Static-per-deploy `/api/v1/<model>/info` catalogs preloaded together on authenticated mount

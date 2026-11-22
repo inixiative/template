@@ -1,11 +1,23 @@
+#!/usr/bin/env bun
 /**
- * @atlas
- * @kind utils
- * @partOf infrastructure:prisma
- * @uses infrastructure:prisma, primitive:authz
+ * Regenerate the Model Capabilities Matrix in `docs/claude/MODEL_CAPABILITIES.md`
+ * from the live Prisma field-map and capability registries.
+ *
+ * Usage:
+ *   bun docs/scripts/modelCapabilities.ts          # write in place
+ *   bun docs/scripts/modelCapabilities.ts --check  # exit 1 if out of date
  */
-import { prismaMap } from '@template/db/generated/prismaMap';
-import { encryptedFieldsByModel } from '@template/db/lib/encryption/registry';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { cacheKeysByModel } from '../../apps/api/src/hooks/cache/constants/cacheKeysByModel';
+import { ImmutableFieldsOverrides } from '../../apps/api/src/hooks/immutableFields/registry';
+import { isRuleReferenceSourceModel } from '../../apps/api/src/hooks/ruleReference/surfaces';
+import { RulesRegistry } from '../../apps/api/src/hooks/rules/registry';
+import { CASCADE_EXEMPT } from '../../apps/api/src/hooks/softDeleteCascade/cascadeExempt';
+import { CLOSE_ON_PARENT_DELETE } from '../../apps/api/src/hooks/softDeleteCascade/closeOnParentDelete';
+import { REGENERATE_ON_REVIVE } from '../../apps/api/src/hooks/softDeleteCascade/regenerateOnRevive';
+import { prismaMap } from '../../packages/db/src/generated/prismaMap.gen';
+import { encryptedFieldsByModel } from '../../packages/db/src/lib/encryption/registry';
 import {
   INTERNAL_FIELDS,
   isAuditEnabled,
@@ -18,16 +30,9 @@ import {
   polymorphismConfigForModel,
   SENSITIVE_FIELDS,
   webhookEnabledModels,
-} from '@template/db/registries';
-import { type ModelName, toAccessor } from '@template/db/utils/modelNames';
-import { rebacSchema } from '@template/permissions/rebac/schema';
-import { cacheKeysByModel } from '#/hooks/cache/constants/cacheKeysByModel';
-import { ImmutableFieldsOverrides } from '#/hooks/immutableFields/registry';
-import { isRuleReferenceSourceModel } from '#/hooks/ruleReference/surfaces';
-import { RulesRegistry } from '#/hooks/rules/registry';
-import { CASCADE_EXEMPT } from '#/hooks/softDeleteCascade/cascadeExempt';
-import { CLOSE_ON_PARENT_DELETE } from '#/hooks/softDeleteCascade/closeOnParentDelete';
-import { REGENERATE_ON_REVIVE } from '#/hooks/softDeleteCascade/regenerateOnRevive';
+} from '../../packages/db/src/registries';
+import { type ModelName, toAccessor } from '../../packages/db/src/utils/modelNames';
+import { rebacSchema } from '../../packages/permissions/src/rebac/schema';
 
 export const CAPABILITIES_START = '<!-- capabilities:start -->';
 export const CAPABILITIES_END = '<!-- capabilities:end -->';
@@ -144,3 +149,27 @@ export const replaceCapabilitiesBlock = (markdown: string, table: string): strin
   const after = markdown.slice(endIdx);
   return `${before}\n\n${table}\n\n${after}`;
 };
+
+if (import.meta.main) {
+  const checkOnly = process.argv.includes('--check');
+  const repoRoot = resolve(import.meta.dir, '../..');
+  const targetPath = resolve(repoRoot, 'docs/claude/MODEL_CAPABILITIES.md');
+  const current = readFileSync(targetPath, 'utf8');
+  const table = renderModelCapabilitiesTable(buildModelCapabilitiesRows());
+  const next = replaceCapabilitiesBlock(current, table);
+
+  if (checkOnly) {
+    if (current !== next) {
+      console.error(
+        'docs/claude/MODEL_CAPABILITIES.md is out of date. Run: bun docs/scripts/modelCapabilities.ts',
+      );
+      process.exit(1);
+    }
+    console.log('docs/claude/MODEL_CAPABILITIES.md is up to date.');
+  } else if (current !== next) {
+    writeFileSync(targetPath, next, 'utf8');
+    console.log('Updated docs/claude/MODEL_CAPABILITIES.md');
+  } else {
+    console.log('docs/claude/MODEL_CAPABILITIES.md unchanged.');
+  }
+}

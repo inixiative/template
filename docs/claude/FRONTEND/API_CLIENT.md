@@ -21,7 +21,7 @@
 - [Form Helpers](#form-helpers)
   - [useDebounce](#usedebounce)
   - [useValidateUniqueness](#usevalidateuniqueness)
-  - [Master-Data Preloading (`MasterDataPreloader`)](#master-data-preloading-masterdatapreloader)
+  - [Batch Query Transport & Master-Data Preloading (`executeBatchQueries`, `MasterDataPreloader`)](#batch-query-transport--master-data-preloading-executebatchqueries-masterdatapreloader)
 - [Testing](#testing)
 - [Key Files](#key-files)
 
@@ -332,11 +332,13 @@ const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug'
 
 `CreateOrganizationModal` combines both: it derives the slug from the name until edited, debounces it, and shows checking / available / taken.
 
-### Master-Data Preloading (`MasterDataPreloader`)
+### Batch Query Transport & Master-Data Preloading (`executeBatchQueries`, `MasterDataPreloader`)
 
-**Location:** `packages/ui/src/lib/masterData/` (`registry.ts`, `preloadMasterData.ts`, `useMasterData.ts`)
+**Location:** `packages/ui/src/lib/batch/executeBatchQueries.ts` and `packages/ui/src/lib/masterData/` (`registry.ts`, `preloadMasterData.ts`, `useMasterData.ts`)
 
-Static-per-deploy `/api/v1/<model>/info` catalogs declared in `MASTER_DATA_ENTRIES` (`contact`, `inquiry`, `segment`, `webhookSubscription`, with a `TEMPLATE ABOVE` extension marker) are preloaded once on authenticated mount via a single `POST /api/v1/batch/execute` call (`strategy: 'allowFailures'`). Each catalog is seeded into its own SDK React Query key with infinite `staleTime` and `gcTime`, and each reader hook (`useContactInfo`, `useInquiryInfo`, `useSegmentInfo`, `useWebhookSubscriptionInfo`) awaits an in-flight preload before falling back to its individual `GET /api/v1/<model>/info` endpoint on cache miss or partial failure.
+`executeBatchQueries(queryClient, entries, options)` is the shared React Query batch transport over `POST /api/v1/batch/execute` (`strategy: 'allowFailures'`). Each entry keeps its own SDK `queryKey` and fallback `apiQuery` fetch function; successful sub-responses (`{ data: object | array }`) are seeded directly into their individual React Query cache keys while failed entries stay unseeded for normal hook fallback (reusable for master-data preloading and summary/dashboard batching boundaries).
+
+Static-per-deploy `/api/v1/<model>/info` catalogs declared in `MASTER_DATA_ENTRIES` (`contact`, `inquiry`, `segment`, `webhookSubscription`, with a `TEMPLATE ABOVE` extension marker) use `executeBatchQueries` via `preloadMasterData` once on authenticated mount with infinite `staleTime` and `gcTime`. Each reader hook (`useContactInfo`, `useInquiryInfo`, `useSegmentInfo`, `useWebhookSubscriptionInfo`) awaits an in-flight preload before falling back to its individual `GET /api/v1/<model>/info` endpoint on cache miss, partial failure, or anonymous access.
 
 Mount `<MasterDataPreloader />` as a sibling before `<Outlet />` inside authenticated layouts (`apps/{web,admin,superadmin}/app/routes/_authenticated.tsx`).
 
@@ -354,6 +356,7 @@ Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `quer
 
 - `packages/sdk/src/` — generated client
 - `packages/ui/src/lib/{apiQuery,apiMutation,makeAuthenticatedApiFetch,makeContextQueries,queryCapabilitiesFromOpenApi}.ts`
+- `packages/ui/src/lib/batch/executeBatchQueries.ts`
 - `packages/ui/src/lib/masterData/{registry,preloadMasterData,useMasterData}.ts`
 - `packages/ui/src/hooks/useOptimisticMutation.ts`
 - `packages/ui/src/hooks/{useListSearchFilterAndOrderState,usePaginatedData,useInfiniteData,useInfiniteDataQuery,useInfiniteScrollTrigger,useScrollState,useSectionHash}.ts`

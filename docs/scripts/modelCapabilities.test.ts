@@ -7,9 +7,9 @@ import {
   CAPABILITIES_START,
   renderModelCapabilitiesTable,
   replaceCapabilitiesBlock,
-} from '#/hooks/modelCapabilitiesDoc';
+} from './modelCapabilities';
 
-describe('generateModelCapabilities', () => {
+describe('modelCapabilities', () => {
   it('builds sorted rows covering core models and their real registries', () => {
     const rows = buildModelCapabilitiesRows();
     const byModel = new Map(rows.map((row) => [row.model, row]));
@@ -57,7 +57,7 @@ describe('generateModelCapabilities', () => {
   });
 
   it('keeps docs/claude/MODEL_CAPABILITIES.md in sync with the live registries', () => {
-    const repoRoot = resolve(import.meta.dir, '../../../..');
+    const repoRoot = resolve(import.meta.dir, '../..');
     const docPath = resolve(repoRoot, 'docs/claude/MODEL_CAPABILITIES.md');
     const committed = readFileSync(docPath, 'utf8');
     const expected = replaceCapabilitiesBlock(
@@ -66,7 +66,7 @@ describe('generateModelCapabilities', () => {
     );
     if (committed !== expected) {
       throw new Error(
-        'docs/claude/MODEL_CAPABILITIES.md is out of date. Run: bun scripts/docs/generateModelCapabilities.ts',
+        'docs/claude/MODEL_CAPABILITIES.md is out of date. Run: bun docs/scripts/modelCapabilities.ts',
       );
     }
     expect(committed).toBe(expected);

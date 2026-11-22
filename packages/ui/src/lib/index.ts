@@ -1,5 +1,6 @@
 export * from './apiQuery';
 export * from './auth';
+export * from './batch';
 export * from './buildBreadcrumbs';
 export * from './buildFilterQuery';
 export * from './dataStatePersistence';
