@@ -13,6 +13,8 @@ export * from './OrganizationSpacesPage';
 export * from './OrganizationsPage';
 export * from './OrganizationUsersPage';
 export * from './ProfilePage';
+export * from './ProjectDetailPage';
+export * from './ProjectsPage';
 export * from './SegmentsPage';
 export * from './SignUpPage';
 export * from './SpaceProfilePage';

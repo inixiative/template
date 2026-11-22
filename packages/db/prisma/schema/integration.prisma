@@ -41,6 +41,8 @@ model Integration {
   auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectIntegration")
   integrationRecords   IntegrationRecord[]
   integrationResources IntegrationResource[]
+  projectIntegrations  ProjectIntegration[]
+  settings             Setting[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

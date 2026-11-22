@@ -220,6 +220,8 @@ export const PolymorphismRegistry = {
           WebhookSubscription: ['targetWebhookSubscriptionId'],
           IntegrationResource: ['targetIntegrationResourceId'],
           ProjectIntegrationResource: ['targetProjectIntegrationResourceId'],
+          Setting: ['targetSettingId'],
+          ProjectIntegration: ['targetProjectIntegrationId'],
         },
       },
     ],
@@ -248,6 +250,8 @@ export const PolymorphismRegistry = {
           WebhookSubscription: ['sourceWebhookSubscriptionId'],
           IntegrationResource: ['sourceIntegrationResourceId'],
           ProjectIntegrationResource: ['sourceProjectIntegrationResourceId'],
+          Setting: ['sourceSettingId'],
+          ProjectIntegration: ['sourceProjectIntegrationId'],
         },
       },
       {
@@ -361,6 +365,27 @@ export const PolymorphismRegistry = {
           Project: ['subjectProjectId'],
           IntegrationResource: ['subjectIntegrationResourceId'],
           ProjectIntegrationResource: ['subjectProjectIntegrationResourceId'],
+          Setting: ['subjectSettingId'],
+          ProjectIntegration: ['subjectProjectIntegrationId'],
+        },
+      },
+    ],
+  },
+
+  Setting: {
+    axes: [
+      {
+        field: 'resourceModel',
+        dualPolymorphismId: 'resourceId',
+        fkMap: {
+          User: ['resourceUserId'],
+          Organization: ['resourceOrganizationId'],
+          OrganizationUser: ['resourceOrganizationId', 'resourceUserId'],
+          Space: ['resourceOrganizationId', 'resourceSpaceId'],
+          SpaceUser: ['resourceOrganizationId', 'resourceSpaceId', 'resourceUserId'],
+          Project: ['resourceProjectId'],
+          Integration: ['resourceIntegrationId'],
+          ProjectIntegration: ['resourceProjectIntegrationId'],
         },
       },
     ],

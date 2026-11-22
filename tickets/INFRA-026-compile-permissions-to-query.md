@@ -81,3 +81,19 @@ Why it has not been needed: permissions walk up, so "some member of some team of
 - **AUTH-008**, **COMM-005**, **FEAT-008** — the consumers.
 - **INFRA-025** — compile json-rules' relative operators to the query layer; same "compile more, degrade at the bridge" theme and the same degradation boundary.
 - **`@inixiative/permissions`** — the algebra being compiled.
+
+## Tenant permission rules make the predicate differ per tenant
+
+Added 2026-11-21 (Aron, reviewing template #315: "This is going to be very hard to reflect, isn't it? We should make a note to the reflection tool that this is going to be a complication that's actually really challenging."). A note, not a plan.
+
+Everything above compiles rules that are known when the query is built: the schema's rules and the actor. Tenant permission rules (`docs/claude/PERMISSIONS.md` § Tenant Rules) are stored on the User, Organization and Space rows, and `check()` ORs them in at every row a walk passes through. So the rule for `contact.read` is not one rule; it is the schema's rule OR whatever the record's own organization and space have stored, and those are only known once you know which tenant the row is under.
+
+What that does to each part:
+
+- **One list inside one tenant** (the common case: an organization's contacts) is fine. Load that tenant's rows first, cut their rules by the lens (`actionsTenantMayExtend`), and compile them as extra `OR` branches.
+- **A list across tenants** (a user's records over all their organizations, a superadmin list) needs one branch per tenant: `organizationId = X AND (X's rules)`. The predicate grows with the number of tenants that have stored rules, and the tenants have to be found before the query is built.
+- **Relation walks.** A `{ rel, action }` walk consults the tenant rules of the row it lands on, not only of the starting record. A nested relation filter cannot read a JSON column of the far row and compile it mid-query, so every tenant the walk could land in has to be loaded and compiled ahead.
+- **The reverse question** ("who can read this record?") has to include whoever the record's tenants' rules admit, on top of roles and entitlements.
+- **Caching the compiled predicate** now depends on the tenant rows: a write to `tenantPermissionRules` has to clear it.
+
+Possible routes, none chosen: compile per tenant and `OR` the branches where the tenant set is small and known; fall back to `check()` per row for a tenant that has stored rules (as bridges do); or materialise a tenant's rules into rows the query can join.

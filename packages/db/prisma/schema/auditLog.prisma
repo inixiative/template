@@ -84,6 +84,10 @@ model AuditLog {
   subjectIntegrationResource    IntegrationResource?  @relation("AuditLogSubjectIntegrationResource", fields: [subjectIntegrationResourceId], references: [id], onDelete: SetNull)
   subjectProjectIntegrationResourceId String?                     @db.VarChar(36)
   subjectProjectIntegrationResource   ProjectIntegrationResource? @relation("AuditLogSubjectProjectIntegrationResource", fields: [subjectProjectIntegrationResourceId], references: [id], onDelete: SetNull)
+  subjectSettingId              String?               @db.VarChar(36)
+  subjectSetting                Setting?              @relation("AuditLogSubjectSetting", fields: [subjectSettingId], references: [id], onDelete: SetNull)
+  subjectProjectIntegrationId   String?               @db.VarChar(36)
+  subjectProjectIntegration     ProjectIntegration?   @relation("AuditLogSubjectProjectIntegration", fields: [subjectProjectIntegrationId], references: [id], onDelete: SetNull)
   // Composite FKs
   subjectOrganizationUser       OrganizationUser?     @relation("AuditLogSubjectOrganizationUser", fields: [subjectOrganizationId, subjectUserId], references: [organizationId, userId], onDelete: SetNull)
   subjectSpaceUser              SpaceUser?            @relation("AuditLogSubjectSpaceUser", fields: [subjectOrganizationId, subjectSpaceId, subjectUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
@@ -127,6 +131,8 @@ model AuditLog {
   @@index([subjectProjectId])
   @@index([subjectIntegrationResourceId])
   @@index([subjectProjectIntegrationResourceId])
+  @@index([subjectSettingId])
+  @@index([subjectProjectIntegrationId])
 }
 
 enum AuditAction {
@@ -157,4 +163,6 @@ enum AuditSubjectModel {
   Project
   IntegrationResource
   ProjectIntegrationResource
+  Setting
+  ProjectIntegration
 }

@@ -35,6 +35,15 @@ export const transferSpaceService: InquiryService<
     await validateSpaceSlugFree({ organizationId, slug });
 
     const transferredAt = new Date();
+    // Tombstone any ProjectIntegration linking a project in this space to an integration outside
+    // this space (e.g. an Org A integration that does not travel with the space).
+    await db.projectIntegration.updateManyAndReturn({
+      where: {
+        project: { spaceId },
+        OR: [{ integration: { spaceId: null } }, { integration: { spaceId: { not: spaceId } } }],
+      },
+      data: { deletedAt: transferredAt },
+    });
     await db.spaceUser.updateManyAndReturn({
       where: {
         spaceId,

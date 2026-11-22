@@ -22,6 +22,7 @@ import {
   rowIsThereAnd,
   tokenAdministering,
 } from '@template/permissions/rebac/rebacSchemaRules';
+import { settingResourcePermission } from '@template/permissions/rebac/settingResourcePermission';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 import { omit } from 'lodash-es';
 
@@ -118,6 +119,25 @@ export const rebacSchema: RebacSchema = {
       },
     },
     'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
+    'db:projectIntegration': {
+      actions: {
+        create: {
+          all: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integration', action: 'operate' },
+          ],
+        },
+        manage: { rel: 'project', action: 'manage' },
+        operate: { any: ['manage', { rel: 'project', action: 'operate' }] },
+        read: { any: ['operate', { rel: 'project', action: 'read' }] },
+        delete: {
+          any: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integration', action: 'manage' },
+          ],
+        },
+      },
+    },
     'db:projectIntegrationResource': {
       actions: {
         create: {
@@ -142,6 +162,7 @@ export const rebacSchema: RebacSchema = {
         read: { rel: 'project', action: 'read' },
       },
     },
+    'db:setting': settingResourcePermission,
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:organizationUser': { actions: memberRowActions('organization') },

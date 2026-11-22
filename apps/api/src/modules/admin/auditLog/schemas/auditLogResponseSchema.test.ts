@@ -41,6 +41,8 @@ const baseAuditLog = {
   subjectProjectId: null,
   subjectIntegrationResourceId: null,
   subjectProjectIntegrationResourceId: null,
+  subjectSettingId: null,
+  subjectProjectIntegrationId: null,
   componentVersions: null,
   actorUser: null,
   actorSpoofUser: null,

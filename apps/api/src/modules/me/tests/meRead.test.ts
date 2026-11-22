@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import { db } from '@template/db';
-import { buildUser, cleanupTouchedTables } from '@template/db/test';
+import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import type { meReadRoute } from '#/modules/me/routes/meRead';
 import { createTestApp } from '#tests/createTestApp';
@@ -15,10 +15,10 @@ type MeReadResponse = z.infer<typeof meReadRoute.responseSchema>;
 
 describe('GET /me', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
-  let mockUser: Awaited<ReturnType<typeof buildUser>>['entity'];
+  let mockUser: Awaited<ReturnType<typeof createUser>>['entity'];
 
   beforeAll(async () => {
-    const { entity } = await buildUser();
+    const { entity } = await createUser();
     mockUser = entity;
 
     const harness = createTestApp({

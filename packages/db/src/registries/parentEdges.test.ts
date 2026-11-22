@@ -23,11 +23,25 @@ describe('parent edges', () => {
     expect(parentOf('Token', { id: 't-1', organizationId: 'o-1' })).toBeNull();
   });
 
+  it('a setting names its resource as its parent, by its dual polymorphism id', () => {
+    expect(
+      parentOf('Setting', {
+        resourceModel: 'OrganizationUser',
+        resourceId: 'ou-1',
+        resourceOrganizationId: 'o-1',
+        resourceUserId: 'u-1',
+      }),
+    ).toEqual({ model: 'OrganizationUser', id: 'ou-1' });
+  });
+
   it('a record finds its children by the edge that reaches its model', () => {
     expect(childrenOf({ model: 'Token', id: 't-1' })).toEqual([
       { child: 'Entitlement', where: { targetModel: 'Token', targetId: 't-1' } },
     ]);
-    expect(childrenOf({ model: 'Organization', id: 'o-1' })).toEqual([]);
+    expect(childrenOf({ model: 'Organization', id: 'o-1' })).toEqual([
+      { child: 'Setting', where: { resourceModel: 'Organization', resourceId: 'o-1' } },
+    ]);
+    expect(childrenOf({ model: 'Contact', id: 'c-1' })).toEqual([]);
   });
 
   it('a foreign-key edge points at one model by one column', () => {

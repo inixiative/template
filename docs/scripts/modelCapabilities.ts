@@ -17,6 +17,7 @@ import { CASCADE_EXEMPT } from '../../apps/api/src/hooks/softDeleteCascade/casca
 import { CLOSE_ON_PARENT_DELETE } from '../../apps/api/src/hooks/softDeleteCascade/closeOnParentDelete';
 import { REGENERATE_ON_REVIVE } from '../../apps/api/src/hooks/softDeleteCascade/regenerateOnRevive';
 import { prismaMap } from '../../packages/db/src/generated/prismaMap.gen';
+import { attributeFieldsByModel } from '../../packages/db/src/lib/attributes/registry';
 import { encryptedFieldsByModel } from '../../packages/db/src/lib/encryption/registry';
 import {
   INTERNAL_FIELDS,
@@ -43,6 +44,7 @@ export type ModelCapabilitiesRow = {
   audit: boolean;
   polymorphicAxes: string[];
   parentEdge: string;
+  attribute: boolean;
   encrypted: boolean;
   orderedList: boolean;
   fieldPolicies: string[];
@@ -71,6 +73,7 @@ const formatParentEdge = (model: ModelName): string => {
 };
 
 export const buildModelCapabilitiesRows = (): ModelCapabilitiesRow[] => {
+  const attributes = attributeFieldsByModel();
   const encrypted = encryptedFieldsByModel();
   const webhookSet = new Set<string>(webhookEnabledModels);
   const rebacResources = rebacSchema.permissions as Record<string, unknown>;
@@ -92,6 +95,7 @@ export const buildModelCapabilitiesRows = (): ModelCapabilitiesRow[] => {
       audit: isAuditEnabled(model),
       polymorphicAxes,
       parentEdge: formatParentEdge(model),
+      attribute: (attributes[model]?.length ?? 0) > 0,
       encrypted: (encrypted[model]?.length ?? 0) > 0,
       orderedList: Object.hasOwn(orderedListRegistry, model),
       fieldPolicies,
@@ -108,8 +112,8 @@ const yesNo = (value: boolean): string => (value ? 'yes' : '-');
 
 export const renderModelCapabilitiesTable = (rows: readonly ModelCapabilitiesRow[]): string => {
   const header = [
-    '| Model | Delete lifecycle | Audit | Polymorphic axes | Parent edge | Encrypted | Ordered list | Field policies | Write rules | Rule ref source | Cached | Webhook | ReBAC |',
-    '|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+    '| Model | Delete lifecycle | Audit | Polymorphic axes | Parent edge | Attribute | Encrypted | Ordered list | Field policies | Write rules | Rule ref source | Cached | Webhook | ReBAC |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
   ];
 
   const lines = rows.map((row) =>
@@ -119,6 +123,7 @@ export const renderModelCapabilitiesTable = (rows: readonly ModelCapabilitiesRow
       yesNo(row.audit),
       row.polymorphicAxes.length ? row.polymorphicAxes.join(', ') : '-',
       row.parentEdge,
+      yesNo(row.attribute),
       yesNo(row.encrypted),
       yesNo(row.orderedList),
       row.fieldPolicies.length ? row.fieldPolicies.join(', ') : '-',

@@ -3,7 +3,7 @@
  * @kind registry
  * @uses infrastructure:prisma
  */
-import { type ModelName, relationsOfModel } from '@template/db';
+import { ATTRIBUTE_MODELS, type ModelName, relationsOfModel, toModelName } from '@template/db';
 import { polymorphismImmutableFields } from '#/hooks/falsePolymorphism/toImmutableFields';
 
 // Fields that should never be modified on any model
@@ -15,7 +15,7 @@ type ImmutableFieldsOverride = {
   refuse?: string[];
 };
 
-export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
+const baseImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
   ...polymorphismImmutableFields,
   Space: { exclude: ['organizationId'] },
   // A changed entitlement is a removed row and a new one; only its tombstones move.
@@ -34,6 +34,9 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
     ...polymorphismImmutableFields.Tag,
     refuse: [...(polymorphismImmutableFields.Tag?.refuse ?? []), 'tagCategoryId'],
   },
+  ProjectIntegration: {
+    refuse: ['projectId', 'integrationId'],
+  },
   CommunicationLog: {
     ...polymorphismImmutableFields.CommunicationLog,
     exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],
@@ -42,6 +45,28 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
     ...polymorphismImmutableFields.WebhookSubscription,
     include: [...(polymorphismImmutableFields.WebhookSubscription?.include ?? []), 'resourceModel'],
   },
+};
+
+export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
+  ...baseImmutableFieldsOverrides,
+  ...Object.fromEntries(
+    Object.entries(ATTRIBUTE_MODELS).map(([accessor, config]) => {
+      const modelName = toModelName(accessor);
+      const existing = baseImmutableFieldsOverrides[modelName];
+      return [
+        modelName,
+        {
+          ...existing,
+          refuse: [
+            ...new Set([
+              ...(existing?.refuse ?? []),
+              ...(config.locatorField ? [config.locatorField] : []),
+            ]),
+          ],
+        },
+      ];
+    }),
+  ),
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {

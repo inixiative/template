@@ -10,6 +10,11 @@ model User {
   updatedAt            DateTime        @updatedAt
   deletedAt            DateTime?
 
+  // The tenant's own additions to the permission schema for the records under it.
+  // Shape: Record<Resource, Record<Action, ActionRule>> ('db:contact' → read → rule). check() ORs each
+  // rule with the schema's for that resource and action. Null = schema-only.
+  tenantPermissionRules Json?
+
   email         String  @unique
   emailVerified Boolean @default(false)
   name          String?
@@ -51,6 +56,7 @@ model User {
   communicationsReceived          CommunicationLog[]     @relation("CommunicationRecipientUser")
   segments                        Segment[]
   flows                           Flow[]
+  settings                        Setting[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

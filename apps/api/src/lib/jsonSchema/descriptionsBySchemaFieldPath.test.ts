@@ -3,12 +3,14 @@ import { descriptionsBySchemaFieldPath } from '#/lib/jsonSchema/descriptionsBySc
 import { contactInfoResponseSchema } from '#/modules/contact/schemas/contactInfoResponseSchema';
 import { inquiryInfoResponseSchema } from '#/modules/inquiry/schemas/inquiryInfoResponseSchema';
 import { segmentInfoResponseSchema } from '#/modules/segment/schemas/segmentInfoResponseSchema';
+import { settingInfoResponseSchema } from '#/modules/setting/schemas/settingInfoResponseSchema';
 import { webhookSubscriptionInfoResponseSchema } from '#/modules/webhookSubscription/schemas/webhookSubscriptionInfoResponseSchema';
 
 const infoResponseSchemas = {
   contact: contactInfoResponseSchema,
   inquiry: inquiryInfoResponseSchema,
   segment: segmentInfoResponseSchema,
+  setting: settingInfoResponseSchema,
   webhookSubscription: webhookSubscriptionInfoResponseSchema,
 };
 

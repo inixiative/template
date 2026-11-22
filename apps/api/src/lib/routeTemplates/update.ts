@@ -12,7 +12,9 @@ import {
   buildOperationId,
   buildRequest,
   buildResponses,
+  buildRoutePath,
   buildTags,
+  hasIdParam,
   prepareMiddleware,
 } from '#/lib/routeTemplates/utils';
 
@@ -23,6 +25,7 @@ export const updateRoute = <const T extends RouteArgs>(args: T) => {
     action,
     description,
     skipId = false,
+    many = false,
     middleware = [],
     admin = false,
     internal = false,
@@ -31,20 +34,30 @@ export const updateRoute = <const T extends RouteArgs>(args: T) => {
   } = args;
 
   const resourceName = submodel || model;
-  const routePath = skipId ? (action ? `/${action}` : '/') : action ? `/{id}/${action}` : '/{id}';
+  const routePath = buildRoutePath({ submodel, action, skipId, many, operation: 'update' });
   const routeTags = buildTags({ model, submodel, tags, admin, internal });
+  const skipResource = !hasIdParam(skipId, submodel, many);
 
   const route = createRoute({
     ...routeArgs,
     model,
     submodel,
-    operationId: buildOperationId({ action: 'update', model, submodel, admin, internal }),
+    operationId: buildOperationId({
+      action: action ?? 'update',
+      model,
+      submodel,
+      many,
+      admin,
+      internal,
+    }),
     method: 'patch',
     path: routePath,
     tags: routeTags,
     security: securityForRoute(args),
-    description: description ?? `Updates an existing ${resourceName}.`,
-    middleware: prepareMiddleware(args, { skipId: skipId, route: (): RouteConfig => route }),
+    description:
+      description ??
+      (many ? `Updates ${resourceName} rows.` : `Updates an existing ${resourceName}.`),
+    middleware: prepareMiddleware(args, { skipId: skipResource, route: (): RouteConfig => route }),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });

@@ -885,6 +885,7 @@ Schema-level configuration in `packages/db/src/registries/`:
 | Registry | Purpose | Used By |
 |----------|---------|---------|
 | `PolymorphismRegistry` | Axis value → required FK columns | Constraints, validation hooks, immutable fields, the helpers below |
+| `ATTRIBUTE_MODELS` | 5-column typed Attribute models (`packages/db/src/lib/attributes/registry.ts`) | `validateAttributeModels`, `registerAttributeValidationHook`, typed codec/operators, immutable `locatorField` ([SETTINGS.md](SETTINGS.md)) |
 
 | Helper (`@template/db`) | Derives |
 |---|---|
@@ -948,6 +949,8 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic over `ProviderModel`) named set of its customer relationships. Every segment has json-rules `conditions` over the segment lens; `static` is computed when created or its conditions change, `dynamic` is recomputed continuously by the reconcile jobs. A hand-picked audience is a static segment whose rule is `id in [...]`. Members are written only by reconcile, and soft-deleted: a member that leaves is tombstoned and one that comes back is revived. See [SEGMENTS.md](SEGMENTS.md) for rules, reconciliation, API routes and the Owned/Memberships pages
 - `flow.prisma` - `Flow`: one user's short-lived walk through a registered flow (`flowKey`, resolved `steps`, optional `returnUrl`); deleted after 15 idle minutes. See [FLOWS.md](FLOWS.md)
 - `contact.prisma` - Unified contact-info entries (phone/email/social handles), false-polymorphic owner (User/Organization/Space), per-type validation registry, per-owner uniqueness on `(ownerModel, …, type, valueKey)`, optional row-level `permissionRules` for sharing
+- `setting.prisma` - `Setting`: dual-polymorphic typed key/value settings across `User`, `Organization`, `Space`, `OrganizationUser`, `SpaceUser`, `Project`, `Integration`, and `ProjectIntegration`, backed by the reusable 5-column Attribute model capability (`ATTRIBUTE_MODELS`), code-first `SETTING_DEFINITIONS`, Postgres `GIN` index on `valueJson`, and per-key compiled ReBAC (`settingResourcePermission`). See [SETTINGS.md](SETTINGS.md)
+- `projectIntegration.prisma` - `ProjectIntegration`: links a `Project` to an `Integration` within the same tenant boundary (`projectIntegrationOwner` hook + cross-org space transfer tombstoning), parent-edged to `Project`, audited and soft-deleted. See [SETTINGS.md](SETTINGS.md)
 
 **Communications:**
 - See [COMMUNICATIONS.md](COMMUNICATIONS.md#database-models) for email template models

@@ -11,6 +11,8 @@
     "./generated/client/models": "./src/generated/client/models.ts",
     "./generated/client/enums": "./src/generated/client/enums.ts",
     "./generated/zod/scalarSchemas.gen": "./src/generated/zod/scalarSchemas.gen.ts",
+    "./lib/attributes": "./src/lib/attributes/index.ts",
+    "./lib/attributes/*": "./src/lib/attributes/*",
     "./lib/auditActorContext": "./src/lib/auditActorContext.ts",
     "./lib/encryption/*": "./src/lib/encryption/*",
     "./test": "./src/test/index.ts",

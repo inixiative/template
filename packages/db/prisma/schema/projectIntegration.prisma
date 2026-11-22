@@ -1,0 +1,32 @@
+// ============================================================================
+// PROJECT INTEGRATION - Links a Project to an Integration within the same tenant
+// ============================================================================
+// Tenant-boundary integrity (same organization / user / space) is enforced by
+// the `projectIntegrationOwner` DB hook (`apps/api/src/hooks/projectIntegrationOwner/hook.ts`),
+// and cross-org space transfers tombstone stale links in `transferSpaceService`.
+
+model ProjectIntegration {
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+
+  projectId     String @db.VarChar(36)
+  integrationId String @db.VarChar(36)
+
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  settings           Setting[]
+  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProjectIntegration")
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([projectId, integrationId], where: raw("\"deletedAt\" IS NULL"), map: "ProjectIntegration_project_integration_key")
+  @@index([projectId])
+  @@index([integrationId])
+}

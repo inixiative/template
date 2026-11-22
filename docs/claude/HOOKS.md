@@ -119,6 +119,7 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 
 | Hook | Purpose |
 |------|---------|
+| `attributes` | Enforces the 5-column Attribute write invariant, definition schema, and canonical sorted `multiSelect` deduplication on every model in `ATTRIBUTE_MODELS` (`registerAttributeValidationHook`, `packages/db/src/lib/attributes/hook.ts`; skips tombstone-only `{ deletedAt }` updates; see [SETTINGS.md](SETTINGS.md)) |
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
 | `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
@@ -128,6 +129,7 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `memberSelfGrant` | After an `OrganizationUser` or `SpaceUser` is created (`create`, `createManyAndReturn`, an `upsert` that creates), writes its self-grant as an `Entitlement` row, tombstoned with the member's own `deletedAt` when the member is created tombstoned. `memberSelfGrant:kept` refuses (422) tombstoning a live member's self-grant; only the member's own tombstone takes it ([PERMISSIONS.md](PERMISSIONS.md#the-member-self-grant)) |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
+| `projectIntegrationOwner` | Enforces tenant-boundary ownership (same organization, same user for personal, same space for space-scoped integrations) on `ProjectIntegration` creates and upserts (`apps/api/src/hooks/projectIntegrationOwner/hook.ts`) |
 | `ruleReference` | Keeps `RuleReference` edges in step with each rule-bearing column (`RULE_REFERENCE_SURFACES`, `apps/api/src/hooks/ruleReference/surfaces.ts`: email templates and components, segment `conditions`, `Entitlement.where` read through `entitlementWhereLens`, which names the entitled record by id) |
 | `ruleReference:target` | Copies a named row's `deletedAt` onto the edges that name it, for every edge in `NAMING_EDGES` (`targetHook.ts`): `RuleReference.targetDeletedAt` and `Entitlement.sourceDeletedAt`. A purged row is left to the null FK |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
@@ -292,7 +294,7 @@ instead of tripping the circuit. A rejection is an `error` event with `httpStatu
 Other failures such as redirects, 401, 403 or 429 do not count, and neither do `unreachable` or
 `retrying`. When a record has 3 rejections since its own last
 success, and some other record has delivered since the first of them, `poisonIntegrationRecord`
-stamps `IntegrationRecord.poisonedAt`. `isIntegrationRecordPoisoned({ integrationId, recordModel, resourceId })`
+stamps `IntegrationRecord.poisonedAt`. `isIntegrationRecordPoisoned({ integrationId, recordModel, recordId })`
 (`apps/api/src/modules/integration/services/isIntegrationRecordPoisoned.ts`) is the check: `sendWebhook`
 calls it first, and later deliveries of that record are skipped before signing,
 with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp yet. See

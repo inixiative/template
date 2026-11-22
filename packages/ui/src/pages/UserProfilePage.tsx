@@ -7,8 +7,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { meRead, meReadQueryKey } from '@template/sdk';
 import { Page } from '@template/ui/components';
-import { ChangePasswordCard, ProfileFormCard } from '@template/ui/components/settings';
+import {
+  ChangePasswordCard,
+  ProfileFormCard,
+  ResourceSettingsSection,
+} from '@template/ui/components/settings';
 import { apiQuery } from '@template/ui/lib/apiQuery';
+import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
+
+const personalContext: AuthenticatedContext = { type: 'user' };
 
 export const UserProfilePage = () => {
   const { data, isLoading } = useQuery({
@@ -30,6 +37,7 @@ export const UserProfilePage = () => {
             readOnlyMessage="User profile editing coming soon"
             showThemeSelector
           />
+          <ResourceSettingsSection context={personalContext} category="general" />
           <ChangePasswordCard />
         </div>
       )}

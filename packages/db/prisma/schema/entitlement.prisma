@@ -45,6 +45,8 @@ model Entitlement {
   sourceWebhookSubscriptionId String?                  @db.VarChar(36)
   sourceIntegrationResourceId        String? @db.VarChar(36)
   sourceProjectIntegrationResourceId String? @db.VarChar(36)
+  sourceSettingId             String?                  @db.VarChar(36)
+  sourceProjectIntegrationId  String?                  @db.VarChar(36)
 
   targetModel              EntitlementTargetModel
   targetId                 String                 @db.VarChar(36)
@@ -72,6 +74,8 @@ model Entitlement {
   sourceWebhookSubscription WebhookSubscription? @relation("EntitlementSource", fields: [sourceWebhookSubscriptionId], references: [id], onDelete: SetNull)
   sourceIntegrationResource        IntegrationResource?        @relation("EntitlementSource", fields: [sourceIntegrationResourceId], references: [id], onDelete: SetNull)
   sourceProjectIntegrationResource ProjectIntegrationResource? @relation("EntitlementSource", fields: [sourceProjectIntegrationResourceId], references: [id], onDelete: SetNull)
+  sourceSetting             Setting?             @relation("EntitlementSource", fields: [sourceSettingId], references: [id], onDelete: SetNull)
+  sourceProjectIntegration  ProjectIntegration?  @relation("EntitlementSource", fields: [sourceProjectIntegrationId], references: [id], onDelete: SetNull)
 
   targetToken            Token?            @relation("EntitlementTarget", fields: [targetTokenId], references: [id], onDelete: Cascade)
   targetIntegration      Integration?      @relation("EntitlementTarget", fields: [targetIntegrationId], references: [id], onDelete: Cascade)
@@ -105,6 +109,8 @@ model Entitlement {
   @@index([sourceWebhookSubscriptionId])
   @@index([sourceIntegrationResourceId])
   @@index([sourceProjectIntegrationResourceId])
+  @@index([sourceSettingId])
+  @@index([sourceProjectIntegrationId])
   @@index([targetTokenId])
   @@index([targetIntegrationId])
   @@index([targetOrganizationId, targetUserId, targetSpaceId])
@@ -129,6 +135,8 @@ enum EntitlementResourceModel {
   WebhookSubscription
   IntegrationResource
   ProjectIntegrationResource
+  Setting
+  ProjectIntegration
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific rebac resources below

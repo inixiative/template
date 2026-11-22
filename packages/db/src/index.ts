@@ -39,6 +39,8 @@ export {
   type WatchedLane,
   watchLane,
 } from './lanes';
+// Attribute model capability (registry, DMMF/index validation, typed codec, operators, hook, utils)
+export * from './lib/attributes';
 // Distributed lock
 export {
   type AcquireOptions,
@@ -129,6 +131,10 @@ export type {
 } from './types/userWithRelations';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
+export {
+  type ApplyWriteDataOptions,
+  applyWriteDataOverPreviousRow,
+} from './utils/applyWriteDataOverPreviousRow';
 export { carryOwnerKeys } from './utils/carryOwnerKeys';
 // Type-safe delegate helpers (pass-the-delegate pattern)
 export {
@@ -152,6 +158,7 @@ export {
   type RuleReferenceTargetDeletedState,
 } from './utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
 export { hasDeletedAt } from './utils/fieldMetadata';
+export { isTombstoneOnlyUpdate } from './utils/isTombstoneOnlyUpdate';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
@@ -170,7 +177,11 @@ export {
   toModelName,
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
-export { polymorphicArmKeys, polymorphicArmRelation } from './utils/polymorphicArmKeys';
+export {
+  polymorphicArmColumns,
+  polymorphicArmKeys,
+  polymorphicArmRelation,
+} from './utils/polymorphicArmKeys';
 export { relationsOfModel } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';
@@ -193,6 +204,11 @@ export {
 } from './utils/sourceQueryValues';
 export { sourceQueryWhere } from './utils/sourceQueryWhere';
 export { type RuleReferenceSource, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
+export {
+  modelsHeldUnderTenant,
+  TENANT_COLUMNS,
+  tenantRowsAbove,
+} from './utils/tenantRowsAbove';
 export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
 export { assertRuleReferencesExist } from './validations/assertRuleReferencesExist';
 export {

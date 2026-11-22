@@ -27,6 +27,8 @@ model Project {
   spaceUser        SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
 
   tagAttachments              TagAttachment[]
+  settings                    Setting[]
+  projectIntegrations         ProjectIntegration[]
   projectIntegrationResources ProjectIntegrationResource[]
 
   auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProject")
