@@ -28,6 +28,8 @@ model IntegrationResource {
 
   projectIntegrationResources ProjectIntegrationResource[]
 
+  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectIntegrationResource")
+
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================

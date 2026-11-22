@@ -21,6 +21,9 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
   AuditSubjectModel.Segment,
   AuditSubjectModel.Token,
   AuditSubjectModel.Entitlement,
+  AuditSubjectModel.Project,
+  AuditSubjectModel.IntegrationResource,
+  AuditSubjectModel.ProjectIntegrationResource,
   // Account, Session excluded — ephemeral auth state, hard-deleted on redact.
 ];
 

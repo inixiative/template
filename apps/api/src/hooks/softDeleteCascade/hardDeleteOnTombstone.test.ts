@@ -200,6 +200,9 @@ const awaitingClassification = [
   'AuditLog.actorTokenId belongs to Token',
   'AuditLog.subjectTokenId belongs to Token',
   'AuditLog.subjectEntitlementId belongs to Entitlement',
+  'AuditLog.subjectProjectId belongs to Project',
+  'AuditLog.subjectIntegrationResourceId belongs to IntegrationResource',
+  'AuditLog.subjectProjectIntegrationResourceId belongs to ProjectIntegrationResource',
   'CommunicationLog.recipientContactId belongs to Contact',
 ];
 
@@ -212,7 +215,7 @@ describe('every child of a soft-deleted parent is classified', () => {
 
   it('accepts a child that is hard-deleted, closed or tombstoned with its parent', () => {
     expect(
-      unclassifiedChildViolations(['Project', 'IntegrationResource', 'WebhookSubscription']),
+      unclassifiedChildViolations(['TagCategory', 'WebhookSubscription', 'SegmentMember']),
     ).toEqual([]);
   });
 

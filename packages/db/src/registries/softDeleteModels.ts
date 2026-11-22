@@ -9,9 +9,6 @@ import { AUDIT_ENABLED_MODELS } from '@template/db/registries/auditEnabledModels
 const SOFT_DELETE_ONLY = [
   'Contact',
   'IntegrationRecord',
-  'IntegrationResource',
-  'Project',
-  'ProjectIntegrationResource',
   'SegmentMember',
   'Tag',
   'TagAttachment',

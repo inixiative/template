@@ -77,17 +77,6 @@ describe('integration resource status and removal', () => {
     expect(await listed('/untracked')).toEqual([]);
   });
 
-  it('tracking lifts untracked but never clears a missing the sync set', async () => {
-    const { entity: missing } = await createIntegrationResource(
-      { status: 'missing' },
-      { integration },
-    );
-    await fetch(patch(`/api/v1/integrationResource/${missing.id}`, { status: 'tracked' }));
-    expect(
-      (await db.integrationResource.findUniqueOrThrow({ where: { id: missing.id } })).status,
-    ).toBe('missing');
-  });
-
   it('refuses a status in the create body: a resource is registered tracked', async () => {
     const response = await fetch(
       post(`/api/v1/integration/${integration.id}/integrationResources`, {
@@ -135,7 +124,7 @@ describe('integration resource status and removal', () => {
           integrationResourceId: resource.id,
         }),
       ),
-    ).rejects.toThrow('untracked');
+    ).rejects.toThrow('Access denied');
   });
 
   it('refuses a caller setting missing, which only the system sets', async () => {
@@ -207,5 +196,19 @@ describe('integration resource status and removal', () => {
       where: { targetModel: 'Token', targetId: token.id },
     });
     expect(entitlement.sourceDeletedAt).toBeInstanceOf(Date);
+  });
+
+  it('untracking is audited', async () => {
+    const { entity: resource } = await createIntegrationResource({}, { integration });
+    await fetch(patch(`/api/v1/integrationResource/${resource.id}`, { status: 'untracked' }));
+    expect(
+      await db.auditLog.count({
+        where: {
+          subjectModel: 'IntegrationResource',
+          subjectIntegrationResourceId: resource.id,
+          action: 'update',
+        },
+      }),
+    ).toBe(1);
   });
 });

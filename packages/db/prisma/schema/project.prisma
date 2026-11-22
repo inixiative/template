@@ -29,6 +29,8 @@ model Project {
   tagAttachments              TagAttachment[]
   projectIntegrationResources ProjectIntegrationResource[]
 
+  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProject")
+
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================

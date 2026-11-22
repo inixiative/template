@@ -17,6 +17,8 @@ model ProjectIntegrationResource {
   integrationResourceId String              @db.VarChar(36)
   integrationResource   IntegrationResource @relation(fields: [integrationResourceId], references: [id], onDelete: Cascade)
 
+  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProjectIntegrationResource")
+
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================

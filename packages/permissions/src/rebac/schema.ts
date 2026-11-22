@@ -5,7 +5,7 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { ContactSource } from '@template/db/generated/client/enums';
+import { ContactSource, IntegrationResourceStatus } from '@template/db/generated/client/enums';
 import { inquiryResourcePermission } from '@template/permissions/rebac/inquiryResourcePermission';
 import {
   actionsForRecordOwnedByAnyOwnerModel,
@@ -120,6 +120,13 @@ export const rebacSchema: RebacSchema = {
           all: [
             { rel: 'project', action: 'manage' },
             { rel: 'integrationResource', action: 'operate' },
+            {
+              rule: {
+                field: 'integrationResource.status',
+                operator: Operator.in,
+                value: [IntegrationResourceStatus.tracked, IntegrationResourceStatus.missing],
+              },
+            },
           ],
         },
         delete: {
