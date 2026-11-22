@@ -1,24 +1,43 @@
 import { describe, expect, it } from 'bun:test';
+import { FieldKind } from '@inixiative/json-rules';
 import {
+  ATTRIBUTE_FIELD_KIND_BY_VALUE_TYPE,
   attributeColumnForValueType,
   attributeTypedColumnIssues,
   decodeAttributeColumnValue,
   deduplicateMultiSelect,
   encodeAttributeValue,
   isStringArray,
+  parseAttributeValue,
   populatedAttributeColumns,
   validateAttributeTypedColumns,
 } from '@template/shared/attributes';
 import { z } from 'zod';
 
 describe('attribute protocol', () => {
-  it('maps each AttributeValueType to one of the 5 standard typed columns', () => {
+  it('maps each AttributeValueType to one of the 5 standard typed columns and json-rules FieldKind', () => {
     expect(attributeColumnForValueType('boolean')).toBe('valueBoolean');
     expect(attributeColumnForValueType('text')).toBe('valueText');
     expect(attributeColumnForValueType('number')).toBe('valueNumber');
     expect(attributeColumnForValueType('date')).toBe('valueDate');
     expect(attributeColumnForValueType('json')).toBe('valueJson');
     expect(attributeColumnForValueType('multiSelect')).toBe('valueJson');
+
+    expect(ATTRIBUTE_FIELD_KIND_BY_VALUE_TYPE).toEqual({
+      boolean: FieldKind.Boolean,
+      text: FieldKind.String,
+      number: FieldKind.Float,
+      date: FieldKind.DateTime,
+      json: FieldKind.Json,
+      multiSelect: FieldKind.Json,
+    });
+
+    expect(parseAttributeValue('number', 42)).toEqual({ ok: true, value: 42 });
+    expect(parseAttributeValue('number', Number.NaN).ok).toBe(false);
+    expect(parseAttributeValue('multiSelect', ['b', 'a', 'b'])).toEqual({
+      ok: true,
+      value: ['a', 'b'],
+    });
   });
 
   it('deduplicates and canonically sorts multiSelect arrays for set-equality stability', () => {

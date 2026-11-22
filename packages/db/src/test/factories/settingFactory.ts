@@ -8,8 +8,8 @@ import { registerFactory } from '@template/db/test/factory';
 
 const settingFactory = registerFactory('Setting', {
   defaults: () => ({
-    key: 'notifications.topics',
-    valueJson: ['inquiries'],
+    key: 'general.defaultTimezone',
+    valueText: 'UTC',
   }),
   dependencies: {
     user: {
@@ -49,6 +49,16 @@ const settingFactory = registerFactory('Setting', {
     project: {
       modelName: 'Project',
       foreignKey: { id: 'resourceProjectId' },
+      required: false,
+    },
+    integration: {
+      modelName: 'Integration',
+      foreignKey: { id: 'resourceIntegrationId' },
+      required: false,
+    },
+    projectIntegration: {
+      modelName: 'ProjectIntegration',
+      foreignKey: { id: 'resourceProjectIntegrationId' },
       required: false,
     },
   },

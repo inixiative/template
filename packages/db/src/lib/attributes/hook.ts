@@ -11,15 +11,20 @@ import {
   registerDbHook,
   type SingleAction,
 } from '@template/db/extensions/hookRegistry';
-import { attributeWriteInspection } from '@template/db/lib/attributes/codec';
 import {
   ATTRIBUTE_MODELS,
   type AttributeModelName,
   attributeModelConfig,
 } from '@template/db/lib/attributes/registry';
+import { attributeWriteInspection } from '@template/db/lib/attributes/writing/attributeWriteInspection';
 import { applyWriteDataOverPreviousRow } from '@template/db/utils/applyWriteDataOverPreviousRow';
+import { isTombstoneOnlyUpdate } from '@template/db/utils/isTombstoneOnlyUpdate';
 import { type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
-import { deduplicateMultiSelect, isStringArray } from '@template/shared/attributes';
+import {
+  type AttributeFieldDefinition,
+  deduplicateMultiSelect,
+  isStringArray,
+} from '@template/shared/attributes';
 import { castArray } from 'lodash-es';
 
 type Row = Record<string, unknown>;
@@ -27,11 +32,6 @@ type Row = Record<string, unknown>;
 const attributeModelNames: ModelName[] = Object.keys(ATTRIBUTE_MODELS).map((accessor) =>
   toModelName(accessor),
 );
-
-const isTombstoneOnlyUpdate = (data: Row): boolean => {
-  const keys = Object.keys(data).filter((key) => data[key] !== undefined);
-  return keys.length > 0 && keys.every((key) => key === 'deletedAt');
-};
 
 const extractScalarWhereValue = (where: Row | undefined, field: string): string | undefined => {
   const raw = where?.[field];
@@ -48,13 +48,15 @@ const arraysEqual = (left: readonly string[], right: readonly string[]): boolean
 export type RegisterAttributeValidationHookOptions = {
   /** Optional custom error factory (e.g. API `makeError({ status: 422, message })`). */
   makeValidationError?: (message: string) => Error;
+  /** Optional definition resolver override (used in unit/DB tests with synthetic definitions). */
+  resolveDefinition?: (locator: string) => AttributeFieldDefinition | undefined;
 };
 
 /**
  * Registers write-time invariant hooks across every model declared in `ATTRIBUTE_MODELS`:
  * - Enforces at most one populated typed value column (and exact schema match when code-defined)
  * - Deduplicates & canonically sorts `multiSelect` arrays in `valueJson` and normalizes `date` values
- * - Skips re-validation on tombstone-only (`{ deletedAt }`) updates so soft-delete cascades never fail
+ * - Skips re-validation on tombstone-only (`{ deletedAt }`) updates so soft-delete cascades & revives never fail
  */
 export const registerAttributeValidationHook = (
   options: RegisterAttributeValidationHookOptions = {},
@@ -62,10 +64,13 @@ export const registerAttributeValidationHook = (
   if (attributeModelNames.length === 0) return;
 
   const toError = options.makeValidationError ?? ((message: string) => new Error(message));
+  const inspectionOptions = options.resolveDefinition
+    ? { resolveDefinition: options.resolveDefinition }
+    : undefined;
 
   const validateAndNormalizeRow = (model: ModelName, mergedRow: Row, writableData?: Row): void => {
     const accessor = toAccessor(model) as AttributeModelName;
-    const result = attributeWriteInspection(accessor, mergedRow);
+    const result = attributeWriteInspection(accessor, mergedRow, inspectionOptions);
     if (!result.ok) {
       throw toError(result.errors.join('; '));
     }
@@ -149,16 +154,15 @@ export const registerAttributeValidationHook = (
       const data = updateArgs?.data as Row | undefined;
       if (!data || typeof data !== 'object' || Array.isArray(data)) return;
       if (isTombstoneOnlyUpdate(data)) return;
-
       if (!isStringArray(data.valueJson)) return;
 
       const config = attributeModelConfig(model);
+      const resolveDef = options.resolveDefinition ?? config.resolveDefinition;
       const where = updateArgs?.where as Row | undefined;
       const locator = config.locatorField
         ? extractScalarWhereValue(where, config.locatorField)
         : undefined;
-      const definition =
-        locator && config.resolveDefinition ? config.resolveDefinition(locator) : undefined;
+      const definition = locator && resolveDef ? resolveDef(locator) : undefined;
       const rowValueType = config.valueTypeField
         ? (data[config.valueTypeField] ?? extractScalarWhereValue(where, config.valueTypeField))
         : undefined;
@@ -175,10 +179,8 @@ export const registerAttributeValidationHook = (
     HookTiming.after,
     [DbAction.updateManyAndReturn],
     async ({ model, args, result }) => {
-      const data = (args as Row | null)?.data as Row | undefined;
-      if (data && typeof data === 'object' && !Array.isArray(data) && isTombstoneOnlyUpdate(data)) {
-        return;
-      }
+      const data = (args as Row | null)?.data;
+      if (isTombstoneOnlyUpdate(data)) return;
       for (const record of castArray(result ?? []) as Row[]) {
         validateAndNormalizeRow(model, record);
       }

@@ -33,19 +33,19 @@ describe('SETTING_DEFINITIONS registry invariants', () => {
 
     expect(
       settingPermissionForModel(
-        SETTING_DEFINITIONS['notifications.topics'].permission,
+        SETTING_DEFINITIONS['general.displayLocale'].permission,
         'OrganizationUser',
       ),
     ).toBe('operate');
     expect(
       settingPermissionForModel(
-        SETTING_DEFINITIONS['notifications.topics'].permission,
+        SETTING_DEFINITIONS['general.displayLocale'].permission,
         'Organization',
       ),
     ).toBe('manage');
     expect(
       settingPermissionForModel(
-        SETTING_DEFINITIONS['notifications.topics'].readPermission,
+        SETTING_DEFINITIONS['general.displayLocale'].readPermission,
         'SpaceUser',
         'read',
       ),
@@ -68,39 +68,39 @@ describe('SETTING_DEFINITIONS registry invariants', () => {
     }
   });
 
-  it('every category key matches its map key', () => {
-    for (const [key, category] of Object.entries(SETTING_CATEGORIES)) {
-      expect(category.key as string).toBe(key);
-    }
-  });
-
-  it('covers all 6 AttributeValueTypes across built-in definitions', () => {
-    const valueTypes = new Set(Object.values(SETTING_DEFINITIONS).map((def) => def.valueType));
-    expect([...valueTypes].sort()).toEqual([
-      'boolean',
-      'date',
-      'json',
-      'multiSelect',
-      'number',
-      'text',
+  it('ships the minimal clean starter catalog (general category with defaultTimezone and displayLocale)', () => {
+    expect(Object.keys(SETTING_CATEGORIES)).toEqual(['general']);
+    expect(SETTING_KEYS).toEqual(['general.defaultTimezone', 'general.displayLocale']);
+    expect(SETTING_RESOURCE_MODELS).toEqual([
+      'User',
+      'Organization',
+      'Space',
+      'OrganizationUser',
+      'SpaceUser',
+      'Project',
+      'Integration',
+      'ProjectIntegration',
     ]);
   });
 
   it('looks up definitions by key and filters by resourceModel in deterministic order', () => {
-    expect(SETTING_KEYS.length).toBeGreaterThan(0);
     expect(settingDefinitionForKey('general.defaultTimezone')?.valueType).toBe('text');
-    expect(settingDefinitionForKey('notifications.snoozeUntil')?.valueType).toBe('date');
+    expect(settingDefinitionForKey('general.displayLocale')?.valueType).toBe('text');
     expect(settingDefinitionForKey('does.not.exist')).toBeUndefined();
     expect(() => settingDefinitionForKeyOrThrow('does.not.exist')).toThrow('Unknown setting key');
 
-    for (const resourceModel of SETTING_RESOURCE_MODELS) {
-      const defs = settingDefinitionsForResourceModel(resourceModel);
-      expect(defs.length).toBeGreaterThan(0);
-      expect(defs.every((def) => def.resourceModels.includes(resourceModel))).toBe(true);
-    }
-
-    const memberDefs = settingDefinitionsForResourceModel('OrganizationUser');
-    expect(memberDefs.map((def) => def.key)).toContain('member.autoAcceptInquiries');
-    expect(memberDefs.map((def) => def.key)).not.toContain('general.defaultTimezone');
+    expect(settingDefinitionsForResourceModel('User').map((d) => d.key)).toEqual([
+      'general.defaultTimezone',
+      'general.displayLocale',
+    ]);
+    expect(settingDefinitionsForResourceModel('OrganizationUser').map((d) => d.key)).toEqual([
+      'general.displayLocale',
+    ]);
+    expect(settingDefinitionsForResourceModel('Project').map((d) => d.key)).toEqual([
+      'general.defaultTimezone',
+    ]);
+    // Starter template has zero Integration/ProjectIntegration definitions until downstream apps add them
+    expect(settingDefinitionsForResourceModel('Integration')).toEqual([]);
+    expect(settingDefinitionsForResourceModel('ProjectIntegration')).toEqual([]);
   });
 });

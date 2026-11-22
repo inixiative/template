@@ -2,8 +2,9 @@
 // SETTING - Lightweight false-polymorphic configuration primitive
 // ============================================================================
 // App-owned configuration dials attached to User, Organization, Space,
-// OrganizationUser, SpaceUser, or Project. Keys and validation schemas live
-// in code (`@template/shared/settings`), not a Prisma enum or DB table.
+// OrganizationUser, SpaceUser, Project, Integration, or ProjectIntegration.
+// Keys and validation schemas live in code (`@template/shared/settings`), not
+// a Prisma enum or DB table.
 // Registered in `ATTRIBUTE_MODELS` (`packages/db/src/lib/attributes/registry.ts`)
 // with the standard 5 typed value columns (`valueBoolean`, `valueText`,
 // `valueNumber`, `valueDate`, `valueJson`), with `multiSelect` stored as a
@@ -21,19 +22,23 @@ model Setting {
   // `resourceId` is the dual polymorphism id (auto-filled from typed FKs on create,
   // supplied by writer for composite member arms) so ParentEdgeRegistry can traverse
   // Setting → parent for AuditLog tenancy context and parent audit history streams.
-  resourceModel          SettingResourceModel
-  resourceId             String               @db.VarChar(36)
-  resourceUserId         String?              @db.VarChar(36)
-  resourceOrganizationId String?              @db.VarChar(36)
-  resourceSpaceId        String?              @db.VarChar(36)
-  resourceProjectId      String?              @db.VarChar(36)
+  resourceModel                SettingResourceModel
+  resourceId                   String               @db.VarChar(36)
+  resourceUserId               String?              @db.VarChar(36)
+  resourceOrganizationId       String?              @db.VarChar(36)
+  resourceSpaceId              String?              @db.VarChar(36)
+  resourceProjectId            String?              @db.VarChar(36)
+  resourceIntegrationId        String?              @db.VarChar(36)
+  resourceProjectIntegrationId String?              @db.VarChar(36)
 
-  resourceUser             User?             @relation(fields: [resourceUserId], references: [id], onDelete: Cascade)
-  resourceOrganization     Organization?     @relation(fields: [resourceOrganizationId], references: [id], onDelete: Cascade)
-  resourceOrganizationUser OrganizationUser? @relation(fields: [resourceOrganizationId, resourceUserId], references: [organizationId, userId], onDelete: Cascade)
-  resourceSpace            Space?            @relation(fields: [resourceOrganizationId, resourceSpaceId], references: [organizationId, id], onDelete: Cascade)
-  resourceSpaceUser        SpaceUser?        @relation(fields: [resourceOrganizationId, resourceSpaceId, resourceUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
-  resourceProject          Project?          @relation(fields: [resourceProjectId], references: [id], onDelete: Cascade)
+  resourceUser               User?               @relation(fields: [resourceUserId], references: [id], onDelete: Cascade)
+  resourceOrganization       Organization?       @relation(fields: [resourceOrganizationId], references: [id], onDelete: Cascade)
+  resourceOrganizationUser   OrganizationUser?   @relation(fields: [resourceOrganizationId, resourceUserId], references: [organizationId, userId], onDelete: Cascade)
+  resourceSpace              Space?              @relation(fields: [resourceOrganizationId, resourceSpaceId], references: [organizationId, id], onDelete: Cascade)
+  resourceSpaceUser          SpaceUser?          @relation(fields: [resourceOrganizationId, resourceSpaceId, resourceUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  resourceProject            Project?            @relation(fields: [resourceProjectId], references: [id], onDelete: Cascade)
+  resourceIntegration        Integration?        @relation(fields: [resourceIntegrationId], references: [id], onDelete: Cascade)
+  resourceProjectIntegration ProjectIntegration? @relation(fields: [resourceProjectIntegrationId], references: [id], onDelete: Cascade)
 
   // Registry key (plain String, NOT a Prisma enum; validated against SETTING_DEFINITIONS)
   key      String  @db.VarChar(120)
@@ -58,6 +63,8 @@ model Setting {
   @@unique([resourceOrganizationId, resourceSpaceId, key], where: raw("\"resourceModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "Setting_space_key_unique")
   @@unique([resourceOrganizationId, resourceSpaceId, resourceUserId, key], where: raw("\"resourceModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "Setting_spaceuser_key_unique")
   @@unique([resourceProjectId, key], where: raw("\"resourceModel\" = 'Project' AND \"deletedAt\" IS NULL"), map: "Setting_project_key_unique")
+  @@unique([resourceIntegrationId, key], where: raw("\"resourceModel\" = 'Integration' AND \"deletedAt\" IS NULL"), map: "Setting_integration_key_unique")
+  @@unique([resourceProjectIntegrationId, key], where: raw("\"resourceModel\" = 'ProjectIntegration' AND \"deletedAt\" IS NULL"), map: "Setting_projectintegration_key_unique")
   @@index([resourceModel, resourceId])
   @@index([resourceModel, key])
   @@index([key, valueBoolean])
@@ -68,6 +75,8 @@ model Setting {
   @@index([resourceOrganizationId])
   @@index([resourceSpaceId])
   @@index([resourceProjectId])
+  @@index([resourceIntegrationId])
+  @@index([resourceProjectIntegrationId])
   @@index([valueJson], type: Gin)
 }
 
@@ -78,6 +87,8 @@ enum SettingResourceModel {
   OrganizationUser
   SpaceUser
   Project
+  Integration
+  ProjectIntegration
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific attachable models below

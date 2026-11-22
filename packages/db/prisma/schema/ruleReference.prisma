@@ -55,6 +55,7 @@ model RuleReference {
   targetAuthProviderId        String?                  @db.VarChar(36)
   targetWebhookSubscriptionId String?                  @db.VarChar(36)
   targetSettingId             String?                  @db.VarChar(36)
+  targetProjectIntegrationId  String?                  @db.VarChar(36)
 
   // Snapshot of the target row's deletedAt, maintained by ruleReference:target. One scalar
   // copied across one hop, so a reader answers "is this rule degraded" from the edge alone rather
@@ -84,6 +85,7 @@ model RuleReference {
   targetAuthProvider        AuthProvider?        @relation("RuleReferenceTarget", fields: [targetAuthProviderId], references: [id])
   targetWebhookSubscription WebhookSubscription? @relation("RuleReferenceTarget", fields: [targetWebhookSubscriptionId], references: [id])
   targetSetting             Setting?             @relation("RuleReferenceTarget", fields: [targetSettingId], references: [id])
+  targetProjectIntegration  ProjectIntegration?  @relation("RuleReferenceTarget", fields: [targetProjectIntegrationId], references: [id])
 
   // Edge identity, on the plain columns: one unique whatever the source model, so a new source
   // model needs no new constraint.
@@ -110,6 +112,7 @@ model RuleReference {
   @@index([targetAuthProviderId])
   @@index([targetWebhookSubscriptionId])
   @@index([targetSettingId])
+  @@index([targetProjectIntegrationId])
 }
 
 enum RuleReferenceSourceModel {
@@ -141,6 +144,7 @@ enum RuleReferenceTargetModel {
   AuthProvider
   WebhookSubscription
   Setting
+  ProjectIntegration
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific referenceable models below

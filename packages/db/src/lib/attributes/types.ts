@@ -4,7 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { AccessorName } from '@template/db/utils/modelNames';
+import type { Prisma } from '@template/db/generated/client/client';
+import type { AccessorName, ModelName } from '@template/db/utils/modelNames';
 import type { AttributeFieldDefinition, AttributeValueType } from '@template/shared/attributes';
 
 export type AttributeModelConfig<A extends AccessorName = AccessorName> = {
@@ -36,21 +37,25 @@ export type AttributeSortDirection = 'asc' | 'desc';
 
 export type AttributeOperatorOptions = {
   valueType?: AttributeValueType;
+  definition?: AttributeFieldDefinition;
 };
 
-export type EffectiveAttributeEntry = {
-  key: string;
-  category: string | null;
-  valueType: AttributeValueType;
-  label: string;
-  description: string;
-  order: number;
-  permission: string | null;
-  defaultValue: unknown;
-  value: unknown;
-  storedValue: unknown;
-  disabled: boolean;
-  isDefault: boolean;
-  recordId: string | null;
-  updatedAt: Date | null;
+export type PrismaAttributeColumnPayload = {
+  valueBoolean: boolean | null;
+  valueText: string | null;
+  valueNumber: number | null;
+  valueDate: Date | null;
+  valueJson: Prisma.InputJsonValue | typeof Prisma.DbNull;
 };
+
+export type AttributeWriteInspectionOk = {
+  ok: true;
+  value: unknown;
+  definition?: AttributeFieldDefinition;
+  normalizedValueJson?: string[];
+  normalizedValueDate?: Date;
+};
+
+export type AttributeWriteInspection = AttributeWriteInspectionOk | { ok: false; errors: string[] };
+
+export type AttributeModelInput = AccessorName | ModelName;

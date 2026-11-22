@@ -15,6 +15,8 @@ export const SETTING_RESOURCE_MODELS = [
   'OrganizationUser',
   'SpaceUser',
   'Project',
+  'Integration',
+  'ProjectIntegration',
 ] as const;
 
 export type SettingResourceModelName = (typeof SETTING_RESOURCE_MODELS)[number];

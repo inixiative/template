@@ -13,6 +13,7 @@ import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerProjectIntegrationOwnerHook } from '#/hooks/projectIntegrationOwner/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -45,6 +46,7 @@ export const registerHooks = () => {
   registerImmutableFieldsHook();
   registerOrderedListHook();
   registerPreventHardDeleteHook();
+  registerProjectIntegrationOwnerHook();
   registerRuleReferenceHook();
   registerRuleReferenceTargetHook();
   registerSegmentConditionsHook();

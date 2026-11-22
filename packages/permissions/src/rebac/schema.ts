@@ -110,6 +110,25 @@ export const rebacSchema: RebacSchema = {
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
     'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
+    'db:projectIntegration': {
+      actions: {
+        create: {
+          all: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integration', action: 'operate' },
+          ],
+        },
+        manage: { rel: 'project', action: 'manage' },
+        operate: { any: ['manage', { rel: 'project', action: 'operate' }] },
+        read: { any: ['operate', { rel: 'project', action: 'read' }] },
+        delete: {
+          any: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integration', action: 'manage' },
+          ],
+        },
+      },
+    },
     'db:setting': settingResourcePermission,
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 

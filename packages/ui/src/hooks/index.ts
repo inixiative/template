@@ -16,6 +16,7 @@ export {
   useSendInquiryMutation,
   useUpdateInquiryMutation,
 } from './inquiry';
+export { useSettingCatalog, useSettingInfo } from './settings';
 export { useApiWebsocket } from './useApiWebsocket';
 export { useApplySpaceThemeCssVariables } from './useApplySpaceThemeCssVariables';
 export { useApplyThemeClassToDocument } from './useApplyThemeClassToDocument';

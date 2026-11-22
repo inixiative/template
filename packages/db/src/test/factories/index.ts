@@ -19,6 +19,7 @@ export * from './jwksFactory';
 export * from './organizationFactory';
 export * from './organizationUserFactory';
 export * from './projectFactory';
+export * from './projectIntegrationFactory';
 export * from './ruleReferenceFactory';
 export * from './segmentFactory';
 export * from './segmentMemberFactory';

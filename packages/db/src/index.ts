@@ -158,6 +158,7 @@ export {
   type RuleReferenceTargetDeletedState,
 } from './utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
 export { hasDeletedAt } from './utils/fieldMetadata';
+export { isTombstoneOnlyUpdate } from './utils/isTombstoneOnlyUpdate';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';

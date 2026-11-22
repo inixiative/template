@@ -9,11 +9,38 @@ import {
   createSetting,
   createUser,
 } from '@template/db/test';
+import { type AttributeFieldDefinition, defineAttributeField } from '@template/shared/attributes';
+import { settingDefinitionForKey } from '@template/shared/settings';
+import { z } from 'zod';
+
+const syntheticHookDefs: Record<string, AttributeFieldDefinition> = {
+  'test.topics': defineAttributeField({
+    key: 'test.topics',
+    valueType: 'multiSelect',
+    schema: z.array(z.enum(['inquiries', 'security', 'billing', 'digest'])),
+    defaultValue: ['inquiries'],
+    label: 'Topics',
+    description: 'Synthetic multiSelect definition.',
+    resourceModels: ['User'],
+  }),
+  'test.maxTasks': defineAttributeField({
+    key: 'test.maxTasks',
+    valueType: 'number',
+    schema: z.number().int().min(1).max(100),
+    defaultValue: 10,
+    label: 'Max Tasks',
+    description: 'Synthetic number definition.',
+    resourceModels: ['OrganizationUser'],
+  }),
+};
+
+const resolveTestDefinition = (key: string) =>
+  syntheticHookDefs[key] ?? settingDefinitionForKey(key);
 
 describe('registerAttributeValidationHook (DB write-time invariant hook)', () => {
   beforeEach(() => {
     clearHookRegistry();
-    registerAttributeValidationHook();
+    registerAttributeValidationHook({ resolveDefinition: resolveTestDefinition });
   });
 
   afterEach(async () => {
@@ -29,6 +56,7 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
         resourceUserId: user.id,
         key: 'nonexistent.key',
         valueBoolean: true,
+        valueText: null,
         valueJson: Prisma.DbNull,
       }),
     ).rejects.toThrow(/Unknown setting key/);
@@ -42,8 +70,8 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
       createSetting({
         resourceModel: 'Project',
         resourceProjectId: project.id,
-        key: 'member.autoAcceptInquiries',
-        valueBoolean: true,
+        key: 'general.displayLocale',
+        valueText: 'en',
         valueJson: Prisma.DbNull,
       }),
     ).rejects.toThrow(/not valid for resourceModel='Project'/);
@@ -99,7 +127,8 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
     const { entity: created } = await createSetting({
       resourceModel: 'User',
       resourceUserId: user.id,
-      key: 'notifications.topics',
+      key: 'test.topics',
+      valueText: null,
       valueJson: ['security', 'inquiries', 'security', 'billing', 'inquiries'],
     });
     expect(created.valueJson).toEqual(['billing', 'inquiries', 'security']);
@@ -111,14 +140,12 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
     expect(updated.valueJson).toEqual(['billing', 'digest']);
 
     const bulkScoped = await db.setting.updateManyAndReturn({
-      where: { key: 'notifications.topics', resourceUserId: user.id },
+      where: { key: 'test.topics', resourceUserId: user.id },
       data: { valueJson: ['security', 'inquiries', 'security'] },
     });
     expect(bulkScoped).toHaveLength(1);
     expect(bulkScoped[0]?.valueJson).toEqual(['inquiries', 'security']);
 
-    // Unscoped updateManyAndReturn with duplicates cannot assume multiSelect in before-hook
-    // and MUST roll back in after-hook so duplicates never persist
     await expect(
       db.setting.updateManyAndReturn({
         where: { id: created.id },
@@ -134,11 +161,12 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
       resourceId: member.id,
       resourceOrganizationId: context.organization.id,
       resourceUserId: context.user.id,
-      key: 'member.maxActiveTasks',
-      ...encodeAttributeColumns('setting', 'member.maxActiveTasks', 10),
+      key: 'test.maxTasks',
+      ...encodeAttributeColumns('setting', 'test.maxTasks', 10, {
+        definition: syntheticHookDefs['test.maxTasks'],
+      }),
     });
 
-    // Confirm parentOf resolves composite member arm cleanly with non-null resourceId
     expect(parentOf('Setting', setting)).toEqual({
       model: 'OrganizationUser',
       id: member.id,
@@ -150,7 +178,6 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
     });
     expect(incremented.valueNumber).toBe(15);
 
-    // Incrementing past Zod max(100) must fail validation
     await expect(
       db.setting.update({
         where: { id: setting.id },
@@ -159,10 +186,9 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
     ).rejects.toThrow();
   });
 
-  it('skips schema re-validation on tombstone-only deletedAt updates (update and updateManyAndReturn)', async () => {
+  it('skips schema re-validation on tombstone-only deletedAt updates (soft-delete AND revive)', async () => {
     const { entity: user } = await createUser();
 
-    // Simulate a legacy row whose key was later retired by inserting with hook disabled
     clearHookRegistry();
     const { entity: legacyA } = await createSetting({
       resourceModel: 'User',
@@ -178,9 +204,8 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
       valueText: 'legacy',
       valueJson: Prisma.DbNull,
     });
-    registerAttributeValidationHook();
+    registerAttributeValidationHook({ resolveDefinition: resolveTestDefinition });
 
-    // Non-tombstone update on a retired key still fails validation
     await expect(
       db.setting.update({
         where: { id: legacyA.id },
@@ -188,12 +213,21 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
       }),
     ).rejects.toThrow(/Unknown setting key/);
 
-    // Tombstone-only update succeeds cleanly so soft-delete & cascades never break
+    // Soft-delete succeeds on retired key
     const softDeleted = await db.setting.update({
       where: { id: legacyA.id },
       data: { deletedAt: new Date() },
     });
     expect(softDeleted.deletedAt).toBeInstanceOf(Date);
+
+    // Revive ({ deletedAt: null }) also succeeds on retired key
+    const revived = await db.withDeleted(() =>
+      db.setting.update({
+        where: { id: legacyA.id },
+        data: { deletedAt: null },
+      }),
+    );
+    expect(revived.deletedAt).toBeNull();
 
     const bulkSoftDeleted = await db.setting.updateManyAndReturn({
       where: { id: legacyB.id },
