@@ -6,13 +6,16 @@
  */
 import type { TagAttachment } from '@template/db/generated/client/client';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { reconcileCustomerOf } from '#/modules/segment/lib/reconcileCustomer';
+import { customerSideOfRow } from '#/modules/customerRelationship/lib/customerRelationshipSides';
+import { enqueueSegmentReconcileForCustomers } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
 export type TagAttachmentCreatedPayload = { tagAttachment: TagAttachment };
 
 export const tagAttachmentCreated = makeAppEvent<TagAttachmentCreatedPayload>({
   cb: [
     ({ tagAttachment }) =>
-      reconcileCustomerOf({ model: 'TagAttachment', axis: 'resourceModel' }, tagAttachment),
+      enqueueSegmentReconcileForCustomers([
+        customerSideOfRow({ model: 'TagAttachment', axis: 'resourceModel' }, tagAttachment),
+      ]),
   ],
 });

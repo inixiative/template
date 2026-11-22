@@ -2778,7 +2778,7 @@ Per-request permission checker created in prepareRequestMiddleware: setup instal
 The per-request permission checker, empty until installPermissions fills it. *Region:* [Request context](request-context-errors/knowledge.md)
 
 **permix.setActor**  
-Sets the actor that { rule } conditions read as __actor. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+Sets the actor that { rule } conditions read as the `actor:` rows. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **permix.setSuperadmin**  
 Makes every permix check pass for a superadmin. *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)

@@ -29,9 +29,6 @@ export type PolymorphicAxis = {
 
 export type PolymorphicConfig = {
   axes: readonly PolymorphicAxis[];
-  // If multiple axes, which combinations are valid (axis0Value → allowed axis1Values)
-  // Only needed when there are restrictions
-  allowedCombinations?: Partial<Record<PolymorphicValue, readonly PolymorphicValue[]>>;
 };
 
 // ============================================================================
@@ -103,10 +100,10 @@ export const PolymorphismRegistry = {
       {
         field: 'resourceModel',
         fkMap: {
-          User: ['userId'],
-          Organization: ['organizationId'],
-          Space: ['spaceId'],
-          Project: ['projectId'],
+          User: ['resourceUserId'],
+          Organization: ['resourceOrganizationId'],
+          Space: ['resourceSpaceId'],
+          Project: ['resourceProjectId'],
         },
       },
     ],
@@ -165,19 +162,7 @@ export const PolymorphismRegistry = {
           Space: ['spaceId'],
         },
       },
-      {
-        field: 'model',
-        fkMap: {
-          CustomerRelationship: [],
-        },
-      },
     ],
-    // All owner types can subscribe to CustomerRelationship
-    allowedCombinations: {
-      User: ['CustomerRelationship'],
-      Organization: ['CustomerRelationship'],
-      Space: ['CustomerRelationship'],
-    },
   },
 
   CustomerRelationship: {
@@ -199,11 +184,6 @@ export const PolymorphismRegistry = {
         },
       },
     ],
-    allowedCombinations: {
-      User: ['User', 'Organization', 'Space'],
-      Organization: ['User', 'Organization', 'Space'],
-      Space: ['User', 'Organization', 'Space'],
-    },
   },
 
   RuleReference: {
@@ -283,6 +263,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'sourceModel',
+        dualPolymorphismId: 'sourceId',
         fkMap: {
           admin: [],
           User: ['sourceUserId'],
@@ -298,6 +279,7 @@ export const PolymorphismRegistry = {
       },
       {
         field: 'targetModel',
+        dualPolymorphismId: 'targetId',
         fkMap: {
           admin: [],
           User: ['targetUserId'],
@@ -352,6 +334,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'subjectModel',
+        dualPolymorphismId: 'subjectId',
         fkMap: {
           User: ['subjectUserId'],
           Organization: ['subjectOrganizationId'],
@@ -392,9 +375,9 @@ export const PolymorphismRegistry = {
   IntegrationRecord: {
     axes: [
       {
-        field: 'model',
+        field: 'recordModel',
         fkMap: {
-          CustomerRelationship: ['customerRelationshipId'],
+          CustomerRelationship: ['recordCustomerRelationshipId'],
         },
       },
     ],
@@ -409,9 +392,9 @@ export const PolymorphismRegistry = {
           admin: [],
           User: ['senderUserId'],
           Organization: ['senderOrganizationId'],
-          Space: ['senderSpaceId'],
-          OrganizationUser: ['senderUserId', 'senderOrganizationId'],
-          SpaceUser: ['senderUserId', 'senderSpaceId'],
+          Space: ['senderOrganizationId', 'senderSpaceId'],
+          OrganizationUser: ['senderOrganizationId', 'senderUserId'],
+          SpaceUser: ['senderOrganizationId', 'senderSpaceId', 'senderUserId'],
         },
       },
     ],
@@ -431,3 +414,12 @@ export const polymorphicAxis = (model: ModelName, axisField: string): Polymorphi
   if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
   return axis;
 };
+
+/** Every key column a side uses, across all its values, once each. */
+export const sideKeyColumns = (axis: PolymorphicAxis): string[] => [
+  ...new Set(Object.values(axis.fkMap).flatMap((keys) => [...(keys ?? [])])),
+];
+
+/** Every key column of a side, null: the base a writer sets one value's keys over. */
+export const emptySideKeyColumns = (axis: PolymorphicAxis): Record<string, null> =>
+  Object.fromEntries(sideKeyColumns(axis).map((column) => [column, null]));

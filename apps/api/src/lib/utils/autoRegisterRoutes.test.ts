@@ -66,8 +66,12 @@ describe('autoRegisterRoutes', () => {
 
   it('skips a route already mounted by hand, so it registers once and the hand mount serves it', async () => {
     const { app: router } = createTestApp();
+    const byHandResponse = {
+      data: [],
+      pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+    };
     router.openapi(toOpenApi({ ...adminSpaceReadManyRoute, path: '/foo' }), (c) =>
-      c.json({ route: 'byHand' }),
+      c.json(byHandResponse, 200),
     );
 
     await autoRegisterRoutes(router, moduleDir);
@@ -81,6 +85,6 @@ describe('autoRegisterRoutes', () => {
     );
 
     const response = await router.request('/foo');
-    expect(await response.json()).toEqual({ route: 'byHand' });
+    expect(await response.json()).toEqual(byHandResponse);
   });
 });

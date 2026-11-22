@@ -46,7 +46,7 @@ const subscribeUser = async (userId: string, isActive = true) =>
     await createWebhookSubscription({
       ownerModel: 'User',
       userId,
-      model: WebhookModel.CustomerRelationship,
+      resourceModel: WebhookModel.CustomerRelationship,
       isActive,
     })
   ).entity;
@@ -56,7 +56,7 @@ const subscribeOrganization = async (organizationId: string) =>
     await createWebhookSubscription({
       ownerModel: 'Organization',
       organizationId,
-      model: WebhookModel.CustomerRelationship,
+      resourceModel: WebhookModel.CustomerRelationship,
     })
   ).entity;
 
@@ -65,7 +65,7 @@ const subscribeSpace = async (spaceId: string) =>
     await createWebhookSubscription({
       ownerModel: 'Space',
       spaceId,
-      model: WebhookModel.CustomerRelationship,
+      resourceModel: WebhookModel.CustomerRelationship,
     })
   ).entity;
 
@@ -470,7 +470,7 @@ describe('webhook hook — origin suppression', () => {
     const subscribe = async (integrationId?: string) =>
       (
         await createWebhookSubscription(
-          { ownerModel: 'User', model: WebhookModel.CustomerRelationship, integrationId },
+          { ownerModel: 'User', resourceModel: WebhookModel.CustomerRelationship, integrationId },
           context,
         )
       ).entity;

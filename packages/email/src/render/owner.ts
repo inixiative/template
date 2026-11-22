@@ -4,7 +4,18 @@
  * @partOf feature:email
  * @uses none
  */
+
 import type { EmailOwnerModel } from '@template/db/generated/client/client';
+import {
+  BIND_NAME_BY_OWNER_MODEL,
+  type BindableOwnerModel,
+  ownerKindsTheArmIdentifies,
+  polymorphicKeyColumns,
+} from '@template/db/registries/polymorphicAxisPointsAt';
+import {
+  type OwnerKeys,
+  wherePolymorphicSideIsOneOf,
+} from '@template/db/registries/wherePolymorphicSideIsOneOf';
 import type { OwnerScope } from '@template/email/render/types';
 import type { EmailLensOwner } from '@template/email/rules/scopeEmailLens';
 
@@ -32,32 +43,35 @@ export const ownerCascade = (owner: EmailOwnerModel): EmailOwnerModel[] => {
   return chain;
 };
 
-const tierKeys = (ctx: OwnerScope, tier: EmailOwnerModel) => {
-  switch (tier) {
-    case 'Space':
-      return { spaceId: ctx.spaceId ?? null };
-    case 'Organization':
-      return { organizationId: ctx.organizationId ?? null, spaceId: null };
-    case 'SpaceUser':
-      return { spaceId: ctx.spaceId ?? null, userId: ctx.userId ?? null };
-    case 'OrganizationUser':
-      return {
-        organizationId: ctx.organizationId ?? null,
-        userId: ctx.userId ?? null,
-        spaceId: null,
-      };
-    case 'User':
-      return { userId: ctx.userId ?? null, organizationId: null, spaceId: null };
-    default:
-      return { organizationId: null, spaceId: null };
-  }
+type EmailOwnedModel = 'EmailTemplate' | 'EmailComponent';
+
+const tierOwnerKeys = (
+  model: EmailOwnedModel,
+  ctx: OwnerScope,
+  tier: EmailOwnerModel,
+): OwnerKeys => {
+  const identified = ownerKindsTheArmIdentifies(model, 'ownerModel', tier).map(({ kind }) => kind);
+  const carried = polymorphicKeyColumns(model, 'ownerModel', tier);
+  return Object.fromEntries(
+    (Object.keys(BIND_NAME_BY_OWNER_MODEL) as BindableOwnerModel[]).flatMap((kind) => {
+      const bindName = BIND_NAME_BY_OWNER_MODEL[kind];
+      if (identified.includes(kind)) return [[kind, ctx[bindName] ?? null]];
+      return carried.includes(bindName) ? [] : [[kind, null]];
+    }),
+  );
 };
 
-export const ownerWhere = (ctx: OwnerScope, tier: EmailOwnerModel = ctx.ownerModel) => ({
+export const ownerWhere = (
+  model: EmailOwnedModel,
+  ctx: OwnerScope,
+  tier: EmailOwnerModel = ctx.ownerModel,
+) => ({
   locale: ctx.locale,
   deletedAt: null,
   ownerModel: tier,
-  ...tierKeys(ctx, tier),
+  ...wherePolymorphicSideIsOneOf(model, 'ownerModel', [
+    { ownerKeys: tierOwnerKeys(model, ctx, tier) },
+  ]),
   ...(tier === 'Organization' && ctx.ownerModel === 'Space' && { inheritToSpaces: true }),
 });
 

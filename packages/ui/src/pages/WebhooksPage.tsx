@@ -68,7 +68,7 @@ export const WebhooksPage = () => {
       key: 'model',
       label: 'Model',
       render: (item: WebhookSubscription) => (
-        <span className="text-muted-foreground">{item.model}</span>
+        <span className="text-muted-foreground">{item.resourceModel}</span>
       ),
     },
     {
@@ -97,7 +97,9 @@ export const WebhooksPage = () => {
     },
   ];
 
-  const handleCreate = (data: Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>) => {
+  const handleCreate = (
+    data: Pick<MeCreateWebhookSubscriptionData['body'], 'resourceModel' | 'url'>,
+  ) => {
     createMutation.mutate({ body: data });
     setIsModalOpen(false);
   };

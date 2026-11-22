@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { claimLane, db, fetchJobSupersededBy, laneKey, watchLane } from '@template/db';
+import { claimLane, db, fetchSupersededBy, laneKey, watchLane } from '@template/db';
 import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
+import { jobLaneStore } from '#/jobs/jobLaneStore';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import {
   flushOutbox,
@@ -269,70 +270,91 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect((await ctx.queue.getJob('keep-id'))?.id).toBe('keep-id');
   });
 
-  it('drops a buffered row displaced by a newer direct claim — no re-enqueue, no counter-mark', async () => {
+  it('drops a buffered row displaced by a newer direct enqueue, and leaves the newer job alone', async () => {
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     const lane = laneKey('recordAppEvent', 'lane-displaced');
+    const older = Bun.randomUUIDv7();
+    const newer = Bun.randomUUIDv7();
     await spillToOutbox({
       handlerName: 'recordAppEvent',
-      jobId: 'older',
+      jobId: older,
       dedupeKey: 'lane-displaced',
       data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'lane-displaced' },
       options: {},
     });
-    await claimLane(lane, 'older'); // the spill-time claim
-    await claimLane(lane, 'newer'); // a direct enqueue (cron / bypass) usurps while the row is buffered
+    await ctx.queue.redis.hset(ctx.queue.toKey(newer), 'name', 'recordAppEvent');
+    await claimLane(jobLaneStore, lane, newer);
 
     await runDrainOutboxPass();
 
-    // the displaced row is deleted without re-adding — re-claiming would superseded mark 'newer' right back
     expect(await db.jobOutbox.count()).toBe(0);
-    expect(await ctx.queue.getJob('older')).toBeUndefined();
-    expect(await ctx.queue.redis.get(lane)).toBe('newer');
-    expect(await fetchJobSupersededBy('newer')).toBeNull();
+    expect(await ctx.queue.getJob(older)).toBeUndefined();
+    expect(await ctx.queue.redis.get(lane)).toBe(newer);
+    expect(await fetchSupersededBy(jobLaneStore, newer)).toBeNull();
+    await ctx.queue.redis.del(ctx.queue.toKey(newer), lane);
   });
 
-  it('keeps the spill-time baton when re-enqueue fails (self-claim is not rolled back)', async () => {
+  it('a spill takes no lane; the drain takes it when it re-adds the row', async () => {
+    await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
+    const lane = laneKey('recordAppEvent', 'lane-at-drain');
+    const jobId = Bun.randomUUIDv7();
+    await spillToOutbox({
+      handlerName: 'recordAppEvent',
+      jobId,
+      dedupeKey: 'lane-at-drain',
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'lane-at-drain' },
+      options: {},
+    });
+    expect(await ctx.queue.redis.get(lane)).toBeNull();
+
+    await runDrainOutboxPass();
+
+    expect(await ctx.queue.redis.get(lane)).toBe(jobId);
+    await ctx.queue.redis.del(lane);
+  });
+
+  it('a failed re-add keeps the row for a retry', async () => {
     poison.add('poisonHandler');
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
-    const lane = laneKey('poisonHandler', 'lane-poison');
     await spillToOutbox({
       handlerName: 'poisonHandler',
-      jobId: 'p-lane',
+      jobId: Bun.randomUUIDv7(),
       dedupeKey: 'lane-poison',
       data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'lane-poison' },
       options: {},
     });
-    await claimLane(lane, 'p-lane'); // the spill-time claim
 
     await runDrainOutboxPass();
 
     const rows = await db.jobOutbox.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].attempts).toBe(1);
-    expect(await ctx.queue.redis.get(lane)).toBe('p-lane');
+    await ctx.queue.redis.del(laneKey('poisonHandler', 'lane-poison'));
   });
 
-  it('supersede lanes are handler-scoped — usurping one lane leaves another handler untouched', async () => {
+  it('supersede lanes are handler-scoped — taking one lane leaves another handler untouched', async () => {
     const laneA = laneKey('handlerA', 'shared');
     const laneB = laneKey('handlerB', 'shared');
-    let aUsurped = false;
-    let bUsurped = false;
-    await claimLane(laneA, 'jobA');
-    await claimLane(laneB, 'jobB');
-    const stopA = watchLane(laneA, 'jobA', () => {
-      aUsurped = true;
+    let aSuperseded = false;
+    let bSuperseded = false;
+    await claimLane(jobLaneStore, laneA, 'jobA');
+    await claimLane(jobLaneStore, laneB, 'jobB');
+    const stopA = watchLane(jobLaneStore, { lane: laneA, holderId: 'jobA' }, () => {
+      aSuperseded = true;
     });
-    const stopB = watchLane(laneB, 'jobB', () => {
-      bUsurped = true;
+    const stopB = watchLane(jobLaneStore, { lane: laneB, holderId: 'jobB' }, () => {
+      bSuperseded = true;
     });
 
-    await claimLane(laneA, 'jobA2'); // a newer job takes lane A's baton
-    await new Promise((r) => setTimeout(r, 700)); // > one poll
+    await ctx.queue.redis.hset(ctx.queue.toKey('jobA2'), 'name', 'handlerA');
+    await claimLane(jobLaneStore, laneA, 'jobA2');
+    await new Promise((r) => setTimeout(r, 700));
     stopA();
     stopB();
 
-    expect(aUsurped).toBe(true);
-    expect(bUsurped).toBe(false); // different handler's lane — untouched
+    expect(aSuperseded).toBe(true);
+    expect(bSuperseded).toBe(false);
+    await ctx.queue.redis.del(ctx.queue.toKey('jobA2'), laneA, laneB);
   });
 
   it('bumps a failed re-enqueue and keeps draining the rest (no batch stranding)', async () => {

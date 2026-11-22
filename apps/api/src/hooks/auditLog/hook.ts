@@ -19,7 +19,7 @@ import {
 import {
   auditActorColumns,
   buildContextFkFields,
-  buildSubjectFkFields,
+  buildSubjectColumns,
   computeDiff,
   omitNoopFieldsForAudit,
 } from '#/hooks/auditLog/utils';
@@ -92,7 +92,7 @@ const buildAuditEntry = (
     changes: (processedChanges as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     ...auditActorColumns(actor),
     ...contextFkFields,
-    ...(withSubjectFkFields ? buildSubjectFkFields(model, record) : {}),
+    ...buildSubjectColumns(model, record, { withKeys: withSubjectFkFields }),
   };
 };
 

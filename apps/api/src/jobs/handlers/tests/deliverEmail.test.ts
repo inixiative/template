@@ -96,7 +96,11 @@ describe('deliverEmail — send-time component version closure', () => {
       mjml: documentMjml('{{#component:closure-footer}}{{/component:closure-footer}}'),
       ownerModel: 'default',
     });
-    const log = await createLog({ senderModel: 'Space', senderSpaceId: space.id });
+    const log = await createLog({
+      senderModel: 'Space',
+      senderOrganizationId: space.organizationId,
+      senderSpaceId: space.id,
+    });
 
     await deliverEmail(
       ctx(),

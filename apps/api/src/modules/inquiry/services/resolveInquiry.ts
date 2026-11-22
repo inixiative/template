@@ -24,7 +24,7 @@ export const resolveInquiry = async (
   status: InquiryResolutionStatus,
   resolutionData: Record<string, unknown>,
   expectedUpdatedAt?: Date,
-): Promise<Inquiry> => {
+) => {
   const db = c.get('db');
 
   // why: the resolving inquiry is known to every write below (audit attribution, the request hooks), with or without a request scope

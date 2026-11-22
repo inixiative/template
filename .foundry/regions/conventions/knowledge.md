@@ -415,11 +415,21 @@ A polymorphic slot is named for the role the row plays, as `<side>Model` + typed
 
 Never `referenced*`.
 
-A side whose typed FKs are `onDelete: SetNull` keeps a plain id beside them: register the axis with
-`dualPolymorphismId` (`sourceId`, `targetId`) in `packages/db/src/registries/falsePolymorphism.ts`. Why:
+A side whose typed FKs are `onDelete: SetNull` to a model that can be hard-deleted keeps a plain id beside
+them: register the axis with `dualPolymorphismId` (`sourceId`, `targetId`, `subjectId`) in
+`packages/db/src/registries/falsePolymorphism.ts`. A soft-delete target is never hard-deleted and needs none. Why:
 SetNull nulls the typed key when the row it points at is hard-deleted, and only the plain id still says
 what it was; the required-FK rule accepts it in the key's place. CI rule
 `set-null-arm-requires-dual-polymorphism-id` enforces this; `Cascade` arms are exempt.
+
+Every side's columns follow its name (CI rule `polymorphic-sides-follow-their-name`). The discriminator is
+`<side>Model`; each key column of a side other than `owner` is `<side><Column>` (`resourceUserId`,
+`senderSpaceId`, `recordCustomerRelationshipId`); `owner` alone keys on the tenancy columns
+(`organizationId`, `spaceId`, `userId`, and the delegate owners' `integrationId`, `projectId`), because
+those name the tenant a row lives in on every model, polymorphic or not. A lowercase value (`default`,
+`admin`, `platform`) names no row and has no key columns; a PascalCase value is a model and has some. A
+dual polymorphism id is `<side>Id`, declared in the registry exactly when the model has that column. Why
+(Aron 2026-11-19): one rule for every side, so code and readers derive a side's columns from its name.
 
 Each side gets its own enum, named for the question it answers, even when the two lists overlap:
 `TagOwnerModel` (who can own a tag: `Tag.ownerModel`, `TagCategory.ownerModel`) and `TagResource`

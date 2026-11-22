@@ -11,7 +11,7 @@ import {
   registerBatch,
   unregisterBatch,
 } from '#/modules/batch/services/batchRegistry';
-import { interpolateRequest } from '#/modules/batch/services/interpolation';
+import { interpolateBatchableRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
 import type { RequestResult, StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
@@ -38,7 +38,7 @@ export const failOnRound: StrategyExecutor = async (
 
       const roundThunks = round.map((request) => async (): Promise<RequestResult> => {
         try {
-          const interpolatedRequest = interpolateRequest(request, {
+          const interpolatedRequest = interpolateBatchableRequest(app, request, {
             results,
             currentRound: roundIndex,
           });
@@ -82,11 +82,7 @@ export const failOnRound: StrategyExecutor = async (
     }
 
     const status =
-      failedRequests === 0
-        ? 'success'
-        : failedRequests === totalRequests
-          ? 'failed'
-          : 'partialSuccess';
+      failedRequests === 0 ? 'success' : successfulRequests === 0 ? 'failed' : 'partialSuccess';
 
     return {
       batch: results,

@@ -29,13 +29,14 @@ export { fetchCachedRecordWithTargetEntitlements, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
 export {
   claimLane,
-  fetchJobSupersededBy,
+  claimLaneUnlessNewerHolder,
+  fetchSupersededBy,
   holdLaneWhileParked,
+  type LaneClaim,
+  type LaneStore,
   laneKey,
-  markJobSupersededBy,
-  reclaimLane,
-  releaseLane,
-  supersededKey,
+  markDisplacedHolder,
+  type WatchedLane,
   watchLane,
 } from './lanes';
 // Distributed lock
@@ -106,6 +107,7 @@ export {
   isBindableOwnerModel,
   polymorphicBindings,
   polymorphicKeyColumn,
+  polymorphicKeyColumnOrThrow,
   polymorphicKeyColumns,
   rowPolymorphicAxisPointsAt,
 } from './registries/polymorphicAxisPointsAt';
@@ -168,7 +170,7 @@ export {
   toModelName,
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
-export { polymorphicArmRelation } from './utils/polymorphicArmKeys';
+export { polymorphicArmKeys, polymorphicArmRelation } from './utils/polymorphicArmKeys';
 export { relationsOfModel } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';

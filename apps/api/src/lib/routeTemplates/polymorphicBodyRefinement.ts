@@ -11,6 +11,7 @@ import {
   type PolymorphicModel,
   polymorphicAxis,
   polymorphicSchema,
+  sideKeyColumns,
 } from '@template/db';
 import { isNil, omitBy, pick } from 'lodash-es';
 import type { z } from 'zod';
@@ -32,7 +33,7 @@ export const polymorphicBodyRefinement = <
   options: PolymorphicBodyRefinementOptions<Model, Field> = {},
 ) => {
   const schema: z.ZodType = polymorphicSchema(model, axisField, options);
-  const axisColumns = [axisField, ...Object.values(polymorphicAxis(model, axisField).fkMap).flat()];
+  const axisColumns = [axisField, ...sideKeyColumns(polymorphicAxis(model, axisField))];
 
   return (body: Record<string, unknown>, ctx: z.RefinementCtx) => {
     const result = schema.safeParse(omitBy(pick(body, axisColumns), isNil));

@@ -4,19 +4,19 @@
  * @partOf feature:integrations, feature:webhooks
  * @uses infrastructure:prisma
  */
-import { db } from '@template/db';
+import { db, polymorphicKeyColumnOrThrow } from '@template/db';
 import type { WebhookModel } from '@template/db/generated/client/enums';
-import { integrationRecordForeignKeyForModel } from '#/modules/integration/services/integrationRecordForeignKeyForModel';
 
 export const isIntegrationRecordPoisoned = async (input: {
   integrationId: string;
-  model: WebhookModel;
-  resourceId: string;
+  recordModel: WebhookModel;
+  recordId: string;
 }): Promise<boolean> => {
   const record = await db.integrationRecord.findFirst({
     where: {
       integrationId: input.integrationId,
-      [integrationRecordForeignKeyForModel(input.model)]: input.resourceId,
+      [polymorphicKeyColumnOrThrow('IntegrationRecord', 'recordModel', input.recordModel)]:
+        input.recordId,
       poisonedAt: { not: null },
     },
     select: { id: true },

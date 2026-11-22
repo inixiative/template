@@ -13,6 +13,7 @@ export {
 export { type FetchAllPagesCap, fetchAllPages, type PageRequest } from './fetchAllPages';
 export { appPathSchema, isAppPath } from './isAppPath';
 export { isUuidV7, uuidV7Schema } from './isUuidV7';
+export type { ModelRow } from './modelRow';
 export { type RetryOptions, withRetry } from './retry';
 export { runAllWithConcurrencyLimit } from './runAllWithConcurrencyLimit';
 export { makeSerializedQueue, type SerializedQueue } from './serializedQueue';

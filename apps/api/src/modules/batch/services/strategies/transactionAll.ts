@@ -5,12 +5,13 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
+import { HTTPException } from 'hono/http-exception';
 import {
   refreshBatchContext,
   registerBatch,
   unregisterBatch,
 } from '#/modules/batch/services/batchRegistry';
-import { interpolateRequest } from '#/modules/batch/services/interpolation';
+import { interpolateBatchableRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
 import type { RequestResult, StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
@@ -40,7 +41,7 @@ export const transactionAll: StrategyExecutor = async (
 
             const roundPromises = round.map(async (request): Promise<RequestResult> => {
               try {
-                const interpolatedRequest = interpolateRequest(request, {
+                const interpolatedRequest = interpolateBatchableRequest(app, request, {
                   results,
                   currentRound: roundIndex,
                 });
@@ -62,15 +63,14 @@ export const transactionAll: StrategyExecutor = async (
 
             const roundResults = await Promise.all(roundPromises);
             results.push(roundResults);
-            completedRounds++;
 
-            for (const result of roundResults) {
-              if (result.error) {
-                failedRequests++;
-                throw new Error(`Request failed: ${result.error}`);
-              }
-              successfulRequests++;
+            const roundErrors = roundResults.filter((r) => r.error);
+            if (roundErrors.length > 0) {
+              failedRequests += roundErrors.length;
+              throw new Error(`Request failed: ${roundErrors[0].error}`);
             }
+
+            completedRounds++;
 
             if (roundIndex < rounds.length - 1) {
               await refreshBatchContext(batchId);
@@ -82,6 +82,8 @@ export const transactionAll: StrategyExecutor = async (
       },
       { timeout },
     );
+
+    successfulRequests = totalRequests;
 
     return {
       batch: results,
@@ -95,14 +97,15 @@ export const transactionAll: StrategyExecutor = async (
         status: 'success' as const,
       },
     };
-  } catch (_error) {
+  } catch (error) {
+    if (error instanceof HTTPException && error.status === 401) throw error;
     return {
       batch: results,
       summary: {
         totalRounds: rounds.length,
-        completedRounds,
+        completedRounds: 0,
         totalRequests,
-        successfulRequests,
+        successfulRequests: 0,
         failedRequests,
         strategy: 'transactionAll',
         status: 'failed' as const,

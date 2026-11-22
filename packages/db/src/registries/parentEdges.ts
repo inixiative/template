@@ -10,6 +10,7 @@ import {
   rowPolymorphicAxisPointsAt,
 } from '@template/db/registries/polymorphicAxisPointsAt';
 import { isModelName, type ModelName } from '@template/db/utils/modelNames';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 
 // why: one statement of "this row's change is that row's" for the cache hook, audit tenancy and the history read (DATABASE.md#parent-edges).
 /** The parent is the row a false-polymorphic axis points at, or the row one foreign key names. */
@@ -21,7 +22,7 @@ export const ParentEdgeRegistry = {
 
 const parentEdges: Partial<Record<ModelName, ParentEdge>> = ParentEdgeRegistry;
 
-export type ParentRow = { model: ModelName; id: string };
+export type ParentRow = ModelRow<ModelName>;
 
 export const parentEdgeOf = (child: ModelName): ParentEdge | null => parentEdges[child] ?? null;
 
@@ -36,7 +37,7 @@ export const parentRowAlongEdge = (
     return typeof id === 'string' ? { model: edge.parent, id } : null;
   }
   const target = rowPolymorphicAxisPointsAt(row, child, edge.axis);
-  return target && isModelName(target.kind) ? { model: target.kind, id: target.id } : null;
+  return target && isModelName(target.model) ? { model: target.model, id: target.id } : null;
 };
 
 export const parentOf = (child: ModelName, row: Record<string, unknown>): ParentRow | null => {

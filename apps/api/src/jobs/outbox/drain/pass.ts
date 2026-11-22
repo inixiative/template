@@ -4,10 +4,11 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma, infrastructure:redis
  */
-import { claimLane, db, fetchJobSupersededBy, laneKey, releaseLane } from '@template/db';
+import { claimLaneUnlessNewerHolder, db, laneKey, markDisplacedHolder } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import type { JobsOptions } from 'bullmq';
 import { fetchSlowLaneState } from '#/jobs/fetchSlowLaneState';
+import { jobLaneStore } from '#/jobs/jobLaneStore';
 import { withLanePriority } from '#/jobs/lanePriority';
 import {
   hasPendingFastSpills,
@@ -49,33 +50,27 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
       // Rows buffered before enqueue validated custom ids would otherwise fail every re-add and
       // quarantine deliverable work; the re-add mints a replacement instead.
       const jobId = isValidJobId(row.jobId) ? row.jobId : Bun.randomUUIDv7();
-      let previousHolder: string | null = null;
       try {
-        // A row marked superseded while buffered was displaced by a newer direct enqueue. Re-claiming it
-        // would mark the usurper superseded right back (mutual superseded marks → neither runs), so drop it.
-        if (baton && (await fetchJobSupersededBy(row.jobId))) {
-          displaced.push(row.id);
-          continue;
-        }
         if (jobId !== row.jobId) {
           log.info(
             `drainOutbox: replaced invalid buffered job id ${row.jobId} with ${jobId}`,
             LogScope.job,
           );
         }
-        // Claim TTL stretches by the re-added job's delay, same as the direct enqueue path.
-        if (baton) previousHolder = await claimLane(baton, jobId, opts.delay);
+        // A newer job holding the lane displaced this row while it was buffered: drop it.
+        const claim = baton
+          ? await claimLaneUnlessNewerHolder(jobLaneStore, baton, jobId, opts.delay)
+          : null;
+        if (claim && !claim.claimed) {
+          displaced.push(row.id);
+          continue;
+        }
         await queue.add(row.handlerName, data, { ...opts, jobId });
+        if (baton) await markDisplacedHolder(jobLaneStore, baton, jobId, claim?.previous ?? null);
         if (lane === JobLane.slow && opts.delay)
           await recordDelayedSlowAdd(queue, jobId, opts.delay);
         drained.push(row.id);
       } catch (e) {
-        // The re-add failed, so roll back the lane claim (fenced) — the row stays buffered for a
-        // retry; don't leave the prior job superseded by a job that never got created. A self-claim
-        // (the spill-time baton, previousHolder === jobId) must survive the retry — keep it.
-        if (baton && previousHolder !== jobId) {
-          await releaseLane(baton, jobId, previousHolder);
-        }
         failed.push(row.id);
         log.error(
           `drainOutbox: failed to re-enqueue ${row.handlerName} (${jobId}) — attempt ${row.attempts + 1}`,

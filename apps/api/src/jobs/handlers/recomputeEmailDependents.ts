@@ -6,12 +6,13 @@
  */
 import { db } from '@template/db';
 import { recomputeAndStoreMissingComponentSlugs } from '@template/email/render';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import type { WorkerContext } from '#/jobs/types';
 
 export type RecomputeEmailDependentsPayload = { slug: string };
 
-type Dependent = { model: 'EmailComponent' | 'EmailTemplate'; id: string; slug: string };
+type Dependent = ModelRow<'EmailComponent' | 'EmailTemplate'> & { slug: string };
 
 const directDependentsOf = async (slug: string): Promise<Dependent[]> => {
   const where = { componentSlugs: { has: slug }, deletedAt: null };

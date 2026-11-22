@@ -23,7 +23,7 @@ const communicationLogFactory = registerFactory('CommunicationLog', {
     },
     senderSpace: {
       modelName: 'Space',
-      foreignKey: { id: 'senderSpaceId' },
+      foreignKey: { id: 'senderSpaceId', organizationId: 'senderOrganizationId' },
       required: false,
     },
   },

@@ -4,14 +4,12 @@
  * @partOf primitive:appEvents
  * @uses primitive:websockets
  */
-import type { CustomerModel } from '@template/db/generated/client/enums';
 import { customerRelationshipSegmentMembershipRefetchHandoffs } from '#/appEvents/handlers/customerRelationship/customerRelationshipSegmentMembershipRefetchHandoffs';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
+import type { CustomerSide } from '#/modules/customerRelationship/lib/customerRelationshipSides';
 
-export type CustomerRelationshipSegmentsAddedPayload = {
+export type CustomerRelationshipSegmentsAddedPayload = CustomerSide & {
   customerRelationshipId: string;
-  customerModel: CustomerModel;
-  customerId: string;
   segmentIds: string[];
 };
 
