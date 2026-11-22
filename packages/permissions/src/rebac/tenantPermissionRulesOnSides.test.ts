@@ -147,7 +147,7 @@ describe('a tenant rule on a two-sided record', () => {
     expect(await reads({}, between(sender(), opened))).toBe(false);
   });
 
-  it("what is addressed to a member or a space of the organization is not the organization's to open", async () => {
+  it("an organization's rule reaches what its space received, and never what is addressed to a member", async () => {
     const opened = receiver({ 'db:inquiry': { read: whoeverReads('targetOrganization') } });
     const toMember = {
       ...between(sender(), opened),
@@ -161,8 +161,8 @@ describe('a tenant rule on a two-sided record', () => {
       targetSpaceId: 's2',
       targetSpace: { id: 's2', organizationId: 'o2', organization: opened },
     };
+    expect(await reads({ o2: 'viewer' }, toSpace)).toBe(true);
+    expect(await reads({ o1: 'viewer' }, toSpace)).toBe(false);
     expect(await reads({ o2: 'viewer' }, toMember)).toBe(false);
-    expect(await reads({ o2: 'viewer' }, toSpace)).toBe(false);
-    expect(await reads({ o2: 'viewer' }, between(sender(), opened))).toBe(true);
   });
 });

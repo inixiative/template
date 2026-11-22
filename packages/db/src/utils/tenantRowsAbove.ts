@@ -6,13 +6,12 @@
  */
 import { fieldAtPath } from '@inixiative/field-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import {
   type BindableOwnerModel,
   isBindableOwnerModel,
 } from '@template/db/registries/polymorphicAxisPointsAt';
 import { type ModelName, modelNames } from '@template/db/utils/modelNames';
-import { polymorphicArmRelation } from '@template/db/utils/polymorphicArmKeys';
+import { namedSideAxesOf, relationToKindOnSide } from '@template/db/utils/polymorphicSides';
 
 type Row = Record<string, unknown>;
 
@@ -40,33 +39,33 @@ export const tenantRowsAbove = (record: Row): { model: BindableOwnerModel; row: 
   return user ? [{ model: 'User', row: user }] : [];
 };
 
-const sideAxesOf = (model: ModelName) =>
-  (polymorphismConfigForModel(model)?.axes ?? []).filter(({ field }) => field !== 'ownerModel');
-
 /** The relations of a two-sided model that reach a tenant of this kind, one per side that can be one (`sourceOrganization`, `targetOrganization`). */
 export const relationsToTenantOnSides = (
   model: ModelName,
   tenantModel: BindableOwnerModel,
 ): string[] =>
-  sideAxesOf(model)
-    .filter((axis) => tenantModel in axis.fkMap)
-    .map((axis) => polymorphicArmRelation(model, axis.field, tenantModel).field);
+  namedSideAxesOf(model).flatMap((axis) => relationToKindOnSide(model, axis, tenantModel) ?? []);
 
 /**
- * The tenant on each side of a two-sided record that is itself a user, organization or space, with
- * the relation that reaches it. A side that is a member, or something a tenant holds, names none:
- * what is addressed to a member is the member's.
+ * The tenants on each side of a two-sided record, with the relation that reaches each: the party
+ * when it is itself a user, organization or space, and a space's organization above it. A side
+ * that is a member, or something a tenant holds, names none: what is addressed to a member is the
+ * member's.
  */
 export const tenantRowsOnSides = (
   model: ModelName,
   record: Row,
 ): { model: BindableOwnerModel; row: Row; relation: string }[] =>
-  sideAxesOf(model).flatMap((axis) => {
+  namedSideAxesOf(model).flatMap((axis) => {
     const party = record[axis.field];
     if (typeof party !== 'string' || !isBindableOwnerModel(party)) return [];
-    const relation = polymorphicArmRelation(model, axis.field, party).field;
-    const row = loaded(record[relation]);
-    return row ? [{ model: party, row, relation }] : [];
+    const tenantModels: BindableOwnerModel[] =
+      party === 'Space' ? ['Space', 'Organization'] : [party];
+    return tenantModels.flatMap((tenantModel) => {
+      const relation = relationToKindOnSide(model, axis, tenantModel);
+      const row = relation ? loaded(record[relation]) : undefined;
+      return relation && row ? [{ model: tenantModel, row, relation }] : [];
+    });
   });
 
 /**

@@ -12,6 +12,7 @@ import {
   Prisma,
   RuleReferenceError,
 } from '@template/db';
+import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/check';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Context } from 'hono';
@@ -64,6 +65,15 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
     return respondAppError(
       c,
       makeError({ status: 409, message: 'Lost the lock guarding this write; please retry' }),
+    );
+
+  if (err instanceof StoredPermissionRuleRefusedError)
+    return respondAppError(
+      c,
+      makeError({
+        status: 409,
+        message: `${err.message}. An owner sets the rules again on the record, or on its user, organization or space (setTenantPermissionRules; null clears them).`,
+      }),
     );
 
   if (err instanceof RuleReferenceError)

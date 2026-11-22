@@ -80,7 +80,7 @@ describe("a tenant rule on an inquiry walks through the tenant's own side", () =
     expect(await holds(await viewerKeyAt(other), 'inquiry', received.id, 'read')).toBe(false);
   });
 
-  it("a space opens its own side; the organization's rule does not reach what its space received", async () => {
+  it("a space opens its own side, and the organization's rule reaches what its space received", async () => {
     const organizationViewer = await viewerKeyAt(organization);
     const { entity: spaceUser } = await createSpaceUser(
       { role: 'viewer' },
@@ -97,6 +97,7 @@ describe("a tenant rule on an inquiry walks through the tenant's own side", () =
       data: { tenantPermissionRules: { 'db:inquiry': { read: whoeverReads('targetSpace') } } },
     });
     expect(await holds(spaceViewer, 'inquiry', toSpace.id, 'read')).toBe(true);
+    expect(await holds(organizationViewer, 'inquiry', toSpace.id, 'read')).toBe(false);
 
     await db.organization.update({
       where: { id: organization.id },
@@ -104,7 +105,7 @@ describe("a tenant rule on an inquiry walks through the tenant's own side", () =
         tenantPermissionRules: { 'db:inquiry': { read: whoeverReads('targetOrganization') } },
       },
     });
-    expect(await holds(organizationViewer, 'inquiry', toSpace.id, 'read')).toBe(false);
+    expect(await holds(organizationViewer, 'inquiry', toSpace.id, 'read')).toBe(true);
   });
 
   it('a stored rule off its side widens nothing', async () => {

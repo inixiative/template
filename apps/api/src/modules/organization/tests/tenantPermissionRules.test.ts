@@ -181,6 +181,32 @@ describe('tenantPermissionRules', () => {
     expect((await asStranger(del(`/api/v1/contact/${contact.id}`))).status).toBe(403);
   });
 
+  it('a stored rule the library refuses answers 409 and says how to fix it', async () => {
+    const { entity: contact } = await createContact({
+      organizationId: org.id,
+      ownerModel: 'Organization',
+      ...website(),
+    });
+    await db.organization.update({
+      where: { id: org.id },
+      data: {
+        tenantPermissionRules: {
+          'db:contact': {
+            read: { rule: { field: 'columnThatWasRenamed', operator: 'equals', value: 'x' } },
+          },
+        },
+      },
+    });
+    const response = await asStranger(get(`/api/v1/contact/${contact.id}`));
+    expect(response.status).toBe(409);
+    const { message } = (await response.json()) as { message: string };
+    expect(message).toContain('columnThatWasRenamed');
+    expect(message).toContain('setTenantPermissionRules');
+
+    expect((await open(null)).status).toBe(200);
+    expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(403);
+  });
+
   it('opens its spaces to read or operate, never to minting their tokens', async () => {
     const { entity: space } = await createSpace({}, { organization: org });
     const members = () => asStranger(get(`/api/v1/space/${space.id}/spaceUsers`));
