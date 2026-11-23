@@ -11,24 +11,35 @@ import { makeError } from '#/lib/errors';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateEntitlementWriter } from '#/lib/permissions/validateEntitlementWriter';
 import {
+  fetchIntegrationNamedByKey,
+  resolveRequestedEntitlements,
+} from '#/modules/inquiry/services/changeEntitlements/resolveRequestedEntitlements';
+import {
   type ChangeEntitlementsContent,
   type ChangeEntitlementsResolutionInput,
   changeEntitlementsContentSchema,
   changeEntitlementsResolutionInputSchema,
+  type RequestedEntitlement,
 } from '#/modules/inquiry/services/changeEntitlements/schema';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
+
+const keyedEntitlementForCheck = async ({
+  source,
+  ...rest
+}: Extract<RequestedEntitlement, { source: unknown }>) => {
+  await fetchIntegrationNamedByKey(source);
+  return { ...rest, sourceId: source.externalId };
+};
 
 export const holderModels: readonly EntitlementTarget['model'][] = ['Token', 'Integration'];
 
 // why: the same check the writer runs, so a request the writer would refuse is refused when asked
 const validate = async (_inquiry: Partial<Inquiry>, content: ChangeEntitlementsContent) => {
-  const problem = content.add
-    .map((input, index) => {
-      const found = entitlementProblem(toEntitlementEntry(input));
-      return found && `add.${index}: ${found}`;
-    })
-    .find(Boolean);
-  if (problem) throw makeError({ status: 422, message: problem });
+  for (const [index, requested] of content.add.entries()) {
+    const input = 'source' in requested ? await keyedEntitlementForCheck(requested) : requested;
+    const found = entitlementProblem(toEntitlementEntry(input));
+    if (found) throw makeError({ status: 422, message: `add.${index}: ${found}` });
+  }
 };
 
 const holderOf = async (inquiry: Inquiry) => {
@@ -62,7 +73,10 @@ export const changeEntitlementsService: InquiryService<
       });
     const writer = c.get('permix');
     const { model, holder } = await holderOf(inquiry);
-    const changes = { add: response.add, remove: response.remove };
+    const changes = {
+      add: await resolveRequestedEntitlements(writer, response.add),
+      remove: response.remove,
+    };
     // why: approving is issuing, so it runs the check the holder's own add and remove routes run
     await validateEntitlementWriter(writer, model, holder, changes);
     await changeEntitlements(writer, { model, id: holder.id }, changes);
