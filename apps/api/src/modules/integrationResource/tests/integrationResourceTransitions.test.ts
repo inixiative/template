@@ -133,7 +133,7 @@ describe('integration resource status transitions', () => {
     );
   });
 
-  it('registering a live untracked resource keeps it untracked unless a person tracks it', async () => {
+  it('registering a not-deleted untracked resource keeps it untracked unless a person tracks it', async () => {
     const row = await resource('untracked');
     expect((await register(itsIntegration, integration.id, {})).status).toBe(201);
     expect(await statusOf(row.id)).toBe('untracked');

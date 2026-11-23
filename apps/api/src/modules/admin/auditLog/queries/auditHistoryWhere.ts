@@ -14,7 +14,7 @@ import {
 } from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
 
-// why: `deletedAt: undefined` opts the subject out of the live scope, so a tombstoned child still joins.
+// why: `deletedAt: undefined` opts the subject out of the not-deleted scope, so a tombstoned child still joins.
 const subjectIs = (
   model: AuditSubjectModel,
   where: Record<string, string>,

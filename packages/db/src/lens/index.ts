@@ -3,7 +3,6 @@ export { lensFor } from '@template/db/lens/lensFor';
 export { omitForeignKeys } from '@template/db/lens/omitForeignKeys';
 export { orderablePaths } from '@template/db/lens/orderablePaths';
 export {
-  live,
   platformOrPointsAtBoundRow,
   pointsAtBoundRowAndIsNotDeleted,
   rerootConditionUnderRelation,

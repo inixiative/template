@@ -183,7 +183,7 @@ describe('handler: transferSpace', () => {
     let integrationTokenId: string;
     let spaceEmailTemplateId: string;
     let spaceProjectId: string;
-    let liveTargetMembersBefore: string[];
+    let notDeletedTargetMembersBefore: string[];
 
     beforeEach(async () => {
       const { entity: s } = await createSpace({}, { organization: org });
@@ -233,7 +233,7 @@ describe('handler: transferSpace', () => {
           spaceId: freshSpace.id,
         })
       ).entity.id;
-      liveTargetMembersBefore = (
+      notDeletedTargetMembersBefore = (
         await db.organizationUser.findMany({ where: { organizationId: targetOrg1.id } })
       ).map(({ id }) => id);
 
@@ -257,29 +257,29 @@ describe('handler: transferSpace', () => {
       expect(transferred.organizationId).toBe(targetOrg1.id);
     });
 
-    it('adds no live member to the target org', async () => {
+    it('adds no not-deleted member to the target org', async () => {
       const after = await db.organizationUser.findMany({
         where: { organizationId: targetOrg1.id },
       });
-      expect(after.map(({ id }) => id).sort()).toEqual([...liveTargetMembersBefore].sort());
+      expect(after.map(({ id }) => id).sort()).toEqual([...notDeletedTargetMembersBefore].sort());
     });
 
     it('keeps a member of the target org, with everything they own as that space member', async () => {
-      const live = { organizationId: targetOrg1.id, deletedAt: null };
+      const notDeleted = { organizationId: targetOrg1.id, deletedAt: null };
       expect(
         await db.spaceUser.findUniqueOrThrow({ where: { id: kept.spaceUser.id } }),
-      ).toMatchObject(live);
+      ).toMatchObject(notDeleted);
       expect(
         await db.integration.findUniqueOrThrow({ where: { id: kept.integration.id } }),
-      ).toMatchObject(live);
+      ).toMatchObject(notDeleted);
       expect(await db.token.findUniqueOrThrow({ where: { id: kept.token.id } })).toMatchObject({
         organizationId: targetOrg1.id,
       });
       expect(
         await db.emailTemplate.findUniqueOrThrow({ where: { id: kept.emailTemplate.id } }),
-      ).toMatchObject(live);
+      ).toMatchObject(notDeleted);
       expect(await db.project.findUniqueOrThrow({ where: { id: kept.project.id } })).toMatchObject(
-        live,
+        notDeleted,
       );
       const entitlements = await db.entitlement.findMany({
         where: { targetModel: 'SpaceUser', targetId: kept.spaceUser.id },
@@ -509,13 +509,13 @@ describe('handler: transferSpace', () => {
     const unchanged = await db.space.findUniqueOrThrow({ where: { id: freshSpace.id } });
     expect(unchanged.organizationId).toBe(org.id);
     for (const member of [kept, dropped]) {
-      const live = { organizationId: org.id, deletedAt: null };
+      const notDeleted = { organizationId: org.id, deletedAt: null };
       expect(
         await db.spaceUser.findUniqueOrThrow({ where: { id: member.spaceUser.id } }),
-      ).toMatchObject(live);
+      ).toMatchObject(notDeleted);
       expect(
         await db.integration.findUniqueOrThrow({ where: { id: member.integration.id } }),
-      ).toMatchObject(live);
+      ).toMatchObject(notDeleted);
       expect(await db.token.findUnique({ where: { id: member.token.id } })).not.toBeNull();
     }
     expect(

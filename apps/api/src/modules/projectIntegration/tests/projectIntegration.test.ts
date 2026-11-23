@@ -427,10 +427,10 @@ describe('ProjectIntegration CRUD, tenant boundary hook, ReBAC, AuditLog, and sp
     expect(resolveRes.status).toBe(200);
 
     // Org A integration link is tombstoned; Space integration link survives in Org B!
-    const liveOrgLink = await ownerApp.db.projectIntegration.findFirst({
+    const notDeletedOrgLink = await ownerApp.db.projectIntegration.findFirst({
       where: { id: orgLink.id },
     });
-    expect(liveOrgLink).toBeNull();
+    expect(notDeletedOrgLink).toBeNull();
 
     const tombstonedOrgLink = await ownerApp.db.withDeleted(() =>
       ownerApp.db.projectIntegration.findUnique({ where: { id: orgLink.id } }),

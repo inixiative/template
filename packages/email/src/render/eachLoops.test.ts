@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import type { LensNarrowing } from '@inixiative/json-rules';
-import { lensFor, live } from '@template/db/lens';
+import { lensFor } from '@template/db/lens';
 import type { RuleErrorSink } from '@template/email/render/evaluateTemplate';
 import { interpolate } from '@template/email/render/interpolate';
 import { defaultEmailLens, type EmailLens, emailLens } from '@template/email/rules/emailLens';
 import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
+import { notDeleted } from '@template/shared/rules';
 
 const render = (template: string, data: Record<string, unknown>, onError?: RuleErrorSink) =>
   interpolate(template, { data }, onError, { lens: defaultEmailLens });
@@ -121,7 +122,7 @@ describe('{{#each}} loops', () => {
           id: 'u1',
           name: 'Ann',
           tagAttachments: [
-            { deletedAt: null, tag: { id: 'live', name: 'a' } },
+            { deletedAt: null, tag: { id: 'notDeleted', name: 'a' } },
             { deletedAt: '2026-01-01', tag: { id: 'gone', name: 'b' } },
           ],
         },
@@ -130,7 +131,7 @@ describe('{{#each}} loops', () => {
       undefined,
       { lens },
     );
-    expect(out).toBe('live ');
+    expect(out).toBe('notDeleted ');
   });
 
   it('the stack a real send renders with — recipient narrowing, owner scope, planner target — shows one truth to tokens and rules', () => {
@@ -327,7 +328,11 @@ describe('{{#each}} loops', () => {
               condition: { field: 'deletedAt', operator: 'exists' },
             },
             relations: {
-              tagAttachments: { picks: [], where: live, relations: { tag: { picks: ['id'] } } },
+              tagAttachments: {
+                picks: [],
+                where: notDeleted,
+                relations: { tag: { picks: ['id'] } },
+              },
             },
           },
         } as LensNarrowing,
@@ -340,7 +345,7 @@ describe('{{#each}} loops', () => {
             id: 'u1',
             name: 'Ann',
             tagAttachments: [
-              { deletedAt: null, tag: { id: 'live' } },
+              { deletedAt: null, tag: { id: 'notDeleted' } },
               { deletedAt: '2026-01-01', tag: { id: 'gone' } },
             ],
           },

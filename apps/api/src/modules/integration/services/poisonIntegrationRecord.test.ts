@@ -93,7 +93,7 @@ describe('poisonIntegrationRecord', () => {
     });
   });
 
-  it('refuses a deleted integration, so its revive never meets a live record it did not own', async () => {
+  it('refuses a deleted integration, so its revive never meets a not-deleted record it did not own', async () => {
     const { customerRelationship, integration } = await setup();
     await poisonIntegrationRecord({
       integrationId: integration.id,

@@ -203,7 +203,7 @@ describe('a read through the cache inside a transaction', () => {
     expect(await read(other)).toBe('other');
     expect(await read(mine)).toBe('mine');
   });
-  it('computes the live view under withDeleted, and reads and writes the shared key', async () => {
+  it('computes the not-deleted view under withDeleted, and reads and writes the shared key', async () => {
     const { entity: user } = await createUser();
     await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
     expect(
@@ -217,13 +217,13 @@ describe('a read through the cache inside a transaction', () => {
     expect('value' in check ? check.value : 'miss').toBeNull();
 
     const shared = cacheKey('organization', 'withDeleted-shared');
-    await fetchThroughCache(shared, async () => 'live');
+    await fetchThroughCache(shared, async () => 'notDeleted');
     expect(await db.withDeleted(() => fetchThroughCache(shared, async () => 'recomputed'))).toBe(
-      'live',
+      'notDeleted',
     );
     expect(
       await db.txn(() => db.withDeleted(() => fetchThroughCache(shared, async () => 'in-txn'))),
-    ).toBe('live');
+    ).toBe('notDeleted');
   });
 
   it('drops a member’s cached relations when their organization is soft-deleted', async () => {

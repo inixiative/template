@@ -86,11 +86,11 @@ export const registerEmailTemplateSlugReservationHook = () => {
       DbAction.upsert,
     ],
     async (options) => {
-      const live = rowsAfterWrite(options).filter(
+      const notDeleted = rowsAfterWrite(options).filter(
         (row): row is TemplateWrite & { slug: string } =>
           typeof row.slug === 'string' && !row.deletedAt,
       );
-      const bySlug = groupBy(live, (row) => row.slug);
+      const bySlug = groupBy(notDeleted, (row) => row.slug);
       for (const slug of Object.keys(bySlug).sort()) await assertSlugAvailable(slug, bySlug[slug]);
     },
   );

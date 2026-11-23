@@ -81,7 +81,7 @@ describe('GET /me/organizations', () => {
     expect(pagination!.total).toBeGreaterThanOrEqual(2);
   });
 
-  it('hides a soft-deleted organization (injected live scope — no hand-written deletedAt in the controller)', async () => {
+  it('hides a soft-deleted organization (injected not-deleted scope — no hand-written deletedAt in the controller)', async () => {
     const { entity: org } = await createOrganization({ name: 'Soft Deleted Org' });
     await createOrganizationUser({ role: Role.member }, { user, organization: org });
     await db.organization.update({ where: { id: org.id }, data: { deletedAt: new Date() } });

@@ -24,7 +24,7 @@ import type { AppEnv } from '#/types/appEnv';
  * 2. Authorizes EVERY item upfront (`db:setting:manage`) — all-or-nothing (403 writes nothing).
  * 3. Sorts keys lexicographically to avoid lock-ordering deadlocks under concurrent writes.
  * 4. Inside one `db.txn`, locks each `(resourceModel, ...targetFks, key)` via
- *    `db.findForUpdate(..., { upserting: true })`, updates live row or creates new row,
+ *    `db.findForUpdate(..., { upserting: true })`, updates the not-deleted row or creates a new row,
  *    and returns raw `Setting[]`.
  */
 export const upsertResourceSettings = async (
@@ -82,16 +82,16 @@ export const upsertResourceSettings = async (
       };
 
       const locked = await db.findForUpdate<Setting>('Setting', whereKey, { upserting: true });
-      const live = locked.find((row) => row.deletedAt === null);
+      const notDeleted = locked.find((row) => row.deletedAt === null);
 
-      const resolvedDisabled = item.disabled ?? (live?.disabled ? false : undefined);
+      const resolvedDisabled = item.disabled ?? (notDeleted?.disabled ? false : undefined);
       const payload = buildAttributeUpsertData('setting', item.key, item.value, {
         resourceModel,
         disabled: resolvedDisabled,
       });
 
-      if (live) {
-        saved.push(await db.setting.update({ where: { id: live.id }, data: payload }));
+      if (notDeleted) {
+        saved.push(await db.setting.update({ where: { id: notDeleted.id }, data: payload }));
       } else {
         saved.push(
           await db.setting.create({
