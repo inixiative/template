@@ -1032,7 +1032,7 @@ const handleAction = async () => {
 
 ### 17. Bun-Native Resume Tests with VCR Fixtures
 
-**Pattern:** Provider task tests use `bun:test`, `mock.module(...)`, and the shared `VCR` (`@template/shared/vcr`, see [TESTING.md](TESTING.md#vcr-external-services)). The `init/api/*` clients (all but `cloudflare` and `resend`) own a `vcr`; tests queue cassettes with `api.vcr.queue(method, fixture)`.
+**Pattern:** Provider task tests use `bun:test`, `mock.module(...)`, and `@inixiative/vcr` (`createVcrRecorder`, see [TESTING.md](TESTING.md#vcr-external-services)). The `init/api/*` clients (all but `cloudflare` and `resend`) own a `VcrRecorder` (`vcr`); tests queue cassettes with `api.vcr.queue(method, fixture)`, reset with `clearQueues()`, and verify consumption with `isQueueEmpty()`.
 
 **Why:**
 - ✅ Fast, deterministic task coverage without live provider calls
