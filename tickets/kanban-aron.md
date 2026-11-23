@@ -8,7 +8,6 @@ config:
 ---
 kanban
   Todo
-    FEAT-027-status-changes-as-transitions
     BRAND-002-email-template-governance-business-plan
     INFRA-002-rules-builder
     INFRA-013-source-map-importer
@@ -42,6 +41,7 @@ kanban
     INFRA-030-reference-registry
     FEAT-021-segments
   Done
+    FEAT-027-status-changes-as-transitions
     DB-006-compiled-wheres-compose-through-the-fold
     DB-003-endpoint-decides-soft-delete-visibility
     INFRA-031-jobs-lane-and-lock-port-from-zealot
@@ -58,7 +58,6 @@ kanban
 - [BRAND-002: Email Template Governance — Business Plan](./BRAND-002-email-template-governance-business-plan.md) ⭐ - Stopgap SaaS launch plan (lens-gated template builder + API); sequences INFRA-002, INFRA-011, FEAT-009, COMM-001 + net-new billing/themes/builder
 
 **Permissions / lifecycle:**
-- [FEAT-027: Status and Role Changes as Transitions](./FEAT-027-status-changes-as-transitions.md) ⭐ - Integration resource status, re-registration and member role through `@inixiative/transitions` 0.9.0; one revive pattern (upsert)
 
 **Infrastructure:**
 - [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (rules-builder repo)
@@ -110,6 +109,8 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 - [FEAT-021: Segments](./FEAT-021-segments.md) - Zealot's Groups ported onto CustomerRelationship, stacked on INFRA-030: owner = `ProviderModel`, every segment is a rule (static = computed at save, dynamic = continuous, hand-picked = `id in [...]`), lens-driven validation + set/entity reconcile jobs through `branchOnRuleHealth` (degraded, not paused; `ruleIssues` on the owner's reads), Segment → Segment edges, business-event triggers handled by jobs, four membership events (owner + member side), read-many pair on me/user/organization/space, nested Owned/Memberships pages in all three contexts
 
 ### ✅ Done
+
+- [FEAT-027: Status and Role Changes as Transitions](./FEAT-027-status-changes-as-transitions.md) - Integration resource status, re-registration and member role through `@inixiative/transitions` 0.9.0; one revive pattern (upsert)
 - [DB-006: A rule that matches nobody matches nobody wherever it is composed](./DB-006-compiled-wheres-compose-through-the-fold.md) - compiled wheres compose through json-rules' `andWhere` / `orWhere`; a segment whose rule matched nobody had admitted every customer (Zealot ZLT-5489)
 - [DB-003: The endpoint decides soft-delete visibility](./DB-003-endpoint-decides-soft-delete-visibility.md) - Declared superadmin endpoints (the admin router) run unscoped; every other endpoint is live-scoped for every actor, superadmin included (ZLT-5486)
 - [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) - makeLock refresh hardening (#104), slow lane as lowest priority + per-worker slot share + per-lane depth budget (matches Zealot #2438), row-state delivery claim
@@ -122,11 +123,11 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 ## Quick Stats
 
 - **Total Tickets**: 21
-- **Todo**: 14
+- **Todo**: 13
 - **In Progress**: 6
 - **Review**: 2
 - **Blocked**: 2 (waiting on rules builder)
-- **Done**: 3
+- **Done**: 4
 
 ## Dependency Map
 

@@ -1,10 +1,10 @@
 # FEAT-027: Status and Role Changes as Transitions
 
-**Status**: 🆕 Not Started
+**Status**: ✅ Done (#327 `8337dc53`; Kingdom port kingdom#325 `6cc893d7`)
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-11-22
-**Updated**: 2026-11-22
+**Updated**: 2026-11-23
 **Related**: [FEAT-018](./FEAT-018-transitions.md) (the transitions primitive), [AUTH-004](./AUTH-004-rebac-bridges-schema-layering.md) § Transitions (adoption deferred until a second lifecycle; this is it), [FEAT-028](./FEAT-028-inquiry-lifecycle-as-transitions.md) (Inquiry, later), template #313 (integration resource soft delete and revive)
 
 ---
