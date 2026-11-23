@@ -9,6 +9,7 @@ import { LogScope, log } from '@template/shared/logger';
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { errorReporter } from '#/lib/errorReporter';
 import { makeError } from '#/lib/errors';
+import { isSystemProbe } from '#/lib/utils/authProbe';
 import { incrementFixedWindows } from '#/middleware/rateLimit/queries/incrementFixedWindows';
 import type { RateLimitKey } from '#/middleware/rateLimit/rateLimitKeys';
 import type { AppEnv } from '#/types/appEnv';
@@ -41,6 +42,8 @@ export const enforceRateLimit = async (
     throw new RangeError(`Rate limit cost must be a non-negative integer, got ${cost}`);
   }
   if (cost === 0) return undefined;
+  // why: a system probe re-checks a request already admitted; limiting it would leave the check unmade
+  if (isSystemProbe(c)) return undefined;
 
   const active = rules
     .map((rule) => ({
