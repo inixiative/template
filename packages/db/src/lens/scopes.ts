@@ -7,12 +7,11 @@
 import { type Condition, Operator } from '@inixiative/json-rules';
 import { conditionPolymorphicAxisPointsAtBoundRow } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
-
-export const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
+import { notDeleted } from '@template/shared/rules';
 
 export const platformOrPointsAtBoundRow = (model: ModelName, axis: string): Condition => ({
   all: [
-    live,
+    notDeleted,
     {
       any: [
         { field: axis, operator: Operator.equals, value: 'platform' },
@@ -23,7 +22,7 @@ export const platformOrPointsAtBoundRow = (model: ModelName, axis: string): Cond
 });
 
 export const pointsAtBoundRowAndIsNotDeleted = (model: ModelName, axis: string): Condition => ({
-  all: [conditionPolymorphicAxisPointsAtBoundRow(model, axis), live],
+  all: [conditionPolymorphicAxisPointsAtBoundRow(model, axis), notDeleted],
 });
 
 export const rerootConditionUnderRelation = (relation: string, condition: Condition): Condition => {

@@ -7,7 +7,8 @@
 import { Operator } from '@inixiative/json-rules';
 import type { Action } from '@inixiative/transitions';
 import { memberRoleWrite } from '@template/permissions/rebac/rebacSchemaRules';
-import { notDeleted, updating } from '@template/permissions/transitions/utils';
+import { updating } from '@template/permissions/transitions/utils';
+import { notDeleted } from '@template/shared/rules';
 
 export const memberRoleTransitions = (
   tenant: 'organization' | 'space',

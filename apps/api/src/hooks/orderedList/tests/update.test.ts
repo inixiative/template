@@ -5,7 +5,7 @@ import { createUser } from '@template/db/test';
 import {
   createEmailContact,
   createPhoneContact,
-  fetchLiveContactPositions,
+  fetchNotDeletedContactPositions,
   phoneContactData,
   positionOfContact,
   positions,
@@ -20,7 +20,7 @@ describe('reorder via direct position update', () => {
     const c = await createPhoneContact(u.id);
     await db.contact.update({ where: { id: c.id }, data: { position: 1 } });
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
     expect(positionOfContact(rows, c.id)).toBe(1);
     expect(positionOfContact(rows, a.id)).toBe(2);
@@ -34,7 +34,7 @@ describe('reorder via direct position update', () => {
     const c = await createPhoneContact(u.id);
     await db.contact.update({ where: { id: a.id }, data: { position: 3 } });
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
     expect(positionOfContact(rows, b.id)).toBe(1);
     expect(positionOfContact(rows, c.id)).toBe(2);
@@ -47,7 +47,7 @@ describe('reorder via direct position update', () => {
     await createPhoneContact(u.id);
     await db.contact.update({ where: { id: a.id }, data: { position: 1 } });
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2]);
     expect(positionOfContact(rows, a.id)).toBe(1);
   });
@@ -60,7 +60,7 @@ describe('reorder via direct position update', () => {
     const d = await createPhoneContact(u.id);
     await db.contact.update({ where: { id: b.id }, data: { position: 4 } });
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3, 4]);
     expect(positionOfContact(rows, a.id)).toBe(1);
     expect(positionOfContact(rows, c.id)).toBe(2);
@@ -77,7 +77,7 @@ describe('reorder via direct position update', () => {
     // Sending position=999 or MAX+1 should clamp to 3 (last), not create a gap at 4.
     await db.contact.update({ where: { id: a.id }, data: { position: 999 } });
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
     expect(positionOfContact(rows, b.id)).toBe(1);
     expect(positionOfContact(rows, c.id)).toBe(2);
@@ -111,7 +111,7 @@ describe('upsert', () => {
       }),
     );
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positionOfContact(rows, b.id)).toBe(2);
   });
 });
@@ -167,7 +167,7 @@ describe('bulk position manipulation', () => {
     await db.contact.update({ where: { id: b.id }, data: { position: 3 } });
     await db.contact.update({ where: { id: c.id }, data: { position: 2 } });
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
     expect(positionOfContact(rows, a.id)).toBe(1);
     expect(positionOfContact(rows, c.id)).toBe(2);

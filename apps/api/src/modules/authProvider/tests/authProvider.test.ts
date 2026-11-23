@@ -357,7 +357,7 @@ describe('AuthProvider Endpoints', () => {
       });
       expect(secrets).toEqual({ clientSecret: 'gitlab-new-secret' });
     });
-    it('adding a live provider again refreshes it and leaves a disabled one disabled', async () => {
+    it('adding a not-deleted provider again refreshes it and leaves a disabled one disabled', async () => {
       const body = {
         type: 'OAUTH',
         provider: 'bitbucket',

@@ -213,7 +213,7 @@ const awaitingClassification = [
 const unclassifiedRelation = (violation: string) => violation.split(', which is soft-deleted')[0];
 
 describe('every child of a soft-deleted parent is classified', () => {
-  it('finds no child the cascade would leave live under a tombstoned parent beyond those awaiting classification', () => {
+  it('finds no child the cascade would leave not-deleted under a tombstoned parent beyond those awaiting classification', () => {
     expect(unclassifiedChildViolations().map(unclassifiedRelation)).toEqual(awaitingClassification);
   });
 

@@ -11,7 +11,8 @@ import {
   actingAsTheRecordsIntegration,
 } from '@template/permissions/rebac/rebacSchemaRules';
 import type { ActionRule } from '@template/permissions/rebac/types';
-import { creating, fieldIs, notDeleted, updating } from '@template/permissions/transitions/utils';
+import { creating, fieldIs, updating } from '@template/permissions/transitions/utils';
+import { notDeleted } from '@template/shared/rules';
 
 const { tracked, missing, untracked } = IntegrationResourceStatus;
 

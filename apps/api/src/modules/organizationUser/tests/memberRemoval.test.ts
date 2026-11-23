@@ -93,7 +93,7 @@ describe('removing a member tombstones the row, and what it held goes with it', 
 });
 
 describe('inviting a removed member back revives their row', () => {
-  it('the same row comes back live with the role of the new invite, and its integrations with it', async () => {
+  it('the same row comes back not deleted with the role of the new invite, and its integrations with it', async () => {
     const { entity: member, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
@@ -126,10 +126,12 @@ describe('inviting a removed member back revives their row', () => {
     );
     expect(response.status).toBe(200);
 
-    const live = await db.organizationUser.findMany({
+    const notDeleted = await db.organizationUser.findMany({
       where: { organizationId: organization.id, userId: context.user.id },
     });
-    expect(live.map(({ id, role }) => ({ id, role }))).toEqual([{ id: member.id, role: 'member' }]);
+    expect(notDeleted.map(({ id, role }) => ({ id, role }))).toEqual([
+      { id: member.id, role: 'member' },
+    ]);
     expect(
       (await db.integration.findUnique({ where: { id: integration.id } }))?.deletedAt,
     ).toBeNull();

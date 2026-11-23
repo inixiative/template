@@ -63,7 +63,7 @@ export const toEntitlementInput = (entry: EntitlementEntry): EntitlementInput =>
 
 const grantsBelow = (row: EntitlementFields): boolean => row.where == null && row.lens == null;
 
-/** The well-formed entries a holder's live rows grant, for the library's checks; a row nothing narrows grants below its record. */
+/** The well-formed entries a holder's not-deleted rows grant, for the library's checks; a row nothing narrows grants below its record. */
 export const entitlementEntriesOfHolder = (holder: {
   targetEntitlements?: EntitlementFields[] | null;
 }): EntitlementEntry[] =>

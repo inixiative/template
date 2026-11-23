@@ -18,7 +18,7 @@ export const entitlementTargetModelOf = (accessor: string): EntitlementTargetMod
   toModelName(accessor) as EntitlementTargetModel;
 
 // why: a member arm keys on the owner chain, so an OrganizationUser's relation also reaches its SpaceUser rows.
-/** A target's live rows, in the order they were granted. */
+/** A target's not-deleted rows, in the order they were granted. */
 export const includeTargetEntitlements = <M extends EntitlementTargetModel>(targetModel: M) => ({
   targetEntitlements: {
     where: { deletedAt: null, targetModel },

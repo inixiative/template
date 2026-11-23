@@ -3,10 +3,10 @@
 // ============================================================================
 // Soft-deleted: a member that leaves is tombstoned, so the entitlements
 // anchored at it and the rules naming it are degraded rather than left naming
-// a live row; it is tombstoned and revived with its segment. A member that
+// a not-deleted row; it is tombstoned and revived with its segment. A member that
 // comes back is revived (the unique holds tombstones too). Rows are
 // written only by the reconcile jobs, which diff the segment's rule against
-// the live set. The member's customer relationship must
+// the not-deleted set. The member's customer relationship must
 // belong to the segment's owner as its provider (segmentMemberOwner hook).
 
 model SegmentMember {

@@ -31,7 +31,7 @@ export type EntitlementChanges = { add?: EntitlementInput[]; remove?: string[] }
 
 type Holder = Record<string, unknown> & { id: string; targetEntitlements: Entitlement[] };
 
-const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
+const fetchNotDeletedRows = async (target: EntitlementTarget): Promise<Holder> => {
   const holder = (await db.delegate(target.model).findUnique({
     where: { id: target.id },
     include: includeTargetEntitlements(target.model),
@@ -85,7 +85,7 @@ export const changeEntitlements = (
 ): Promise<Entitlement[]> =>
   db.txn(() =>
     withOwnerLock({ ownerModel: target.model, ownerId: target.id }, 'entitlements', async () => {
-      const holder = await liveRows(target);
+      const holder = await fetchNotDeletedRows(target);
       const removedIds = uniq(remove);
       if (
         holder.targetEntitlements.filter((row) => removedIds.includes(row.id)).length !==
@@ -131,6 +131,6 @@ export const changeEntitlements = (
           ),
         });
 
-      return (await liveRows(target)).targetEntitlements;
+      return (await fetchNotDeletedRows(target)).targetEntitlements;
     }),
   );

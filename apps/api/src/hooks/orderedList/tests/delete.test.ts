@@ -6,7 +6,7 @@ import {
   createEmailContact,
   createPhoneContact,
   fetchContactPositionsIncludingDeleted,
-  fetchLiveContactPositions,
+  fetchNotDeletedContactPositions,
   positionOfContact,
   positions,
   softDeleteContact,
@@ -20,7 +20,7 @@ describe('soft delete', () => {
     const c = await createPhoneContact(u.id); // 3
     await softDeleteContact(b.id);
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2]);
     expect(positionOfContact(rows, a.id)).toBe(1);
     expect(positionOfContact(rows, c.id)).toBe(2);
@@ -38,11 +38,11 @@ describe('soft delete', () => {
     await softDeleteContact(b.id);
 
     const all = await fetchContactPositionsIncludingDeleted(u.id);
-    const live = all.filter((r) => !r.deletedAt);
-    const dead = all.filter((r) => r.deletedAt);
-    expect(positions(live)).toEqual([1]);
-    expect(dead.every((r) => r.position < 0)).toBe(true);
-    expect(new Set(dead.map((r) => r.position)).size).toBe(2);
+    const notDeleted = all.filter((r) => !r.deletedAt);
+    const deleted = all.filter((r) => r.deletedAt);
+    expect(positions(notDeleted)).toEqual([1]);
+    expect(deleted.every((r) => r.position < 0)).toBe(true);
+    expect(new Set(deleted.map((r) => r.position)).size).toBe(2);
   });
 });
 
@@ -52,12 +52,12 @@ describe('bulk soft delete', () => {
     const a = await createPhoneContact(u.id); // 1
     const b = await createPhoneContact(u.id); // 2 — already soft-deleted before the bulk op
     const c = await createPhoneContact(u.id); // 3
-    await softDeleteContact(b.id); // live: a=1, c=2; b: negative
+    await softDeleteContact(b.id); // not-deleted: a=1, c=2; b: negative
     const bAfterFirstDelete = await db.withDeleted(() =>
       db.contact.findUnique({ where: { id: b.id } }),
     );
     const bOldNeg = bAfterFirstDelete!.position;
-    // Bulk-set deletedAt over a where-clause that matches BOTH live and the already-deleted row.
+    // Bulk-set deletedAt over a where-clause that matches BOTH not-deleted and the already-deleted row.
     // Only a and c should transition; b must keep its existing negative.
     await db.contact.updateManyAndReturn({
       where: { userId: u.id, type: ContactType.phone },
@@ -86,14 +86,14 @@ describe('bulk soft delete', () => {
       data: { deletedAt: new Date() },
     });
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
     expect(positionOfContact(rows, a.id)).toBe(1);
     expect(positionOfContact(rows, c.id)).toBe(2);
     expect(positionOfContact(rows, e.id)).toBe(3);
   });
 
-  it('bulk delete all leaves empty live list', async () => {
+  it('bulk delete all leaves empty not-deleted list', async () => {
     const { entity: u } = await createUser();
     await createPhoneContact(u.id);
     await createPhoneContact(u.id);
@@ -104,7 +104,7 @@ describe('bulk soft delete', () => {
       data: { deletedAt: new Date() },
     });
 
-    expect(await fetchLiveContactPositions(u.id)).toEqual([]);
+    expect(await fetchNotDeletedContactPositions(u.id)).toEqual([]);
     const all = await fetchContactPositionsIncludingDeleted(u.id);
     expect(all.every((r) => r.position < 0)).toBe(true);
     expect(new Set(all.map((r) => r.position)).size).toBe(3);
@@ -121,7 +121,7 @@ describe('hard delete', () => {
     const c = await createPhoneContact(u.id); // 3
     await db.contact.delete({ where: { id: b.id } });
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2]);
     expect(positionOfContact(rows, a.id)).toBe(1);
     expect(positionOfContact(rows, c.id)).toBe(2);
@@ -137,7 +137,7 @@ describe('hard delete', () => {
 
     await db.contact.deleteMany({ where: { id: { in: [b.id, d.id] } } });
 
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
   });
 });
@@ -157,8 +157,8 @@ describe('multi-scope isolation — bulk soft-delete', () => {
       data: { deletedAt: new Date() },
     });
 
-    expect(positions(await fetchLiveContactPositions(u1.id))).toEqual([1]);
-    expect(positions(await fetchLiveContactPositions(u2.id))).toEqual([1, 2]);
+    expect(positions(await fetchNotDeletedContactPositions(u1.id))).toEqual([1]);
+    expect(positions(await fetchNotDeletedContactPositions(u2.id))).toEqual([1, 2]);
   });
 
   it('deleting across two types (same owner) compacts each list independently', async () => {
@@ -173,8 +173,10 @@ describe('multi-scope isolation — bulk soft-delete', () => {
       data: { deletedAt: new Date() },
     });
 
-    expect(positions(await fetchLiveContactPositions(u.id, ContactType.phone))).toEqual([1]);
-    expect(positions(await fetchLiveContactPositions(u.id, ContactType.email))).toEqual([1, 2]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id, ContactType.phone))).toEqual([1]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id, ContactType.email))).toEqual([
+      1, 2,
+    ]);
   });
 });
 
@@ -193,8 +195,8 @@ describe('multi-scope isolation — deleteMany', () => {
 
     await db.contact.deleteMany({ where: { id: { in: [b1.id, b2.id] } } });
 
-    expect(positions(await fetchLiveContactPositions(u1.id))).toEqual([1, 2]);
-    expect(positions(await fetchLiveContactPositions(u2.id))).toEqual([1, 2]);
+    expect(positions(await fetchNotDeletedContactPositions(u1.id))).toEqual([1, 2]);
+    expect(positions(await fetchNotDeletedContactPositions(u2.id))).toEqual([1, 2]);
   });
 
   it('deleting across two types (same owner) compacts each list independently', async () => {
@@ -208,7 +210,11 @@ describe('multi-scope isolation — deleteMany', () => {
 
     await db.contact.deleteMany({ where: { id: { in: [pb.id, eb.id] } } });
 
-    expect(positions(await fetchLiveContactPositions(u.id, ContactType.phone))).toEqual([1, 2]);
-    expect(positions(await fetchLiveContactPositions(u.id, ContactType.email))).toEqual([1, 2, 3]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id, ContactType.phone))).toEqual([
+      1, 2,
+    ]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id, ContactType.email))).toEqual([
+      1, 2, 3,
+    ]);
   });
 });

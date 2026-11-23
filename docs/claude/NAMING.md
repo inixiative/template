@@ -84,6 +84,7 @@ business logic is `services`; `handlers` are jobs and frontend event handlers. Z
 | redact | Erase a person, and nothing else | `redactUser`, `meRedact` |
 | internal | Never leaves, for privilege rather than secrecy | `INTERNAL_FIELDS` (`User.platformRole`) |
 | no-op | A change not worth recording or firing | `NOOP_FIELDS` |
+| `deleted` / `notDeleted` | Soft-delete state (`deletedAt != null` vs `deletedAt == null`). Never use `live` for non-deleted rows (R-2026-11-23-04) | `deleted`, `notDeleted` (`@template/shared/rules`), `notDeletedWhere`, `notDeletedIncludes`, `reDensifyNotDeleted` |
 
 A webhook excludes no-op, sensitive and internal fields (`WEBHOOK_EXCLUDED_FIELDS`). Side names for
 polymorphic slots and back-relations are under [Polymorphic Sides](#polymorphic-sides).
@@ -318,7 +319,7 @@ between them, only where a holder is handed to the library:
 | the holder it is installed on | `targetModel`, `targetId` and the arm's keys: `targetTokenId`, `targetIntegrationId`, or a member's owner chain (`targetOrganizationId`, `targetSpaceId`, `targetUserId`, as `Inquiry`'s) |
 
 Back-relations follow the side rule: `targetEntitlements` on a holder, `sourceEntitlements` on every
-model an entitlement can anchor at. An API response carries the holder's live rows as stored, under
+model an entitlement can anchor at. An API response carries the holder's not-deleted rows as stored, under
 `targetEntitlements`; a create body's `entitlements` is a list of `EntitlementInput` rows. Entries
 never cross the API. The grantor has no name on the row: it is the target's owner.
 
