@@ -143,7 +143,9 @@ secondaryStorage: {
 
 Fixed windows, one atomic Lua `INCR` + first-hit `PEXPIRE` per rule (`incrementFixedWindows`).
 A `rateLimit(rules)` middleware ANDs its rules — every bucket must be under its max — and 429s
-with `Retry-After`. Redis down = fail open (warn + report, request allowed).
+with `Retry-After`. Redis down = fail open (warn + report, request allowed). A system probe (the
+server's own re-check of a request already admitted, `isSystemProbe`) is never limited: a limited
+re-check would be a check that never ran.
 
 ```typescript
 // `${redisNamespace.limit}:${scope}:${windowMs}:${identity}`
