@@ -15,6 +15,7 @@ kanban
     FEAT-019-extensible-actor-attribution
     FEAT-016-inquiry-lineage-and-nesting
     FEAT-026-settings-primitive
+    FEAT-028-inquiry-lifecycle-as-transitions
     API-001-idempotency-and-safe-retries
     API-003-cursor-pagination-mode
     API-005-route-permission-tags
@@ -98,6 +99,7 @@ kanban
 - [INFRA-050: Signet and KCP-Backed Init Provisioning](./INFRA-050-signet-kcp-init.md) - optional Kingdom Signet / KCP transport for `init/` over shared `@inixiative/infra` drivers; standalone direct token mode stays default
 - [INFRA-051: Attribute json-rules Support, Postgres JSONB array_contains, and Paginated Lens Filtering](./INFRA-051-attribute-json-rules-and-lens-filtering.md) - unify `ATTRIBUTE_MODELS` operators with `@inixiative/json-rules` + `filterLens` (including Postgres `GIN` `array_contains` and Zealot-style paginated relation filtering)
 - [FEAT-026: Settings Primitive](./FEAT-026-settings-primitive.md) - lightweight false-polymorphic `Setting` model, code-first registry, typed value columns, and `/api/v1/setting/info` discovery for app-owned configuration dials
+- [FEAT-028: Inquiry Lifecycle as Transitions](./FEAT-028-inquiry-lifecycle-as-transitions.md) - Inquiry's draft → sent → resolved statuses through `@inixiative/transitions`, after FEAT-027; held on purpose
 - [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - json-rules `clockUnit` with the `clock.finestUnit` engine floor; `Segment.clockUnit` derived at save, `lastComputedAt` on what was computed; one cron row per unit, looking one unit ahead
 - [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
 - [INFRA-040: WS Content Channels](./INFRA-040-ws-content-channels.md) - Every delivery is a channel named by content and authorized by its route; drops per-user addressing

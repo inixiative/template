@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { createVcrRecorder, fetchCliVersion } from '@inixiative/vcr';
+import { captureInTest } from './capture';
 import { fetchInfisicalTokenOrThrow } from './infisical';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisicalRailway');
@@ -34,21 +35,21 @@ type EnsureRailwaySyncInput = {
 };
 
 class InfisicalRailwayApi {
-  readonly vcr = new VCR(FIXTURES_DIR, {
+  readonly vcr = createVcrRecorder(FIXTURES_DIR, {
     service: 'infisical|railway',
     // Composite: either CLI bumping should invalidate cassettes since
     // both shape the Infisical-Railway connection payload.
     version: async () =>
-      (await Promise.all([cliVersion('infisical'), cliVersion('railway')])).join('|'),
+      (await Promise.all([fetchCliVersion('infisical'), fetchCliVersion('railway')])).join('|'),
     sanitizers: {
-      createRailwayConnection: { fn: () => 'MASKED' },
+      createRailwayConnection: { transform: () => 'MASKED' },
     },
   });
 
   async listRailwayConnections(
     infisicalProjectId: string,
   ): Promise<Array<{ id: string; name: string }>> {
-    return this.vcr.capture('listRailwayConnections', async () => {
+    return captureInTest(this.vcr, 'listRailwayConnections', async () => {
       const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/app-connections/railway?projectId=${infisicalProjectId}`,
@@ -67,7 +68,7 @@ class InfisicalRailwayApi {
   }
 
   async listRailwaySyncs(infisicalProjectId: string): Promise<RailwaySecretSync[]> {
-    return this.vcr.capture('listRailwaySyncs', async () => {
+    return captureInTest(this.vcr, 'listRailwaySyncs', async () => {
       const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/secret-syncs/railway?projectId=${infisicalProjectId}`,
@@ -88,7 +89,7 @@ class InfisicalRailwayApi {
     railwayApiToken: string,
     connectionName: string,
   ): Promise<string> {
-    return this.vcr.capture('createRailwayConnection', async () => {
+    return captureInTest(this.vcr, 'createRailwayConnection', async () => {
       const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch('https://app.infisical.com/api/v1/app-connections/railway', {
         method: 'POST',
@@ -122,7 +123,7 @@ class InfisicalRailwayApi {
   }
 
   async createRailwaySync(input: EnsureRailwaySyncInput): Promise<void> {
-    return this.vcr.capture('createRailwaySync', async () => {
+    return captureInTest(this.vcr, 'createRailwaySync', async () => {
       const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch('https://app.infisical.com/api/v1/secret-syncs/railway', {
         method: 'POST',
@@ -154,7 +155,7 @@ class InfisicalRailwayApi {
   }
 
   async ensureRailwaySync(input: EnsureRailwaySyncInput): Promise<void> {
-    return this.vcr.capture('ensureRailwaySync', async () => {
+    return captureInTest(this.vcr, 'ensureRailwaySync', async () => {
       const existing = (await this.listRailwaySyncs(input.infisicalProjectId)).find(
         (s) => s.name === input.syncName,
       );

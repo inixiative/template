@@ -69,12 +69,13 @@ Unused imports and exports, dead files, stale docs and comments, baselines or ex
 
 ## 9. Verify and record
 
-1. `bun run check` passes. A failure that predates the change is shown on the default branch, not assumed.
-2. Commit the fixes.
-3. Record the scan of the exact commit you will push:
+1. Commit the fixes.
+2. Record the scan of the exact commit you will push:
 
 ```bash
-git rev-parse HEAD > "$(git rev-parse --git-path cleanup-scan)"
+bun run cleanup-scan:record
 ```
+
+It refuses an uncommitted tree, runs `bun run check`, and records HEAD only when the check passes and the checkout did not change while it ran. A failure that predates the change is shown on the default branch, not assumed.
 
 The gate compares that file to HEAD, so any later commit needs a new scan. In the report, name what each step found and fixed, or that it found nothing.

@@ -16,9 +16,9 @@ config.install();
 
 describe('Vercel Bootstrap Resume Scenario', () => {
   beforeEach(() => {
-    infisicalVercelApi.vcr.clear();
-    vercelApi.vcr.clear();
-    githubApi.vcr.clear();
+    infisicalVercelApi.vcr.clearQueues();
+    vercelApi.vcr.clearQueues();
+    githubApi.vcr.clearQueues();
     config.clearAll();
 
     config.setConfig({
@@ -59,9 +59,9 @@ describe('Vercel Bootstrap Resume Scenario', () => {
   });
 
   afterEach(() => {
-    infisicalVercelApi.vcr.clear();
-    vercelApi.vcr.clear();
-    githubApi.vcr.clear();
+    infisicalVercelApi.vcr.clearQueues();
+    vercelApi.vcr.clearQueues();
+    githubApi.vcr.clearQueues();
     config.clearAll();
   });
 
@@ -80,7 +80,7 @@ describe('Vercel Bootstrap Resume Scenario', () => {
     expect(config.mocks.markComplete).toHaveBeenCalledWith('vercel', 'createInfisicalConnection');
 
     // No other API calls happened — VCR would throw if they did (no cassettes queued)
-    expect(infisicalVercelApi.vcr.isEmpty()).toBe(true);
-    expect(vercelApi.vcr.isEmpty()).toBe(true);
+    expect(infisicalVercelApi.vcr.isQueueEmpty()).toBe(true);
+    expect(vercelApi.vcr.isQueueEmpty()).toBe(true);
   }, 60_000);
 });

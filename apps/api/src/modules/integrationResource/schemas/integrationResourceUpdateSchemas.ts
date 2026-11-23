@@ -7,8 +7,8 @@ import { z } from '@hono/zod-openapi';
 import { IntegrationResourceStatus } from '@template/db/generated/client/enums';
 
 export const integrationResourceUpdateBodySchema = z.object({
-  status: z.enum([IntegrationResourceStatus.tracked, IntegrationResourceStatus.untracked]).openapi({
+  status: z.enum(IntegrationResourceStatus).openapi({
     description:
-      'Untracked: we stop listening; it leaves every list and flow, keeps its grants, and no sync brings it back. Tracked: listen again (the app sync sets `missing`, never a caller).',
+      "Tracked: we listen. Untracked: we stop listening; it leaves every list and flow, keeps its grants, and no sync brings it back. Missing: the provider no longer lists it. A person tracks and untracks; only the resource's own integration moves it to or from missing.",
   }),
 });

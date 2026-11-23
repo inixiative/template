@@ -64,7 +64,7 @@ const unscannedCommits = (landing: Landing): string[] => {
 };
 
 const SCAN = 'Run the cleanup scan before pushing: .claude/skills/cleanup-scan/SKILL.md';
-const RECORD = 'Its last step records the scanned commit: git rev-parse HEAD > "$(git rev-parse --git-path cleanup-scan)"';
+const RECORD = 'Its last step records the scanned commit: bun run cleanup-scan:record (runs the full check, then records HEAD)';
 
 export const gate = (input: HookInput): string | undefined => {
   const command = input.tool_input?.command;

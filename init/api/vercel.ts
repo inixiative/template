@@ -1,6 +1,7 @@
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { createVcrRecorder, fetchCliVersion } from '@inixiative/vcr';
 import { execAsync, execFileWithInput } from '../utils/exec';
+import { captureInTest } from './capture';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/vercel');
 
@@ -8,7 +9,10 @@ export type VercelTeam = { id: string; name: string; slug: string };
 export type VercelProject = { id: string; name: string; framework: string | null };
 
 class VercelApi {
-  readonly vcr = new VCR(FIXTURES_DIR, { service: 'vercel', version: () => cliVersion('vercel') });
+  readonly vcr = createVcrRecorder(FIXTURES_DIR, {
+    service: 'vercel',
+    version: () => fetchCliVersion('vercel'),
+  });
 
   async fetchVercelToken(): Promise<string> {
     const { homedir } = await import('node:os');
@@ -35,7 +39,7 @@ class VercelApi {
   }
 
   async listTeams(): Promise<VercelTeam[]> {
-    return this.vcr.capture('listTeams', async () => {
+    return captureInTest(this.vcr, 'listTeams', async () => {
       try {
         const result = await this.vercelAPI('/v2/teams', 'GET');
         if (result.error) return [];
@@ -53,7 +57,7 @@ class VercelApi {
   }
 
   async fetchProject(projectName: string, teamId?: string): Promise<VercelProject | null> {
-    return this.vcr.capture('fetchProject', async () => {
+    return captureInTest(this.vcr, 'fetchProject', async () => {
       try {
         const teamFlag = teamId ? `--scope ${teamId}` : '';
         const { stdout, stderr } = await execAsync(
@@ -74,7 +78,7 @@ class VercelApi {
   }
 
   async createProject(projectName: string, teamId?: string): Promise<VercelProject> {
-    return this.vcr.capture('createProject', async () => {
+    return captureInTest(this.vcr, 'createProject', async () => {
       try {
         const teamFlag = teamId ? `--scope ${teamId}` : '';
         await execAsync(`vercel project add ${projectName} ${teamFlag}`, { encoding: 'utf-8' });
@@ -90,7 +94,7 @@ class VercelApi {
   }
 
   async checkGitHubIntegration(): Promise<unknown> {
-    return this.vcr.capture('checkGitHubIntegration', async () => {
+    return captureInTest(this.vcr, 'checkGitHubIntegration', async () => {
       try {
         return await this.vercelAPI('/v1/integrations/git-namespaces?provider=github', 'GET');
       } catch (_error) {
@@ -100,7 +104,7 @@ class VercelApi {
   }
 
   async findGitHubNamespace(orgName: string): Promise<string | null> {
-    return this.vcr.capture('findGitHubNamespace', async () => {
+    return captureInTest(this.vcr, 'findGitHubNamespace', async () => {
       const integrations = await this.checkGitHubIntegration();
       if (!integrations || !Array.isArray(integrations)) return null;
       const namespace = integrations.find(
@@ -117,7 +121,7 @@ class VercelApi {
     _branch: string = 'main',
     teamId?: string,
   ): Promise<void> {
-    return this.vcr.capture('linkGitHub', async () => {
+    return captureInTest(this.vcr, 'linkGitHub', async () => {
       try {
         const teamFlag = teamId ? `--scope ${teamId}` : '';
         await execAsync(`vercel link --project ${projectId} ${teamFlag} --yes`, {
@@ -156,7 +160,7 @@ class VercelApi {
     environment: 'production' | 'preview' | 'development',
     teamId?: string,
   ): Promise<void> {
-    return this.vcr.capture('addEnvVar', async () => {
+    return captureInTest(this.vcr, 'addEnvVar', async () => {
       try {
         await execFileWithInput(
           'vercel',
@@ -190,7 +194,7 @@ class VercelApi {
       git?: { deploymentEnabled?: Record<string, boolean> };
     },
   ): Promise<void> {
-    return this.vcr.capture('updateProjectSettings', async () => {
+    return captureInTest(this.vcr, 'updateProjectSettings', async () => {
       const result = await this.vercelAPI(
         `/v10/projects/${projectId}?teamId=${teamId}`,
         'PATCH',
@@ -210,7 +214,7 @@ class VercelApi {
     environmentName: string,
     trackedBranch: string,
   ): Promise<string> {
-    return this.vcr.capture('createCustomEnvironment', async () => {
+    return captureInTest(this.vcr, 'createCustomEnvironment', async () => {
       const result = await this.vercelAPI(
         `/v9/projects/${projectId}/custom-environments?teamId=${teamId}`,
         'POST',
@@ -234,7 +238,7 @@ class VercelApi {
     production: boolean = false,
     teamId?: string,
   ): Promise<{ url: string; deploymentId: string }> {
-    return this.vcr.capture('deploy', async () => {
+    return captureInTest(this.vcr, 'deploy', async () => {
       try {
         const teamFlag = teamId ? `--scope ${teamId}` : '';
         const prodFlag = production ? '--prod' : '';

@@ -50,8 +50,6 @@
     "./reference/*": "./src/reference/*.ts",
     "./settings": "./src/settings/index.ts",
     "./settings/*": "./src/settings/*.ts",
-    "./vcr": "./src/vcr/index.ts",
-    "./vcr/*": "./src/vcr/*.ts",
     "./ws": "./src/ws/index.ts",
     "./styles/theme.css": "./styles/theme.css",
     "./telemetry": "./src/telemetry/index.ts",

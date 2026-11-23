@@ -2,15 +2,15 @@
  * @atlas
  * @kind client
  * @partOf feature:email
- * @uses primitive:shared
+ * @uses none
  */
 import { join } from 'node:path';
+import { createVcrRecorder, fetchHttpVersion } from '@inixiative/vcr';
 import type {
   EmailVerifier,
   VerificationResult,
   VerificationStatus,
 } from '@template/email/client/verification/types';
-import { fetchVersion, VCR } from '@template/shared/vcr';
 
 type BouncerResponse = {
   email: string;
@@ -35,12 +35,12 @@ const toResult = (data: BouncerResponse): VerificationResult => ({
 
 class BouncerVerifierClient implements EmailVerifier {
   // No SDK + no CLI — derive version from the docs page for this specific
-  // endpoint. When their contract changes, the doc updates, the body hash
-  // shifts, cassettes auto-refresh.
-  readonly vcr = new VCR(FIXTURES_DIR, {
+  // endpoint so `assertCassettesFresh` and `VCR_MODE=record` track contract
+  // shifts via the docs body hash.
+  readonly vcr = createVcrRecorder(FIXTURES_DIR, {
     service: 'bouncer',
     version: () =>
-      fetchVersion('https://docs.usebouncer.com/api-reference/real-time/verify-email.md'),
+      fetchHttpVersion('https://docs.usebouncer.com/api-reference/real-time/verify-email.md'),
     sanitizers: { verify: { keys: SANITIZE_KEYS } },
   });
   private readonly apiKey: string;

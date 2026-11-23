@@ -1,9 +1,10 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { createVcrRecorder, fetchCliVersion } from '@inixiative/vcr';
 import { fetchSecretOrThrow } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
 import { fetchProjectConfig } from '../utils/fetchProjectConfig';
+import { captureInTest } from './capture';
 
 const PLANETSCALE_API = 'https://api.planetscale.com/v1';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/planetscale');
@@ -66,9 +67,9 @@ export type PlanetScaleRegion = {
 type ServiceToken = { id: string; token: string };
 
 class PlanetScaleApi {
-  readonly vcr = new VCR(FIXTURES_DIR, {
+  readonly vcr = createVcrRecorder(FIXTURES_DIR, {
     service: 'planetscale',
-    version: () => cliVersion('pscale'),
+    version: () => fetchCliVersion('pscale'),
     sanitizers: {
       createPassword: { keys: SANITIZE_KEYS },
       createRole: { keys: SANITIZE_KEYS },
@@ -102,7 +103,7 @@ class PlanetScaleApi {
   }
 
   async listOrganizations(): Promise<PlanetScaleOrganization[]> {
-    return this.vcr.capture('listOrganizations', async () => {
+    return captureInTest(this.vcr, 'listOrganizations', async () => {
       const { stdout } = await execAsync(
         'pscale org list --format json',
         withCliEnv({ encoding: 'utf-8' }),
@@ -113,7 +114,7 @@ class PlanetScaleApi {
   }
 
   async listRegions(organizationName: string): Promise<PlanetScaleRegion[]> {
-    return this.vcr.capture('listRegions', async () => {
+    return captureInTest(this.vcr, 'listRegions', async () => {
       const { stdout } = await execAsync(
         `pscale region list --org ${organizationName} --format json`,
         withCliEnv({ encoding: 'utf-8' }),
@@ -137,7 +138,7 @@ class PlanetScaleApi {
   }
 
   async fetchOrganization(orgName: string): Promise<PlanetScaleOrganization> {
-    return this.vcr.capture('fetchOrganization', () =>
+    return captureInTest(this.vcr, 'fetchOrganization', () =>
       this.request<PlanetScaleOrganization>(`/organizations/${orgName}`),
     );
   }
@@ -148,7 +149,7 @@ class PlanetScaleApi {
     region: string = 'us-east-1',
     clusterSize: string = 'PS-5',
   ): Promise<PlanetScaleDatabase> {
-    return this.vcr.capture('createDatabase', async () => {
+    return captureInTest(this.vcr, 'createDatabase', async () => {
       const response = await this.request<{ data: PlanetScaleDatabase }>(
         `/organizations/${organizationName}/databases`,
         {
@@ -170,7 +171,7 @@ class PlanetScaleApi {
     organizationName: string,
     databaseName: string,
   ): Promise<PlanetScaleDatabase> {
-    return this.vcr.capture('fetchDatabase', async () => {
+    return captureInTest(this.vcr, 'fetchDatabase', async () => {
       const { stdout } = await execAsync(
         `pscale database show ${databaseName} --org ${organizationName} --format json`,
         withCliEnv({ encoding: 'utf-8' }),
@@ -189,7 +190,7 @@ class PlanetScaleApi {
       default_branch?: string;
     },
   ): Promise<void> {
-    return this.vcr.capture('updateDatabaseSettings', async () => {
+    return captureInTest(this.vcr, 'updateDatabaseSettings', async () => {
       await this.request<PlanetScaleDatabase>(
         `/organizations/${organizationName}/databases/${databaseName}`,
         {
@@ -201,7 +202,7 @@ class PlanetScaleApi {
   }
 
   async listDatabases(organizationName: string): Promise<PlanetScaleDatabase[]> {
-    return this.vcr.capture('listDatabases', async () => {
+    return captureInTest(this.vcr, 'listDatabases', async () => {
       const response = await this.request<{ data?: PlanetScaleDatabase[] }>(
         `/organizations/${organizationName}/databases`,
       );
@@ -215,7 +216,7 @@ class PlanetScaleApi {
     branchName: string,
     parentBranch?: string,
   ): Promise<PlanetScaleBranch> {
-    return this.vcr.capture('createBranch', async () => {
+    return captureInTest(this.vcr, 'createBranch', async () => {
       const parentFlag = parentBranch ? `--from ${parentBranch}` : '';
       const { stdout } = await execAsync(
         `pscale branch create ${databaseName} ${branchName} --org ${organizationName} ${parentFlag} --format json`,
@@ -230,7 +231,7 @@ class PlanetScaleApi {
     databaseName: string,
     branchName: string,
   ): Promise<PlanetScaleBranch> {
-    return this.vcr.capture('fetchBranch', async () => {
+    return captureInTest(this.vcr, 'fetchBranch', async () => {
       const { stdout } = await execAsync(
         `pscale branch show ${databaseName} ${branchName} --org ${organizationName} --format json`,
         withCliEnv({ encoding: 'utf-8' }),
@@ -240,7 +241,7 @@ class PlanetScaleApi {
   }
 
   async listBranches(organizationName: string, databaseName: string): Promise<PlanetScaleBranch[]> {
-    return this.vcr.capture('listBranches', async () => {
+    return captureInTest(this.vcr, 'listBranches', async () => {
       const response = await this.request<{ data?: PlanetScaleBranch[] }>(
         `/organizations/${organizationName}/databases/${databaseName}/branches`,
       );
@@ -254,7 +255,7 @@ class PlanetScaleApi {
     branchName: string,
     roleName: string,
   ): Promise<PlanetScalePassword> {
-    return this.vcr.capture('createRole', async () => {
+    return captureInTest(this.vcr, 'createRole', async () => {
       const { stdout } = await execAsync(
         `pscale role create ${databaseName} ${branchName} ${roleName} --org ${organizationName} --inherited-roles postgres --format json`,
         withCliEnv({ encoding: 'utf-8' }),
@@ -279,7 +280,7 @@ class PlanetScaleApi {
     branchName: string,
     passwordName: string,
   ): Promise<PlanetScalePassword> {
-    return this.vcr.capture('createPassword', async () => {
+    return captureInTest(this.vcr, 'createPassword', async () => {
       const { stdout } = await execAsync(
         `pscale password create ${databaseName} ${branchName} ${passwordName} --org ${organizationName} --format json`,
         withCliEnv({ encoding: 'utf-8' }),
@@ -303,7 +304,7 @@ class PlanetScaleApi {
     databaseName: string,
     branchName: string,
   ): Promise<PlanetScalePassword[]> {
-    return this.vcr.capture('listPasswords', async () => {
+    return captureInTest(this.vcr, 'listPasswords', async () => {
       const response = await this.request<{ data?: PlanetScalePassword[] }>(
         `/organizations/${organizationName}/databases/${databaseName}/branches/${branchName}/passwords`,
       );
@@ -316,7 +317,7 @@ class PlanetScaleApi {
     databaseName: string,
     branchName: string,
   ): Promise<PlanetScaleBranch> {
-    return this.vcr.capture('promoteBranch', async () => {
+    return captureInTest(this.vcr, 'promoteBranch', async () => {
       const { stdout } = await execAsync(
         `pscale branch promote ${databaseName} ${branchName} --org ${organizationName} --format json`,
         withCliEnv({ encoding: 'utf-8' }),
@@ -331,7 +332,7 @@ class PlanetScaleApi {
     branchName: string,
     newName: string,
   ): Promise<PlanetScaleBranch> {
-    return this.vcr.capture('renameBranch', () =>
+    return captureInTest(this.vcr, 'renameBranch', () =>
       this.request<PlanetScaleBranch>(
         `/organizations/${organizationName}/databases/${databaseName}/branches/${branchName}`,
         { method: 'PATCH', body: JSON.stringify({ new_name: newName }) },
@@ -344,7 +345,7 @@ class PlanetScaleApi {
     databaseName: string,
     branchName: string,
   ): Promise<void> {
-    return this.vcr.capture('deleteBranch', async () => {
+    return captureInTest(this.vcr, 'deleteBranch', async () => {
       await execAsync(
         `pscale branch delete ${databaseName} ${branchName} --org ${organizationName} --force`,
         withCliEnv({ encoding: 'utf-8' }),
@@ -353,7 +354,7 @@ class PlanetScaleApi {
   }
 
   async createServiceToken(orgName: string): Promise<ServiceToken> {
-    return this.vcr.capture('createServiceToken', async () => {
+    return captureInTest(this.vcr, 'createServiceToken', async () => {
       const { stdout } = await execAsync(
         `pscale service-token create --org ${orgName} --format json`,
         {
