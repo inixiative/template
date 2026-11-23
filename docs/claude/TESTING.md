@@ -450,21 +450,24 @@ export const createModel = modelFactory.create;
 
 ## VCR (external services)
 
-Tests never call a live provider. `@template/shared/vcr` is a thin wrapper around `@inixiative/vcr` (`VCR`, `createVcrRecorder`, `createVcrFetch`, `createScrubber`, `fetchCliVersion`, `fetchHttpVersion`, `assertCassettesFresh`). A client that talks to an external service wraps each call in `VCR`:
+Tests never call a live provider. External service clients use `@inixiative/vcr` directly (`createVcrRecorder`, `createVcrFetch`, `createScrubber`, `fetchCliVersion`, `fetchHttpVersion`, `assertCassettesFresh`):
 
 ```typescript
-readonly vcr = new VCR(FIXTURES_DIR, { service: 'resend', version: () => '…', sanitizers });
+import { createVcrRecorder } from '@inixiative/vcr';
+
+readonly vcr = createVcrRecorder(FIXTURES_DIR, { service: 'resend', version: () => '…', sanitizers });
 
 send(options) {
+  if (process.env.NODE_ENV !== 'test') return this.__send(options);
   return this.vcr.capture('send', () => this.__send(options));
 }
 ```
 
-- Outside tests (`ENVIRONMENT !== 'test'`), `VCR.capture` and `VCR.captureResponse` call straight through.
-- In tests, the test queues a cassette per call (`client.vcr.queue('send', 'accepted')`). Mode resolves via `VCR_MODE` (`replay` by default — fails closed on missing cassettes without hitting the network; `auto` records missing cassettes; `record` re-records live and holds back structural drift to `*.pending.json`).
+- Outside tests (`NODE_ENV !== 'test'`), clients call straight through without touching cassettes (`init/api/*` shares `captureInTest` in `init/api/capture.ts`).
+- In tests, queue a cassette per call (`client.vcr.queue('send', 'accepted')`), clear with `clearQueues()`, and assert exhaustion with `isQueueEmpty()`. Mode resolves via `VCR_MODE` (`replay` by default — fails closed on missing cassettes without hitting the network; `auto` records missing cassettes; `record` re-records live and holds back structural drift to `*.pending.json`).
 - A recorded `status >= 400` replays as a thrown error.
 - Per-method sanitizers (`{ keys, transform, isArray, binaryExtension }`) and `@inixiative/vcr`'s built-in scrubber redact secrets, headers, URL credentials, and emails before writing, and `assertScrubbed` gates every cassette write.
-- For HTTP clients that take a `fetch` implementation, pass `client.vcr.recorder` (or `createVcrRecorder`) to `createVcrFetch` for request-matched HTTP record/replay.
+- For HTTP clients that take a `fetch` implementation, pass `client.vcr` (a `VcrRecorder`) to `createVcrFetch` for request-matched HTTP record/replay.
 
 Used by `packages/email` (Resend, Bouncer) and the `init/api/*` clients (all but `cloudflare` and `resend`).
 

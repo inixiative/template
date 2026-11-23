@@ -1,10 +1,11 @@
 import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { fetchCliVersion, VCR } from '../../packages/shared/src/vcr';
+import { createVcrRecorder, fetchCliVersion } from '@inixiative/vcr';
 import { fetchSecretOrThrow, setSecretAsync } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
 import { fetchProjectConfig } from '../utils/fetchProjectConfig';
+import { captureInTest } from './capture';
 
 const escapeName = (str: string) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
@@ -35,7 +36,7 @@ export type RailwayDeployment = {
 };
 
 class RailwayApi {
-  readonly vcr = new VCR(FIXTURES_DIR, {
+  readonly vcr = createVcrRecorder(FIXTURES_DIR, {
     service: 'railway',
     version: () => fetchCliVersion('railway'),
     sanitizers: {
@@ -81,7 +82,7 @@ class RailwayApi {
   }
 
   async fetchRailwayUserToken(): Promise<string> {
-    return this.vcr.capture('fetchRailwayUserToken', async () => {
+    return captureInTest(this.vcr, 'fetchRailwayUserToken', async () => {
       const config = await fetchProjectConfig();
       const projectId = config.infisical.projectId;
       if (!projectId)
@@ -110,7 +111,7 @@ class RailwayApi {
   }
 
   async fetchRailwayWorkspaceToken(): Promise<string> {
-    return this.vcr.capture('fetchRailwayWorkspaceToken', async () => {
+    return captureInTest(this.vcr, 'fetchRailwayWorkspaceToken', async () => {
       const config = await fetchProjectConfig();
       const projectId = config.infisical.projectId;
       if (!projectId)
@@ -132,7 +133,7 @@ class RailwayApi {
   }
 
   async listWorkspaces(): Promise<RailwayWorkspace[]> {
-    return this.vcr.capture('listWorkspaces', async () => {
+    return captureInTest(this.vcr, 'listWorkspaces', async () => {
       try {
         const { stdout } = await execAsync('railway whoami --json', { encoding: 'utf-8' });
         const data = JSON.parse(stdout.trim()) as { workspaces?: RailwayWorkspace[] };
@@ -144,7 +145,7 @@ class RailwayApi {
   }
 
   async createProject(workspaceId: string, name: string): Promise<RailwayProject> {
-    return this.vcr.capture('createProject', async () => {
+    return captureInTest(this.vcr, 'createProject', async () => {
       try {
         const { stdout } = await execAsync(`railway init -n "${name}" -w "${workspaceId}" --json`, {
           encoding: 'utf-8',
@@ -162,7 +163,7 @@ class RailwayApi {
   }
 
   async isServiceConnectedToGitHub(serviceId: string, environmentId: string): Promise<boolean> {
-    return this.vcr.capture('isServiceConnectedToGitHub', async () => {
+    return captureInTest(this.vcr, 'isServiceConnectedToGitHub', async () => {
       const data = await this.railwayGraphQLUser<{
         serviceInstance: { id: string; source: { repo: string } | null } | null;
       }>(
@@ -186,7 +187,7 @@ class RailwayApi {
     repo: string,
     branch: string = 'main',
   ): Promise<void> {
-    return this.vcr.capture('connectServiceToGitHub', async () => {
+    return captureInTest(this.vcr, 'connectServiceToGitHub', async () => {
       // Two-step wiring:
       //   1. serviceInstanceUpdate sets the repo on the service's source — Railway
       //      uses this to know WHERE to fetch code from at deploy time.
@@ -254,7 +255,7 @@ class RailwayApi {
   }
 
   async renameService(serviceId: string, name: string): Promise<void> {
-    return this.vcr.capture('renameService', async () => {
+    return captureInTest(this.vcr, 'renameService', async () => {
       await this.railwayGraphQLUser<{ serviceUpdate: { id: string; name: string } }>(
         `
           mutation ServiceUpdate($id: String!, $input: ServiceUpdateInput!) {
@@ -271,7 +272,7 @@ class RailwayApi {
     environmentId: string,
     input: { rootDirectory?: string; buildCommand?: string; startCommand?: string },
   ): Promise<void> {
-    return this.vcr.capture('updateServiceInstanceConfig', async () => {
+    return captureInTest(this.vcr, 'updateServiceInstanceConfig', async () => {
       const data = await this.railwayGraphQLUser<{ serviceInstanceUpdate: boolean }>(
         `
           mutation ServiceInstanceUpdate(
@@ -293,7 +294,7 @@ class RailwayApi {
   }
 
   async fetchProjectVolumes(projectId: string): Promise<Array<{ id: string; name: string }>> {
-    return this.vcr.capture('fetchProjectVolumes', async () => {
+    return captureInTest(this.vcr, 'fetchProjectVolumes', async () => {
       const data = await this.railwayGraphQLUser<{
         project: { volumes: { edges: Array<{ node: { id: string; name: string } }> } };
       }>(
@@ -314,7 +315,7 @@ class RailwayApi {
     projectId: string,
     serviceName: string,
   ): Promise<{ id: string; name: string } | null> {
-    return this.vcr.capture('fetchServiceVolume', async () => {
+    return captureInTest(this.vcr, 'fetchServiceVolume', async () => {
       const volumes = await this.fetchProjectVolumes(projectId);
       if (volumes.length === 0) return null;
       // Match by name first (works after volumes are renamed in earlier steps)
@@ -326,7 +327,7 @@ class RailwayApi {
   }
 
   async renameVolume(volumeId: string, name: string): Promise<void> {
-    return this.vcr.capture('renameVolume', async () => {
+    return captureInTest(this.vcr, 'renameVolume', async () => {
       await this.railwayGraphQLUser<{ volumeUpdate: { id: string; name: string } }>(
         `
           mutation VolumeUpdate($volumeId: String!, $input: VolumeUpdateInput!) {
@@ -344,7 +345,7 @@ class RailwayApi {
     environmentName: string,
     name: string,
   ): Promise<RailwayService> {
-    return this.vcr.capture('createService', async () => {
+    return captureInTest(this.vcr, 'createService', async () => {
       await execAsync(`railway environment link "${escapeName(environmentName)}"`, {
         encoding: 'utf-8',
         cwd: process.cwd(),
@@ -364,7 +365,7 @@ class RailwayApi {
   }
 
   async fetchProjectEnvironments(projectId: string): Promise<Array<{ id: string; name: string }>> {
-    return this.vcr.capture('fetchProjectEnvironments', async () => {
+    return captureInTest(this.vcr, 'fetchProjectEnvironments', async () => {
       const data = await this.railwayGraphQLUser<{
         project: { environments: { edges: Array<{ node: { id: string; name: string } }> } };
       }>(
@@ -386,7 +387,7 @@ class RailwayApi {
     name: string,
     sourceEnvironmentId?: string,
   ): Promise<{ id: string; name: string }> {
-    return this.vcr.capture('createEnvironment', async () => {
+    return captureInTest(this.vcr, 'createEnvironment', async () => {
       try {
         const duplicateFlag = sourceEnvironmentId ? `--duplicate ${sourceEnvironmentId}` : '';
         const { stdout } = await execAsync(
@@ -410,7 +411,7 @@ class RailwayApi {
   }
 
   async deleteEnvironment(projectId: string, environmentName: string): Promise<void> {
-    return this.vcr.capture('deleteEnvironment', async () => {
+    return captureInTest(this.vcr, 'deleteEnvironment', async () => {
       try {
         await execAsync(
           `railway environment delete "${escapeName(environmentName)}" --yes --json`,
@@ -429,7 +430,7 @@ class RailwayApi {
   }
 
   async renameEnvironment(environmentId: string, newName: string): Promise<boolean> {
-    return this.vcr.capture('renameEnvironment', async () => {
+    return captureInTest(this.vcr, 'renameEnvironment', async () => {
       const data = await this.railwayGraphQLUser<{ environmentRename: boolean }>(
         `
           mutation RenameEnvironment($id: String!, $name: String!) {
@@ -447,7 +448,7 @@ class RailwayApi {
     environmentId: string,
     environmentName: string,
   ): Promise<RailwayRedis> {
-    return this.vcr.capture('createRedis', async () => {
+    return captureInTest(this.vcr, 'createRedis', async () => {
       try {
         await execAsync(`railway environment link "${escapeName(environmentName)}"`, {
           encoding: 'utf-8',
@@ -481,7 +482,7 @@ class RailwayApi {
     environmentName: string,
     projectId: string,
   ): Promise<string> {
-    return this.vcr.capture('fetchRedisUrl', async () => {
+    return captureInTest(this.vcr, 'fetchRedisUrl', async () => {
       try {
         const { stdout } = await execAsync(
           `railway variables list -s ${serviceId} -e ${environmentName} --json`,
@@ -507,7 +508,7 @@ class RailwayApi {
     environmentId: string,
     environmentName: string,
   ): Promise<RailwayPostgres> {
-    return this.vcr.capture('createPostgres', async () => {
+    return captureInTest(this.vcr, 'createPostgres', async () => {
       try {
         await execAsync(`railway environment link "${escapeName(environmentName)}"`, {
           encoding: 'utf-8',
@@ -542,7 +543,7 @@ class RailwayApi {
     environmentName: string,
     projectId: string,
   ): Promise<string> {
-    return this.vcr.capture('fetchPostgresUrl', async () => {
+    return captureInTest(this.vcr, 'fetchPostgresUrl', async () => {
       try {
         const { stdout } = await execAsync(
           `railway variables list -s ${serviceId} -e ${environmentName} --json`,
@@ -569,7 +570,7 @@ class RailwayApi {
     environmentId: string,
     variables: Record<string, string>,
   ): Promise<void> {
-    return this.vcr.capture('setEnvironmentVariables', async () => {
+    return captureInTest(this.vcr, 'setEnvironmentVariables', async () => {
       await this.railwayGraphQLUser<{ variableCollectionUpsert: { id: string } }>(
         `
           mutation SetVariables($serviceId: String!, $environmentId: String!, $variables: String!) {
@@ -587,7 +588,7 @@ class RailwayApi {
     serviceId: string,
     environmentId: string,
   ): Promise<RailwayDeployment | null> {
-    return this.vcr.capture('fetchLatestDeployment', async () => {
+    return captureInTest(this.vcr, 'fetchLatestDeployment', async () => {
       const data = await this.railwayGraphQLUser<{
         serviceInstance: { latestDeployment: RailwayDeployment | null };
       }>(
@@ -605,7 +606,7 @@ class RailwayApi {
   }
 
   async triggerServiceDeployment(serviceId: string, environmentId: string): Promise<void> {
-    return this.vcr.capture('triggerServiceDeployment', async () => {
+    return captureInTest(this.vcr, 'triggerServiceDeployment', async () => {
       const data = await this.railwayGraphQLUser<{ serviceInstanceDeploy: boolean }>(
         `
           mutation ServiceInstanceDeploy(
@@ -627,7 +628,7 @@ class RailwayApi {
   }
 
   async fetchServiceDomain(serviceId: string, environmentId: string): Promise<string | null> {
-    return this.vcr.capture('fetchServiceDomain', async () => {
+    return captureInTest(this.vcr, 'fetchServiceDomain', async () => {
       const data = await this.railwayGraphQLUser<{
         serviceInstance: { domains: { serviceDomains: Array<{ domain: string }> } };
       }>(
@@ -646,7 +647,7 @@ class RailwayApi {
   }
 
   async ensureServiceDomain(serviceId: string, environmentId: string): Promise<string> {
-    return this.vcr.capture('ensureServiceDomain', async () => {
+    return captureInTest(this.vcr, 'ensureServiceDomain', async () => {
       const existing = await this.fetchServiceDomain(serviceId, environmentId);
       if (existing) return existing;
 
@@ -671,7 +672,7 @@ class RailwayApi {
     infisicalEnvironment: string,
     infisicalPath: string = '/',
   ): Promise<{ id: string }> {
-    return this.vcr.capture('setupInfisicalIntegration', async () => {
+    return captureInTest(this.vcr, 'setupInfisicalIntegration', async () => {
       const data = await this.railwayGraphQLUser<{ integrationCreate: { id: string } }>(
         `
           mutation SetupInfisicalIntegration(
@@ -702,7 +703,7 @@ class RailwayApi {
   }
 
   async fetchProjectBuckets(projectId: string): Promise<Array<{ id: string; name: string }>> {
-    return this.vcr.capture('fetchProjectBuckets', async () => {
+    return captureInTest(this.vcr, 'fetchProjectBuckets', async () => {
       const data = await this.railwayGraphQLUser<{
         project: { buckets: Array<{ id: string; name: string }> };
       }>(
@@ -720,7 +721,7 @@ class RailwayApi {
   }
 
   async createBucket(projectId: string, name: string): Promise<{ id: string; name: string }> {
-    return this.vcr.capture('createBucket', async () => {
+    return captureInTest(this.vcr, 'createBucket', async () => {
       const data = await this.railwayGraphQLUser<{
         bucketCreate: { id: string; name: string; projectId: string };
       }>(
@@ -740,7 +741,7 @@ class RailwayApi {
   }
 
   async ensureBucket(projectId: string, name: string): Promise<{ id: string; name: string }> {
-    return this.vcr.capture('ensureBucket', async () => {
+    return captureInTest(this.vcr, 'ensureBucket', async () => {
       const existing = (await this.fetchProjectBuckets(projectId)).find((b) => b.name === name);
       if (existing) return existing;
       return this.createBucket(projectId, name);
@@ -759,7 +760,7 @@ class RailwayApi {
     endpoint: string;
     urlStyle: string;
   }> {
-    return this.vcr.capture('fetchBucketCredentials', async () => {
+    return captureInTest(this.vcr, 'fetchBucketCredentials', async () => {
       const data = await this.railwayGraphQLUser<{
         bucketS3Credentials: {
           accessKeyId: string;
