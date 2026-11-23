@@ -250,6 +250,10 @@ Some writes are legal only from one state to another, and only for some parties:
 
 `assertTransition(permix, model, action, record, changes)` (`apps/api/src/lib/permissions/assertTransition.ts`) hydrates the row, runs `checkTransition` and evaluates each permission with template's own `check` (`packages/permissions/src/rebac/check.ts`, which supplies the actor rows). It throws 403 when a path's predicates held and only its permission failed, and 409 when no path's state allows the change. The library's own permissions adapter is not used: it evaluates with a permix that holds nothing, so a `{ rel }` walk through the caller's grants never passes.
 
+Paths are written out as plain rules, one per legal move, from the conditions in `packages/permissions/src/transitions/utils.ts`: `creating` and `updating` (the row has no id yet, or has one), `deleted` and `notDeleted` (on `deletedAt`), and `fieldIs(field, value)`.
+
+Deleted rows, the convention: every path's `to` includes `notDeleted`, so no transition leaves a row deleted or acts on one it does not bring back. A path that may start from a deleted row says so in its `from` (or leaves `deletedAt` open); one that must start from a live row puts `notDeleted` in its `from`. Only a write whose changes clear `deletedAt` (a revive through upsert) can pass a path from a deleted row. Not yet settled (Aron, 2026-11-23): whether every transition should be checked this way, and so whether `assertTransition` should always load the row with deleted rows included; today only `register` does, through its caller's `withDeleted` lookup.
+
 Integration resource status (`changeStatus`; `PATCH /integrationResource/:id`). A person is a user, or a token owned by anything but an integration (`actingAsAPerson`); the resource's own integration is a token owned by an integration whose `integrationId` is the resource's (`actingAsTheRecordsIntegration`). Both need `manage` on the resource as well.
 
 | From → to | A person | The resource's own integration |
@@ -260,7 +264,7 @@ Integration resource status (`changeStatus`; `PATCH /integrationResource/:id`). 
 
 Aron, 2026-11-22: "integration resources should be able to move missing to tracked, but should not be able to touch untracked." A token of a different integration fails even when granted `manage` on this one.
 
-Registering (`register`; `POST /integration/:id/integrationResources`) is the same moves crossed with whether the row exists: a new key is created tracked (`create`), a live row may make any move above, and a removed row may make any move above except staying untracked. So a removed untracked resource comes back only when a person registers it with `status: 'tracked'`; otherwise the answer is 409 (Aron, 2026-11-22: "You have to track it to revive it"), and an integration re-registering its resources never undoes a person's untrack.
+Registering (`register`; `POST /integration/:id/integrationResources`) is a new key created tracked (`create`) plus the same paths as `changeStatus`: a live row may make any move above, and a removed row any move except staying untracked (that path's `from` holds `notDeleted`). So a removed untracked resource comes back only when a person registers it with `status: 'tracked'`; otherwise the answer is 409 (Aron, 2026-11-22: "You have to track it to revive it"), and an integration re-registering its resources never undoes a person's untrack.
 
 ## Member Rows
 

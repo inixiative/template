@@ -4,7 +4,6 @@
  * @partOf primitive:authz, feature:integrations
  * @uses none
  */
-import { type Condition, Operator } from '@inixiative/json-rules';
 import type { Action, Transition } from '@inixiative/transitions';
 import { IntegrationResourceStatus } from '@template/db/generated/client/enums';
 import {
@@ -12,59 +11,66 @@ import {
   actingAsTheRecordsIntegration,
 } from '@template/permissions/rebac/rebacSchemaRules';
 import type { ActionRule } from '@template/permissions/rebac/types';
+import { creating, fieldIs, notDeleted, updating } from '@template/permissions/transitions/utils';
 
 const { tracked, missing, untracked } = IntegrationResourceStatus;
-
-const statusIs = (status: IntegrationResourceStatus): Condition => ({
-  field: 'status',
-  operator: Operator.equals,
-  value: status,
-});
-const registered: Condition = { field: 'id', operator: Operator.exists };
-const unregistered: Condition = { field: 'id', operator: Operator.notExists };
-const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
-const removed: Condition = { field: 'deletedAt', operator: Operator.exists };
 
 const byAPerson: ActionRule = { all: ['manage', actingAsAPerson] };
 const byItsIntegration: ActionRule = { all: ['manage', actingAsTheRecordsIntegration] };
 
-type StatusMove = {
-  from: IntegrationResourceStatus;
-  to: IntegrationResourceStatus;
-  permission: ActionRule;
-};
-
-const statusMoves: StatusMove[] = [
-  { from: tracked, to: tracked, permission: 'manage' },
-  { from: missing, to: missing, permission: 'manage' },
-  { from: untracked, to: untracked, permission: 'manage' },
-  { from: tracked, to: untracked, permission: byAPerson },
-  { from: untracked, to: tracked, permission: byAPerson },
-  { from: missing, to: untracked, permission: byAPerson },
-  { from: tracked, to: missing, permission: byItsIntegration },
-  { from: missing, to: tracked, permission: byItsIntegration },
+const statusPaths: Transition[] = [
+  {
+    from: { predicate: { all: [updating, fieldIs('status', tracked)] }, permission: 'manage' },
+    to: { predicate: { all: [notDeleted, fieldIs('status', tracked)] } },
+  },
+  {
+    from: { predicate: { all: [updating, fieldIs('status', missing)] }, permission: 'manage' },
+    to: { predicate: { all: [notDeleted, fieldIs('status', missing)] } },
+  },
+  {
+    from: {
+      predicate: { all: [updating, notDeleted, fieldIs('status', untracked)] },
+      permission: 'manage',
+    },
+    to: { predicate: { all: [notDeleted, fieldIs('status', untracked)] } },
+  },
+  {
+    from: { predicate: { all: [updating, fieldIs('status', tracked)] }, permission: byAPerson },
+    to: { predicate: { all: [notDeleted, fieldIs('status', untracked)] } },
+  },
+  {
+    from: { predicate: { all: [updating, fieldIs('status', untracked)] }, permission: byAPerson },
+    to: { predicate: { all: [notDeleted, fieldIs('status', tracked)] } },
+  },
+  {
+    from: { predicate: { all: [updating, fieldIs('status', missing)] }, permission: byAPerson },
+    to: { predicate: { all: [notDeleted, fieldIs('status', untracked)] } },
+  },
+  {
+    from: {
+      predicate: { all: [updating, fieldIs('status', tracked)] },
+      permission: byItsIntegration,
+    },
+    to: { predicate: { all: [notDeleted, fieldIs('status', missing)] } },
+  },
+  {
+    from: {
+      predicate: { all: [updating, fieldIs('status', missing)] },
+      permission: byItsIntegration,
+    },
+    to: { predicate: { all: [notDeleted, fieldIs('status', tracked)] } },
+  },
 ];
 
-const moveFrom = (move: StatusMove, rowState: Condition): Transition => ({
-  from: { predicate: { all: [rowState, statusIs(move.from)] }, permission: move.permission },
-  to: { predicate: { all: [live, statusIs(move.to)] } },
-});
-
-const staysRemovedUnlessTracked = (move: StatusMove) =>
-  !(move.from === untracked && move.to === untracked);
-
 export const integrationResourceTransitions: Record<string, Action> = {
-  changeStatus: { paths: statusMoves.map((move) => moveFrom(move, registered)) },
+  changeStatus: { paths: statusPaths },
   register: {
     paths: [
       {
-        from: { predicate: unregistered, permission: 'create' },
-        to: { predicate: statusIs(tracked) },
+        from: { predicate: creating, permission: 'create' },
+        to: { predicate: fieldIs('status', tracked) },
       },
-      ...statusMoves.map((move) => moveFrom(move, { all: [registered, live] })),
-      ...statusMoves
-        .filter(staysRemovedUnlessTracked)
-        .map((move) => moveFrom(move, { all: [registered, removed] })),
+      ...statusPaths,
     ],
   },
 };

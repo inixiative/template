@@ -7,6 +7,7 @@
 import { Operator } from '@inixiative/json-rules';
 import type { Action } from '@inixiative/transitions';
 import { memberRoleWrite } from '@template/permissions/rebac/rebacSchemaRules';
+import { notDeleted, updating } from '@template/permissions/transitions/utils';
 
 export const memberRoleTransitions = (
   tenant: 'organization' | 'space',
@@ -15,11 +16,11 @@ export const memberRoleTransitions = (
     paths: [
       {
         from: {
-          predicate: { field: 'id', operator: Operator.exists },
+          predicate: updating,
           permission: memberRoleWrite(tenant),
         },
         to: {
-          predicate: { field: 'role', operator: Operator.exists },
+          predicate: { all: [notDeleted, { field: 'role', operator: Operator.exists }] },
           permission: memberRoleWrite(tenant),
         },
       },
