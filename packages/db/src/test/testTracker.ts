@@ -7,11 +7,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Db } from '@template/db/clientTypes';
 import { DbAction, HookTiming, registerDbHook } from '@template/db/extensions/hookRegistry';
+import { rowsKeptUntilEndOfFile } from '@template/db/test/rowsKeptUntilEndOfFile';
 import { isModelName, modelNames } from '@template/db/utils/modelNames';
 
 const touchedTables = new Set<string>();
-
-let rowsAreKeptForTheFile = false;
 
 let startupClear: Promise<void> | undefined;
 
@@ -66,7 +65,7 @@ export const touchedTableNames = (): ReadonlySet<string> => touchedTables;
 
 export const cleanupTouchedTables = async (db: Db) => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;
-  if (rowsAreKeptForTheFile || touchedTables.size === 0) return;
+  if (rowsKeptUntilEndOfFile.on || touchedTables.size === 0) return;
 
   // Mock-model tests register names that have no table.
   const tables = Array.from(touchedTables).filter(isModelName);
@@ -78,10 +77,6 @@ export const cleanupTouchedTables = async (db: Db) => {
   await deleteFrom(db, tables);
   // Forget the tables only once the delete commits, so a rolled-back cleanup is retried next time.
   touchedTables.clear();
-};
-
-export const keepRowsForTheFile = (kept: boolean) => {
-  rowsAreKeptForTheFile = kept;
 };
 
 export const resetTouchedTables = () => {
