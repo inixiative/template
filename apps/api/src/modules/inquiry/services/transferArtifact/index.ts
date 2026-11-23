@@ -52,9 +52,8 @@ const ownerOf = ({ model, id }: Party): OwnedArtifact =>
 
 const fetchOwnedObject = async (artifactId: string, source: Party): Promise<Artifact> => {
   const artifact = await db.artifact.findUnique({ where: { id: artifactId } });
-  if (!artifact) throw makeError({ status: 404, message: 'Artifact not found' });
-  if (!sameArtifactOwner(artifact, ownerOf(source))) {
-    throw makeError({ status: 422, message: 'Only the owner of an artifact can transfer it' });
+  if (!artifact || !sameArtifactOwner(artifact, ownerOf(source))) {
+    throw makeError({ status: 404, message: 'Artifact not found' });
   }
   if (artifact.system) {
     throw makeError({ status: 422, message: 'System artifacts cannot be transferred' });
@@ -78,15 +77,27 @@ const fetchOwnedObject = async (artifactId: string, source: Party): Promise<Arti
 
 const grantSourceRead = async (artifactId: string, source: Party) => {
   const bindingType: ResourceBindingType = 'tracking';
-  await db.resourceBinding.create({
-    data: {
+  const resourceKey = polymorphicKeyColumnOrThrow('ResourceBinding', 'resourceModel', source.model);
+  const existingBinding = await db.resourceBinding.findFirst({
+    where: {
       sourceModel: 'Artifact',
       sourceArtifactId: artifactId,
       resourceModel: source.model,
       bindingType,
-      [polymorphicKeyColumnOrThrow('ResourceBinding', 'resourceModel', source.model)]: source.id,
+      [resourceKey]: source.id,
     },
   });
+  if (!existingBinding) {
+    await db.resourceBinding.create({
+      data: {
+        sourceModel: 'Artifact',
+        sourceArtifactId: artifactId,
+        resourceModel: source.model,
+        bindingType,
+        [resourceKey]: source.id,
+      },
+    });
+  }
   await db.artifactPermission.create({
     data: {
       artifactId,
@@ -134,6 +145,9 @@ export const transferArtifactService: InquiryService<
   handleApprove: async (_c, inquiry, content, response) => {
     const source = party(inquiry, 'sourceModel');
     const target = party(inquiry, 'targetModel');
+    if (target.model === source.model && target.id === source.id) {
+      throw makeError({ status: 422, message: 'The artifact already belongs to that owner' });
+    }
     await db.findForUpdate('Artifact', { id: content.artifactId });
     const artifact = await fetchOwnedObject(content.artifactId, source);
     const allowTracking = response.allowTracking ?? content.allowTracking;

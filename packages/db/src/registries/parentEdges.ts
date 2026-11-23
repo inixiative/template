@@ -18,6 +18,7 @@ export type ParentEdge = { axis: string } | { parent: ModelName; foreignKey: str
 
 export const ParentEdgeRegistry = {
   ArtifactPermission: { parent: 'Artifact', foreignKey: 'artifactId' },
+  ArtifactPlacement: { parent: 'Artifact', foreignKey: 'artifactId' },
   Entitlement: { axis: 'targetModel' },
   ProjectIntegration: { parent: 'Project', foreignKey: 'projectId' },
   Setting: { axis: 'resourceModel' },

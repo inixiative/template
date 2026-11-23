@@ -35,16 +35,8 @@ const fetchSpace = async (spaceId: string): Promise<HydratedRecord | null> => {
 const delegateCap = (delegate: { full: boolean; role: Role | null }): Role | null =>
   delegate.full ? 'owner' : delegate.role;
 
-const membershipCap = (actor: ArtifactActor): Role | null => {
-  if (!actor.token) return 'owner';
-  if (actor.token.ownerModel === 'Integration') {
-    return cappedRole(
-      delegateCap(actor.token),
-      actor.token.integration ? delegateCap(actor.token.integration) : null,
-    );
-  }
-  return delegateCap(actor.token);
-};
+const membershipCap = (actor: ArtifactActor): Role | null =>
+  actor.token ? delegateCap(actor.token) : 'owner';
 
 export const actorPrincipalRole = (actor: ArtifactActor) => {
   const memo = new Map<string, Promise<Role | null>>();

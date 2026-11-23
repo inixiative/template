@@ -16,7 +16,7 @@ export const artifactReadAccessController = makeController(
   async (c, respond) => {
     const artifact = contextResource<'artifact'>(c);
     const verdict =
-      artifactAccessVerdict(c) ??
+      artifactAccessVerdict(c, artifact.id) ??
       (await checkArtifactAccess(artifactActorFromContext(c), [artifact.id], 'read')).get(
         artifact.id,
       )!;

@@ -7,12 +7,14 @@
 import type { Role } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { roleExceeds } from '#/modules/artifact/lib/artifactRoles';
+import { assertArtifactAction } from '#/modules/artifact/lib/assertArtifactAction';
 import type { ArtifactAccessVerdict } from '#/modules/artifact/services/checkArtifactAccess';
 
 export const assertGrantableRole = (
   verdict: ArtifactAccessVerdict | undefined,
   ...roles: Role[]
 ) => {
+  assertArtifactAction(verdict, 'manage');
   for (const role of roles) {
     if (!verdict?.role || roleExceeds(role, verdict.role)) {
       throw makeError({

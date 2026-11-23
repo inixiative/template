@@ -293,6 +293,38 @@ describe('artifact routes', () => {
       `/api/v1/organization/${organization.id}/artifacts`,
     );
     expect((await entOnlyFetch(get(`/api/v1/artifact/${memberOwned.id}/access`))).status).toBe(404);
+
+    const { entity: memberToken } = await createToken({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: member.id,
+      role: 'member',
+    });
+    const memberTokenFetch = createTestApp({
+      mockToken: {
+        ...memberToken,
+        targetEntitlements: [],
+        user: member,
+        organization,
+        organizationUser: {
+          ...memberMembership,
+          organization,
+          user: member,
+          targetEntitlements: [],
+        },
+        space: null,
+        spaceUser: null,
+        integration: null,
+      },
+      mount,
+    }).fetch;
+    const tokenCreated = await createFolder(
+      memberTokenFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+    );
+    const tokenAccess = await memberTokenFetch(get(`/api/v1/artifact/${tokenCreated.id}/access`));
+    expect(tokenAccess.status).toBe(200);
+    expect((await parseSuccessBody<{ role: string }>(tokenAccess)).data.role).toBe('member');
   });
 
   it('refuses a placement whose longest path (despite shortcut edges) exceeds ARTIFACT_MAX_DEPTH', async () => {

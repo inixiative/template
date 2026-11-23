@@ -21,13 +21,20 @@ export const removeArtifactPlacement = async (
   const member = await db.artifact.findUniqueOrThrow({ where: { id: placement.artifactId } });
   await withOwnerLock(artifactOwner(member), 'containers', () =>
     db.txn(async () => {
-      const [locked] = await db.findForUpdate<Artifact>('Artifact', { id: placement.artifactId });
-      if (!locked || locked.deletedAt) {
-        throw makeError({ status: 404, message: 'Artifact not found' });
+      for (const id of [...new Set([placement.artifactId, placement.containerArtifactId])].sort()) {
+        const [locked] = await db.findForUpdate<Artifact>('Artifact', { id });
+        if (!locked || locked.deletedAt) {
+          throw makeError({ status: 404, message: 'Artifact not found' });
+        }
       }
-      await assertKeepsMemberScope([placement.artifactId], placement.containerArtifactId);
+      const current = await db.artifactPlacement.findUnique({ where: { id: placement.id } });
+      if (!current) {
+        throw makeError({ status: 404, message: 'The artifact is not in that container' });
+      }
+      await assertEdgeAuthority(actor, current.artifactId, current.containerArtifactId);
+      await assertKeepsMemberScope([current.artifactId], current.containerArtifactId);
       await db.artifactPlacement.update({
-        where: { id: placement.id },
+        where: { id: current.id },
         data: { deletedAt: new Date() },
       });
     }),

@@ -24,7 +24,7 @@ const diedWith = (childDeletedAt: Date | null, parentDeletedAt: Date | null): bo
   childDeletedAt == null ||
   (parentDeletedAt != null && childDeletedAt.getTime() === parentDeletedAt.getTime());
 
-const loadFrontierLive = async (frontier: string[]) =>
+const fetchFrontierLive = async (frontier: string[]) =>
   db.artifact.findMany({
     where: { id: { in: frontier } },
     include: {
@@ -33,7 +33,7 @@ const loadFrontierLive = async (frontier: string[]) =>
     },
   });
 
-const loadFrontierWithTombstones = async (frontier: string[], tombstones: Date[]) =>
+const fetchFrontierWithTombstones = async (frontier: string[], tombstones: Date[]) =>
   db.withDeleted(() =>
     db.artifact.findMany({
       where: {
@@ -63,8 +63,8 @@ export const fetchArtifactGraph = async (
   for (let depth = 0; frontier.length > 0 && depth <= ARTIFACT_MAX_DEPTH + 1; depth++) {
     const artifacts =
       tombstones.length > 0
-        ? await loadFrontierWithTombstones(frontier, tombstones)
-        : await loadFrontierLive(frontier);
+        ? await fetchFrontierWithTombstones(frontier, tombstones)
+        : await fetchFrontierLive(frontier);
     const next = new Set<string>();
     for (const { placements, permissions, ...artifact } of artifacts) {
       const expectedDeletedAt = deletedAtByArtifactId?.get(artifact.id) ?? artifact.deletedAt;

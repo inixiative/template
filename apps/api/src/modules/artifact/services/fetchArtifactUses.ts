@@ -46,7 +46,7 @@ export const fetchArtifactUses = async (
 ): Promise<ArtifactUses> => {
   const actor = artifactActorFromContext(c);
   const verdict =
-    artifactAccessVerdict(c) ??
+    artifactAccessVerdict(c, artifactId) ??
     (await checkArtifactAccess(actor, [artifactId], 'read')).get(artifactId);
   const canManage = roleAllows(verdict?.role ?? null, 'manage');
   const [artifact, placements, bindings, resolutions] = await Promise.all([

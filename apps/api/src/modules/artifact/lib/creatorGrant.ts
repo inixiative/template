@@ -11,32 +11,59 @@ import type { CreatorGrant } from '#/modules/artifact/services/artifactPlacement
 import type { AppEnv } from '#/types/appEnv';
 
 export const creatorGrantFor = (c: Context<AppEnv>, owner: OwnerRef): CreatorGrant | undefined => {
-  const userId = actingUser(c)?.id ?? c.get('token')?.userId ?? null;
+  const token = c.get('token');
+  const userId = actingUser(c)?.id ?? token?.userId ?? null;
   if (!userId) return undefined;
   if (owner.ownerModel === 'Organization') {
     const member = (c.get('organizationUsers') ?? []).find(
       (membership) => membership.organizationId === owner.organizationId,
     );
-    return member
-      ? {
-          granteeModel: 'OrganizationUser',
-          granteeOrganizationId: member.organizationId,
-          granteeUserId: member.userId,
-        }
-      : undefined;
+    if (member) {
+      return {
+        granteeModel: 'OrganizationUser',
+        granteeOrganizationId: member.organizationId,
+        granteeUserId: member.userId,
+      };
+    }
+    if (
+      token?.ownerModel === 'OrganizationUser' &&
+      token.organizationId === owner.organizationId &&
+      token.userId
+    ) {
+      return {
+        granteeModel: 'OrganizationUser',
+        granteeOrganizationId: owner.organizationId,
+        granteeUserId: token.userId,
+      };
+    }
+    return undefined;
   }
   if (owner.ownerModel === 'Space') {
     const member = (c.get('spaceUsers') ?? []).find(
       (membership) => membership.spaceId === owner.spaceId,
     );
-    return member
-      ? {
-          granteeModel: 'SpaceUser',
-          granteeOrganizationId: member.organizationId,
-          granteeSpaceId: member.spaceId,
-          granteeUserId: member.userId,
-        }
-      : undefined;
+    if (member) {
+      return {
+        granteeModel: 'SpaceUser',
+        granteeOrganizationId: member.organizationId,
+        granteeSpaceId: member.spaceId,
+        granteeUserId: member.userId,
+      };
+    }
+    if (
+      token?.ownerModel === 'SpaceUser' &&
+      token.spaceId === owner.spaceId &&
+      token.organizationId &&
+      token.userId
+    ) {
+      return {
+        granteeModel: 'SpaceUser',
+        granteeOrganizationId: token.organizationId,
+        granteeSpaceId: owner.spaceId,
+        granteeUserId: token.userId,
+      };
+    }
+    return undefined;
   }
   return undefined;
 };

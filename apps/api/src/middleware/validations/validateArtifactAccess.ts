@@ -17,8 +17,13 @@ import type { AppEnv } from '#/types/appEnv';
 
 const verdictByContext = new WeakMap<Context<AppEnv>, ArtifactAccessVerdict>();
 
-export const artifactAccessVerdict = (c: Context<AppEnv>): ArtifactAccessVerdict | undefined =>
-  verdictByContext.get(c);
+export const artifactAccessVerdict = (
+  c: Context<AppEnv>,
+  artifactId: string,
+): ArtifactAccessVerdict | undefined => {
+  const verdict = verdictByContext.get(c);
+  return verdict?.artifactId === artifactId ? verdict : undefined;
+};
 
 export const validateArtifactAccess = makeMiddleware<StandardAction>(
   (action) => async (c, next) => {

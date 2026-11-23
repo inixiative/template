@@ -128,6 +128,7 @@ export const placeArtifact = async (
   return withOwnerLock(artifactOwner(member), 'containers', () =>
     db.txn(async () => {
       const locked = await lockArtifacts([artifactId, containerArtifactId]);
+      await assertEdgeAuthority(actor, artifactId, containerArtifactId);
       return writePlacement(locked.get(artifactId)!, locked.get(containerArtifactId)!, inherit);
     }),
   );
@@ -137,14 +138,17 @@ export const moveArtifact = async (
   actor: ArtifactActor,
   { artifactId, fromContainerArtifactId, toContainerArtifactId }: MoveArtifactInput,
 ): Promise<Artifact> => {
+  const assertMoveAuthority = async () => {
+    if (fromContainerArtifactId)
+      await assertEdgeAuthority(actor, artifactId, fromContainerArtifactId);
+    if (toContainerArtifactId) await assertEdgeAuthority(actor, artifactId, toContainerArtifactId);
+    if (!fromContainerArtifactId)
+      await assertAction(actor, artifactId, ARTIFACT_EDGE_AUTHORITY.member);
+  };
+  await assertMoveAuthority();
   if (fromContainerArtifactId === toContainerArtifactId) {
     throw makeError({ status: 422, message: 'A move needs a different destination' });
   }
-  if (fromContainerArtifactId)
-    await assertEdgeAuthority(actor, artifactId, fromContainerArtifactId);
-  if (toContainerArtifactId) await assertEdgeAuthority(actor, artifactId, toContainerArtifactId);
-  if (!fromContainerArtifactId)
-    await assertAction(actor, artifactId, ARTIFACT_EDGE_AUTHORITY.member);
   const member = await fetchArtifact(artifactId);
 
   return withOwnerLock(artifactOwner(member), 'containers', () =>
@@ -155,6 +159,7 @@ export const moveArtifact = async (
         ...(fromContainerArtifactId ? [fromContainerArtifactId] : []),
       ];
       const locked = await lockArtifacts(idsToLock);
+      await assertMoveAuthority();
       if (toContainerArtifactId) {
         await writePlacement(
           locked.get(artifactId)!,
@@ -168,12 +173,10 @@ export const moveArtifact = async (
   );
 };
 
-const insertArtifact = async ({
-  containerArtifactId,
-  access,
-  creatorGrant,
-  ...data
-}: CreateArtifactInput): Promise<Artifact> => {
+const insertArtifact = async (
+  { containerArtifactId, access, creatorGrant, ...data }: CreateArtifactInput,
+  actor?: ArtifactActor,
+): Promise<Artifact> => {
   const kind = artifactKindDef(data.kind);
   if (!kind) throw makeError({ status: 422, message: `Unknown artifact kind: ${data.kind}` });
 
@@ -182,6 +185,7 @@ const insertArtifact = async ({
   if (containerArtifactId) {
     const locked = await lockArtifacts([containerArtifactId]);
     container = locked.get(containerArtifactId)!;
+    if (actor) await assertAction(actor, container.id, ARTIFACT_EDGE_AUTHORITY.container);
     assertContainable(container, { ...candidateOwner, id: '', kind: data.kind });
   }
 
@@ -211,7 +215,7 @@ export const createArtifact = async (
     await assertAction(actor, input.containerArtifactId, ARTIFACT_EDGE_AUTHORITY.container);
   }
   return withOwnerLock(artifactOwner(ownerColumns(input)), 'containers', () =>
-    db.txn(() => insertArtifact(input)),
+    db.txn(() => insertArtifact(input, actor)),
   );
 };
 
@@ -266,18 +270,21 @@ export const copyArtifact = async (
 ): Promise<Artifact> => {
   await assertAction(actor, artifactId, 'read');
   await assertAction(actor, containerArtifactId, ARTIFACT_EDGE_AUTHORITY.container);
-  const [source, container] = await Promise.all([
-    fetchArtifact(artifactId),
-    fetchArtifact(containerArtifactId),
-  ]);
-  const resolvedGrant = typeof creatorGrant === 'function' ? creatorGrant(container) : creatorGrant;
-  return withOwnerLock(artifactOwner(container), 'containers', () =>
-    db.txn(() =>
-      copyArtifactInto(source, container, {
-        containerArtifactId,
+  const initialContainer = await fetchArtifact(containerArtifactId);
+  return withOwnerLock(artifactOwner(initialContainer), 'containers', () =>
+    db.txn(async () => {
+      const locked = await lockArtifacts([artifactId, containerArtifactId]);
+      const source = locked.get(artifactId)!;
+      const container = locked.get(containerArtifactId)!;
+      await assertAction(actor, source.id, 'read');
+      await assertAction(actor, container.id, ARTIFACT_EDGE_AUTHORITY.container);
+      const resolvedGrant =
+        typeof creatorGrant === 'function' ? creatorGrant(container) : creatorGrant;
+      return copyArtifactInto(source, container, {
+        containerArtifactId: container.id,
         name,
         creatorGrant: resolvedGrant,
-      }),
-    ),
+      });
+    }),
   );
 };

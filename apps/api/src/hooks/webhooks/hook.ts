@@ -7,6 +7,7 @@ import {
   omitRegisteredFields,
   registerDbHook,
   WEBHOOK_EXCLUDED_FIELDS,
+  webhookRelatedModels,
 } from '@template/db';
 import type { WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
@@ -17,6 +18,7 @@ import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
 import {
   fetchParentDeliveries,
   fetchWebhookPartiesByRow,
+  isWebhookModel,
   type WebhookRow,
 } from '#/hooks/webhooks/parties';
 import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
@@ -115,6 +117,7 @@ export const registerWebhookHook = () => {
     actions,
     async (options: HookOptions) => {
       const { model, action: dbAction } = options;
+      if (!isWebhookModel(model) && !webhookRelatedModels[model]?.length) return;
 
       const records: { resultData: WebhookRow; previousData?: Record<string, unknown> }[] = [];
       if (isManyAction(dbAction)) {

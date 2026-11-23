@@ -25,14 +25,14 @@ export const artifactPermissionUpdateController = makeController(
       if (!locked || locked.deletedAt) {
         throw makeError({ status: 404, message: 'Artifact not found' });
       }
+      const current = await db.artifactPermission.findUnique({ where: { id: permission.id } });
+      if (!current || current.artifactId !== locked.id) {
+        throw makeError({ status: 404, message: 'ArtifactPermission not found' });
+      }
       const verdicts = await checkArtifactAccess(actor, [locked.id], 'manage');
-      assertGrantableRole(
-        verdicts.get(locked.id),
-        permission.role,
-        ...(body.role ? [body.role] : []),
-      );
+      assertGrantableRole(verdicts.get(locked.id), current.role, ...(body.role ? [body.role] : []));
       return db.artifactPermission.update({
-        where: { id: permission.id },
+        where: { id: current.id },
         data: body,
       });
     });

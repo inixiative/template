@@ -65,7 +65,7 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 | AppEvent | - | - | - | - | - | - | - | - | - | - | - | - | - |
 | Artifact | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | - | - | yes | - |
 | ArtifactPermission | soft | yes | granteeModel | Artifact (artifactId) | - | - | - | immutable-override | yes | - | - | - | - |
-| ArtifactPlacement | soft | yes | - | - | - | - | - | - | - | - | - | - | - |
+| ArtifactPlacement | soft | yes | - | Artifact (artifactId) | - | - | - | - | - | - | - | - | - |
 | AuditLog | - | - | subjectModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | AuthProvider | soft | yes | - | - | - | yes | - | sensitive | - | - | - | - | yes |
 | CommunicationComponentVersion | - | - | - | - | - | - | - | - | - | - | - | - | - |
