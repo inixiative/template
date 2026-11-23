@@ -149,6 +149,53 @@ describe('asking for access names an integration resource by its external id (Ar
   });
 });
 
+describe('what asking may name, and what approving records (review, 2026-11-23)', () => {
+  it("a key is checked only on an integration the asker can read, so another's integration tells nothing", async () => {
+    const { entity: elsewhere } = await createOrganization();
+    const { entity: theirs } = await createIntegration({
+      ownerModel: 'Organization',
+      organizationId: elsewhere.id,
+      provider: 'github',
+    });
+    const response = await ask([onChannel({ integrationId: theirs.id })]);
+    expect(response.status).toBe(422);
+    expect(JSON.stringify(await response.json())).not.toContain('github');
+  });
+
+  it('a kind that is a property of every object is still not a kind the provider has', async () => {
+    expect((await ask([onChannel({ kind: 'constructor' })])).status).toBe(400);
+    expect((await ask([onChannel({ kind: '__proto__' })])).status).toBe(400);
+  });
+
+  it('approving access to an untracked channel tracks it', async () => {
+    const { entity: channel } = await createIntegrationResource(
+      { kind: 'channel', externalId: 'C0123', status: 'untracked' },
+      { integration },
+    );
+    const inquiry = (await parseSuccessBody<Inquiry>(await ask([onChannel({})]))).data;
+    expect((await answer(inquiry, 'approved', [onChannel({})])).status).toBe(200);
+    expect(await channels()).toMatchObject([{ id: channel.id, status: 'tracked' }]);
+  });
+
+  it('the approved record names the resource the grant anchors at', async () => {
+    const inquiry = (await parseSuccessBody<Inquiry>(await ask([onChannel({})]))).data;
+    await answer(inquiry, 'approved', [onChannel({})]);
+    const [channel] = await channels();
+    const approved = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(approved.resolution).toMatchObject({
+      add: [{ sourceModel: 'IntegrationResource', sourceId: channel!.id }],
+    });
+  });
+
+  it('an approval the writer refuses registers nothing and stays open', async () => {
+    const inquiry = (await parseSuccessBody<Inquiry>(await ask([onChannel({})]))).data;
+    const response = await answer(inquiry, 'approved', [{ ...onChannel({}), actions: ['own'] }]);
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(await channels()).toEqual([]);
+    expect((await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } })).status).toBe('sent');
+  });
+});
+
 describe('registering checks the key against what the provider has', () => {
   it('a github repository id is numeric', async () => {
     const { entity: github } = await createIntegration({

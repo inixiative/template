@@ -6,38 +6,41 @@
  */
 import { db, type EntitlementTarget, rowPolymorphicAxisPointsAt } from '@template/db';
 import { toEntitlementEntry } from '@template/permissions';
+import type { Permix } from '@template/permissions/client';
 import { entitlementProblem } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateEntitlementWriter } from '#/lib/permissions/validateEntitlementWriter';
-import {
-  fetchIntegrationNamedByKey,
-  resolveRequestedEntitlements,
-} from '#/modules/inquiry/services/changeEntitlements/resolveRequestedEntitlements';
+import { fetchReadableIntegrationOrThrow } from '#/modules/inquiry/services/changeEntitlements/fetchReadableIntegrationOrThrow';
+import { resolveRequestedEntitlements } from '#/modules/inquiry/services/changeEntitlements/resolveRequestedEntitlements';
 import {
   type ChangeEntitlementsContent,
   type ChangeEntitlementsResolutionInput,
   changeEntitlementsContentSchema,
   changeEntitlementsResolutionInputSchema,
-  type RequestedEntitlement,
 } from '#/modules/inquiry/services/changeEntitlements/schema';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
-
-const keyedEntitlementForCheck = async ({
-  source,
-  ...rest
-}: Extract<RequestedEntitlement, { source: unknown }>) => {
-  await fetchIntegrationNamedByKey(source);
-  return { ...rest, sourceId: source.externalId };
-};
+import { validateIntegrationResourceKey } from '#/modules/integration/validations/validateIntegrationResourceKey';
 
 export const holderModels: readonly EntitlementTarget['model'][] = ['Token', 'Integration'];
 
 // why: the same check the writer runs, so a request the writer would refuse is refused when asked
-const validate = async (_inquiry: Partial<Inquiry>, content: ChangeEntitlementsContent) => {
+const validate = async (
+  _inquiry: Partial<Inquiry>,
+  content: ChangeEntitlementsContent,
+  asker: Permix,
+) => {
   for (const [index, requested] of content.add.entries()) {
-    const input = 'source' in requested ? await keyedEntitlementForCheck(requested) : requested;
-    const found = entitlementProblem(toEntitlementEntry(input));
+    if ('source' in requested) {
+      const { integrationId, kind, externalId } = requested.source;
+      validateIntegrationResourceKey(
+        await fetchReadableIntegrationOrThrow(asker, integrationId),
+        kind,
+        externalId,
+      );
+    }
+    const sourceId = 'source' in requested ? requested.source.externalId : requested.sourceId;
+    const found = entitlementProblem(toEntitlementEntry({ ...requested, sourceId }));
     if (found) throw makeError({ status: 422, message: `add.${index}: ${found}` });
   }
 };
@@ -80,5 +83,6 @@ export const changeEntitlementsService: InquiryService<
     // why: approving is issuing, so it runs the check the holder's own add and remove routes run
     await validateEntitlementWriter(writer, model, holder, changes);
     await changeEntitlements(writer, { model, id: holder.id }, changes);
+    return changes;
   },
 };

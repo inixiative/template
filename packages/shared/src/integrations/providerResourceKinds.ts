@@ -41,4 +41,8 @@ export const resourceKindDefinition = (
   provider: Provider | null,
   kind: string,
 ): ResourceKindDefinition | undefined =>
-  provider ? providerResourceKinds[provider][kind] : plainResourceKind;
+  provider
+    ? Object.hasOwn(providerResourceKinds[provider], kind)
+      ? providerResourceKinds[provider][kind]
+      : undefined
+    : plainResourceKind;

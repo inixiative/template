@@ -4,16 +4,17 @@
  * @partOf feature:inquiry
  * @uses primitive:authz
  */
+import { IntegrationResourceScalarInputSchema } from '@template/db';
 import { EntitlementResourceModel } from '@template/db/generated/client/enums';
 import { entitlementInputSchema } from '@template/permissions/rebac';
 import { baseResolutionInputSchema } from '@template/shared/inquiry';
 import { z } from 'zod';
 
-export const integrationResourceKeySchema = z.strictObject({
-  integrationId: z.string().min(1),
-  kind: z.string().min(1),
-  externalId: z.string().min(1),
-});
+export const integrationResourceKeySchema = IntegrationResourceScalarInputSchema.pick({
+  integrationId: true,
+  kind: true,
+  externalId: true,
+}).strict();
 
 const entitlementOnIntegrationResourceKeySchema = entitlementInputSchema
   .omit({ sourceModel: true, sourceId: true })
