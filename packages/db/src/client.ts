@@ -326,7 +326,7 @@ const dbMethods = {
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
   // the where-key itself (see acquireFindForUpdateLock) and returns the rows it currently names. One
   // field may list values as `{ in: [...] }` to fence a batch of such rows, each under the key a
-  // single-row fence on it takes. On a soft-delete model tombstones are locked but only live rows
+  // single-row fence on it takes. On a soft-delete model tombstones are locked but only not-deleted rows
   // return, unless inside db.withDeleted or the where names deletedAt.
   findForUpdate: async <T = unknown>(
     model: string,
@@ -366,7 +366,7 @@ const dbMethods = {
       }
       return value === null ? Prisma.sql`${column} IS NULL` : Prisma.sql`${column} = ${value}`;
     });
-    const liveOnly =
+    const notDeletedOnly =
       hasDeletedAt(modelName) &&
       !('deletedAt' in where) &&
       !auditActorContext.isSoftDeleteBypassed();
@@ -376,7 +376,7 @@ const dbMethods = {
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} ${Prisma.raw(options?.changesKey ? 'FOR UPDATE' : 'FOR NO KEY UPDATE')}`,
     );
     // why: tombstones are locked too, so a revive in flight on the key is waited on, not raced
-    if (!liveOnly) return locked;
+    if (!notDeletedOnly) return locked;
     const deletedAtColumn = columnFor('deletedAt');
     return locked.filter((row) => (row as Record<string, unknown>)[deletedAtColumn] == null);
   },

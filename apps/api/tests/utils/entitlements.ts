@@ -10,7 +10,7 @@ type Fetch = { fetch: (request: Request) => Promise<Response> };
 export const entitlementRowToInput = (row: Entitlement): EntitlementInput =>
   toEntitlementInput(toEntitlementEntry(row));
 
-const liveRows = (target: EntitlementTarget) =>
+const fetchNotDeletedRows = (target: EntitlementTarget) =>
   db.entitlement.findMany({
     where: { targetModel: target.model, targetId: target.id, deletedAt: null },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -18,14 +18,14 @@ const liveRows = (target: EntitlementTarget) =>
 
 /** The rows a target holds now, as inputs, in the order they were granted. */
 export const heldEntitlements = async (target: EntitlementTarget): Promise<EntitlementInput[]> =>
-  (await liveRows(target)).map(entitlementRowToInput);
+  (await fetchNotDeletedRows(target)).map(entitlementRowToInput);
 
-/** The ids of the target's live rows that store these inputs. */
+/** The ids of the target's not-deleted rows that store these inputs. */
 export const entitlementIds = async (
   target: EntitlementTarget,
   inputs: EntitlementInput[],
 ): Promise<string[]> =>
-  (await liveRows(target))
+  (await fetchNotDeletedRows(target))
     .filter((row) => inputs.some((input) => isEqual(entitlementRowToInput(row), input)))
     .map((row) => row.id);
 

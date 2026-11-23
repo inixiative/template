@@ -123,7 +123,7 @@ describe('Project', () => {
       expect((await app.fetch(post('/api/v1/me/projects', { name: '   ' }))).status).toBe(422);
     });
 
-    it('refuses a second live project with the same name under one owner (409)', async () => {
+    it('refuses a second not-deleted project with the same name under one owner (409)', async () => {
       const name = `Twice ${nextFactorySequenceNumber()}`;
       expect((await app.fetch(post('/api/v1/me/projects', { name }))).status).toBe(201);
       expect((await app.fetch(post('/api/v1/me/projects', { name }))).status).toBe(409);

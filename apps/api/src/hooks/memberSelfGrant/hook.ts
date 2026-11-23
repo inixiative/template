@@ -74,12 +74,12 @@ const assertSelfGrantsKept = async (rows: Entitlement[]) => {
     const members = (await db.withDeleted(() =>
       db.delegate(model).findMany({ where: { id: { in: removed.map((row) => row.targetId) } } }),
     )) as Member[];
-    const live = keyBy(
+    const notDeleted = keyBy(
       members.filter((member) => member.deletedAt == null),
       'id',
     );
     const dropped = removed.find((row) => {
-      const member = live[row.targetId];
+      const member = notDeleted[row.targetId];
       return member && isMemberSelfGrant(resourceOf[model], member)(toEntitlementEntry(row));
     });
     if (dropped) throw makeError({ status: 422, message: 'a member keeps its self-grant' });

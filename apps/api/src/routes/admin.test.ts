@@ -89,7 +89,7 @@ describe('adminRouter', () => {
       expect(await listed('all')).toEqual([deletedOrganization.id]);
     });
 
-    it('hides it when the route asks for live rows', async () => {
+    it('hides it when the route asks for not-deleted rows', async () => {
       expect(await listed('false')).toEqual([]);
     });
   });

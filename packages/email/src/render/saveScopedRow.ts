@@ -22,8 +22,8 @@ type ScopedDelegate<Row extends { id: string }> = {
 const reviveRow = (model: keyof ScopedEmailRow, id: string) =>
   model === 'emailTemplate' ? revive(db.emailTemplate, { id }) : revive(db.emailComponent, { id });
 
-// A natural key (slug, locale, owner) holds at most one row, live or tombstoned: the uniques cover
-// deleted rows too. Saving onto the key updates the live row, or revives the tombstone in place so
+// A natural key (slug, locale, owner) holds at most one row, not-deleted or tombstoned: the uniques cover
+// deleted rows too. Saving onto the key updates the not-deleted row, or revives the tombstone in place so
 // the id, its audit history and every reference to it carry over; only a key that has never existed
 // gets a new row. This stays read-then-write rather than an upsert because the uniques are still
 // partial on ownerModel (each tier keys on its own nullable FK column), and a partial index cannot be
@@ -48,8 +48,9 @@ export const saveScopedRow = async <Model extends keyof ScopedEmailRow>(
   const data = { ...input, ...scope } as Partial<Row>;
   const { id: _inputId, ...keptData } = data as Partial<Row> & { id?: string };
 
-  const live = await delegate.findFirst({ where: { ...naturalKey, deletedAt: null } });
-  if (live) return delegate.update({ where: { id: live.id }, data: keptData as Partial<Row> });
+  const notDeleted = await delegate.findFirst({ where: { ...naturalKey, deletedAt: null } });
+  if (notDeleted)
+    return delegate.update({ where: { id: notDeleted.id }, data: keptData as Partial<Row> });
 
   const tombstone = await db.withDeleted(() =>
     delegate.findFirst({ where: { ...naturalKey, deletedAt: { not: null } } }),

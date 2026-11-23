@@ -22,7 +22,7 @@ import type { AppEnv } from '#/types/appEnv';
 /**
  * Shared reader for all 8 parent-scoped `GET /.../settings` routes.
  * Parent `read` access is enforced on the route via `validatePermission('read')`;
- * raw live rows for `(resourceModel, resourceId)` are cached in Redis via `fetchThroughCache`
+ * raw not-deleted rows for `(resourceModel, resourceId)` are cached in Redis via `fetchThroughCache`
  * (invalidated automatically by `cacheKeysByModel.Setting`), then filtered in memory per key
  * through `db:setting:read` and optional `category`/`key` filters.
  */

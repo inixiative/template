@@ -17,11 +17,11 @@ export const fetchThroughCache = async <T>(
   ttl: number | ((value: T) => number) = DEFAULT_TTL,
 ): Promise<T> => {
   validateCacheKeyHasNoUndefined(key);
-  const live = (): Promise<T> => auditActorContext.withoutDeleted(fn) as Promise<T>;
+  const withoutDeleted = (): Promise<T> => auditActorContext.withoutDeleted(fn) as Promise<T>;
   const overlay = db.cacheOverlay();
   return withCacheSpan(key, true, (setResult) =>
     overlay
-      ? fetchThroughTransactionCacheOverlay(overlay, key, live, ttl, setResult)
-      : fetchThroughRedisWithSingleFlight(key, live, ttl, setResult),
+      ? fetchThroughTransactionCacheOverlay(overlay, key, withoutDeleted, ttl, setResult)
+      : fetchThroughRedisWithSingleFlight(key, withoutDeleted, ttl, setResult),
   );
 };

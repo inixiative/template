@@ -82,7 +82,7 @@ enum InquiryResourceModel {
 }
 ```
 
-Both ends carry a real relation per party: `sourceUser`, `sourceOrganization`, `sourceSpace`, `sourceIntegration`, `sourceToken`, plus the membership relations `sourceOrganizationUser` (on `[sourceOrganizationId, sourceUserId]`) and `sourceSpaceUser` (on `[sourceOrganizationId, sourceSpaceId, sourceUserId]`); the target side mirrors them. A membership party has no column of its own: it fills the user + organization (+ space) columns. `admin` has no FK. The relations cascade on delete in the database, but no party can be hard-deleted (every party model is soft-delete); a soft-deleted party cancels its open inquiries and keeps every inquiry live (see *Data Model*).
+Both ends carry a real relation per party: `sourceUser`, `sourceOrganization`, `sourceSpace`, `sourceIntegration`, `sourceToken`, plus the membership relations `sourceOrganizationUser` (on `[sourceOrganizationId, sourceUserId]`) and `sourceSpaceUser` (on `[sourceOrganizationId, sourceSpaceId, sourceUserId]`); the target side mirrors them. A membership party has no column of its own: it fills the user + organization (+ space) columns. `admin` has no FK. The relations cascade on delete in the database, but no party can be hard-deleted (every party model is soft-delete); a soft-deleted party cancels its open inquiries and keeps every inquiry not-deleted (see *Data Model*).
 
 ### Status Flow
 
@@ -148,7 +148,7 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 | `PATCH` | `/api/v1/inquiry/:id` | `send` | Update `content`; `status: draft` moves it back to draft (clears `expiresAt`), `status: sent` sends it. Allowed in draft, sent, or changesRequested |
 | `POST` | `/api/v1/inquiry/:id/send` | `send` | Send a draft or changesRequested inquiry |
 | `POST` | `/api/v1/inquiry/:id/resolve` | `resolve` | Approve, deny, or request changes |
-| `DELETE` | `/api/v1/inquiry/:id/cancel` | `send` | Cancel (source only): sets `canceled` and clears `expiresAt`; the inquiry stays live, so both sides see it withdrawn |
+| `DELETE` | `/api/v1/inquiry/:id/cancel` | `send` | Cancel (source only): sets `canceled` and clears `expiresAt`; the inquiry stays not-deleted, so both sides see it withdrawn |
 
 **Every state-changing action carries the version the actor saw.** `expectedUpdatedAt` is the inquiry's `updatedAt` as the actor read it: in the body of `PATCH`, `/send` and `/resolve`, and as a query parameter on `DELETE /cancel`. `lockInquiryAtVersion` row-locks the inquiry (`db.findForUpdate`, inside the action's `db.txn`) and answers **409** when the version moved, so an edit between reading and approving fails the approval instead of approving something nobody looked at. The status checks run on the locked row. The UI hooks send `inquiry.updatedAt` on every mutation.
 
@@ -319,11 +319,11 @@ All five services return `autoApprove: async () => false` — no type currently 
 
 ### Transferring a space
 
-Approving a transfer moves the space, its members and everything downstream into the target org, in the resolution transaction. A member who already belongs to the target org keeps their membership. Every other member is removed; their space membership and its rows move to the target org as tombstones, and hiring them there later does not bring the space back. Nobody becomes a live member of an org they didn't join.
+Approving a transfer moves the space, its members and everything downstream into the target org, in the resolution transaction. A member who already belongs to the target org keeps their membership. Every other member is removed; their space membership and its rows move to the target org as tombstones, and hiring them there later does not bring the space back. Nobody becomes a not-deleted member of an org they didn't join.
 
 1. The space is locked (`db.findForUpdate`). Its slug in the target org is the resolution's `slug` when the approver gives one (a rename, read from the response), else its current slug. A slug the target org already holds, or an open `createSpace` request for it, refuses the transfer with a 409 (`validateSpaceSlugFree`, shared with `createSpace` and `updateSpace`). The target org's Review dialog offers the rename.
-2. One update tombstones every live `SpaceUser` whose user is not a live member of the target org, stamped with the transfer time; `softDeleteCascade` tombstones what they owned and deletes their tokens.
-3. Every space member, live or tombstoned, gets a tombstoned `member` row in the target org unless they already have one (`skipDuplicates`): the `SpaceUser` → `OrganizationUser` key needs it once step 4 re-keys their space membership. Its stamp is one no space membership carries, so hiring the person revives only their org membership. Putting them back in the space is a manual re-add; the transfer revives nothing.
+2. One update tombstones every not-deleted `SpaceUser` whose user is not a not-deleted member of the target org, stamped with the transfer time; `softDeleteCascade` tombstones what they owned and deletes their tokens.
+3. Every space member, not-deleted or tombstoned, gets a tombstoned `member` row in the target org unless they already have one (`skipDuplicates`): the `SpaceUser` → `OrganizationUser` key needs it once step 4 re-keys their space membership. Its stamp is one no space membership carries, so hiring the person revives only their org membership. Putting them back in the space is a manual re-add; the transfer revives nothing.
 4. `Space.organizationId` is set. Every row keyed to the space or a space member carries the org in a composite key (`SpaceUser`; Integration, Token, EmailTemplate and EmailComponent; Inquiry and AuditLog rows keyed to a space member), so one statement re-keys them all by `ON UPDATE CASCADE`; Postgres runs every cascade of a statement before it checks the keys. `spaceKeys.test.ts` (`packages/db/src/registries`) fails when a Space- or SpaceUser-owned model carries an org column outside such a key.
 5. The rows the cascade re-keyed are cleared from the cache (`clearSpaceRowCaches`, through `queueCacheClear`). It finds them through every cached model's composite relation to `Space` or `SpaceUser` (`spaceKeyColumns`), so a prefixed pair such as `sourceSpaceId`/`sourceOrganizationId` counts; a space reference without an org column isn't re-keyed and is left alone.
 

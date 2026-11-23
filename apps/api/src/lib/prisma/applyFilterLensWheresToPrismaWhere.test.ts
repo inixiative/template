@@ -173,15 +173,15 @@ describe('applyFilterLensWheresToPrismaWhere — query-plan execution (count ope
     expect(rows.map((r) => r.id)).toEqual([qualified.id]);
   });
 
-  it('counts only live related rows — a soft-deleted child does not satisfy the count', async () => {
+  it('counts only not-deleted related rows — a soft-deleted child does not satisfy the count', async () => {
     const { entity: onlyTombstoned } = await createUser();
-    const { entity: hasLive } = await createUser();
+    const { entity: hasNotDeleted } = await createUser();
     await createContact({ ownerModel: 'User' }, { user: onlyTombstoned });
     await db.contact.updateManyAndReturn({
       where: { userId: onlyTombstoned.id },
       data: { deletedAt: new Date() },
     });
-    await createContact({ ownerModel: 'User' }, { user: hasLive });
+    await createContact({ ownerModel: 'User' }, { user: hasNotDeleted });
 
     const lens: LensNarrowing = {
       parent: lensFor('User'),
@@ -193,9 +193,9 @@ describe('applyFilterLensWheresToPrismaWhere — query-plan execution (count ope
 
     const where = await applyFilterLensWheresToPrismaWhere(lens, {});
     const rows = await db.user.findMany({
-      where: { AND: [{ id: { in: [onlyTombstoned.id, hasLive.id] } }, where] },
+      where: { AND: [{ id: { in: [onlyTombstoned.id, hasNotDeleted.id] } }, where] },
     });
-    expect(rows.map((r) => r.id)).toEqual([hasLive.id]);
+    expect(rows.map((r) => r.id)).toEqual([hasNotDeleted.id]);
   });
 
   it('leaves the count plan unscoped when the related model has no deletedAt column', async () => {

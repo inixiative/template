@@ -24,14 +24,16 @@ const fetchCustomerRelationshipsOfCustomers = (customers: CustomerSide[]) =>
     ),
   });
 
-const changesOnLiveSegments = async (changes: MembershipChange[]): Promise<MembershipChange[]> => {
-  const live = new Map(
+const fetchChangesOnNotDeletedSegments = async (
+  changes: MembershipChange[],
+): Promise<MembershipChange[]> => {
+  const notDeleted = new Map(
     (
       await db.segment.findMany({ where: { id: { in: changes.map(({ segment }) => segment.id) } } })
     ).map((segment) => [segment.id, segment]),
   );
   return changes.flatMap(({ segment, diff }) => {
-    const current = live.get(segment.id);
+    const current = notDeleted.get(segment.id);
     return current ? [{ segment: current, diff }] : [];
   });
 };
@@ -43,5 +45,5 @@ export const reconcileCustomerRelationshipSegments =
       await fetchCustomerRelationshipsOfCustomers(customers),
     );
     if (!changes.length) return;
-    await publishMembershipChanges(await changesOnLiveSegments(changes));
+    await publishMembershipChanges(await fetchChangesOnNotDeletedSegments(changes));
   });

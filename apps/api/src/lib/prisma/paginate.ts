@@ -125,7 +125,7 @@ const isBracketQueryRecord = (value: BracketQueryValue | undefined): value is Br
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 // Everything up to the terminal findMany is shared by offset and cursor mode: lens binding
-// resolution, search composition, authorization narrowing and live scope. Only the tail differs.
+// resolution, search composition, authorization narrowing and not-deleted scope. Only the tail differs.
 const composeScopedFindMany = async <T extends AnyDelegate>(
   c: ValidatedContext<'query', PaginationQuery>,
   options?: PaginateOptions<T>,
@@ -299,7 +299,7 @@ export const cursorPaginate = async <
     options as PaginateOptions<T> | undefined,
   );
   const chain = withTotalOrder(model, normalizeChain(callerOrderByOption));
-  // The token binds to the composed filter — lens narrowing, search, live scope and the caller's
+  // The token binds to the composed filter — lens narrowing, search, not-deleted scope and the caller's
   // where all included — so "same query?" is answered by the system that owns the query, not by
   // the request params.
   const filterHash = stableHash({ model, where });

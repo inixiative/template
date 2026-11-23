@@ -49,7 +49,7 @@ describe('DELETE /api/v1/inquiry/:id/cancel', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('cancels a sent inquiry and leaves it live', async () => {
+  it('cancels a sent inquiry and leaves it not-deleted', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,

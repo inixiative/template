@@ -20,16 +20,21 @@ const table = (model: string) => {
 
 const col = (name: string) => Prisma.raw(`"${name}"`);
 
-// liveOnly=true:  deletedAt IS NULL AND position > 0  (normal live scope)
-// liveOnly=false: scope columns only (no deletedAt / position filter)
-const scopeWhere = (model: string, scope: Where, field: string, liveOnly = true): Prisma.Sql => {
+// notDeletedOnly=true:  deletedAt IS NULL AND position > 0  (normal not-deleted scope)
+// notDeletedOnly=false: scope columns only (no deletedAt / position filter)
+const scopeWhere = (
+  model: string,
+  scope: Where,
+  field: string,
+  notDeletedOnly = true,
+): Prisma.Sql => {
   const parts: Prisma.Sql[] = [];
 
   for (const [k, v] of Object.entries(scope)) {
     parts.push(v === null ? Prisma.sql`${col(k)} IS NULL` : Prisma.sql`${col(k)} = ${v}`);
   }
 
-  if (liveOnly) {
+  if (notDeletedOnly) {
     if (hasDeletedAt(model)) parts.push(Prisma.sql`"deletedAt" IS NULL`);
     parts.push(Prisma.sql`${col(field)} > 0`);
   }
@@ -37,9 +42,9 @@ const scopeWhere = (model: string, scope: Where, field: string, liveOnly = true)
   return Prisma.join(parts, ' AND ');
 };
 
-// deletedAt IS NULL only (no position > 0). Used for reDensifyLive so items
+// deletedAt IS NULL only (no position > 0). Used for reDensifyNotDeleted so items
 // that were bulk-decremented to ≤0 still get renumbered.
-const liveOnlyWhere = (model: string, scope: Where): Prisma.Sql => {
+const notDeletedOnlyWhere = (model: string, scope: Where): Prisma.Sql => {
   const parts: Prisma.Sql[] = [];
   for (const [k, v] of Object.entries(scope)) {
     parts.push(v === null ? Prisma.sql`${col(k)} IS NULL` : Prisma.sql`${col(k)} = ${v}`);
@@ -117,12 +122,16 @@ export const compactAfterRemove = async (
   field: string,
 ): Promise<Row[]> => shiftDown(model, scope, field, Prisma.sql`${col(field)} > ${removedPosition}`);
 
-// Renumbers all live rows regardless of current position value.
+// Renumbers all not-deleted rows regardless of current position value.
 // Used after bulk increment/decrement that may push positions to ≤0.
-export const reDensifyLive = async (model: string, scope: Where, field: string): Promise<Row[]> => {
+export const reDensifyNotDeleted = async (
+  model: string,
+  scope: Where,
+  field: string,
+): Promise<Row[]> => {
   const t = table(model);
   const f = col(field);
-  const where = liveOnlyWhere(model, scope);
+  const where = notDeletedOnlyWhere(model, scope);
 
   return db.$queryRaw<Row[]>(Prisma.sql`
     WITH numbered AS (
@@ -330,9 +339,9 @@ export const applyOrderedListUpdate = async (
   for (const [field, scopeFields] of Object.entries(config)) {
     const scope = buildScope(merged, scopeFields);
 
-    const wasLive = previous.deletedAt == null;
+    const wasNotDeleted = previous.deletedAt == null;
     const isSoftDeleting = data.deletedAt != null;
-    if (wasLive && isSoftDeleting) {
+    if (wasNotDeleted && isSoftDeleting) {
       const oldPos = previous[field] as number;
       if (typeof oldPos === 'number' && oldPos > 0) {
         data[field] = await minSortOrderRaw(model, scope, field);
@@ -389,7 +398,7 @@ export const applyOrderedListUpdate = async (
 };
 
 // AFTER-hook for delete / deleteMany. By the time this fires the deleted
-// rows are physically gone, so a single reDensifyLive per scope ROW_NUMBERs
+// rows are physically gone, so a single reDensifyNotDeleted per scope ROW_NUMBERs
 // the survivors into [1..N] — one query per scope regardless of how many
 // rows were deleted.
 export const applyOrderedListHardDelete = async (
@@ -407,7 +416,7 @@ export const applyOrderedListHardDelete = async (
       const key = JSON.stringify(scope);
       if (seen.has(key)) continue;
       seen.add(key);
-      affected.push(...(await reDensifyLive(model, scope, field)));
+      affected.push(...(await reDensifyNotDeleted(model, scope, field)));
     }
   }
   return affected;
@@ -468,8 +477,8 @@ const bulkAssignNegatives = async (
   `);
 };
 
-// Bulk-append restored rows to the end of the live list in one statement per
-// scope. Anchored to current MAX(live positives), then ROW_NUMBER assigns
+// Bulk-append restored rows to the end of the not-deleted list in one statement per
+// scope. Anchored to current MAX(not-deleted positives), then ROW_NUMBER assigns
 // MAX+1, MAX+2, … in id order.
 const bulkAssignAppend = async (
   model: string,
@@ -480,7 +489,7 @@ const bulkAssignAppend = async (
   if (ids.length === 0) return [];
   const t = table(model);
   const f = col(field);
-  const liveScopeSQL = scopeWhere(model, scope, field, true);
+  const notDeletedScopeSQL = scopeWhere(model, scope, field, true);
   const idsList = Prisma.join(
     ids.map((id) => Prisma.sql`${id}`),
     ', ',
@@ -490,7 +499,7 @@ const bulkAssignAppend = async (
     WITH base AS (
       SELECT COALESCE(MAX(${f}), 0) AS max_val
       FROM ${t}
-      WHERE ${liveScopeSQL}
+      WHERE ${notDeletedScopeSQL}
     ),
     numbered AS (
       SELECT t."id", (base.max_val + ROW_NUMBER() OVER (ORDER BY t."id" ASC)) AS new_pos
@@ -507,10 +516,10 @@ const bulkAssignAppend = async (
 // By this point query(args) has already committed, so deletedAt is set and
 // we can read the current DB state.
 //
-// Soft-delete: re-densify live rows (close gaps), then bulk-assign distinct
+// Soft-delete: re-densify not-deleted rows (close gaps), then bulk-assign distinct
 //   negatives to the newly soft-deleted rows in a single statement per scope.
 // Restore: bulk-assign sequential positive positions (append to end of each
-//   scope's live list).
+//   scope's not-deleted list).
 export const applyOrderedListBulkDeletedAtChange = async (
   model: string,
   data: Row,
@@ -524,7 +533,7 @@ export const applyOrderedListBulkDeletedAtChange = async (
   if (!isSoftDeleting && !isRestoring) return [];
 
   // Filter to rows actually transitioning state — a bulk
-  // `data.deletedAt = null` on a where-clause that matches both already-live
+  // `data.deletedAt = null` on a where-clause that matches both already-not-deleted
   // and previously-deleted rows must only re-slot the deleted ones.
   // Symmetrically for soft-delete.
   const transitioning = isSoftDeleting
@@ -538,7 +547,7 @@ export const applyOrderedListBulkDeletedAtChange = async (
 
     if (isSoftDeleting) {
       for (const { scope } of grouped.values()) {
-        affected.push(...(await reDensifyLive(model, scope, field)));
+        affected.push(...(await reDensifyNotDeleted(model, scope, field)));
       }
       for (const { scope, ids } of grouped.values()) {
         affected.push(...(await bulkAssignNegatives(model, scope, field, ids)));
