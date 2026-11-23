@@ -28,6 +28,25 @@ const rolesCovering: Record<StandardAction, readonly Role[]> = {
   read: roleHierarchy,
 };
 
+const tokenCovers = (action: StandardAction): ActionRule => ({
+  any: [
+    { rule: { field: 'actor:Token.full', operator: Operator.equals, value: true } },
+    {
+      rule: {
+        field: 'actor:Token.role',
+        operator: Operator.in,
+        value: [...rolesCovering[action]],
+      },
+    },
+  ],
+});
+
+const actorCoversAction = (action: StandardAction): ActionRule =>
+  kind.ruleForEachKind('actor:Acting', 'model', {
+    User: true,
+    Token: tokenCovers(action),
+  });
+
 const granteeIs = (granteeModel: string): ActionRule => ({
   rule: { field: 'permission.granteeModel', operator: Operator.equals, value: granteeModel },
 });
@@ -72,12 +91,14 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
             all: [
               granteeIs('OrganizationUser'),
               { rel: 'permission.granteeOrganizationUser', action: 'operate' },
+              ...(action === 'own' ? [actorCoversAction('own')] : []),
             ],
           },
           {
             all: [
               granteeIs('SpaceUser'),
               { rel: 'permission.granteeSpaceUser', action: 'operate' },
+              ...(action === 'own' ? [actorCoversAction('own')] : []),
             ],
           },
           {
@@ -103,6 +124,7 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
                       'permission.granteeIntegrationId',
                       'actor:Token.integrationId',
                     ),
+                    tokenCovers(action),
                   ],
                 },
               }),
@@ -153,7 +175,12 @@ export const artifactResourcePermission: ResourcePermission = {
     own: {
       any: [
         actorMayPerformActionOnOwner('own', '', ['User', 'Organization', 'Space']),
-        actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
+        {
+          all: [
+            actorCoversAction('own'),
+            actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
+          ],
+        },
         effectiveGrant('own'),
       ],
     },
@@ -164,6 +191,7 @@ export const artifactResourcePermission: ResourcePermission = {
       any: [
         'own',
         actorMayPerformActionOnOwner('manage', '', ['User', 'Organization', 'Space']),
+        actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
         effectiveGrant('manage'),
       ],
     },

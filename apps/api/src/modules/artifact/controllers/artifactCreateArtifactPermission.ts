@@ -8,7 +8,9 @@ import type { Prisma } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
+import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { makeController } from '#/lib/utils/makeController';
+import { artifactOwner } from '#/modules/artifact/lib/artifactOwner';
 import { assertGrantableRole } from '#/modules/artifact/lib/assertGrantableRole';
 import { hydrateArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactCreateArtifactPermissionRoute } from '#/modules/artifact/routes/artifactCreateArtifactPermission';
@@ -20,16 +22,18 @@ export const artifactCreateArtifactPermissionController = makeController(
     const artifact = contextResource<'artifact'>(c);
     const body = c.req.valid('json');
     const permix = c.get('permix');
-    const permission = await db.txn(async () => {
-      const [locked] = await db.findForUpdate<Artifact>('Artifact', { id: artifact.id });
-      if (!locked || locked.deletedAt) {
-        throw makeError({ status: 404, message: 'Artifact not found' });
-      }
-      assertGrantableRole(permix, await hydrateArtifact(locked), body.role);
-      return db.artifactPermission.create({
-        data: { ...body, artifactId: locked.id } as Prisma.ArtifactPermissionUncheckedCreateInput,
-      });
-    });
+    const permission = await withOwnerLock(artifactOwner(artifact), 'containers', () =>
+      db.txn(async () => {
+        const [locked] = await db.findForUpdate<Artifact>('Artifact', { id: artifact.id });
+        if (!locked || locked.deletedAt) {
+          throw makeError({ status: 404, message: 'Artifact not found' });
+        }
+        assertGrantableRole(permix, await hydrateArtifact(locked), body.role);
+        return db.artifactPermission.create({
+          data: { ...body, artifactId: locked.id } as Prisma.ArtifactPermissionUncheckedCreateInput,
+        });
+      }),
+    );
     return respond.created(permission);
   },
 );

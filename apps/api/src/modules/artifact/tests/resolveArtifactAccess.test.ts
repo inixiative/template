@@ -1,20 +1,23 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { db, fetchCachedRecordWithTargetEntitlements } from '@template/db';
 import type { Artifact, Organization, Space, User } from '@template/db/generated/client/client';
 import type { Role } from '@template/db/generated/client/enums';
 import {
   createArtifact,
   createArtifactPermission,
   createArtifactPlacement,
+  createIntegration,
   createOrganization,
   createOrganizationUser,
   createSpace,
   createSpaceUser,
+  createToken,
   createUser,
 } from '@template/db/test';
-import { permissionsOfUser } from '@template/permissions';
+import { delegate, permissionsOfUser } from '@template/permissions';
 import { createPermissions, installPermissions } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
+import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { ARTIFACT_MAX_DEPTH } from '#/hooks/artifactClosure/syncArtifactClosure';
 import {
   artifactEffectiveRole,
@@ -222,8 +225,20 @@ describe('artifact ReBAC & closure inheritance', () => {
     }
   });
 
-  it('tenantPermissionRules on Organization can widen db:artifact read to org members', async () => {
+  it('tenantPermissionRules on Organization widens Organization artifacts without leaking private member workspaces or delete', async () => {
     const folder = await folderOf(organization);
+    const { context: orgUserCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization },
+    );
+    const privateMemberArtifact = (
+      await createArtifact({
+        kind: 'file',
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: orgUserCtx.user.id,
+      })
+    ).entity;
     const memberPermix = permixForUser(reader, [{ id: organization.id, role: 'member' }]);
     expect(
       check(memberPermix, rebacSchema, 'artifact', await hydrateArtifact(folder), 'read'),
@@ -240,5 +255,150 @@ describe('artifact ReBAC & closure inheritance', () => {
     expect(
       check(memberPermix, rebacSchema, 'artifact', await hydrateArtifact(folder), 'read'),
     ).toBe(true);
+    expect(
+      check(
+        memberPermix,
+        rebacSchema,
+        'artifact',
+        await hydrateArtifact(privateMemberArtifact),
+        'read',
+      ),
+    ).toBe(false);
+    expect(actionsTenantMayExtend('Organization', 'db:artifact')).not.toContain('own');
+    expect(actionsTenantMayExtend('Organization', 'db:artifact')).not.toContain('delete');
+  });
+
+  it('Integration grantee enforces token role ceiling and rejects non-full null-role tokens', async () => {
+    const folder = await folderOf(organization);
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+    });
+    await createArtifactPermission({
+      artifactId: folder.id,
+      granteeModel: 'Integration',
+      granteeIntegrationId: integration.id,
+      role: 'owner',
+    });
+    const hydrated = await hydrateArtifact(folder);
+
+    const makeIntegrationTokenPermix = async (opts: { full: boolean; role: Role | null }) => {
+      const { entity: token } = await createToken({
+        ownerModel: 'Integration',
+        integrationId: integration.id,
+        full: opts.full,
+        role: opts.role,
+      });
+      const permix = createPermissions();
+      permix.setActor({ model: 'Token', record: token });
+      return permix;
+    };
+
+    const viewerToken = await makeIntegrationTokenPermix({ full: false, role: 'viewer' });
+    expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'read')).toBe(true);
+    expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'operate')).toBe(false);
+    expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'manage')).toBe(false);
+    expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'own')).toBe(false);
+    expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'delete')).toBe(false);
+
+    const entitlementOnlyToken = await makeIntegrationTokenPermix({ full: false, role: null });
+    expect(check(entitlementOnlyToken, rebacSchema, 'artifact', hydrated, 'read')).toBe(false);
+
+    const fullToken = await makeIntegrationTokenPermix({ full: true, role: null });
+    expect(check(fullToken, rebacSchema, 'artifact', hydrated, 'own')).toBe(true);
+    expect(check(fullToken, rebacSchema, 'artifact', hydrated, 'delete')).toBe(true);
+  });
+
+  it('admin-capped User token gets manage but not own or delete on member-owned and member-granted artifacts', async () => {
+    const { context: orgUserCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization },
+    );
+    const memberOwned = (
+      await createArtifact({
+        kind: 'file',
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: orgUserCtx.user.id,
+      })
+    ).entity;
+    const orgFolder = await folderOf(organization);
+    await createArtifactPermission({
+      artifactId: orgFolder.id,
+      granteeModel: 'OrganizationUser',
+      granteeOrganizationId: organization.id,
+      granteeUserId: orgUserCtx.user.id,
+      role: 'owner',
+    });
+
+    const { entity: adminUserToken } = await createToken({
+      ownerModel: 'User',
+      userId: orgUserCtx.user.id,
+      full: false,
+      role: 'admin',
+    });
+    const permix = createPermissions();
+    permix.setActor({ model: 'Token', record: adminUserToken });
+    const base = permissionsOfUser(
+      orgUserCtx.user.id,
+      [{ organizationId: organization.id, role: 'member' }],
+      [],
+    );
+    await installPermissions(permix, delegate(rebacSchema, base, { ceiling: 'manage' }));
+
+    for (const artifact of [memberOwned, orgFolder]) {
+      const hydrated = await hydrateArtifact(artifact);
+      expect(check(permix, rebacSchema, 'artifact', hydrated, 'manage')).toBe(true);
+      expect(check(permix, rebacSchema, 'artifact', hydrated, 'own')).toBe(false);
+      expect(check(permix, rebacSchema, 'artifact', hydrated, 'delete')).toBe(false);
+    }
+  });
+
+  it('closure hooks stay live-scoped inside db.withDeleted (revive never resurrects revoked grants or placements)', async () => {
+    const parent = await folderOf(organization, 'public');
+    const child = await folderOf(organization, 'inherit');
+    const placement = (
+      await createArtifactPlacement({ artifactId: child.id, containerArtifactId: parent.id })
+    ).entity;
+    const perm = (
+      await createArtifactPermission({
+        artifactId: child.id,
+        granteeModel: 'User',
+        granteeUserId: reader.id,
+        role: 'admin',
+      })
+    ).entity;
+
+    // Revoke permission inside withDeleted: effective row must be removed immediately.
+    await db.withDeleted(() =>
+      db.artifactPermission.update({ where: { id: perm.id }, data: { deletedAt: new Date() } }),
+    );
+    expect(await db.artifactEffectivePermission.count({ where: { permissionId: perm.id } })).toBe(
+      0,
+    );
+
+    // Remove placement before tombstoning child, then tombstone and revive child inside withDeleted.
+    await db.artifactPlacement.update({
+      where: { id: placement.id },
+      data: { deletedAt: new Date() },
+    });
+    await db.artifact.update({ where: { id: child.id }, data: { deletedAt: new Date() } });
+    const revived = await db.withDeleted(() =>
+      db.artifact.update({ where: { id: child.id }, data: { deletedAt: null } }),
+    );
+
+    expect(await db.artifactAncestor.count({ where: { artifactId: child.id } })).toBe(0);
+    expect(await db.artifactEffectivePermission.count({ where: { artifactId: child.id } })).toBe(0);
+    expect(isArtifactPublic(await hydrateArtifact(revived))).toBe(false);
+    expect(artifactEffectiveRole(permixForUser(reader), await hydrateArtifact(revived))).toBeNull();
+  });
+
+  it('direct fetchCachedRecordWithTargetEntitlements populates down lists so hydrate succeeds', async () => {
+    const folder = await folderOf(organization);
+    const cached = await fetchCachedRecordWithTargetEntitlements('artifact', folder.id);
+    expect(cached).not.toBeNull();
+    const hydrated = await hydrateArtifact(folder);
+    expect(Array.isArray(hydrated.ancestors)).toBe(true);
+    expect(Array.isArray(hydrated.effectivePermissions)).toBe(true);
   });
 });

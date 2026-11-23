@@ -209,105 +209,111 @@ export const syncArtifactSubgraph = async (rootIds: string[]): Promise<void> => 
   const uniqueRoots = [...new Set(rootIds)];
   if (uniqueRoots.length === 0) return;
 
-  const affected = await collectDescendantIds(uniqueRoots);
-  const nodes = await fetchUpwardGraph([...affected]);
-  const liveIds = [...affected].filter((id) => nodes.has(id));
-  const deadIds = [...affected].filter((id) => !nodes.has(id));
+  await db.withoutDeleted(async () => {
+    const affected = await collectDescendantIds(uniqueRoots);
+    const nodes = await fetchUpwardGraph([...affected]);
+    const liveIds = [...affected].filter((id) => nodes.has(id));
+    const deadIds = [...affected].filter((id) => !nodes.has(id));
 
-  if (deadIds.length > 0) {
-    await db.artifactAncestor.deleteMany({ where: { artifactId: { in: deadIds } } });
-    await db.artifactEffectivePermission.deleteMany({ where: { artifactId: { in: deadIds } } });
-  }
-  if (liveIds.length === 0) return;
+    if (deadIds.length > 0) {
+      await db.artifactAncestor.deleteMany({ where: { artifactId: { in: deadIds } } });
+      await db.artifactEffectivePermission.deleteMany({ where: { artifactId: { in: deadIds } } });
+    }
+    if (liveIds.length === 0) return;
 
-  const ancestorsOf = computeAncestorsMap(nodes);
-  const desiredByArtifact = new Map<string, Map<string, AncestorInfo>>(
-    liveIds.map((id) => [id, ancestorsOf(id)]),
-  );
+    const ancestorsOf = computeAncestorsMap(nodes);
+    const desiredByArtifact = new Map<string, Map<string, AncestorInfo>>(
+      liveIds.map((id) => [id, ancestorsOf(id)]),
+    );
 
-  await syncAncestors(liveIds, desiredByArtifact);
-  await syncEffectivePermissions(liveIds, desiredByArtifact);
+    await syncAncestors(liveIds, desiredByArtifact);
+    await syncEffectivePermissions(liveIds, desiredByArtifact);
+  });
 };
 
 export const syncArtifactPermissionEffective = async (permissionIds: string[]): Promise<void> => {
   const uniqueIds = [...new Set(permissionIds)];
   if (uniqueIds.length === 0) return;
 
-  const [livePermissions, existingRows] = await Promise.all([
-    db.artifactPermission.findMany({
-      where: { id: { in: uniqueIds } },
-      select: { id: true, artifactId: true },
-    }),
-    db.artifactEffectivePermission.findMany({
-      where: { permissionId: { in: uniqueIds } },
-    }),
-  ]);
-
-  const liveById = new Map(livePermissions.map((permission) => [permission.id, permission]));
-  const existingByKey = new Map(
-    existingRows.map((row) => [`${row.artifactId}:${row.permissionId}`, row]),
-  );
-  const cacheEvictIds = new Set(existingRows.map((row) => row.artifactId));
-
-  const sourceArtifactIds = [
-    ...new Set(livePermissions.map((permission) => permission.artifactId)),
-  ];
-  const descendantRows =
-    sourceArtifactIds.length > 0
-      ? await db.artifactAncestor.findMany({
-          where: { ancestorArtifactId: { in: sourceArtifactIds }, inherits: true },
-          select: { artifactId: true, ancestorArtifactId: true },
-        })
-      : [];
-  const descendantsBySource = new Map<string, string[]>();
-  for (const row of descendantRows) {
-    const list = descendantsBySource.get(row.ancestorArtifactId) ?? [];
-    list.push(row.artifactId);
-    descendantsBySource.set(row.ancestorArtifactId, list);
-  }
-
-  const toCreate: { artifactId: string; permissionId: string }[] = [];
-  for (const permission of liveById.values()) {
-    const targetIds = new Set([
-      permission.artifactId,
-      ...(descendantsBySource.get(permission.artifactId) ?? []),
+  await db.withoutDeleted(async () => {
+    const [livePermissions, existingRows] = await Promise.all([
+      db.artifactPermission.findMany({
+        where: { id: { in: uniqueIds } },
+        select: { id: true, artifactId: true },
+      }),
+      db.artifactEffectivePermission.findMany({
+        where: { permissionId: { in: uniqueIds } },
+      }),
     ]);
-    for (const artifactId of targetIds) {
-      cacheEvictIds.add(artifactId);
-      const key = `${artifactId}:${permission.id}`;
-      if (existingByKey.has(key)) {
-        existingByKey.delete(key);
-      } else {
-        toCreate.push({ artifactId, permissionId: permission.id });
+
+    const liveById = new Map(livePermissions.map((permission) => [permission.id, permission]));
+    const existingByKey = new Map(
+      existingRows.map((row) => [`${row.artifactId}:${row.permissionId}`, row]),
+    );
+    const cacheEvictIds = new Set(existingRows.map((row) => row.artifactId));
+
+    const sourceArtifactIds = [
+      ...new Set(livePermissions.map((permission) => permission.artifactId)),
+    ];
+    const descendantRows =
+      sourceArtifactIds.length > 0
+        ? await db.artifactAncestor.findMany({
+            where: { ancestorArtifactId: { in: sourceArtifactIds }, inherits: true },
+            select: { artifactId: true, ancestorArtifactId: true },
+          })
+        : [];
+    const descendantsBySource = new Map<string, string[]>();
+    for (const row of descendantRows) {
+      const list = descendantsBySource.get(row.ancestorArtifactId) ?? [];
+      list.push(row.artifactId);
+      descendantsBySource.set(row.ancestorArtifactId, list);
+    }
+
+    const toCreate: { artifactId: string; permissionId: string }[] = [];
+    for (const permission of liveById.values()) {
+      const targetIds = new Set([
+        permission.artifactId,
+        ...(descendantsBySource.get(permission.artifactId) ?? []),
+      ]);
+      for (const artifactId of targetIds) {
+        cacheEvictIds.add(artifactId);
+        const key = `${artifactId}:${permission.id}`;
+        if (existingByKey.has(key)) {
+          existingByKey.delete(key);
+        } else {
+          toCreate.push({ artifactId, permissionId: permission.id });
+        }
       }
     }
-  }
 
-  const toDeleteIds = [...existingByKey.values()].map((row) => row.id);
-  if (toDeleteIds.length > 0) {
-    await db.artifactEffectivePermission.deleteMany({ where: { id: { in: toDeleteIds } } });
-  }
-  if (toCreate.length > 0) {
-    await db.artifactEffectivePermission.createManyAndReturn({ data: toCreate });
-  }
-  if (cacheEvictIds.size > 0) {
-    await queueCacheClear(
-      'Artifact',
-      [...cacheEvictIds].map((id) => ({ id })),
-    );
-  }
+    const toDeleteIds = [...existingByKey.values()].map((row) => row.id);
+    if (toDeleteIds.length > 0) {
+      await db.artifactEffectivePermission.deleteMany({ where: { id: { in: toDeleteIds } } });
+    }
+    if (toCreate.length > 0) {
+      await db.artifactEffectivePermission.createManyAndReturn({ data: toCreate });
+    }
+    if (cacheEvictIds.size > 0) {
+      await queueCacheClear(
+        'Artifact',
+        [...cacheEvictIds].map((id) => ({ id })),
+      );
+    }
+  });
 };
 
 export const invalidateInheritingDescendants = async (artifactIds: string[]): Promise<void> => {
   const uniqueIds = [...new Set(artifactIds)];
   if (uniqueIds.length === 0) return;
-  const rows = await db.artifactAncestor.findMany({
-    where: { ancestorArtifactId: { in: uniqueIds }, inherits: true },
-    select: { artifactId: true },
+  await db.withoutDeleted(async () => {
+    const rows = await db.artifactAncestor.findMany({
+      where: { ancestorArtifactId: { in: uniqueIds }, inherits: true },
+      select: { artifactId: true },
+    });
+    if (rows.length === 0) return;
+    await queueCacheClear(
+      'Artifact',
+      [...new Set(rows.map((row) => row.artifactId))].map((id) => ({ id })),
+    );
   });
-  if (rows.length === 0) return;
-  await queueCacheClear(
-    'Artifact',
-    [...new Set(rows.map((row) => row.artifactId))].map((id) => ({ id })),
-  );
 };

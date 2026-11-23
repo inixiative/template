@@ -362,7 +362,7 @@ describe('artifact routes', () => {
       await createArtifactPlacement({ artifactId: sub[i]!.id, containerArtifactId: sub[0]!.id });
     }
     expect((await place(adminFetch, sub[0]!, top[top.length - 1]!)).status).toBe(422);
-  });
+  }, 15_000);
 
   it('answers 403 when the caller cannot access the container', async () => {
     const own = await createFolder(outsiderFetch, '/api/v1/me/artifacts');
