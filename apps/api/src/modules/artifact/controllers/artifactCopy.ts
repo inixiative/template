@@ -6,14 +6,13 @@
  */
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { creatorGrantFor } from '#/modules/artifact/lib/creatorGrant';
 import { artifactCopyRoute } from '#/modules/artifact/routes/artifactCopy';
 import { copyArtifact } from '#/modules/artifact/services/artifactPlacements';
 
 export const artifactCopyController = makeController(artifactCopyRoute, async (c, respond) => {
   const { containerArtifactId, name } = c.req.valid('json');
-  const copy = await copyArtifact(artifactActorFromContext(c), {
+  const copy = await copyArtifact(c.get('permix'), {
     artifactId: contextResource<'artifact'>(c).id,
     containerArtifactId,
     name,

@@ -4,30 +4,43 @@
  * @partOf feature:files
  * @uses infrastructure:prisma
  */
-import { findReferenceCycle } from '@template/shared/graph';
+import { db } from '@template/db';
+import { ARTIFACT_MAX_DEPTH } from '#/hooks/artifactClosure/syncArtifactClosure';
 import { makeError } from '#/lib/errors';
-import { fetchArtifactAncestorDepth } from '#/modules/artifact/services/fetchArtifactAncestorDepth';
-import { fetchArtifactDescendants } from '#/modules/artifact/services/fetchArtifactDescendants';
-import { ARTIFACT_MAX_DEPTH } from '#/modules/artifact/services/fetchArtifactGraph';
 
 export const assertNoContainerCycle = async (
   containerArtifactId: string,
   artifactId: string,
 ): Promise<void> => {
-  const { contents, height } = await fetchArtifactDescendants(artifactId, ARTIFACT_MAX_DEPTH + 1);
-  const candidate = new Map(contents);
-  candidate.set(
-    containerArtifactId,
-    new Set([...(contents.get(containerArtifactId) ?? []), artifactId]),
-  );
-  const cycle = findReferenceCycle(candidate, containerArtifactId);
-  if (cycle) {
+  if (containerArtifactId === artifactId) {
     throw makeError({
       status: 422,
-      message: `Containers would form a loop: ${cycle.join(' -> ')}`,
+      message: `Containers would form a loop: ${containerArtifactId} -> ${artifactId}`,
     });
   }
-  if ((await fetchArtifactAncestorDepth(containerArtifactId)) + 1 + height > ARTIFACT_MAX_DEPTH) {
+  const existingCycle = await db.artifactAncestor.findFirst({
+    where: { artifactId: containerArtifactId, ancestorArtifactId: artifactId },
+    select: { id: true },
+  });
+  if (existingCycle) {
+    throw makeError({
+      status: 422,
+      message: `Containers would form a loop: ${containerArtifactId} -> ${artifactId}`,
+    });
+  }
+  const [above, below] = await Promise.all([
+    db.artifactAncestor.aggregate({
+      where: { artifactId: containerArtifactId },
+      _max: { depth: true },
+    }),
+    db.artifactAncestor.aggregate({
+      where: { ancestorArtifactId: artifactId, artifact: { type: 'container' } },
+      _max: { depth: true },
+    }),
+  ]);
+  const upDepth = above._max.depth ?? 0;
+  const downHeight = below._max.depth ?? 0;
+  if (upDepth + 1 + downHeight > ARTIFACT_MAX_DEPTH) {
     throw makeError({
       status: 422,
       message: `Containers nest at most ${ARTIFACT_MAX_DEPTH} deep`,

@@ -8,42 +8,72 @@ model Artifact {
   type   ArtifactType
   name   String
   access ArtifactAccess @default(inherit)
-  system    Boolean        @default(false)
-  systemKey String?
-
-  integrationId String?      @db.VarChar(36)
-  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   ownerModel     ArtifactOwnerModel
   userId         String?            @db.VarChar(36)
   organizationId String?            @db.VarChar(36)
   spaceId        String?            @db.VarChar(36)
 
-  user         User?         @relation("ArtifactOwnerUser", fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization? @relation("ArtifactOwnerOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
-  space        Space?        @relation("ArtifactOwnerSpace", fields: [spaceId], references: [id], onDelete: Cascade)
+  user             User?             @relation("ArtifactOwnerUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization?     @relation("ArtifactOwnerOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationUser OrganizationUser? @relation("ArtifactOwnerOrganizationUser", fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  space            Space?            @relation("ArtifactOwnerSpace", fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
+  spaceUser        SpaceUser?        @relation("ArtifactOwnerSpaceUser", fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
 
   file        File?
   bindings    ResourceBinding[]
   permissions ArtifactPermission[]
   placements  ArtifactPlacement[] @relation("ArtifactPlacementArtifact")
   contents    ArtifactPlacement[] @relation("ArtifactPlacementContainer")
-  auditLogs   AuditLog[]
 
+  /// @permissions(down: [ancestorArtifact])
+  ancestors   ArtifactAncestor[] @relation("ArtifactAncestorDescendant")
+  descendants ArtifactAncestor[] @relation("ArtifactAncestorAncestor")
+
+  /// @permissions(down: [permission.granteeUser, permission.granteeOrganization, permission.granteeSpace.organization, permission.granteeOrganizationUser.user, permission.granteeOrganizationUser.organization, permission.granteeSpaceUser.user, permission.granteeSpaceUser.space.organization, permission.granteeCustomerRelationship.customerUser, permission.granteeCustomerRelationship.customerOrganization, permission.granteeCustomerRelationship.customerSpace.organization])
+  effectivePermissions ArtifactEffectivePermission[]
+
+  auditLogs          AuditLog[]
   integrationRecords IntegrationRecord[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@unique([organizationId, systemKey], where: raw("\"ownerModel\" = 'Organization' AND \"systemKey\" IS NOT NULL AND \"deletedAt\" IS NULL"), map: "Artifact_organization_system_key")
   @@index([ownerModel])
   @@index([userId])
   @@index([organizationId])
   @@index([spaceId])
   @@index([kind])
   @@index([type])
-  @@index([integrationId])
+}
+
+model ArtifactAncestor {
+  id                 String  @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  artifactId         String  @db.VarChar(36)
+  ancestorArtifactId String  @db.VarChar(36)
+  inherits           Boolean
+  depth              Int
+
+  artifact         Artifact @relation("ArtifactAncestorDescendant", fields: [artifactId], references: [id], onDelete: Cascade)
+  ancestorArtifact Artifact @relation("ArtifactAncestorAncestor", fields: [ancestorArtifactId], references: [id], onDelete: Cascade)
+
+  @@unique([artifactId, ancestorArtifactId], map: "ArtifactAncestor_pair_key")
+  @@index([artifactId])
+  @@index([ancestorArtifactId])
+}
+
+model ArtifactEffectivePermission {
+  id           String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  artifactId   String @db.VarChar(36)
+  permissionId String @db.VarChar(36)
+
+  artifact   Artifact           @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  permission ArtifactPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([artifactId, permissionId], map: "ArtifactEffectivePermission_pair_key")
+  @@index([artifactId])
+  @@index([permissionId])
 }
 
 model ArtifactPlacement {
@@ -93,7 +123,8 @@ model ArtifactPermission {
   fromVersion      Int       @default(1)
   preserveOnRevoke Boolean   @default(false)
 
-  auditLogs AuditLog[]
+  effectiveOn ArtifactEffectivePermission[]
+  auditLogs   AuditLog[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -127,8 +158,10 @@ enum ArtifactAccess {
 
 enum ArtifactOwnerModel {
   User
+  OrganizationUser
   Organization
   Space
+  SpaceUser
 }
 
 enum ArtifactPermissionGranteeModel {

@@ -7,7 +7,7 @@
 import { z } from '@hono/zod-openapi';
 import { ResourceBindingScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
-import { validateArtifactAccess } from '#/middleware/validations/validateArtifactAccess';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { artifactPlacementReadResponseSchema } from '#/modules/artifact/schemas/artifactPlacementSchemas';
 import { Modules } from '#/modules/modules';
 
@@ -30,5 +30,5 @@ export const artifactReadUsesRoute = readRoute({
     placements: z.array(artifactPlacementReadResponseSchema),
     bindings: z.array(ResourceBindingScalarSchema),
   }),
-  middleware: [validateArtifactAccess('read')],
+  middleware: [validatePermission('read')],
 });

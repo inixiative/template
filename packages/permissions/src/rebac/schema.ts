@@ -6,6 +6,11 @@
  */
 import { Operator } from '@inixiative/json-rules';
 import { ContactSource, IntegrationResourceStatus } from '@template/db/generated/client/enums';
+import {
+  artifactPermissionResourcePermission,
+  artifactPlacementResourcePermission,
+  artifactResourcePermission,
+} from '@template/permissions/rebac/artifactResourcePermission';
 import { inquiryResourcePermission } from '@template/permissions/rebac/inquiryResourcePermission';
 import {
   actionsForRecordOwnedByAnyOwnerModel,
@@ -163,6 +168,9 @@ export const rebacSchema: RebacSchema = {
       },
     },
     'db:setting': settingResourcePermission,
+    'db:artifact': artifactResourcePermission,
+    'db:artifactPermission': artifactPermissionResourcePermission,
+    'db:artifactPlacement': artifactPlacementResourcePermission,
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:organizationUser': { actions: memberRowActions('organization') },

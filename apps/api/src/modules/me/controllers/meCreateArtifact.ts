@@ -6,18 +6,16 @@
  */
 import { actingUser } from '#/lib/context/actingUser';
 import { makeController } from '#/lib/utils/makeController';
-import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { createArtifact } from '#/modules/artifact/services/artifactPlacements';
 import { meCreateArtifactRoute } from '#/modules/me/routes/meCreateArtifact';
 
 export const meCreateArtifactController = makeController(
   meCreateArtifactRoute,
   async (c, respond) => {
-    const user = actingUser(c)!;
-    const artifact = await createArtifact(artifactActorFromContext(c), {
+    const artifact = await createArtifact(c.get('permix'), {
       ...c.req.valid('json'),
       ownerModel: 'User',
-      userId: user.id,
+      userId: actingUser(c)!.id,
     });
     return respond.created(artifact);
   },

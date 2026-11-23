@@ -5,11 +5,14 @@
  * @uses infrastructure:prisma
  */
 import { db, rowPolymorphicAxisPointsAt } from '@template/db';
-import type { ArtifactPermission } from '@template/db/generated/client/client';
+import type { Artifact, ArtifactPermission } from '@template/db/generated/client/client';
 import type { WebhookAudienceResolver } from '#/hooks/webhooks/audiences';
 import { partyKey, type Party as WebhookParty } from '#/hooks/webhooks/parties';
-import { type ArtifactPrincipal, granteePrincipal } from '#/modules/artifact/lib/artifactPrincipal';
-import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
+import {
+  type ArtifactPrincipal,
+  granteePrincipal,
+  ownerPrincipal,
+} from '#/modules/artifact/lib/artifactPrincipal';
 
 const directParty = ({ kind, ids }: ArtifactPrincipal): WebhookParty | null => {
   switch (kind) {
@@ -74,32 +77,100 @@ const principalParties = async (
   return audiences;
 };
 
+const diedWith = (childDeletedAt: Date | null, parentDeletedAt: Date): boolean =>
+  childDeletedAt === null || childDeletedAt.getTime() === parentDeletedAt.getTime();
+
+const isActivePermission = (permission: ArtifactPermission, now: Date): boolean =>
+  !permission.expiresAt || permission.expiresAt > now;
+
 export const artifactWebhookAudience: WebhookAudienceResolver = async (rows) => {
-  const deletedAtByArtifactId = new Map<string, Date>();
-  for (const row of rows) {
-    if (row.deletedAt instanceof Date) deletedAtByArtifactId.set(row.id, row.deletedAt);
+  const now = new Date();
+  const artifacts = rows as unknown as Artifact[];
+  const principalsByArtifact = new Map<string, ArtifactPrincipal[]>(
+    artifacts.map((artifact) => [artifact.id, [ownerPrincipal(artifact)]]),
+  );
+
+  const liveIds = artifacts.filter((row) => !(row.deletedAt instanceof Date)).map((row) => row.id);
+  const deadRows = artifacts.filter((row) => row.deletedAt instanceof Date);
+
+  if (liveIds.length > 0) {
+    const effective = await db.artifactEffectivePermission.findMany({
+      where: { artifactId: { in: liveIds } },
+      include: { permission: true },
+    });
+    for (const row of effective) {
+      if (!row.permission || row.permission.deletedAt || !isActivePermission(row.permission, now)) {
+        continue;
+      }
+      principalsByArtifact.get(row.artifactId)?.push(granteePrincipal(row.permission));
+    }
   }
-  const resolutions = await resolveArtifactAccess(
-    rows.map((row) => row.id),
-    deletedAtByArtifactId.size > 0 ? { deletedAtByArtifactId } : undefined,
-  );
-  return principalParties(
-    new Map(
-      [...resolutions.values()].map((resolution) => [
-        resolution.artifactId,
-        resolution.grants
-          .filter((grant) => !(resolution.memberScoped && grant.implicit))
-          .map((grant) => grant.principal),
+
+  if (deadRows.length > 0) {
+    const deadById = new Map(deadRows.map((row) => [row.id, row]));
+    const deadIds = [...deadById.keys()];
+    const tombstones = deadRows.map((row) => row.deletedAt!);
+
+    const [directPerms, deadPlacements] = await db.withDeleted(() =>
+      Promise.all([
+        db.artifactPermission.findMany({
+          where: {
+            artifactId: { in: deadIds },
+            OR: [{ deletedAt: null }, { deletedAt: { in: tombstones } }],
+          },
+        }),
+        db.artifactPlacement.findMany({
+          where: {
+            artifactId: { in: deadIds },
+            OR: [{ deletedAt: null }, { deletedAt: { in: tombstones } }],
+          },
+          select: { artifactId: true, containerArtifactId: true, deletedAt: true },
+        }),
       ]),
-    ),
-  );
+    );
+
+    for (const permission of directPerms) {
+      const parent = deadById.get(permission.artifactId);
+      if (!parent || !diedWith(permission.deletedAt, parent.deletedAt!)) continue;
+      if (!isActivePermission(permission, now)) continue;
+      principalsByArtifact.get(parent.id)?.push(granteePrincipal(permission));
+    }
+
+    const inheritedPairs = deadPlacements.filter((placement) => {
+      const child = deadById.get(placement.artifactId);
+      return child && child.access !== 'private' && diedWith(placement.deletedAt, child.deletedAt!);
+    });
+    const containerIds = [...new Set(inheritedPairs.map((pair) => pair.containerArtifactId))];
+    if (containerIds.length > 0) {
+      const containerEffective = await db.artifactEffectivePermission.findMany({
+        where: { artifactId: { in: containerIds } },
+        include: { permission: true },
+      });
+      const permsByContainer = new Map<string, ArtifactPermission[]>();
+      for (const row of containerEffective) {
+        if (!row.permission || row.permission.deletedAt || !isActivePermission(row.permission, now))
+          continue;
+        const list = permsByContainer.get(row.artifactId) ?? [];
+        list.push(row.permission);
+        permsByContainer.set(row.artifactId, list);
+      }
+      for (const { artifactId, containerArtifactId } of inheritedPairs) {
+        for (const permission of permsByContainer.get(containerArtifactId) ?? []) {
+          principalsByArtifact.get(artifactId)?.push(granteePrincipal(permission));
+        }
+      }
+    }
+  }
+
+  return principalParties(principalsByArtifact);
 };
 
 export const artifactPermissionGranteeAudience: WebhookAudienceResolver = async (rows) => {
   const principalsByArtifact = new Map<string, ArtifactPrincipal[]>();
   for (const row of rows as unknown as ArtifactPermission[]) {
-    const held = principalsByArtifact.get(row.artifactId) ?? [];
-    principalsByArtifact.set(row.artifactId, [...held, granteePrincipal(row)]);
+    const list = principalsByArtifact.get(row.artifactId) ?? [];
+    list.push(granteePrincipal(row));
+    principalsByArtifact.set(row.artifactId, list);
   }
   return principalParties(principalsByArtifact);
 };

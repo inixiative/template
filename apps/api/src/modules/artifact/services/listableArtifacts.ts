@@ -5,17 +5,15 @@
  * @uses primitive:authz
  */
 import type { Artifact } from '@template/db/generated/client/client';
-import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
-import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
+import type { Permix } from '@template/permissions/client';
+import { canActOnArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
 
-export const listableArtifacts = async <T extends Pick<Artifact, 'id'>>(
-  actor: ArtifactActor,
+export const listableArtifacts = async <T extends Artifact>(
+  permix: Permix,
   artifacts: T[],
 ): Promise<T[]> => {
-  const verdicts = await checkArtifactAccess(
-    actor,
-    artifacts.map((artifact) => artifact.id),
-    'read',
+  const checks = await Promise.all(
+    artifacts.map((artifact) => canActOnArtifact(permix, artifact, 'read')),
   );
-  return artifacts.filter((artifact) => verdicts.get(artifact.id)?.listed);
+  return artifacts.filter((_, index) => checks[index]);
 };

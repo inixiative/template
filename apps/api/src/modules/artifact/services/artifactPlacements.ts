@@ -7,22 +7,19 @@
 import { db, type Prisma } from '@template/db';
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
 import type { ArtifactAccess } from '@template/db/generated/client/enums';
+import type { Permix } from '@template/permissions/client';
 import { artifactKindDef } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
-import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
-import { ARTIFACT_EDGE_AUTHORITY } from '#/modules/artifact/lib/artifactEdgeAuthority';
 import {
   artifactOwner,
   type OwnedArtifact,
   ownerColumns,
 } from '#/modules/artifact/lib/artifactOwner';
-import { assertArtifactAction } from '#/modules/artifact/lib/assertArtifactAction';
 import { assertContainable } from '#/modules/artifact/lib/assertContainable';
 import { assertEdgeAuthority } from '#/modules/artifact/lib/assertEdgeAuthority';
-import { assertKeepsMemberScope } from '#/modules/artifact/services/assertKeepsMemberScope';
+import { assertArtifactPermission } from '#/modules/artifact/lib/checkArtifactPermission';
 import { assertNoContainerCycle } from '#/modules/artifact/services/assertNoContainerCycle';
-import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 
 export type PlaceArtifactInput = {
   artifactId: string;
@@ -52,15 +49,6 @@ export type CopyArtifactInput = {
   containerArtifactId: string;
   name?: string;
   creatorGrant?: CreatorGrant | ((container: Artifact) => CreatorGrant | undefined);
-};
-
-const assertAction = async (
-  actor: ArtifactActor,
-  artifactId: string,
-  action: 'read' | 'operate' | 'manage',
-) => {
-  const verdicts = await checkArtifactAccess(actor, [artifactId], action);
-  assertArtifactAction(verdicts.get(artifactId), action);
 };
 
 const lockArtifacts = async (ids: string[]): Promise<Map<string, Artifact>> => {
@@ -112,7 +100,6 @@ const removePlacement = async (artifactId: string, containerArtifactId: string) 
   });
   if (!placement)
     throw makeError({ status: 404, message: 'The artifact is not in that container' });
-  await assertKeepsMemberScope([artifactId], containerArtifactId);
   await db.artifactPlacement.update({
     where: { id: placement.id },
     data: { deletedAt: new Date() },
@@ -120,30 +107,29 @@ const removePlacement = async (artifactId: string, containerArtifactId: string) 
 };
 
 export const placeArtifact = async (
-  actor: ArtifactActor,
+  permix: Permix,
   { artifactId, containerArtifactId, inherit }: PlaceArtifactInput,
 ): Promise<ArtifactPlacement> => {
-  await assertEdgeAuthority(actor, artifactId, containerArtifactId);
+  await assertEdgeAuthority(permix, artifactId, containerArtifactId);
   const member = await fetchArtifact(artifactId);
   return withOwnerLock(artifactOwner(member), 'containers', () =>
     db.txn(async () => {
       const locked = await lockArtifacts([artifactId, containerArtifactId]);
-      await assertEdgeAuthority(actor, artifactId, containerArtifactId);
+      await assertEdgeAuthority(permix, artifactId, containerArtifactId);
       return writePlacement(locked.get(artifactId)!, locked.get(containerArtifactId)!, inherit);
     }),
   );
 };
 
 export const moveArtifact = async (
-  actor: ArtifactActor,
+  permix: Permix,
   { artifactId, fromContainerArtifactId, toContainerArtifactId }: MoveArtifactInput,
 ): Promise<Artifact> => {
   const assertMoveAuthority = async () => {
     if (fromContainerArtifactId)
-      await assertEdgeAuthority(actor, artifactId, fromContainerArtifactId);
-    if (toContainerArtifactId) await assertEdgeAuthority(actor, artifactId, toContainerArtifactId);
-    if (!fromContainerArtifactId)
-      await assertAction(actor, artifactId, ARTIFACT_EDGE_AUTHORITY.member);
+      await assertEdgeAuthority(permix, artifactId, fromContainerArtifactId);
+    if (toContainerArtifactId) await assertEdgeAuthority(permix, artifactId, toContainerArtifactId);
+    if (!fromContainerArtifactId) await assertArtifactPermission(permix, artifactId, 'manage');
   };
   await assertMoveAuthority();
   if (fromContainerArtifactId === toContainerArtifactId) {
@@ -175,7 +161,7 @@ export const moveArtifact = async (
 
 const insertArtifact = async (
   { containerArtifactId, access, creatorGrant, ...data }: CreateArtifactInput,
-  actor?: ArtifactActor,
+  permix?: Permix,
 ): Promise<Artifact> => {
   const kind = artifactKindDef(data.kind);
   if (!kind) throw makeError({ status: 422, message: `Unknown artifact kind: ${data.kind}` });
@@ -185,7 +171,7 @@ const insertArtifact = async (
   if (containerArtifactId) {
     const locked = await lockArtifacts([containerArtifactId]);
     container = locked.get(containerArtifactId)!;
-    if (actor) await assertAction(actor, container.id, ARTIFACT_EDGE_AUTHORITY.container);
+    if (permix) await assertArtifactPermission(permix, container.id, 'operate');
     assertContainable(container, { ...candidateOwner, id: '', kind: data.kind });
   }
 
@@ -208,14 +194,14 @@ const insertArtifact = async (
 };
 
 export const createArtifact = async (
-  actor: ArtifactActor,
+  permix: Permix,
   input: CreateArtifactInput,
 ): Promise<Artifact> => {
   if (input.containerArtifactId) {
-    await assertAction(actor, input.containerArtifactId, ARTIFACT_EDGE_AUTHORITY.container);
+    await assertArtifactPermission(permix, input.containerArtifactId, 'operate');
   }
   return withOwnerLock(artifactOwner(ownerColumns(input)), 'containers', () =>
-    db.txn(() => insertArtifact(input, actor)),
+    db.txn(() => insertArtifact(input, permix)),
   );
 };
 
@@ -265,19 +251,19 @@ export const copyArtifactInto = async (
 };
 
 export const copyArtifact = async (
-  actor: ArtifactActor,
+  permix: Permix,
   { artifactId, containerArtifactId, name, creatorGrant }: CopyArtifactInput,
 ): Promise<Artifact> => {
-  await assertAction(actor, artifactId, 'read');
-  await assertAction(actor, containerArtifactId, ARTIFACT_EDGE_AUTHORITY.container);
+  await assertArtifactPermission(permix, artifactId, 'read');
+  await assertArtifactPermission(permix, containerArtifactId, 'operate');
   const initialContainer = await fetchArtifact(containerArtifactId);
   return withOwnerLock(artifactOwner(initialContainer), 'containers', () =>
     db.txn(async () => {
       const locked = await lockArtifacts([artifactId, containerArtifactId]);
       const source = locked.get(artifactId)!;
       const container = locked.get(containerArtifactId)!;
-      await assertAction(actor, source.id, 'read');
-      await assertAction(actor, container.id, ARTIFACT_EDGE_AUTHORITY.container);
+      await assertArtifactPermission(permix, source.id, 'read');
+      await assertArtifactPermission(permix, container.id, 'operate');
       const resolvedGrant =
         typeof creatorGrant === 'function' ? creatorGrant(container) : creatorGrant;
       return copyArtifactInto(source, container, {

@@ -4,20 +4,14 @@
  * @partOf feature:files
  * @uses primitive:authz
  */
-import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
-import { ARTIFACT_EDGE_AUTHORITY } from '#/modules/artifact/lib/artifactEdgeAuthority';
-import { assertArtifactAction } from '#/modules/artifact/lib/assertArtifactAction';
-import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
+import type { Permix } from '@template/permissions/client';
+import { assertArtifactPermission } from '#/modules/artifact/lib/checkArtifactPermission';
 
 export const assertEdgeAuthority = async (
-  actor: ArtifactActor,
+  permix: Permix,
   artifactId: string,
   containerArtifactId: string,
 ): Promise<void> => {
-  const [member, container] = await Promise.all([
-    checkArtifactAccess(actor, [artifactId], ARTIFACT_EDGE_AUTHORITY.member),
-    checkArtifactAccess(actor, [containerArtifactId], ARTIFACT_EDGE_AUTHORITY.container),
-  ]);
-  assertArtifactAction(member.get(artifactId), ARTIFACT_EDGE_AUTHORITY.member);
-  assertArtifactAction(container.get(containerArtifactId), ARTIFACT_EDGE_AUTHORITY.container);
+  await assertArtifactPermission(permix, artifactId, 'manage');
+  await assertArtifactPermission(permix, containerArtifactId, 'operate');
 };

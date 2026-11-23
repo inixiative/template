@@ -6,7 +6,6 @@
  */
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { artifactReadManyArtifactsRoute } from '#/modules/artifact/routes/artifactReadManyArtifacts';
 import { listableArtifacts } from '#/modules/artifact/services/listableArtifacts';
 
@@ -19,6 +18,6 @@ export const artifactReadManyArtifactsController = makeController(
       where: { placements: { some: { containerArtifactId: container.id } } },
       orderBy: { name: 'asc' },
     });
-    return respond.ok(await listableArtifacts(artifactActorFromContext(c), members));
+    return respond.ok(await listableArtifacts(c.get('permix'), members));
   },
 );

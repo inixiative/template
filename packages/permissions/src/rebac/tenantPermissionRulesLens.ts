@@ -45,6 +45,7 @@ const everyResourceAndAction = createLens({
 const resourcesATenantMayExtend: Partial<
   Record<ModelName, { picks?: string[]; omits?: string[] }>
 > = {
+  Artifact: { omits: ['own'] },
   Contact: { omits: ['own'] },
   Segment: { omits: ['own'] },
   // why: an organization opens its spaces to read or operate; `manage` is what minting a space's

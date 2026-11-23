@@ -14,6 +14,8 @@ export const HARD_DELETE_ON_TOMBSTONE = [
   'WebhookEvent',
   'RuleReference',
   'Flow',
+  'ArtifactAncestor',
+  'ArtifactEffectivePermission',
 ] as const;
 
 export type HardDeletedOnTombstone = (typeof HARD_DELETE_ON_TOMBSTONE)[number];

@@ -1,5 +1,6 @@
 import { registerAttributeValidationHook } from '@template/db';
 import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
+import { registerArtifactClosureHook } from '#/hooks/artifactClosure/hook';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
@@ -13,7 +14,6 @@ import { registerFullDelegateTakesNoRoleOrEntitlementsHook } from '#/hooks/fullD
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
-import { registerOrganizationUserFolderHook } from '#/hooks/organizationUserFolder/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerProjectIntegrationOwnerHook } from '#/hooks/projectIntegrationOwner/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
@@ -55,7 +55,7 @@ export const registerHooks = () => {
   registerSegmentConditionsHook();
   registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook();
   registerSoftDeleteCascadeHook();
-  registerOrganizationUserFolderHook();
+  registerArtifactClosureHook();
   registerTagOwnerCategoryHook();
   registerUserEmailAddressValidationHook();
   registerUserEmailContactHook();

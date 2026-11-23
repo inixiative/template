@@ -6,16 +6,17 @@
  */
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { fetchRootArtifacts } from '#/modules/artifact/services/fetchRootArtifacts';
 import { spaceReadManyArtifactsRoute } from '#/modules/space/routes/spaceReadManyArtifacts';
 
 export const spaceReadManyArtifactsController = makeController(
   spaceReadManyArtifactsRoute,
   async (c, respond) => {
-    const roots = await fetchRootArtifacts(artifactActorFromContext(c), {
+    const space = contextResource<'space'>(c);
+    const roots = await fetchRootArtifacts(c.get('permix'), {
       ownerModel: 'Space',
-      spaceId: contextResource<'space'>(c).id,
+      organizationId: space.organizationId,
+      spaceId: space.id,
     });
     return respond.ok(roots);
   },

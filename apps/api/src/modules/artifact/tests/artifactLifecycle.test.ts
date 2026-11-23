@@ -18,8 +18,9 @@ import { artifactPlacementRouter } from '#/modules/artifactPlacement';
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
+import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { del, get, parseSuccessBody, post } from '#tests/utils/request';
+import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [
   (app) => {
@@ -28,6 +29,7 @@ const mount: MountFn[] = [
     app.route('/api/v1/artifactPermission', artifactPermissionRouter);
     app.route('/api/v1/batch', batchRouter);
     app.route('/api/v1/organization', organizationRouter);
+    app.route('/api/v1/organizationUser', organizationUserRouter);
     app.route('/api/v1/me', meRouter);
   },
 ];
@@ -95,43 +97,42 @@ describe('artifact lifecycle', () => {
     }).fetch;
   });
 
-  describe("a member's org-user content", () => {
-    let memberFolder: Artifact;
+  describe('5-way OrganizationUser-owned artifacts', () => {
     let note: Artifact;
 
     beforeEach(async () => {
-      memberFolder = await orgArtifact('organizationUserFolder', { system: true });
-      await createArtifactPermission({
-        artifactId: memberFolder.id,
-        granteeModel: 'OrganizationUser',
-        granteeOrganizationId: organization.id,
-        granteeUserId: member.id,
-        role: 'owner',
-      });
-      note = await orgArtifact('folder');
-      await placeInside(note, memberFolder);
+      const response = await memberFetch(
+        post(`/api/v1/organizationUser/${memberSeat.id}/artifacts`, {
+          kind: 'folder',
+          name: 'private-note',
+        }),
+      );
+      expect(response.status).toBe(201);
+      note = (await parseSuccessBody<Artifact>(response)).data;
     });
 
-    const listedFor = async (fetch: Fetch, container: Artifact) =>
-      (
-        await parseSuccessBody<Artifact[]>(
-          await fetch(get(`/api/v1/artifact/${container.id}/artifacts`)),
-        )
-      ).data.map((artifact) => artifact.id);
-
-    it('org owners can reach it on purpose but never browse it; admins cannot reach it', async () => {
+    it('org owners have read/delete break-glass (no manage); admins get 403; org root never lists it', async () => {
       expect(await status(memberFetch, note)).toBe(200);
       expect(await status(ownerFetch, note)).toBe(200);
-      expect(await status(adminFetch, note)).toBe(404);
-      expect(await listedFor(memberFetch, memberFolder)).toContain(note.id);
-      expect(await listedFor(ownerFetch, memberFolder)).not.toContain(note.id);
-      const roots = await parseSuccessBody<Artifact[]>(
+      expect(await status(adminFetch, note)).toBe(403);
+      expect(
+        (await ownerFetch(patch(`/api/v1/artifact/${note.id}`, { name: 'nope' }))).status,
+      ).toBe(403);
+      expect(
+        (await adminFetch(get(`/api/v1/organizationUser/${memberSeat.id}/artifacts`))).status,
+      ).toBe(403);
+      const memberRoots = await parseSuccessBody<Artifact[]>(
+        await memberFetch(get(`/api/v1/organizationUser/${memberSeat.id}/artifacts`)),
+      );
+      expect(memberRoots.data.map((artifact) => artifact.id)).toContain(note.id);
+      const orgRoots = await parseSuccessBody<Artifact[]>(
         await ownerFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
       );
-      expect(roots.data.map((artifact) => artifact.id)).not.toContain(memberFolder.id);
+      expect(orgRoots.data.map((artifact) => artifact.id)).not.toContain(note.id);
+      expect((await ownerFetch(del(`/api/v1/artifact/${note.id}`))).status).toBe(204);
     });
 
-    it('an explicit grant always works', async () => {
+    it('an explicit grant opens it to an admin', async () => {
       await createArtifactPermission({
         artifactId: note.id,
         granteeModel: 'User',
@@ -139,49 +140,6 @@ describe('artifact lifecycle', () => {
         role: 'viewer',
       });
       expect(await status(adminFetch, note)).toBe(200);
-      expect(await listedFor(ownerFetch, memberFolder)).not.toContain(note.id);
-    });
-
-    it('cannot be left in no container; once shared, the edge can go and it shows in team browse', async () => {
-      const draft = await orgArtifact('folder');
-      await placeInside(draft, memberFolder);
-      const [edge] = await db.artifactPlacement.findMany({
-        where: { artifactId: draft.id, containerArtifactId: memberFolder.id },
-      });
-      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge?.id}`))).status).toBe(422);
-
-      const team = await orgArtifact('folder');
-      await createArtifactPermission({
-        artifactId: team.id,
-        granteeModel: 'OrganizationUser',
-        granteeOrganizationId: organization.id,
-        granteeUserId: member.id,
-        role: 'member',
-      });
-      const placed = await memberFetch(
-        post(`/api/v1/artifact/${draft.id}/artifactPlacements`, { containerArtifactId: team.id }),
-      );
-      expect(placed.status).toBe(201);
-      expect(await listedFor(adminFetch, team)).toContain(draft.id);
-      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge?.id}`))).status).toBe(204);
-    });
-
-    it('a team artifact a member also files into their folder stays visible to admins', async () => {
-      const team = await orgArtifact('folder');
-      const plan = await orgArtifact('folder');
-      await placeInside(plan, team);
-      await createArtifactPlacement({ artifactId: plan.id, containerArtifactId: memberFolder.id });
-      expect(await listedFor(adminFetch, team)).toContain(plan.id);
-    });
-
-    it('is a system kind the plain create route refuses', async () => {
-      const response = await ownerFetch(
-        post(`/api/v1/organization/${organization.id}/artifacts`, {
-          kind: 'organizationUserFolder',
-          name: 'mine',
-        }),
-      );
-      expect(response.status).toBe(422);
     });
   });
 
@@ -372,7 +330,7 @@ describe('artifact lifecycle', () => {
   it('revoking a grant soft-deletes and audits it; the grantee can be granted again', async () => {
     const folder = await orgArtifact('folder');
     const grant = { granteeModel: 'User', granteeUserId: member.id, role: 'viewer' };
-    expect(await status(memberFetch, folder)).toBe(404);
+    expect(await status(memberFetch, folder)).toBe(403);
     const created = await parseSuccessBody<{ id: string }>(
       await ownerFetch(post(`/api/v1/artifact/${folder.id}/artifactPermissions`, grant)),
     );
@@ -385,7 +343,7 @@ describe('artifact lifecycle', () => {
       where: { id: created.data.id, deletedAt: undefined },
     });
     expect(revoked.deletedAt).not.toBeNull();
-    expect(await status(memberFetch, folder)).toBe(404);
+    expect(await status(memberFetch, folder)).toBe(403);
     const audit = await db.auditLog.findMany({
       where: { subjectArtifactPermissionId: created.data.id },
     });
@@ -420,6 +378,6 @@ describe('artifact lifecycle', () => {
       }),
     );
     expect(placed.status).toBe(201);
-    expect((await outsiderFetch(get(`/api/v1/artifact/${file.id}/access`))).status).toBe(404);
+    expect((await outsiderFetch(get(`/api/v1/artifact/${file.id}/access`))).status).toBe(403);
   });
 });

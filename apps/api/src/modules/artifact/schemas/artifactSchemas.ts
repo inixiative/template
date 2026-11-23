@@ -14,8 +14,6 @@ export const ARTIFACT_CREATE_IMMUTABLE_FIELDS = [
   'userId',
   'organizationId',
   'spaceId',
-  'integrationId',
-  'system',
 ] as const;
 
 export const artifactCreateBodySchema = ArtifactScalarInputSchema.pick({ name: true }).extend({

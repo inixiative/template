@@ -6,7 +6,6 @@
  */
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { creatorGrantFor } from '#/modules/artifact/lib/creatorGrant';
 import { createArtifact } from '#/modules/artifact/services/artifactPlacements';
 import { organizationCreateArtifactRoute } from '#/modules/organization/routes/organizationCreateArtifact';
@@ -18,7 +17,7 @@ export const organizationCreateArtifactController = makeController(
       ownerModel: 'Organization' as const,
       organizationId: contextResource<'organization'>(c).id,
     };
-    const artifact = await createArtifact(artifactActorFromContext(c), {
+    const artifact = await createArtifact(c.get('permix'), {
       ...c.req.valid('json'),
       ...owner,
       creatorGrant: creatorGrantFor(c, owner),

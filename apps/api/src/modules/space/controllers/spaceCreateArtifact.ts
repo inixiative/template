@@ -6,7 +6,6 @@
  */
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { creatorGrantFor } from '#/modules/artifact/lib/creatorGrant';
 import { createArtifact } from '#/modules/artifact/services/artifactPlacements';
 import { spaceCreateArtifactRoute } from '#/modules/space/routes/spaceCreateArtifact';
@@ -14,8 +13,13 @@ import { spaceCreateArtifactRoute } from '#/modules/space/routes/spaceCreateArti
 export const spaceCreateArtifactController = makeController(
   spaceCreateArtifactRoute,
   async (c, respond) => {
-    const owner = { ownerModel: 'Space' as const, spaceId: contextResource<'space'>(c).id };
-    const artifact = await createArtifact(artifactActorFromContext(c), {
+    const space = contextResource<'space'>(c);
+    const owner = {
+      ownerModel: 'Space' as const,
+      organizationId: space.organizationId,
+      spaceId: space.id,
+    };
+    const artifact = await createArtifact(c.get('permix'), {
       ...c.req.valid('json'),
       ...owner,
       creatorGrant: creatorGrantFor(c, owner),

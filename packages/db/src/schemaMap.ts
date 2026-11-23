@@ -24,6 +24,7 @@ const actorModel = (model: ActorModel) => ({
 const actorMap: FieldMap = {
   models: {
     Acting: { fields: { model: { kind: 'enum', type: 'ActorModel' } } },
+    Clock: { fields: { now: { kind: 'scalar', type: 'DateTime' } } },
     User: actorModel(ActorModel.User),
     Token: actorModel(ActorModel.Token),
   },

@@ -7,6 +7,7 @@ import {
   createArtifactPermission,
   createArtifactPlacement,
   createOrganization,
+  createOrganizationUser,
   createSpace,
   createUser,
   createWebhookSubscription,
@@ -136,34 +137,24 @@ describe('webhook hook: Artifact audience', () => {
     await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
     expect(heardBy(granteeSub.id)).toEqual([member.id]);
   });
-  it('org-user content reaches no org-level subscription on create, update, or delete', async () => {
-    const memberFolder = (
-      await createArtifact({
-        kind: 'organizationUserFolder',
-        ownerModel: 'Organization',
-        organizationId: organization.id,
-        system: true,
-      })
-    ).entity;
+  it('OrganizationUser-owned content reaches no org-level subscription on create, update, or delete', async () => {
+    const { context } = await createOrganizationUser({ role: 'member' }, { organization });
     const superadmin = createPermissions();
     superadmin.setSuperadmin(true);
     enqueueSpy.mockClear();
-    const note = await createArtifactRecord(
-      { user: null, token: null, permix: superadmin },
-      {
-        kind: 'folder',
-        name: 'private-note',
-        ownerModel: 'Organization',
-        organizationId: organization.id,
-        containerArtifactId: memberFolder.id,
-      },
-    );
+    const note = await createArtifactRecord(superadmin, {
+      kind: 'folder',
+      name: 'private-note',
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: context.user.id,
+    });
     expect(heardBy(organizationSub.id)).toEqual([]);
 
     enqueueSpy.mockClear();
     await db.artifact.update({
       where: { id: note.id },
-      data: { name: 'renamed', access: 'inherit' },
+      data: { name: 'renamed' },
     });
     expect(heardBy(organizationSub.id)).toEqual([]);
 

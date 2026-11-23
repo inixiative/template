@@ -4,12 +4,9 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
+import { db } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
-import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
-import {
-  type ArtifactNode,
-  fetchArtifactGraph,
-} from '#/modules/artifact/services/fetchArtifactGraph';
+import type { Permix } from '@template/permissions/client';
 import { listableArtifacts } from '#/modules/artifact/services/listableArtifacts';
 
 export type ArtifactAncestry = {
@@ -17,35 +14,46 @@ export type ArtifactAncestry = {
   edges: { artifactId: string; containerArtifactId: string }[];
 };
 
-const asArtifact = ({
-  permissions: _p,
-  containerArtifactIds: _c,
-  ...artifact
-}: ArtifactNode): Artifact => artifact;
-
 export const fetchArtifactAncestors = async (
-  actor: ArtifactActor,
+  permix: Permix,
   artifactId: string,
 ): Promise<ArtifactAncestry> => {
-  const graph = await fetchArtifactGraph([artifactId]);
-  const live = [...graph.values()].filter(
-    (node) => node.deletedAt === null && node.id !== artifactId,
-  );
-  const readable = new Set((await listableArtifacts(actor, live)).map((node) => node.id));
+  const ancestorRows = await db.artifactAncestor.findMany({
+    where: { artifactId },
+    include: { ancestorArtifact: true },
+  });
+  const candidates = ancestorRows
+    .map((row) => row.ancestorArtifact)
+    .filter((artifact) => artifact.deletedAt === null);
+  const readable = await listableArtifacts(permix, candidates);
+  const readableById = new Map(readable.map((artifact) => [artifact.id, artifact]));
+  if (readableById.size === 0) return { artifacts: [], edges: [] };
+
+  const placements = await db.artifactPlacement.findMany({
+    where: {
+      artifactId: { in: [artifactId, ...readableById.keys()] },
+      containerArtifactId: { in: [...readableById.keys()] },
+    },
+    select: { artifactId: true, containerArtifactId: true },
+  });
+  const parentsByNode = new Map<string, string[]>();
+  for (const placement of placements) {
+    const list = parentsByNode.get(placement.artifactId) ?? [];
+    list.push(placement.containerArtifactId);
+    parentsByNode.set(placement.artifactId, list);
+  }
 
   const reached = new Set<string>();
   const edges: ArtifactAncestry['edges'] = [];
-  const visit = (node: ArtifactNode) => {
-    for (const containerArtifactId of node.containerArtifactIds) {
-      if (!readable.has(containerArtifactId)) continue;
-      edges.push({ artifactId: node.id, containerArtifactId });
+  const visit = (nodeId: string) => {
+    for (const containerArtifactId of parentsByNode.get(nodeId) ?? []) {
+      edges.push({ artifactId: nodeId, containerArtifactId });
       if (reached.has(containerArtifactId)) continue;
       reached.add(containerArtifactId);
-      visit(graph.get(containerArtifactId)!);
+      visit(containerArtifactId);
     }
   };
-  const start = graph.get(artifactId);
-  if (start) visit(start);
+  visit(artifactId);
 
-  return { artifacts: [...reached].map((id) => asArtifact(graph.get(id)!)), edges };
+  return { artifacts: [...reached].map((id) => readableById.get(id)!), edges };
 };

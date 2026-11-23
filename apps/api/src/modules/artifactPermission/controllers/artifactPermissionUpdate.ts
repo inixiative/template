@@ -8,9 +8,8 @@ import type { Artifact } from '@template/db/generated/client/client';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
-import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { assertGrantableRole } from '#/modules/artifact/lib/assertGrantableRole';
-import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
+import { hydrateArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactPermissionUpdateRoute } from '#/modules/artifactPermission/routes/artifactPermissionUpdate';
 
 export const artifactPermissionUpdateController = makeController(
@@ -19,7 +18,7 @@ export const artifactPermissionUpdateController = makeController(
     const db = c.get('db');
     const permission = contextResource<'artifactPermission'>(c);
     const body = c.req.valid('json');
-    const actor = artifactActorFromContext(c);
+    const permix = c.get('permix');
     const updated = await db.txn(async () => {
       const [locked] = await db.findForUpdate<Artifact>('Artifact', { id: permission.artifactId });
       if (!locked || locked.deletedAt) {
@@ -29,8 +28,12 @@ export const artifactPermissionUpdateController = makeController(
       if (!current || current.artifactId !== locked.id) {
         throw makeError({ status: 404, message: 'ArtifactPermission not found' });
       }
-      const verdicts = await checkArtifactAccess(actor, [locked.id], 'manage');
-      assertGrantableRole(verdicts.get(locked.id), current.role, ...(body.role ? [body.role] : []));
+      assertGrantableRole(
+        permix,
+        await hydrateArtifact(locked),
+        current.role,
+        ...(body.role ? [body.role] : []),
+      );
       return db.artifactPermission.update({
         where: { id: current.id },
         data: body,

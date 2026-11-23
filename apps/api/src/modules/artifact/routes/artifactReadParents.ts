@@ -6,7 +6,7 @@
  */
 import { z } from '@hono/zod-openapi';
 import { readRoute } from '#/lib/routeTemplates';
-import { validateArtifactAccess } from '#/middleware/validations/validateArtifactAccess';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { artifactReadResponseSchema } from '#/modules/artifact/schemas/artifactSchemas';
 import { Modules } from '#/modules/modules';
 
@@ -16,5 +16,5 @@ export const artifactReadParentsRoute = readRoute({
   description:
     'Lists the containers an artifact sits in directly, among those the caller can read.',
   responseSchema: z.array(artifactReadResponseSchema),
-  middleware: [validateArtifactAccess('read')],
+  middleware: [validatePermission('read')],
 });

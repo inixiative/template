@@ -120,6 +120,7 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | Hook | Purpose |
 |------|---------|
 | `artifactAccess` | An Artifact's `type` is set from its kind and its `access` at creation is its kind's default when it is `inherit` or unset; refuses a kind the catalog does not know ([ARTIFACTS.md](ARTIFACTS.md)) |
+| `artifactClosure` | Keeps `ArtifactAncestor` and `ArtifactEffectivePermission` materialized closure tables in sync across `ArtifactPlacement`, `ArtifactPermission`, and `Artifact` (`access`/revive) mutations, and evicts affected `Artifact` cache keys ([ARTIFACTS.md](ARTIFACTS.md)) |
 | `attributes` | Enforces the 5-column Attribute write invariant, definition schema, and canonical sorted `multiSelect` deduplication on every model in `ATTRIBUTE_MODELS` (`registerAttributeValidationHook`, `packages/db/src/lib/attributes/hook.ts`; skips tombstone-only `{ deletedAt }` updates; see [SETTINGS.md](SETTINGS.md)) |
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
 | `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
@@ -129,7 +130,6 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
 | `memberSelfGrant` | After an `OrganizationUser` or `SpaceUser` is created (`create`, `createManyAndReturn`, an `upsert` that creates), writes its self-grant as an `Entitlement` row, tombstoned with the member's own `deletedAt` when the member is created tombstoned. `memberSelfGrant:kept` refuses (422) tombstoning a live member's self-grant; only the member's own tombstone takes it ([PERMISSIONS.md](PERMISSIONS.md#the-member-self-grant)) |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
-| `organizationUserFolder` | Creates a member's `organizationUserFolder` when an OrganizationUser is created (`ensureOrganizationUserFolder`; the invite `sent` callback creates it earlier) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
 | `projectIntegrationOwner` | Enforces tenant-boundary ownership (same organization, same user for personal, same space for space-scoped integrations) on `ProjectIntegration` creates and upserts (`apps/api/src/hooks/projectIntegrationOwner/hook.ts`) |
 | `ruleReference` | Keeps `RuleReference` edges in step with each rule-bearing column (`RULE_REFERENCE_SURFACES`, `apps/api/src/hooks/ruleReference/surfaces.ts`: email templates and components, segment `conditions`, `Entitlement.where` read through `entitlementWhereLens`, which names the entitled record by id) |

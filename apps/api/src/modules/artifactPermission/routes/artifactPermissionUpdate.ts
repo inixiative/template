@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { updateRoute } from '#/lib/routeTemplates';
-import { validateArtifactAccess } from '#/middleware/validations/validateArtifactAccess';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   ARTIFACT_PERMISSION_IMMUTABLE_FIELDS,
   artifactPermissionReadResponseSchema,
@@ -18,5 +18,5 @@ export const artifactPermissionUpdateRoute = updateRoute({
   bodySchema: artifactPermissionUpdateBodySchema,
   sanitizeKeys: ARTIFACT_PERMISSION_IMMUTABLE_FIELDS,
   responseSchema: artifactPermissionReadResponseSchema,
-  middleware: [validateArtifactAccess('manage')],
+  middleware: [validatePermission('manage')],
 });

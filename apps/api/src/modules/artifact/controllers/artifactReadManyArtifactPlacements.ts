@@ -6,9 +6,8 @@
  */
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { artifactReadManyArtifactPlacementsRoute } from '#/modules/artifact/routes/artifactReadManyArtifactPlacements';
-import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
+import { listableArtifacts } from '#/modules/artifact/services/listableArtifacts';
 
 export const artifactReadManyArtifactPlacementsController = makeController(
   artifactReadManyArtifactPlacementsRoute,
@@ -16,11 +15,14 @@ export const artifactReadManyArtifactPlacementsController = makeController(
     const db = c.get('db');
     const artifact = contextResource<'artifact'>(c);
     const edges = await db.artifactPlacement.findMany({ where: { artifactId: artifact.id } });
-    const verdicts = await checkArtifactAccess(
-      artifactActorFromContext(c),
-      edges.map((edge) => edge.containerArtifactId),
-      'read',
+    const containerIds = [...new Set(edges.map((edge) => edge.containerArtifactId))];
+    const containers =
+      containerIds.length > 0
+        ? await db.artifact.findMany({ where: { id: { in: containerIds } } })
+        : [];
+    const visibleContainerIds = new Set(
+      (await listableArtifacts(c.get('permix'), containers)).map((container) => container.id),
     );
-    return respond.ok(edges.filter((edge) => verdicts.get(edge.containerArtifactId)?.listed));
+    return respond.ok(edges.filter((edge) => visibleContainerIds.has(edge.containerArtifactId)));
   },
 );

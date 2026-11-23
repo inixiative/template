@@ -6,7 +6,7 @@
  */
 import { z } from '@hono/zod-openapi';
 import { readRoute } from '#/lib/routeTemplates';
-import { validateArtifactAccess } from '#/middleware/validations/validateArtifactAccess';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { artifactReadResponseSchema } from '#/modules/artifact/schemas/artifactSchemas';
 import { Modules } from '#/modules/modules';
 
@@ -19,5 +19,5 @@ export const artifactReadAncestorsRoute = readRoute({
     artifacts: z.array(artifactReadResponseSchema),
     edges: z.array(z.object({ artifactId: z.string(), containerArtifactId: z.string() })),
   }),
-  middleware: [validateArtifactAccess('read')],
+  middleware: [validatePermission('read')],
 });

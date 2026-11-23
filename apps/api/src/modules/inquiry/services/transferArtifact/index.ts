@@ -21,7 +21,6 @@ import {
   sameArtifactOwner,
 } from '#/modules/artifact/lib/artifactOwner';
 import { copyArtifactInto } from '#/modules/artifact/services/artifactPlacements';
-import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
 import { openInquiryWhere } from '#/modules/inquiry/validations/validateInquiryStatus';
 
@@ -44,27 +43,25 @@ const party = (inquiry: Partial<Inquiry>, axis: 'sourceModel' | 'targetModel'): 
   return target as Party;
 };
 
-const ownerOf = ({ model, id }: Party): OwnedArtifact =>
-  ownerColumns({
+const fetchOwnerOf = async ({ model, id }: Party): Promise<OwnedArtifact> => {
+  if (model === 'Space') {
+    const space = await db.space.findUnique({ where: { id }, select: { organizationId: true } });
+    if (!space) throw makeError({ status: 404, message: 'Space not found' });
+    return ownerColumns({ ownerModel: 'Space', organizationId: space.organizationId, spaceId: id });
+  }
+  return ownerColumns({
     ownerModel: model,
     [polymorphicKeyColumnOrThrow('Artifact', 'ownerModel', model)]: id,
   });
+};
 
 const fetchOwnedObject = async (artifactId: string, source: Party): Promise<Artifact> => {
-  const artifact = await db.artifact.findUnique({ where: { id: artifactId } });
-  if (!artifact || !sameArtifactOwner(artifact, ownerOf(source))) {
+  const [artifact, expectedOwner] = await Promise.all([
+    db.artifact.findUnique({ where: { id: artifactId } }),
+    fetchOwnerOf(source),
+  ]);
+  if (!artifact || !sameArtifactOwner(artifact, expectedOwner)) {
     throw makeError({ status: 404, message: 'Artifact not found' });
-  }
-  if (artifact.system) {
-    throw makeError({ status: 422, message: 'System artifacts cannot be transferred' });
-  }
-  const resolution = (await resolveArtifactAccess([artifact.id])).get(artifact.id);
-  if (resolution?.memberScoped) {
-    throw makeError({
-      status: 422,
-      message:
-        "Org-user content can't be transferred; share it into one of the org's containers first",
-    });
   }
   if (artifact.type !== 'object') {
     throw makeError({
@@ -150,11 +147,15 @@ export const transferArtifactService: InquiryService<
     }
     await db.findForUpdate('Artifact', { id: content.artifactId });
     const artifact = await fetchOwnedObject(content.artifactId, source);
+    const [sourceOwner, targetOwner] = await Promise.all([
+      fetchOwnerOf(source),
+      fetchOwnerOf(target),
+    ]);
     const allowTracking = response.allowTracking ?? content.allowTracking;
     const tracked = content.keepTracking && allowTracking !== false;
 
     if (content.keepTracking && allowTracking === false) {
-      await copyArtifactInto(artifact, ownerOf(source), {});
+      await copyArtifactInto(artifact, sourceOwner, {});
     }
     await db.artifactPlacement.updateManyAndReturn({
       where: { artifactId: artifact.id },
@@ -164,7 +165,7 @@ export const transferArtifactService: InquiryService<
       where: { artifactId: artifact.id },
       data: { deletedAt: new Date() },
     });
-    await db.artifact.update({ where: { id: artifact.id }, data: ownerOf(target) });
+    await db.artifact.update({ where: { id: artifact.id }, data: targetOwner });
     if (tracked) await grantSourceRead(artifact.id, source);
     return {};
   },

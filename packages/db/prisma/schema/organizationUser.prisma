@@ -28,7 +28,8 @@ model OrganizationUser {
   settings           Setting[]
   emailTemplates     EmailTemplate[]
   emailComponents    EmailComponent[]
-  auditLogsAsSubject AuditLog[]       @relation("AuditLogSubjectOrganizationUser")
+  auditLogsAsSubject AuditLog[]           @relation("AuditLogSubjectOrganizationUser")
+  ownedArtifacts     Artifact[]           @relation("ArtifactOwnerOrganizationUser")
   artifactGrants     ArtifactPermission[] @relation("ArtifactPermissionGranteeOrganizationUser")
 
   // ==========================================================================

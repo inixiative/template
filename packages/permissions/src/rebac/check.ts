@@ -15,9 +15,12 @@ const rebacCheck = createRebacCheck(schemaMap, { additionalRules: tenantPermissi
 
 const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> => {
   const actor = permix.getActor();
-  return actor
-    ? { 'actor:Acting': [{ model: actor.model }], [`actor:${actor.model}`]: [actor.record] }
-    : {};
+  return {
+    'actor:Clock': [{ now: new Date() }],
+    ...(actor
+      ? { 'actor:Acting': [{ model: actor.model }], [`actor:${actor.model}`]: [actor.record] }
+      : {}),
+  };
 };
 
 export const check = (
@@ -31,6 +34,6 @@ export const check = (
   rebacCheck(
     permix,
     schema,
-    { resource: `db:${model}`, record, data: { ...data, ...rowsOfActor(permix) } },
+    { resource: `db:${model}`, record, data: { ...rowsOfActor(permix), ...data } },
     actionOrRule,
   );

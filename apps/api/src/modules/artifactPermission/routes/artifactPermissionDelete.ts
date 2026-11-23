@@ -5,12 +5,12 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { deleteRoute } from '#/lib/routeTemplates';
-import { validateArtifactAccess } from '#/middleware/validations/validateArtifactAccess';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { artifactPermissionReadResponseSchema } from '#/modules/artifact/schemas/artifactPermissionSchemas';
 import { Modules } from '#/modules/modules';
 
 export const artifactPermissionDeleteRoute = deleteRoute({
   model: Modules.artifactPermission,
   responseSchema: artifactPermissionReadResponseSchema,
-  middleware: [validateArtifactAccess('manage')],
+  middleware: [validatePermission('delete')],
 });

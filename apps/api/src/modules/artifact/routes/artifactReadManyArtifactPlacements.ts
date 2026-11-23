@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { readRoute } from '#/lib/routeTemplates';
-import { validateArtifactAccess } from '#/middleware/validations/validateArtifactAccess';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { artifactPlacementReadResponseSchema } from '#/modules/artifact/schemas/artifactPlacementSchemas';
 import { Modules } from '#/modules/modules';
 
@@ -15,5 +15,5 @@ export const artifactReadManyArtifactPlacementsRoute = readRoute({
   many: true,
   description: 'Lists the container edges an artifact sits in.',
   responseSchema: artifactPlacementReadResponseSchema,
-  middleware: [validateArtifactAccess('read')],
+  middleware: [validatePermission('read')],
 });

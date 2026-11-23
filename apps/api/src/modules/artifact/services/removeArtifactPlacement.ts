@@ -6,18 +6,17 @@
  */
 import { db } from '@template/db';
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
+import type { Permix } from '@template/permissions/client';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
-import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
 import { artifactOwner } from '#/modules/artifact/lib/artifactOwner';
 import { assertEdgeAuthority } from '#/modules/artifact/lib/assertEdgeAuthority';
-import { assertKeepsMemberScope } from '#/modules/artifact/services/assertKeepsMemberScope';
 
 export const removeArtifactPlacement = async (
-  actor: ArtifactActor,
+  permix: Permix,
   placement: ArtifactPlacement,
 ): Promise<void> => {
-  await assertEdgeAuthority(actor, placement.artifactId, placement.containerArtifactId);
+  await assertEdgeAuthority(permix, placement.artifactId, placement.containerArtifactId);
   const member = await db.artifact.findUniqueOrThrow({ where: { id: placement.artifactId } });
   await withOwnerLock(artifactOwner(member), 'containers', () =>
     db.txn(async () => {
@@ -31,8 +30,7 @@ export const removeArtifactPlacement = async (
       if (!current) {
         throw makeError({ status: 404, message: 'The artifact is not in that container' });
       }
-      await assertEdgeAuthority(actor, current.artifactId, current.containerArtifactId);
-      await assertKeepsMemberScope([current.artifactId], current.containerArtifactId);
+      await assertEdgeAuthority(permix, current.artifactId, current.containerArtifactId);
       await db.artifactPlacement.update({
         where: { id: current.id },
         data: { deletedAt: new Date() },

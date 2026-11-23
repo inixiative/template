@@ -43,7 +43,6 @@ model Integration {
   integrationResources IntegrationResource[]
   projectIntegrations  ProjectIntegration[]
   settings             Setting[]
-  artifacts            Artifact[]
   artifactGrants       ArtifactPermission[]  @relation("ArtifactPermissionGranteeIntegration")
 
   // ==========================================================================

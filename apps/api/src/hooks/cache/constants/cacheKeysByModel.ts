@@ -16,6 +16,8 @@ export const cacheKeysByModel: CacheKeysByModel = {
 
   Integration: (r) => [cacheKey('integration', r.id)],
 
+  Artifact: (r) => [cacheKey('artifact', r.id)],
+
   Setting: (r) => [
     cacheKey('setting', r.id),
     cacheKey('setting', { resourceModel: r.resourceModel, resourceId: r.resourceId }),

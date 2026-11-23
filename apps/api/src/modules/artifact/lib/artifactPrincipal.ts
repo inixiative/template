@@ -14,7 +14,6 @@ import type {
 export type ArtifactPrincipalKind =
   | ArtifactPermissionGranteeModel
   | 'OrganizationManager'
-  | 'OrganizationOwner'
   | 'SpaceManager';
 
 export type ArtifactPrincipal = { kind: ArtifactPrincipalKind; ids: string[] };
@@ -35,12 +34,20 @@ type OwnedRow = {
   spaceId: string | null;
 };
 
-export const ownerPrincipal = (artifact: OwnedRow, memberScoped = false): ArtifactPrincipal => {
-  if (artifact.ownerModel === 'Organization')
-    return {
-      kind: memberScoped ? 'OrganizationOwner' : 'OrganizationManager',
-      ids: [artifact.organizationId!],
-    };
-  if (artifact.ownerModel === 'Space') return { kind: 'SpaceManager', ids: [artifact.spaceId!] };
-  return { kind: 'User', ids: [artifact.userId!] };
+export const ownerPrincipal = (artifact: OwnedRow): ArtifactPrincipal => {
+  switch (artifact.ownerModel) {
+    case 'User':
+      return { kind: 'User', ids: [artifact.userId!] };
+    case 'Organization':
+      return { kind: 'OrganizationManager', ids: [artifact.organizationId!] };
+    case 'Space':
+      return { kind: 'SpaceManager', ids: [artifact.spaceId!] };
+    case 'OrganizationUser':
+      return { kind: 'OrganizationUser', ids: [artifact.organizationId!, artifact.userId!] };
+    case 'SpaceUser':
+      return {
+        kind: 'SpaceUser',
+        ids: [artifact.organizationId!, artifact.spaceId!, artifact.userId!],
+      };
+  }
 };

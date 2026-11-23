@@ -8,6 +8,8 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import {
+  createArtifact,
+  createArtifactPlacement,
   createOrganizationUser,
   createSpace,
   createSpaceUser,
@@ -150,13 +152,18 @@ describe('artifact routes', () => {
       mockToken,
       mount,
     }).fetch;
-    const viewerOwned = await createFolder(
+    const personalOwned = await createFolder(memberFetch, '/api/v1/me/artifacts');
+    const access = await tokenFetch(get(`/api/v1/artifact/${personalOwned.id}/access`));
+    expect(access.status).toBe(200);
+    expect((await parseSuccessBody<{ role: string }>(access)).data.role).toBe('viewer');
+    expect((await place(tokenFetch, personalOwned, shared)).status).toBe(403);
+    const orgMemberOwned = await createFolder(
       memberFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
     );
-    const access = await tokenFetch(get(`/api/v1/artifact/${viewerOwned.id}/access`));
-    expect((await parseSuccessBody<{ role: string }>(access)).data.role).toBe('viewer');
-    expect((await place(tokenFetch, viewerOwned, shared)).status).toBe(403);
+    expect((await tokenFetch(get(`/api/v1/artifact/${orgMemberOwned.id}/access`))).status).toBe(
+      403,
+    );
   });
 
   it('placing an artifact that already sits somewhere keeps its explicit access', async () => {
@@ -214,7 +221,7 @@ describe('artifact routes', () => {
       mount,
     }).fetch;
     const personal = await createFolder(memberFetch, '/api/v1/me/artifacts');
-    expect((await tokenFetch(get(`/api/v1/artifact/${personal.id}/access`))).status).toBe(404);
+    expect((await tokenFetch(get(`/api/v1/artifact/${personal.id}/access`))).status).toBe(403);
   });
 
   it('refuses an edge when the caller only operates on the artifact', async () => {
@@ -292,13 +299,14 @@ describe('artifact routes', () => {
       memberFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
     );
-    expect((await entOnlyFetch(get(`/api/v1/artifact/${memberOwned.id}/access`))).status).toBe(404);
+    expect((await entOnlyFetch(get(`/api/v1/artifact/${memberOwned.id}/access`))).status).toBe(403);
 
     const { entity: memberToken } = await createToken({
       ownerModel: 'OrganizationUser',
       organizationId: organization.id,
       userId: member.id,
-      role: 'member',
+      role: null,
+      full: true,
     });
     const memberTokenFetch = createTestApp({
       mockToken: {
@@ -310,7 +318,9 @@ describe('artifact routes', () => {
           ...memberMembership,
           organization,
           user: member,
-          targetEntitlements: [],
+          targetEntitlements: await db.entitlement.findMany({
+            where: { targetModel: 'OrganizationUser', targetId: memberMembership.id },
+          }),
         },
         space: null,
         spaceUser: null,
@@ -324,32 +334,40 @@ describe('artifact routes', () => {
     );
     const tokenAccess = await memberTokenFetch(get(`/api/v1/artifact/${tokenCreated.id}/access`));
     expect(tokenAccess.status).toBe(200);
-    expect((await parseSuccessBody<{ role: string }>(tokenAccess)).data.role).toBe('member');
+    expect((await parseSuccessBody<{ role: string }>(tokenAccess)).data.role).toBe('owner');
   });
 
   it('refuses a placement whose longest path (despite shortcut edges) exceeds ARTIFACT_MAX_DEPTH', async () => {
     const chain = async (length: number) => {
       const nodes: Artifact[] = [];
       for (let i = 0; i < length; i++) {
-        nodes.push(
-          await createFolder(adminFetch, `/api/v1/organization/${organization.id}/artifacts`),
-        );
-        if (i > 0) expect((await place(adminFetch, nodes[i]!, nodes[i - 1]!)).status).toBe(201);
+        const { entity } = await createArtifact({
+          kind: 'folder',
+          ownerModel: 'Organization',
+          organizationId: organization.id,
+        });
+        nodes.push(entity);
+        if (i > 0) {
+          await createArtifactPlacement({
+            artifactId: entity.id,
+            containerArtifactId: nodes[i - 1]!.id,
+          });
+        }
       }
       return nodes;
     };
-    const top = await chain(7);
-    const sub = await chain(6);
+    const top = await chain(30);
+    const sub = await chain(22);
     for (let i = 2; i < sub.length; i++) {
-      expect((await place(adminFetch, sub[i]!, sub[0]!)).status).toBe(201);
+      await createArtifactPlacement({ artifactId: sub[i]!.id, containerArtifactId: sub[0]!.id });
     }
     expect((await place(adminFetch, sub[0]!, top[top.length - 1]!)).status).toBe(422);
   });
 
-  it('answers 404 when the caller cannot see the container', async () => {
+  it('answers 403 when the caller cannot access the container', async () => {
     const own = await createFolder(outsiderFetch, '/api/v1/me/artifacts');
     const response = await place(outsiderFetch, own, shared);
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(403);
   });
 
   it('refuses a loop', async () => {
@@ -419,7 +437,7 @@ describe('artifact routes', () => {
     const stranger = (await createUser()).entity;
     const strangerFetch = createTestApp({ mockUser: stranger, mount }).fetch;
     const edge = await placeDraftsInShared();
-    expect((await strangerFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(404);
+    expect((await strangerFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(403);
     expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(204);
     const roots = await parseSuccessBody<Artifact[]>(
       await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),

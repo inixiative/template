@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { readRoute } from '#/lib/routeTemplates';
-import { validateArtifactAccess } from '#/middleware/validations/validateArtifactAccess';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { artifactPermissionReadResponseSchema } from '#/modules/artifact/schemas/artifactPermissionSchemas';
 import { Modules } from '#/modules/modules';
 
@@ -15,5 +15,5 @@ export const artifactReadManyArtifactPermissionsRoute = readRoute({
   many: true,
   description: 'Lists the grants made directly on an artifact.',
   responseSchema: artifactPermissionReadResponseSchema,
-  middleware: [validateArtifactAccess('manage')],
+  middleware: [validatePermission('manage')],
 });
