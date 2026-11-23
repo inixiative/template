@@ -207,6 +207,9 @@ const awaitingClassification = [
   'AuditLog.subjectProjectIntegrationResourceId belongs to ProjectIntegrationResource',
   'AuditLog.subjectSettingId belongs to Setting',
   'AuditLog.subjectProjectIntegrationId belongs to ProjectIntegration',
+  'AuditLog.subjectBillingAccountId belongs to BillingAccount',
+  'BillingWebhookEvent.billingAccountId belongs to BillingAccount',
+  'AuditLog.subjectBillingResourceId belongs to BillingResource',
   'CommunicationLog.recipientContactId belongs to Contact',
 ];
 

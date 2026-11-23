@@ -8,6 +8,7 @@ import {
   transferSpaceResolutionInputSchema,
 } from '@template/shared/inquiry';
 import { emitAppEvent } from '#/appEvents/emit';
+import { enqueueJob } from '#/jobs/enqueue';
 import { makeError } from '#/lib/errors';
 import { clearSpaceRowCaches } from '#/modules/inquiry/services/transferSpace/clearSpaceRowCaches';
 import type { InquiryService } from '#/modules/inquiry/services/types';
@@ -44,6 +45,24 @@ export const transferSpaceService: InquiryService<
       },
       data: { deletedAt: transferredAt },
     });
+    await db.billingResource.updateManyAndReturn({
+      where: {
+        OR: [
+          { resourceSpaceId: spaceId },
+          { resourceProject: { spaceId } },
+          { resourceProjectIntegration: { project: { spaceId } } },
+        ],
+        AND: [
+          {
+            OR: [
+              { billingAccount: { spaceId: null } },
+              { billingAccount: { spaceId: { not: spaceId } } },
+            ],
+          },
+        ],
+      },
+      data: { deletedAt: transferredAt },
+    });
     await db.spaceUser.updateManyAndReturn({
       where: {
         spaceId,
@@ -68,6 +87,9 @@ export const transferSpaceService: InquiryService<
 
     await clearSpaceRowCaches(spaceId, organizationId);
     const moved = await db.space.update({ where: { id: spaceId }, data: { organizationId, slug } });
+    db.onCommit(async () => {
+      await enqueueJob('reconcileBillingGovernance', { organizationId, spaceId });
+    });
     await emitAppEvent('space.updated', { space: moved });
     return { slug };
   },

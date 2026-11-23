@@ -30,6 +30,7 @@ model Project {
   settings                    Setting[]
   projectIntegrations         ProjectIntegration[]
   projectIntegrationResources ProjectIntegrationResource[]
+  billingResources            BillingResource[]
 
   auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProject")
 

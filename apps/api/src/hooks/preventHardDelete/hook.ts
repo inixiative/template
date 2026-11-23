@@ -3,7 +3,7 @@ import { DbAction, HookTiming, registerDbHook, SOFT_DELETE_MODEL_SET } from '@te
 // Append-only history: models with no deletedAt column whose rows must never
 // be hard-deleted either. Updates stay allowed (status transitions, snapshot
 // augmentation); only row removal is refused.
-const APPEND_ONLY_MODELS = new Set(['AuditLog']);
+const APPEND_ONLY_MODELS = new Set(['AuditLog', 'BillingWebhookEvent']);
 
 export const registerPreventHardDeleteHook = () => {
   registerDbHook(

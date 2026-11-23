@@ -12,6 +12,7 @@ const NOOP_FIELDS_BASE: FieldRegistry = {
   _global: ['updatedAt'],
   User: ['lastLoginAt'],
   Token: ['lastUsedAt'],
+  BillingAccount: ['lastSyncedAt'],
   // Live "broken refs" projection for the index list — stamped on the written row by the versioning
   // hook and on its ancestors by the recomputeEmailDependents job; not versioned content (the
   // snapshot's componentVersions is the record). Ignored so updating it neither snapshots nor

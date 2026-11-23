@@ -15,6 +15,8 @@ import { apiRateLimit } from '#/middleware/rateLimit/apiRateLimit';
 import { authRateLimit } from '#/middleware/rateLimit/authRateLimit';
 import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
+import { billingAccountRouter } from '#/modules/billingAccount';
+import { billingResourceRouter } from '#/modules/billingResource';
 import { contactRouter } from '#/modules/contact';
 import { flowRouter } from '#/modules/flow';
 import { identifyRouter } from '#/modules/identify';
@@ -34,6 +36,7 @@ import { tokenRouter } from '#/modules/token';
 import { userRouter } from '#/modules/user';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { adminRouter } from '#/routes/admin';
+import { billingWebhooksRouter } from '#/routes/billingWebhooks';
 import { browserTelemetryRouter } from '#/routes/browserTelemetry';
 import { internalRouter } from '#/routes/internal';
 import { unsubscribeRouter } from '#/routes/unsubscribe';
@@ -57,6 +60,7 @@ apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 
 // One-click unsubscribe — public (no JWT or token); authorized by its own signed link.
 apiRouter.route('/unsubscribe', unsubscribeRouter);
+apiRouter.route('/webhooks/billing', billingWebhooksRouter);
 
 // A user presents a JWT, a program an API token; sessions never reach past /auth.
 // Spoof runs last so it applies whichever credential resolved the user.
@@ -90,3 +94,5 @@ apiRouter.route('/v1/project', projectRouter);
 apiRouter.route('/v1/integrationResource', integrationResourceRouter);
 apiRouter.route('/v1/projectIntegration', projectIntegrationRouter);
 apiRouter.route('/v1/setting', settingRouter);
+apiRouter.route('/v1/billingAccount', billingAccountRouter);
+apiRouter.route('/v1/billingResource', billingResourceRouter);

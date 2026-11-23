@@ -5,8 +5,8 @@
  * @uses none
  */
 
-// why: a grant revived with its parent re-grants access nobody decided on; issue a new one instead
-export const SKIP_REVIVE: readonly string[] = ['Token'];
+// why: a grant or canceled billing account revived with its parent would re-grant access or restore external billing nobody decided on
+export const SKIP_REVIVE: readonly string[] = ['Token', 'BillingAccount'];
 
 export const SKIP_REVIVE_SET: ReadonlySet<string> = new Set(SKIP_REVIVE);
 

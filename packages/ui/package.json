@@ -8,6 +8,8 @@
     "./components": "./src/components/index.ts",
     "./components/auth": "./src/components/auth/index.ts",
     "./components/auth/*": "./src/components/auth/*",
+    "./components/billing": "./src/components/billing/index.ts",
+    "./components/billing/*": "./src/components/billing/*",
     "./components/flows": "./src/components/flows/index.ts",
     "./components/flows/*": "./src/components/flows/*",
     "./components/layout": "./src/components/layout/index.ts",

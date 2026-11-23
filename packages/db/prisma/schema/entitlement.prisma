@@ -47,6 +47,8 @@ model Entitlement {
   sourceProjectIntegrationResourceId String? @db.VarChar(36)
   sourceSettingId             String?                  @db.VarChar(36)
   sourceProjectIntegrationId  String?                  @db.VarChar(36)
+  sourceBillingAccountId      String?                  @db.VarChar(36)
+  sourceBillingResourceId     String?                  @db.VarChar(36)
 
   targetModel              EntitlementTargetModel
   targetId                 String                 @db.VarChar(36)
@@ -76,6 +78,8 @@ model Entitlement {
   sourceProjectIntegrationResource ProjectIntegrationResource? @relation("EntitlementSource", fields: [sourceProjectIntegrationResourceId], references: [id], onDelete: SetNull)
   sourceSetting             Setting?             @relation("EntitlementSource", fields: [sourceSettingId], references: [id], onDelete: SetNull)
   sourceProjectIntegration  ProjectIntegration?  @relation("EntitlementSource", fields: [sourceProjectIntegrationId], references: [id], onDelete: SetNull)
+  sourceBillingAccount      BillingAccount?      @relation("EntitlementSource", fields: [sourceBillingAccountId], references: [id], onDelete: SetNull)
+  sourceBillingResource     BillingResource?     @relation("EntitlementSource", fields: [sourceBillingResourceId], references: [id], onDelete: SetNull)
 
   targetToken            Token?            @relation("EntitlementTarget", fields: [targetTokenId], references: [id], onDelete: Cascade)
   targetIntegration      Integration?      @relation("EntitlementTarget", fields: [targetIntegrationId], references: [id], onDelete: Cascade)
@@ -111,6 +115,8 @@ model Entitlement {
   @@index([sourceProjectIntegrationResourceId])
   @@index([sourceSettingId])
   @@index([sourceProjectIntegrationId])
+  @@index([sourceBillingAccountId])
+  @@index([sourceBillingResourceId])
   @@index([targetTokenId])
   @@index([targetIntegrationId])
   @@index([targetOrganizationId, targetUserId, targetSpaceId])
@@ -137,6 +143,8 @@ enum EntitlementResourceModel {
   ProjectIntegrationResource
   Setting
   ProjectIntegration
+  BillingAccount
+  BillingResource
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific rebac resources below

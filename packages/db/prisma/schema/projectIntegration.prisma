@@ -21,6 +21,7 @@ model ProjectIntegration {
   integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   settings           Setting[]
+  billingResources   BillingResource[]
   auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProjectIntegration")
 
   // ==========================================================================

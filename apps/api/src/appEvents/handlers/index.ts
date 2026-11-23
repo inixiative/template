@@ -1,4 +1,8 @@
 import {
+  type BillingAccountStatusChangedPayload,
+  billingAccountStatusChanged,
+} from '#/appEvents/handlers/billingAccount/billingAccountStatusChanged';
+import {
   type CommunicationOutcomeRecordedPayload,
   communicationOutcomeRecorded,
 } from '#/appEvents/handlers/communication/communicationOutcomeRecorded';
@@ -88,6 +92,7 @@ import {
 import type { AppEventHandlerFn } from '#/appEvents/makeAppEvent';
 
 export type AppEventPayloads = {
+  'billingAccount.statusChanged': BillingAccountStatusChangedPayload;
   'communication.outcomeRecorded': CommunicationOutcomeRecordedPayload;
   'contact.created': ContactCreatedPayload;
   'contact.updated': ContactUpdatedPayload;
@@ -118,6 +123,7 @@ export type AppEventPayloads = {
 };
 
 export const AppEventName = {
+  billingAccountStatusChanged: 'billingAccount.statusChanged',
   communicationOutcomeRecorded: 'communication.outcomeRecorded',
   contactCreated: 'contact.created',
   contactUpdated: 'contact.updated',
@@ -150,6 +156,7 @@ export const AppEventName = {
 export type AppEventName = (typeof AppEventName)[keyof typeof AppEventName];
 
 export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
+  'billingAccount.statusChanged': billingAccountStatusChanged,
   'communication.outcomeRecorded': communicationOutcomeRecorded,
   'contact.created': contactCreated,
   'contact.updated': contactUpdated,

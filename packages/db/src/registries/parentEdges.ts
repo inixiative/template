@@ -17,6 +17,7 @@ import type { ModelRow } from '@template/shared/utils/modelRow';
 export type ParentEdge = { axis: string } | { parent: ModelName; foreignKey: string };
 
 export const ParentEdgeRegistry = {
+  BillingResource: { parent: 'BillingAccount', foreignKey: 'billingAccountId' },
   Entitlement: { axis: 'targetModel' },
   ProjectIntegration: { parent: 'Project', foreignKey: 'projectId' },
   Setting: { axis: 'resourceModel' },

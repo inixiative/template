@@ -1,3 +1,7 @@
+import {
+  type CancelBillingAccountPayload,
+  cancelBillingAccount,
+} from '#/jobs/handlers/cancelBillingAccount';
 import { coordinateRollingCaches } from '#/jobs/handlers/coordinateRollingCaches';
 import { type DeliverEmailPayload, deliverEmail } from '#/jobs/handlers/deliverEmail';
 import {
@@ -12,6 +16,10 @@ import {
   type RecomputeEmailDependentsPayload,
   recomputeEmailDependents,
 } from '#/jobs/handlers/recomputeEmailDependents';
+import {
+  type ReconcileBillingGovernancePayload,
+  reconcileBillingGovernance,
+} from '#/jobs/handlers/reconcileBillingGovernance';
 import {
   type ReconcileCustomerRelationshipSegmentsPayload,
   reconcileCustomerRelationshipSegments,
@@ -43,6 +51,8 @@ export const JobHandlerName = {
   coordinateRollingCaches: 'coordinateRollingCaches',
   refreshRollingCache: 'refreshRollingCache',
   refreshRollingCacheTarget: 'refreshRollingCacheTarget',
+  cancelBillingAccount: 'cancelBillingAccount',
+  reconcileBillingGovernance: 'reconcileBillingGovernance',
 } as const;
 
 export type JobHandlerName = (typeof JobHandlerName)[keyof typeof JobHandlerName];
@@ -60,6 +70,8 @@ export type JobPayloads = {
   coordinateRollingCaches: undefined;
   refreshRollingCache: RefreshRollingCachePayload;
   refreshRollingCacheTarget: RefreshRollingCacheTargetPayload;
+  cancelBillingAccount: CancelBillingAccountPayload;
+  reconcileBillingGovernance: ReconcileBillingGovernancePayload;
 };
 
 export type JobHandlers = {
@@ -79,6 +91,8 @@ export const jobHandlers: JobHandlers = {
   coordinateRollingCaches,
   refreshRollingCache,
   refreshRollingCacheTarget,
+  cancelBillingAccount,
+  reconcileBillingGovernance,
 };
 
 export const isValidHandlerName = (name: string): name is JobHandlerName => name in jobHandlers;

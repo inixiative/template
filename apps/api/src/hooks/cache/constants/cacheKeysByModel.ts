@@ -16,6 +16,13 @@ export const cacheKeysByModel: CacheKeysByModel = {
 
   Integration: (r) => [cacheKey('integration', r.id)],
 
+  BillingAccount: (r) => [cacheKey('billingAccount', r.id)],
+
+  BillingResource: (r) => [
+    cacheKey('billingResource', r.id),
+    cacheKey('billingAccount', r.billingAccountId),
+  ],
+
   Setting: (r) => [
     cacheKey('setting', r.id),
     cacheKey('setting', { resourceModel: r.resourceModel, resourceId: r.resourceId }),
