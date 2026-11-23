@@ -22,8 +22,8 @@ system.install();
 
 describe('PlanetScale Resume Scenario', () => {
   beforeEach(() => {
-    planetscaleApi.vcr.clear();
-    infisicalApi.vcr.clear();
+    planetscaleApi.vcr.clearQueues();
+    infisicalApi.vcr.clearQueues();
     config.clearAll();
     system.clearAll();
     system.stubExec('bun --cwd packages/db scripts/initMigrationTable.ts', {
@@ -64,8 +64,8 @@ describe('PlanetScale Resume Scenario', () => {
   });
 
   afterEach(() => {
-    planetscaleApi.vcr.clear();
-    infisicalApi.vcr.clear();
+    planetscaleApi.vcr.clearQueues();
+    infisicalApi.vcr.clearQueues();
     config.clearAll();
     system.clearAll();
   });
@@ -80,7 +80,7 @@ describe('PlanetScale Resume Scenario', () => {
     await setupPlanetScale('test-org');
 
     // All VCR cassettes consumed — fetchSecret was called the expected number of times
-    expect(infisicalApi.vcr.isEmpty()).toBe(true);
+    expect(infisicalApi.vcr.isQueueEmpty()).toBe(true);
 
     const calls = system.mocks.exec.mock.calls;
     const migrationCalls = calls.filter(

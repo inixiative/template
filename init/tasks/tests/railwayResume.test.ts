@@ -84,9 +84,9 @@ config.install();
 
 describe('Railway Resume Scenario', () => {
   beforeEach(() => {
-    railwayApi.vcr.clear();
-    infisicalApi.vcr.clear();
-    infisicalRailwayApi.vcr.clear();
+    railwayApi.vcr.clearQueues();
+    infisicalApi.vcr.clearQueues();
+    infisicalRailwayApi.vcr.clearQueues();
     config.clearAll();
 
     seedRailwayResumeState(['storeStagingRedisUrl']);
@@ -101,9 +101,9 @@ describe('Railway Resume Scenario', () => {
   });
 
   afterEach(() => {
-    railwayApi.vcr.clear();
-    infisicalApi.vcr.clear();
-    infisicalRailwayApi.vcr.clear();
+    railwayApi.vcr.clearQueues();
+    infisicalApi.vcr.clearQueues();
+    infisicalRailwayApi.vcr.clearQueues();
     config.clearAll();
   });
 
@@ -119,13 +119,13 @@ describe('Railway Resume Scenario', () => {
     expect(result.stagingRedisUrl).toEqual(expect.any(String));
 
     // All VCR cassettes consumed
-    expect(infisicalApi.vcr.isEmpty()).toBe(true);
+    expect(infisicalApi.vcr.isQueueEmpty()).toBe(true);
   }, 60_000);
 
   test('resumes only the missing prod API deployment step', async () => {
-    railwayApi.vcr.clear();
-    infisicalApi.vcr.clear();
-    infisicalRailwayApi.vcr.clear();
+    railwayApi.vcr.clearQueues();
+    infisicalApi.vcr.clearQueues();
+    infisicalRailwayApi.vcr.clearQueues();
     config.clearAll();
 
     seedRailwayResumeState(['ensureProdApiDeployment']);
@@ -151,6 +151,6 @@ describe('Railway Resume Scenario', () => {
     expect(result.stagingApiUrl).toEqual(expect.any(String));
 
     // All VCR cassettes consumed — no setSecret calls happened
-    expect(infisicalApi.vcr.isEmpty()).toBe(true);
+    expect(infisicalApi.vcr.isQueueEmpty()).toBe(true);
   }, 60_000);
 });

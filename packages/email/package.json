@@ -25,6 +25,7 @@
     "@inixiative/field-map": "^0.1.2",
     "@inixiative/json-rules": "^4.6.0",
     "@inixiative/rules-builder": "^0.33.0",
+    "@inixiative/vcr": "^0.1.0",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
     "html-to-text": "^10.0.1",

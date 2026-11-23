@@ -13,7 +13,7 @@ config.install();
 
 describe('Infisical Resume Scenario', () => {
   beforeEach(() => {
-    infisicalApi.vcr.clear();
+    infisicalApi.vcr.clearQueues();
     config.clearAll();
 
     config.setConfig({
@@ -107,7 +107,7 @@ describe('Infisical Resume Scenario', () => {
   });
 
   afterEach(() => {
-    infisicalApi.vcr.clear();
+    infisicalApi.vcr.clearQueues();
     config.clearAll();
   });
 
@@ -139,6 +139,6 @@ describe('Infisical Resume Scenario', () => {
     );
 
     // All VCR cassettes consumed — no extra setSecret/fetchSecret calls happened
-    expect(infisicalApi.vcr.isEmpty()).toBe(true);
+    expect(infisicalApi.vcr.isQueueEmpty()).toBe(true);
   }, 60_000);
 });

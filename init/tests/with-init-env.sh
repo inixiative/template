@@ -25,6 +25,7 @@ fi
 if [ "$CLEAR_FIXTURES" = "1" ]; then
     echo "Clearing existing fixtures..."
     find "$FIXTURES_DIR" -name "*.json" -delete 2>/dev/null || true
+    export VCR_MODE="${VCR_MODE:-auto}"
     echo "Done."
 fi
 
