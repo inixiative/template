@@ -17,11 +17,11 @@ const liveRegion = process.env.PLANETSCALE_REGION ?? 'us-east';
 
 describe('TokenInputView - setSecretAsync via VCR', () => {
   beforeEach(() => {
-    infisicalApi.vcr.clear();
+    infisicalApi.vcr.clearQueues();
   });
 
   afterEach(() => {
-    infisicalApi.vcr.clear();
+    infisicalApi.vcr.clearQueues();
   });
 
   test('setSecretAsync stores tokens in Infisical', async () => {
@@ -34,7 +34,7 @@ describe('TokenInputView - setSecretAsync via VCR', () => {
     await setSecretAsync(liveProjectId, 'root', 'PLANETSCALE_TOKEN_ID', liveTokenId);
     await setSecretAsync(liveProjectId, 'root', 'PLANETSCALE_TOKEN', liveToken);
 
-    expect(infisicalApi.vcr.isEmpty()).toBe(true);
+    expect(infisicalApi.vcr.isQueueEmpty()).toBe(true);
   }, 60_000);
 
   test('multiple token fields are stored independently', async () => {
@@ -56,17 +56,17 @@ describe('TokenInputView - setSecretAsync via VCR', () => {
       await setSecretAsync(liveProjectId, t.env, t.key, t.value);
     }
 
-    expect(infisicalApi.vcr.isEmpty()).toBe(true);
+    expect(infisicalApi.vcr.isQueueEmpty()).toBe(true);
   }, 60_000);
 });
 
 describe('TokenInputView - fetchSecretOrThrow via VCR', () => {
   beforeEach(() => {
-    infisicalApi.vcr.clear();
+    infisicalApi.vcr.clearQueues();
   });
 
   afterEach(() => {
-    infisicalApi.vcr.clear();
+    infisicalApi.vcr.clearQueues();
   });
 
   test('fetchSecretOrThrow returns values from VCR fixtures', async () => {
@@ -86,6 +86,6 @@ describe('TokenInputView - fetchSecretOrThrow via VCR', () => {
 
     expect(tokenId).toEqual(expect.any(String));
     expect(token).toEqual(expect.any(String));
-    expect(infisicalApi.vcr.isEmpty()).toBe(true);
+    expect(infisicalApi.vcr.isQueueEmpty()).toBe(true);
   }, 60_000);
 });

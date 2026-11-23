@@ -2,16 +2,16 @@
  * @atlas
  * @kind client
  * @partOf feature:email, integration:resend
- * @uses primitive:shared
+ * @uses none
  */
 import { join } from 'node:path';
+import { createVcrRecorder } from '@inixiative/vcr';
 import {
   classifyResendError,
   type ResendErrorResponse,
 } from '@template/email/client/classifyResendError';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 import { EmailProviderError } from '@template/email/errors/EmailProviderError';
-import { VCR } from '@template/shared/vcr';
 import { Resend } from 'resend';
 
 // Bun resolves the installed resend/package.json at runtime — version comes
@@ -67,7 +67,7 @@ const toResendPayload = (options: SendEmailOptions) => ({
 });
 
 class ResendEmailClient implements EmailClient {
-  readonly vcr = new VCR(FIXTURES_DIR, {
+  readonly vcr = createVcrRecorder(FIXTURES_DIR, {
     service: 'resend',
     version: () => resendPkg.version,
     sanitizers: { send: { keys: SANITIZE_KEYS } },

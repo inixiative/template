@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
+import { createVcrRecorder, fetchCliVersion } from '@inixiative/vcr';
+import { captureInTest } from './capture';
 import { fetchInfisicalTokenOrThrow } from './infisical';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisicalVercel');
@@ -31,21 +32,21 @@ type EnsureVercelSyncInput = {
 };
 
 class InfisicalVercelApi {
-  readonly vcr = new VCR(FIXTURES_DIR, {
+  readonly vcr = createVcrRecorder(FIXTURES_DIR, {
     service: 'infisical|vercel',
     // Composite: either CLI bumping should invalidate cassettes since
     // both shape the Infisical-Vercel connection payload.
     version: async () =>
-      (await Promise.all([cliVersion('infisical'), cliVersion('vercel')])).join('|'),
+      (await Promise.all([fetchCliVersion('infisical'), fetchCliVersion('vercel')])).join('|'),
     sanitizers: {
-      createVercelConnection: { fn: () => 'MASKED' },
+      createVercelConnection: { transform: () => 'MASKED' },
     },
   });
 
   async listVercelConnections(
     infisicalProjectId: string,
   ): Promise<Array<{ id: string; name: string }>> {
-    return this.vcr.capture('listVercelConnections', async () => {
+    return captureInTest(this.vcr, 'listVercelConnections', async () => {
       const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/app-connections/vercel?projectId=${infisicalProjectId}`,
@@ -64,7 +65,7 @@ class InfisicalVercelApi {
   }
 
   async listVercelSyncs(infisicalProjectId: string): Promise<VercelSecretSync[]> {
-    return this.vcr.capture('listVercelSyncs', async () => {
+    return captureInTest(this.vcr, 'listVercelSyncs', async () => {
       const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/secret-syncs/vercel?projectId=${infisicalProjectId}`,
@@ -85,7 +86,7 @@ class InfisicalVercelApi {
     vercelApiToken: string,
     connectionName: string,
   ): Promise<string> {
-    return this.vcr.capture('createVercelConnection', async () => {
+    return captureInTest(this.vcr, 'createVercelConnection', async () => {
       const existing = (await this.listVercelConnections(infisicalProjectId)).find(
         (c) => c.name === connectionName,
       );
@@ -126,7 +127,7 @@ class InfisicalVercelApi {
     vercelTeamId: string,
     vercelBranch?: string,
   ): Promise<string> {
-    return this.vcr.capture('createVercelSync', async () => {
+    return captureInTest(this.vcr, 'createVercelSync', async () => {
       const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch('https://app.infisical.com/api/v1/secret-syncs/vercel', {
         method: 'POST',
@@ -162,7 +163,7 @@ class InfisicalVercelApi {
   }
 
   async deleteVercelSync(syncId: string): Promise<void> {
-    return this.vcr.capture('deleteVercelSync', async () => {
+    return captureInTest(this.vcr, 'deleteVercelSync', async () => {
       const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/secret-syncs/vercel/${syncId}`,
@@ -180,7 +181,7 @@ class InfisicalVercelApi {
   }
 
   async ensureVercelSync(input: EnsureVercelSyncInput): Promise<void> {
-    return this.vcr.capture('ensureVercelSync', async () => {
+    return captureInTest(this.vcr, 'ensureVercelSync', async () => {
       const existing = (await this.listVercelSyncs(input.infisicalProjectId)).find(
         (s) => s.name === input.syncName,
       );
