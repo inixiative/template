@@ -15,8 +15,9 @@ import {
 import { strongerRole } from '#/modules/artifact/lib/artifactRoles';
 import {
   type ArtifactGraph,
-  loadArtifactGraph,
-} from '#/modules/artifact/services/loadArtifactGraph';
+  type FetchArtifactGraphOptions,
+  fetchArtifactGraph,
+} from '#/modules/artifact/services/fetchArtifactGraph';
 
 export type ArtifactGrant = { principal: ArtifactPrincipal; role: Role; implicit: boolean };
 
@@ -107,8 +108,9 @@ const effectiveAccess = (
 
 export const resolveArtifactAccess = async (
   artifactIds: string[],
+  options?: FetchArtifactGraphOptions,
 ): Promise<Map<string, ArtifactAccessResolution>> => {
-  const graph = await loadArtifactGraph(artifactIds);
+  const graph = await fetchArtifactGraph(artifactIds, options);
   const isMemberScoped = memberScopedReach(graph);
   const resolve = effectiveAccess(graph, new Date(), isMemberScoped);
   const resolutions = new Map<string, ArtifactAccessResolution>();

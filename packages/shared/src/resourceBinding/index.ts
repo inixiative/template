@@ -1,1 +1,1 @@
-export * from '@template/shared/resourceBinding/registry';
+export * from './registry';

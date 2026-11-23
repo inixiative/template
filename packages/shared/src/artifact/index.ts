@@ -1,1 +1,2 @@
-export * from '@template/shared/artifact/kinds';
+export * from './kinds';
+export * from './systemKeys';

@@ -11,7 +11,7 @@ import { type OwnerRef, ownerColumns } from '#/modules/artifact/lib/artifactOwne
 import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 import { listableArtifacts } from '#/modules/artifact/services/listableArtifacts';
 
-export const listRootArtifacts = async (
+export const fetchRootArtifacts = async (
   actor: ArtifactActor,
   owner: OwnerRef,
 ): Promise<Artifact[]> => {

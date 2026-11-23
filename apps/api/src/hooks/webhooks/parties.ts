@@ -93,7 +93,7 @@ export const fetchWebhookPartiesThroughRelation = async (
 export const isWebhookModel = (model: string): model is WebhookModel =>
   (webhookEnabledModels as readonly string[]).includes(model);
 
-const partyKey = (party: Party) => `${party.model}:${party.id}`;
+export const partyKey = (party: Party) => `${party.model}:${party.id}`;
 
 const ownAudiences = async (
   model: WebhookModel,
@@ -107,7 +107,6 @@ const ownAudiences = async (
   return Object.fromEntries(rows.map((row) => [row.id, audiences.get(row.id) ?? []]));
 };
 
-// A related row that names its parent by a plain foreign key: the event is the parent's update.
 export type ParentDelivery = {
   webhookModel: WebhookModel;
   parents: WebhookRow[];
@@ -123,7 +122,19 @@ const parentKeyColumns = (model: string, parentModel: WebhookModel): string[] =>
       return foreignKey.id ? [foreignKey.id] : [];
     });
 
-export const parentDeliveries = async (
+const parentDiedWithChild = (parent: WebhookRow, children: WebhookRow[]): boolean => {
+  const parentDeletedAt = parent.deletedAt;
+  return (
+    parentDeletedAt instanceof Date &&
+    children.length > 0 &&
+    children.every(
+      (child) =>
+        child.deletedAt instanceof Date && child.deletedAt.getTime() === parentDeletedAt.getTime(),
+    )
+  );
+};
+
+export const fetchParentDeliveries = async (
   model: string,
   rows: WebhookRow[],
 ): Promise<ParentDelivery[]> => {
@@ -137,12 +148,25 @@ export const parentDeliveries = async (
       (id): id is string => typeof id === 'string',
     );
     if (parentIds.length === 0) continue;
-    const parents = (await db.delegate(toAccessor(parentModel)).findMany({
+    const rowsByParentId = new Map<string, WebhookRow[]>();
+    for (const row of rows) {
+      for (const column of columns) {
+        const parentId = row[column];
+        if (typeof parentId !== 'string') continue;
+        const list = rowsByParentId.get(parentId) ?? [];
+        list.push(row);
+        rowsByParentId.set(parentId, list);
+      }
+    }
+    const fetchedParents = (await db.delegate(toAccessor(parentModel)).findMany({
       where: {
         id: { in: parentIds },
         ...(hasDeletedAt(parentModel) ? { deletedAt: undefined } : {}),
       },
     })) as WebhookRow[];
+    const parents = fetchedParents.filter(
+      (parent) => !parentDiedWithChild(parent, rowsByParentId.get(parent.id) ?? []),
+    );
     if (parents.length === 0) continue;
     const audiences = await ownAudiences(parentModel, parents);
     const named = (await webhookRelatedRowAudiences[model]?.(rows)) ?? new Map<string, Party[]>();

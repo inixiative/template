@@ -6,11 +6,11 @@
  */
 import type { Artifact } from '@template/db/generated/client/client';
 import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
-import { listableArtifacts } from '#/modules/artifact/services/listableArtifacts';
 import {
   type ArtifactNode,
-  loadArtifactGraph,
-} from '#/modules/artifact/services/loadArtifactGraph';
+  fetchArtifactGraph,
+} from '#/modules/artifact/services/fetchArtifactGraph';
+import { listableArtifacts } from '#/modules/artifact/services/listableArtifacts';
 
 export type ArtifactAncestry = {
   artifacts: Artifact[];
@@ -23,11 +23,11 @@ const asArtifact = ({
   ...artifact
 }: ArtifactNode): Artifact => artifact;
 
-export const readArtifactAncestors = async (
+export const fetchArtifactAncestors = async (
   actor: ArtifactActor,
   artifactId: string,
 ): Promise<ArtifactAncestry> => {
-  const graph = await loadArtifactGraph([artifactId]);
+  const graph = await fetchArtifactGraph([artifactId]);
   const live = [...graph.values()].filter(
     (node) => node.deletedAt === null && node.id !== artifactId,
   );

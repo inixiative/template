@@ -7,6 +7,7 @@
 import type { User } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions/client';
 import type { Context } from 'hono';
+import { actingUser } from '#/lib/context/actingUser';
 import type { TokenWithRelations } from '#/lib/context/types';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -17,7 +18,7 @@ export type ArtifactActor = {
 };
 
 export const artifactActorFromContext = (c: Context<AppEnv>): ArtifactActor => ({
-  user: c.get('user'),
+  user: actingUser(c),
   token: c.get('token'),
   permix: c.get('permix'),
 });

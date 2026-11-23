@@ -20,8 +20,10 @@ const rank = (role: Role) => roleHierarchy.indexOf(role);
 export const roleAllows = (role: Role | null, action: StandardAction): boolean =>
   role !== null && rank(role) >= rank(roleForAction[action]);
 
+export const roleExceeds = (candidate: Role, held: Role): boolean => rank(candidate) > rank(held);
+
 export const strongerRole = (current: Role | null, next: Role | null): Role | null =>
   current && next ? (rank(current) >= rank(next) ? current : next) : (current ?? next);
 
-export const cappedRole = (role: Role, cap: Role | null): Role | null =>
-  cap ? (rank(role) <= rank(cap) ? role : cap) : null;
+export const cappedRole = (role: Role | null, cap: Role | null): Role | null =>
+  role && cap ? (rank(role) <= rank(cap) ? role : cap) : null;

@@ -4,10 +4,10 @@
  * @partOf feature:files
  * @uses infrastructure:prisma
  */
-import { loadArtifactGraph } from '#/modules/artifact/services/loadArtifactGraph';
+import { fetchArtifactGraph } from '#/modules/artifact/services/fetchArtifactGraph';
 
-export const artifactAncestorDepth = async (artifactId: string): Promise<number> => {
-  const graph = await loadArtifactGraph([artifactId]);
+export const fetchArtifactAncestorDepth = async (artifactId: string): Promise<number> => {
+  const graph = await fetchArtifactGraph([artifactId]);
   const memo = new Map<string, number>();
   const depthOf = (id: string, walking: Set<string>): number => {
     const cached = memo.get(id);

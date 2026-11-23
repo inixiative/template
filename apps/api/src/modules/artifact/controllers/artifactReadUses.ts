@@ -7,9 +7,9 @@
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactReadUsesRoute } from '#/modules/artifact/routes/artifactReadUses';
-import { listArtifactUses } from '#/modules/artifact/services/listArtifactUses';
+import { fetchArtifactUses } from '#/modules/artifact/services/fetchArtifactUses';
 
 export const artifactReadUsesController = makeController(
   artifactReadUsesRoute,
-  async (c, respond) => respond.ok(await listArtifactUses(c, contextResource<'artifact'>(c).id)),
+  async (c, respond) => respond.ok(await fetchArtifactUses(c, contextResource<'artifact'>(c).id)),
 );

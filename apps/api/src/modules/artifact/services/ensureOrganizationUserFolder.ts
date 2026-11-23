@@ -6,10 +6,12 @@
  */
 import { db } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
+import { artifactSystemKey, artifactSystemKeyNamespace } from '@template/shared/artifact';
 
-const folderKey = (userId: string) => `organizationUser:${userId}`;
+const folderKey = (userId: string) =>
+  artifactSystemKey(artifactSystemKeyNamespace.organizationUser, userId);
 
-export const findOrganizationUserFolder = (
+export const fetchOrganizationUserFolder = (
   organizationId: string,
   userId: string,
 ): Promise<Artifact | null> =>

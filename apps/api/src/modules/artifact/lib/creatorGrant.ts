@@ -5,13 +5,14 @@
  * @uses primitive:requestContext
  */
 import type { Context } from 'hono';
+import { actingUser } from '#/lib/context/actingUser';
 import type { OwnerRef } from '#/modules/artifact/lib/artifactOwner';
 import type { CreatorGrant } from '#/modules/artifact/services/artifactPlacements';
 import type { AppEnv } from '#/types/appEnv';
 
 export const creatorGrantFor = (c: Context<AppEnv>, owner: OwnerRef): CreatorGrant | undefined => {
-  const user = c.get('user');
-  if (!user) return undefined;
+  const userId = actingUser(c)?.id ?? c.get('token')?.userId ?? null;
+  if (!userId) return undefined;
   if (owner.ownerModel === 'Organization') {
     const member = (c.get('organizationUsers') ?? []).find(
       (membership) => membership.organizationId === owner.organizationId,

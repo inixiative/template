@@ -7,9 +7,12 @@
 import { db } from '@template/db';
 import type { ArtifactPlacement, ResourceBinding } from '@template/db/generated/client/client';
 import type { Context } from 'hono';
+import { actingUser } from '#/lib/context/actingUser';
+import { artifactAccessVerdict } from '#/middleware/validations/validateArtifactAccess';
 import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { artifactOwner } from '#/modules/artifact/lib/artifactOwner';
 import type { ArtifactPrincipal } from '#/modules/artifact/lib/artifactPrincipal';
+import { roleAllows } from '#/modules/artifact/lib/artifactRoles';
 import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
 import { fetchAsCaller } from '#/modules/batch/services/fetchAsCaller';
@@ -30,18 +33,22 @@ const ownerReadPath: Partial<
 };
 
 const visibleToCaller = async (c: Context<AppEnv>, binding: ResourceBinding): Promise<boolean> => {
-  if (binding.resourceModel === 'User') return c.get('user')?.id === binding.resourceUserId;
+  if (binding.resourceModel === 'User') return actingUser(c)?.id === binding.resourceUserId;
   const path = ownerReadPath[binding.resourceModel]?.(binding);
   if (!path) return false;
   const { status } = await fetchAsCaller(c, path);
   return status >= 200 && status < 300;
 };
 
-export const listArtifactUses = async (
+export const fetchArtifactUses = async (
   c: Context<AppEnv>,
   artifactId: string,
 ): Promise<ArtifactUses> => {
   const actor = artifactActorFromContext(c);
+  const verdict =
+    artifactAccessVerdict(c) ??
+    (await checkArtifactAccess(actor, [artifactId], 'read')).get(artifactId);
+  const canManage = roleAllows(verdict?.role ?? null, 'manage');
   const [artifact, placements, bindings, resolutions] = await Promise.all([
     db.artifact.findUniqueOrThrow({ where: { id: artifactId } }),
     db.artifactPlacement.findMany({ where: { artifactId } }),
@@ -62,7 +69,9 @@ export const listArtifactUses = async (
     owner: artifactOwner(artifact),
     access: {
       public: resolution?.public ?? false,
-      grants: (resolution?.grants ?? []).map(({ principal, role }) => ({ principal, role })),
+      grants: canManage
+        ? (resolution?.grants ?? []).map(({ principal, role }) => ({ principal, role }))
+        : [],
     },
     placements: placements.filter(
       (placement) => containers.get(placement.containerArtifactId)?.listed,

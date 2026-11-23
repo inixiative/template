@@ -24,7 +24,7 @@ import {
 } from '@template/db/test';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { artifactRouter } from '#/modules/artifact';
-import { findOrganizationUserFolder } from '#/modules/artifact/services/ensureOrganizationUserFolder';
+import { fetchOrganizationUserFolder } from '#/modules/artifact/services/ensureOrganizationUserFolder';
 import { artifactPlacementRouter } from '#/modules/artifactPlacement';
 import { inquiryRouter } from '#/modules/inquiry';
 import { meRouter } from '#/modules/me';
@@ -229,9 +229,14 @@ describe('artifact actions', () => {
       bindings: { bindingType: string }[];
     }>(await memberFetch(get(`/api/v1/artifact/${logo.id}/uses`)));
     expect(data.owner.ownerModel).toBe('Organization');
-    expect(data.access.grants.length).toBeGreaterThan(0);
+    expect(data.access.grants).toEqual([]);
     expect(data.placements.map((placement) => placement.containerArtifactId)).toEqual([shown.id]);
     expect(data.bindings.map((binding) => binding.bindingType)).toEqual(['logo']);
+
+    const { data: adminUses } = await parseSuccessBody<{
+      access: { grants: unknown[] };
+    }>(await adminFetch(get(`/api/v1/artifact/${logo.id}/uses`)));
+    expect(adminUses.access.grants.length).toBeGreaterThan(0);
   });
 
   describe('transferArtifact', () => {
@@ -297,7 +302,7 @@ describe('artifact actions', () => {
     });
 
     it("an org manager can't transfer a member's org-user content out", async () => {
-      const memberFolder = await findOrganizationUserFolder(organization.id, member.id);
+      const memberFolder = await fetchOrganizationUserFolder(organization.id, member.id);
       const note = (
         await createArtifact({
           kind: 'file',
@@ -339,7 +344,7 @@ describe('artifact actions', () => {
       expect((await strangerSends(first)).status).toBe(409);
     });
 
-    it('auto-approves only when the sender already manages the receiver', async () => {
+    it('does not auto-approve even when the sender manages the receiver, and expired transfers do not block new ones', async () => {
       const file = await userFile(admin);
       const response = await adminFetch(
         post('/api/v1/me/inquiries', {
@@ -352,29 +357,37 @@ describe('artifact actions', () => {
       );
       expect(response.status).toBe(201);
       expect((await db.artifact.findUniqueOrThrow({ where: { id: file.id } })).ownerModel).toBe(
-        'Organization',
+        'User',
       );
 
-      const other = await userFile(member);
-      await memberFetch(
+      const expiredFile = await userFile(stranger);
+      await createInquiry({
+        type: InquiryType.transferArtifact,
+        status: InquiryStatus.sent,
+        expiresAt: new Date(Date.now() - 60_000),
+        sourceModel: InquiryResourceModel.User,
+        sourceUserId: stranger.id,
+        targetModel: InquiryResourceModel.Organization,
+        targetOrganizationId: organization.id,
+        content: { artifactId: expiredFile.id, keepTracking: false },
+      });
+      const retry = await strangerFetch(
         post('/api/v1/me/inquiries', {
           type: InquiryType.transferArtifact,
           targetModel: InquiryResourceModel.Organization,
           targetOrganizationId: organization.id,
-          content: { artifactId: other.id },
+          content: { artifactId: expiredFile.id },
           status: 'sent',
         }),
       );
-      expect((await db.artifact.findUniqueOrThrow({ where: { id: other.id } })).ownerModel).toBe(
-        'User',
-      );
+      expect(retry.status).toBe(201);
     });
   });
 
   describe('org-user folders', () => {
     it('a new membership gets its folder, granted to the membership', async () => {
       const { context } = await createOrganizationUser({ role: 'member' }, { organization });
-      const folder = await findOrganizationUserFolder(organization.id, context.user.id);
+      const folder = await fetchOrganizationUserFolder(organization.id, context.user.id);
       expect(folder?.kind).toBe('organizationUserFolder');
       const grants = await db.artifactPermission.findMany({ where: { artifactId: folder?.id } });
       expect(grants.map((grant) => grant.granteeModel)).toEqual(['OrganizationUser']);
@@ -384,7 +397,7 @@ describe('artifact actions', () => {
       const joiner = (await createUser()).entity;
       const someone = (await createOrganizationUser({ role: 'member' }, { organization })).context
         .user;
-      const theirs = await findOrganizationUserFolder(organization.id, someone.id);
+      const theirs = await fetchOrganizationUserFolder(organization.id, someone.id);
       await createArtifactPermission({
         artifactId: theirs?.id,
         granteeModel: 'User',
@@ -392,7 +405,7 @@ describe('artifact actions', () => {
         role: 'owner',
       });
       await createOrganizationUser({ role: 'member' }, { organization, user: joiner });
-      const own = await findOrganizationUserFolder(organization.id, joiner.id);
+      const own = await fetchOrganizationUserFolder(organization.id, joiner.id);
       expect(own).not.toBeNull();
       expect(own?.id).not.toBe(theirs?.id);
     });
@@ -409,7 +422,7 @@ describe('artifact actions', () => {
         }),
       );
       expect(response.status).toBe(201);
-      const early = await findOrganizationUserFolder(organization.id, invitee.id);
+      const early = await fetchOrganizationUserFolder(organization.id, invitee.id);
       expect(early).not.toBeNull();
       expect(await db.artifactPermission.count({ where: { artifactId: early?.id } })).toBe(0);
       const { id: inquiryId, updatedAt } = (
@@ -436,7 +449,7 @@ describe('artifact actions', () => {
         { role: 'member', deletedAt: new Date() },
         { organization, user: dropped },
       );
-      expect(await findOrganizationUserFolder(organization.id, dropped.id)).toBeNull();
+      expect(await fetchOrganizationUserFolder(organization.id, dropped.id)).toBeNull();
 
       await db.withDeleted(() =>
         db.organizationUser.update({
@@ -444,10 +457,34 @@ describe('artifact actions', () => {
           data: { deletedAt: null },
         }),
       );
-      const revived = await findOrganizationUserFolder(organization.id, dropped.id);
+      const revived = await fetchOrganizationUserFolder(organization.id, dropped.id);
       expect(revived).not.toBeNull();
       const grants = await db.artifactPermission.findMany({ where: { artifactId: revived?.id } });
       expect(grants.map((grant) => grant.granteeModel)).toEqual(['OrganizationUser']);
+    });
+
+    it('reviving a previously live membership does not collide with softDeleteCascade reviving its grant', async () => {
+      const returning = (await createUser()).entity;
+      const { entity: membership } = await createOrganizationUser(
+        { role: 'member' },
+        { organization, user: returning },
+      );
+      const folder = await fetchOrganizationUserFolder(organization.id, returning.id);
+      expect(folder).not.toBeNull();
+
+      await db.organizationUser.update({
+        where: { id: membership.id },
+        data: { deletedAt: new Date() },
+      });
+      await db.withDeleted(() =>
+        db.organizationUser.update({
+          where: { id: membership.id },
+          data: { deletedAt: null },
+        }),
+      );
+      const grants = await db.artifactPermission.findMany({ where: { artifactId: folder?.id } });
+      expect(grants).toHaveLength(1);
+      expect(grants[0]?.granteeModel).toBe('OrganizationUser');
     });
   });
 });

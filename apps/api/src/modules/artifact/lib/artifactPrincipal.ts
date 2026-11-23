@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses infrastructure:prisma
  */
-import { polymorphismConfigForModel } from '@template/db';
+import { polymorphicKeyColumns } from '@template/db';
 import type { ArtifactPermission } from '@template/db/generated/client/client';
 import type {
   ArtifactOwnerModel,
@@ -21,17 +21,10 @@ export type ArtifactPrincipal = { kind: ArtifactPrincipalKind; ids: string[] };
 
 export const principalKey = ({ kind, ids }: ArtifactPrincipal): string => [kind, ...ids].join(':');
 
-const granteeKeyColumns = (granteeModel: ArtifactPermissionGranteeModel): string[] => {
-  const axis = polymorphismConfigForModel('ArtifactPermission')?.axes.find(
-    (candidate) => candidate.field === 'granteeModel',
-  );
-  return [...((axis?.fkMap as Record<string, readonly string[] | undefined>)[granteeModel] ?? [])];
-};
-
 export const granteePrincipal = (permission: ArtifactPermission): ArtifactPrincipal => ({
   kind: permission.granteeModel,
-  ids: granteeKeyColumns(permission.granteeModel).map((column) =>
-    String((permission as Record<string, unknown>)[column]),
+  ids: polymorphicKeyColumns('ArtifactPermission', 'granteeModel', permission.granteeModel).map(
+    (column) => String((permission as Record<string, unknown>)[column]),
   ),
 });
 

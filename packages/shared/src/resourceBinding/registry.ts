@@ -23,8 +23,6 @@ export type ResourceBindingTypeDef = {
   media?: ResourceBindingMedia;
 };
 
-// Canonical binding-type vocabulary. `ResourceBinding.bindingType` is a key here.
-// Start minimal; extend as resources need it (fork-extensible).
 export const ResourceBindingRegistry = {
   logo: { cardinality: 'single', accepts: ['image'], source: 'both', requiresPublic: true },
   avatar: { cardinality: 'single', accepts: ['image'], source: 'both', requiresPublic: true },
@@ -33,7 +31,6 @@ export const ResourceBindingRegistry = {
 
 export type ResourceBindingType = keyof typeof ResourceBindingRegistry;
 
-// Which binding types each resource may carry.
 export const ResourceBindings = {
   Organization: ['logo', 'tracking'],
   Space: ['logo', 'tracking'],

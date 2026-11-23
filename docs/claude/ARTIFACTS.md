@@ -40,7 +40,7 @@ Why one table: a grant, a placement, an audit entry and a webhook each have a si
 | Can this caller read / edit / manage this artifact: "who can see this file", "is it public" | **`checkArtifactAccess`** · service, **`validateArtifactAccess(action)`** · middleware `apps/api/src/middleware/validations/` | § Access | `validatePermission` on an artifact route (it skips grants); reading `artifact.access` alone to decide public |
 | Everyone with access to an artifact, without an actor: "build the reader set for an index", "who should hear about this change" | **`resolveArtifactAccess`** · service — public flag + grants with roles, through containers | § Access | re-walking containers by hand to collect grants |
 | Give an artifact to another user, org or space: "hand this file over", "move it to the client's workspace" | **`transferArtifact`** · Inquiry service `apps/api/src/modules/inquiry/services/transferArtifact/` | § Ownership | rewriting `organizationId` on the row; copying the file and deleting the original |
-| Where something is used and placed, as the caller sees it: "what uses this logo", "which folders is this in" | **`GET /artifact/:id/uses`** (`listArtifactUses`) | § Navigating | joining placements and bindings by hand without the caller's view |
+| Where something is used and placed, as the caller sees it: "what uses this logo", "which folders is this in" | **`GET /artifact/:id/uses`** (`fetchArtifactUses`) | § Navigating | joining placements and bindings by hand without the caller's view |
 | Delete a folder, or delete a folder and what is in it: "empty this folder", "remove the folder but keep the files" | **`deleteArtifact`** · service (`DELETE /artifact/:id`), **`artifactReadExclusiveContents`** · route, **`/v1/batch`** | § Deleting | a delete that walks a container's members and removes them; a bespoke delete-many endpoint |
 
 ---
@@ -100,7 +100,7 @@ The grants an artifact carries are:
 - the implicit owner grant: the owning user, or `OrganizationManager` / `SpaceManager` (owners and admins of the owning org or space);
 - for `inherit` and `public` artifacts, every container's grants.
 
-**A member's org-user content.** Every member has an `organizationUserFolder` in the org: owned by the org (the bytes stay with the org), private, and granted to the member. It is created optimistically, when a membership is created (which covers org creation and accepting an invite) and already when an invite is sent; at invite time it is granted to the invited user, and on joining that grant becomes the membership grant. For that folder and everything under it (`memberScoped`), the implicit owner grant is `OrganizationOwner`. Org owners (the org's IT and owner) can reach it as an internal superadmin would: they don't see everything, but if the member needs help, they can open it by id. Org admins (the average manager) cannot. It is also left out of every listing and root view (children, parents, ancestors, the owner's root, `exclusiveContents`, `/uses` placements) for anyone whose access is only that implicit owner reach, so owners don't browse it. The member, and anyone with an explicit grant, sees it listed: an explicit grant always works. Org-level webhook subscriptions don't hear it. Filing it into a team folder shares it, and then it is ordinary team content. Org-user content must stay in a container: removing its last placement, or deleting a member-scoped folder that still holds it, is refused, since at the org root it would show in the org's normal browse.
+**A member's org-user content.** Every member has an `organizationUserFolder` in the org: owned by the org (the bytes stay with the org), private, and granted to the member. It is created optimistically, when a membership is created (which covers org creation and accepting an invite) and already when an invite is sent (with no grant until the invitee joins and the membership grant is written). For that folder and everything under it (`memberScoped`), the implicit owner grant is `OrganizationOwner`. Org owners (the org's IT and owner) can reach it as an internal superadmin would: they don't see everything, but if the member needs help, they can open it by id. Org admins (the average manager) cannot. It is also left out of every listing and root view (children, parents, ancestors, the owner's root, `exclusiveContents`, `/uses` placements) for anyone whose access is only that implicit owner reach, so owners don't browse it. The member, and anyone with an explicit grant, sees it listed: an explicit grant always works. Org-level webhook subscriptions don't hear it. Filing it into a team folder shares it, and then it is ordinary team content. Org-user content must stay in a container: removing its last placement, or deleting a member-scoped folder that still holds it, is refused, since at the org root it would show in the org's normal browse.
 
 **Creation and the kind default.** The `artifactAccess` hook stamps the kind's `defaultAccess` on an artifact created with `inherit` or no access, so a new file is private. `createArtifact` creates and, if asked, places it in a container with `inherit`, in one locked `db.txn`. Placing with `inherit: false` keeps it private: an artifact at its root is first set to its kind's default access.
 
@@ -126,7 +126,7 @@ Not in this cut: access per placement. Access is the artifact's column plus its 
 Ownership never changes as a side effect. **`transferArtifact`** is an Inquiry from the current owner (a user, organization or space) to the receiver; whoever manages the owner it is leaving may send it.
 - The receiver accepts or declines. On accept the artifact's owner changes, its placements in the old owner's containers are removed (it arrives at the receiver's root), and its old grants are revoked, so the receiver starts clean. Every step is in the audit log.
 - If the sender asked to keep tracking it (`keepTracking`), the sender keeps a pointer: a `tracking` `ResourceBinding` on the sender plus a `viewer` grant. If the receiver refuses the pointer (`allowTracking: false`), the sender keeps a copy instead. Copies happen only then.
-- It auto-approves only on the existing handshake rule: when the sender already manages the receiver.
+- Auto-approve is off for now (the receiver explicitly approves or declines).
 - Only objects transfer for now.
 
 ---
@@ -172,9 +172,9 @@ No frontend is built yet.
 | Kind catalog | `packages/shared/src/artifact/kinds.ts` |
 | Access resolution | `apps/api/src/modules/artifact/services/resolveArtifactAccess.ts`, `checkArtifactAccess.ts`, `actorPrincipalRole.ts` |
 | Placements | `apps/api/src/modules/artifact/services/artifactPlacements.ts`, `removeArtifactPlacement.ts`, `assertNoContainerCycle.ts` |
-| Navigation and uses | `apps/api/src/modules/artifact/services/listRootArtifacts.ts`, `readArtifactAncestors.ts`, `listArtifactUses.ts` |
+| Navigation and uses | `apps/api/src/modules/artifact/services/fetchRootArtifacts.ts`, `fetchArtifactAncestors.ts`, `fetchArtifactUses.ts` |
 | Ownership | `apps/api/src/modules/inquiry/services/transferArtifact/` |
 | Org-user folders | `apps/api/src/modules/artifact/services/ensureOrganizationUserFolder.ts`, `apps/api/src/hooks/organizationUserFolder/hook.ts` |
-| Deleting | `apps/api/src/modules/artifact/services/deleteArtifact.ts`, `listExclusiveContents.ts` |
+| Deleting | `apps/api/src/modules/artifact/services/deleteArtifact.ts`, `fetchExclusiveContents.ts` |
 | Hooks | `apps/api/src/hooks/artifactAccess/hook.ts` (kind default and type) |
 | Routes | `apps/api/src/modules/{artifact,artifactPlacement,artifactPermission}/`, `{me,organization,space}CreateArtifact`, `{me,organization,space}ReadManyArtifacts` |

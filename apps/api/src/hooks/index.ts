@@ -48,7 +48,6 @@ export const registerHooks = () => {
   registerCronJobSyncHook();
   registerImmutableFieldsHook();
   registerOrderedListHook();
-  registerOrganizationUserFolderHook();
   registerPreventHardDeleteHook();
   registerProjectIntegrationOwnerHook();
   registerRuleReferenceHook();
@@ -56,6 +55,7 @@ export const registerHooks = () => {
   registerSegmentConditionsHook();
   registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook();
   registerSoftDeleteCascadeHook();
+  registerOrganizationUserFolderHook();
   registerTagOwnerCategoryHook();
   registerUserEmailAddressValidationHook();
   registerUserEmailContactHook();

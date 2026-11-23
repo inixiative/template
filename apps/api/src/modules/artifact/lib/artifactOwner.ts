@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses infrastructure:prisma
  */
-import { rowPolymorphicAxisPointsAt } from '@template/db';
+import { emptySideKeyColumns, polymorphicAxis, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 
 export type OwnedArtifact = Pick<Artifact, 'ownerModel' | 'userId' | 'organizationId' | 'spaceId'>;
@@ -23,9 +23,15 @@ export const artifactOwner = (artifact: OwnedArtifact) => {
 
 export type OwnerRef = Pick<OwnedArtifact, 'ownerModel'> & Partial<OwnedArtifact>;
 
+const emptyOwnerKeys = emptySideKeyColumns(polymorphicAxis('Artifact', 'ownerModel')) as Pick<
+  OwnedArtifact,
+  'userId' | 'organizationId' | 'spaceId'
+>;
+
 export const ownerColumns = (artifact: OwnerRef): OwnedArtifact => ({
+  ...emptyOwnerKeys,
   ownerModel: artifact.ownerModel,
-  userId: artifact.userId ?? null,
-  organizationId: artifact.organizationId ?? null,
-  spaceId: artifact.spaceId ?? null,
+  ...(artifact.userId != null ? { userId: artifact.userId } : {}),
+  ...(artifact.organizationId != null ? { organizationId: artifact.organizationId } : {}),
+  ...(artifact.spaceId != null ? { spaceId: artifact.spaceId } : {}),
 });

@@ -49,8 +49,6 @@ export type ArtifactKind = keyof typeof ArtifactKinds;
 
 const kindDefs: Record<string, ArtifactKindDef> = ArtifactKinds;
 
-export const isArtifactKind = (kind: string): kind is ArtifactKind => kind in kindDefs;
-
 export const artifactKindDef = (kind: string): ArtifactKindDef | null => kindDefs[kind] ?? null;
 
 export const plainArtifactKinds = (Object.keys(kindDefs) as ArtifactKind[]).filter(

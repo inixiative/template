@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses primitive:routeTemplates, primitive:authz
  */
-import { createRoute } from '#/lib/routeTemplates';
+import { createRoute, polymorphicBodyRefinement } from '#/lib/routeTemplates';
 import { validateArtifactAccess } from '#/middleware/validations/validateArtifactAccess';
 import {
   artifactPermissionCreateBodySchema,
@@ -17,6 +17,7 @@ export const artifactCreateArtifactPermissionRoute = createRoute({
   submodel: Modules.artifactPermission,
   description: 'Grants a role on an artifact, and through inherit on everything inside it.',
   bodySchema: artifactPermissionCreateBodySchema,
+  bodyRefinement: polymorphicBodyRefinement('ArtifactPermission', 'granteeModel'),
   responseSchema: artifactPermissionReadResponseSchema,
   middleware: [validateArtifactAccess('manage')],
 });

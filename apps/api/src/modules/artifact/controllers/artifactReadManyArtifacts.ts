@@ -8,7 +8,7 @@ import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
 import { artifactReadManyArtifactsRoute } from '#/modules/artifact/routes/artifactReadManyArtifacts';
-import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
+import { listableArtifacts } from '#/modules/artifact/services/listableArtifacts';
 
 export const artifactReadManyArtifactsController = makeController(
   artifactReadManyArtifactsRoute,
@@ -19,11 +19,6 @@ export const artifactReadManyArtifactsController = makeController(
       where: { placements: { some: { containerArtifactId: container.id } } },
       orderBy: { name: 'asc' },
     });
-    const verdicts = await checkArtifactAccess(
-      artifactActorFromContext(c),
-      members.map((member) => member.id),
-      'read',
-    );
-    return respond.ok(members.filter((member) => verdicts.get(member.id)?.listed));
+    return respond.ok(await listableArtifacts(artifactActorFromContext(c), members));
   },
 );

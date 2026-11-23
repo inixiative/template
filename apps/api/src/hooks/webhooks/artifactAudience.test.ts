@@ -11,7 +11,9 @@ import {
   createUser,
   createWebhookSubscription,
 } from '@template/db/test';
+import { createPermissions } from '@template/permissions/client';
 import * as enqueueModule from '#/jobs/enqueue';
+import { createArtifact as createArtifactRecord } from '#/modules/artifact/services/artifactPlacements';
 
 type Enqueued = { subscriptionId: string; action: string; resourceId: string };
 
@@ -134,7 +136,7 @@ describe('webhook hook: Artifact audience', () => {
     await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
     expect(heardBy(granteeSub.id)).toEqual([member.id]);
   });
-  it('org-user content reaches no org-level subscription', async () => {
+  it('org-user content reaches no org-level subscription on create, update, or delete', async () => {
     const memberFolder = (
       await createArtifact({
         kind: 'organizationUserFolder',
@@ -143,18 +145,47 @@ describe('webhook hook: Artifact audience', () => {
         system: true,
       })
     ).entity;
-    const note = await folder();
-    await createArtifactPlacement({ artifactId: note.id, containerArtifactId: memberFolder.id });
+    const superadmin = createPermissions();
+    superadmin.setSuperadmin(true);
+    enqueueSpy.mockClear();
+    const note = await createArtifactRecord(
+      { user: null, token: null, permix: superadmin },
+      {
+        kind: 'folder',
+        name: 'private-note',
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        containerArtifactId: memberFolder.id,
+      },
+    );
+    expect(heardBy(organizationSub.id)).toEqual([]);
+
     enqueueSpy.mockClear();
     await db.artifact.update({
       where: { id: note.id },
       data: { name: 'renamed', access: 'inherit' },
     });
     expect(heardBy(organizationSub.id)).toEqual([]);
+
+    enqueueSpy.mockClear();
+    await db.artifact.update({
+      where: { id: note.id },
+      data: { deletedAt: new Date() },
+    });
+    expect(heardBy(organizationSub.id)).toEqual([]);
   });
 
-  it('deleting a shared artifact still reaches its grantees', async () => {
+  it('deleting a shared artifact (direct or inherited) reaches its grantees with delete action', async () => {
+    const container = await folder();
+    await createArtifactPermission({
+      artifactId: container.id,
+      granteeModel: 'Space',
+      granteeSpaceId: space.id,
+      role: 'viewer',
+    });
     const artifact = await folder();
+    await createArtifactPlacement({ artifactId: artifact.id, containerArtifactId: container.id });
+    await db.artifact.update({ where: { id: artifact.id }, data: { access: 'inherit' } });
     await createArtifactPermission({
       artifactId: artifact.id,
       granteeModel: 'User',
@@ -163,6 +194,11 @@ describe('webhook hook: Artifact audience', () => {
     });
     enqueueSpy.mockClear();
     await db.artifact.update({ where: { id: artifact.id }, data: { deletedAt: new Date() } });
-    expect(heardBy(granteeSub.id)).toContain(artifact.id);
+    expect(
+      enqueued().filter((e) => e.subscriptionId === granteeSub.id && e.resourceId === artifact.id),
+    ).toEqual([expect.objectContaining({ action: 'delete', resourceId: artifact.id })]);
+    expect(
+      enqueued().filter((e) => e.subscriptionId === spaceSub.id && e.resourceId === artifact.id),
+    ).toEqual([expect.objectContaining({ action: 'delete', resourceId: artifact.id })]);
   });
 });

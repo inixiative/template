@@ -7,7 +7,7 @@
 import { db, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { ArtifactPermission } from '@template/db/generated/client/client';
 import type { WebhookAudienceResolver } from '#/hooks/webhooks/audiences';
-import type { Party as WebhookParty } from '#/hooks/webhooks/parties';
+import { partyKey, type Party as WebhookParty } from '#/hooks/webhooks/parties';
 import { type ArtifactPrincipal, granteePrincipal } from '#/modules/artifact/lib/artifactPrincipal';
 import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
 
@@ -48,8 +48,6 @@ const customerParties = async (
   return parties;
 };
 
-const partyKey = (party: WebhookParty) => `${party.model}:${party.id}`;
-
 const principalParties = async (
   principalsByArtifact: Map<string, ArtifactPrincipal[]>,
 ): Promise<Map<string, WebhookParty[]>> => {
@@ -77,7 +75,14 @@ const principalParties = async (
 };
 
 export const artifactWebhookAudience: WebhookAudienceResolver = async (rows) => {
-  const resolutions = await resolveArtifactAccess(rows.map((row) => row.id));
+  const deletedAtByArtifactId = new Map<string, Date>();
+  for (const row of rows) {
+    if (row.deletedAt instanceof Date) deletedAtByArtifactId.set(row.id, row.deletedAt);
+  }
+  const resolutions = await resolveArtifactAccess(
+    rows.map((row) => row.id),
+    deletedAtByArtifactId.size > 0 ? { deletedAtByArtifactId } : undefined,
+  );
   return principalParties(
     new Map(
       [...resolutions.values()].map((resolution) => [

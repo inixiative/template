@@ -54,7 +54,7 @@ model ArtifactPlacement {
 
   containerArtifactId String   @db.VarChar(36)
   artifactId          String   @db.VarChar(36)
-  containerArtifact   Artifact @relation("ArtifactPlacementContainer", fields: [containerArtifactId], references: [id], onDelete: Restrict)
+  containerArtifact   Artifact @relation("ArtifactPlacementContainer", fields: [containerArtifactId], references: [id], onDelete: Cascade)
   artifact            Artifact @relation("ArtifactPlacementArtifact", fields: [artifactId], references: [id], onDelete: Cascade)
 
   auditLogs AuditLog[]

@@ -6,15 +6,15 @@
  */
 import { findReferenceCycle } from '@template/shared/graph';
 import { makeError } from '#/lib/errors';
-import { artifactAncestorDepth } from '#/modules/artifact/services/artifactAncestorDepth';
-import { listArtifactDescendants } from '#/modules/artifact/services/listArtifactDescendants';
-import { ARTIFACT_MAX_DEPTH } from '#/modules/artifact/services/loadArtifactGraph';
+import { fetchArtifactAncestorDepth } from '#/modules/artifact/services/fetchArtifactAncestorDepth';
+import { fetchArtifactDescendants } from '#/modules/artifact/services/fetchArtifactDescendants';
+import { ARTIFACT_MAX_DEPTH } from '#/modules/artifact/services/fetchArtifactGraph';
 
 export const assertNoContainerCycle = async (
   containerArtifactId: string,
   artifactId: string,
 ): Promise<void> => {
-  const { contents, height } = await listArtifactDescendants(artifactId, ARTIFACT_MAX_DEPTH + 1);
+  const { contents, height } = await fetchArtifactDescendants(artifactId, ARTIFACT_MAX_DEPTH + 1);
   const candidate = new Map(contents);
   candidate.set(
     containerArtifactId,
@@ -27,7 +27,7 @@ export const assertNoContainerCycle = async (
       message: `Containers would form a loop: ${cycle.join(' -> ')}`,
     });
   }
-  if ((await artifactAncestorDepth(containerArtifactId)) + 1 + height > ARTIFACT_MAX_DEPTH) {
+  if ((await fetchArtifactAncestorDepth(containerArtifactId)) + 1 + height > ARTIFACT_MAX_DEPTH) {
     throw makeError({
       status: 422,
       message: `Containers nest at most ${ARTIFACT_MAX_DEPTH} deep`,

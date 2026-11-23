@@ -4,21 +4,26 @@
  * @partOf feature:inquiry, feature:files
  * @uses infrastructure:prisma
  */
-import { db, rowPolymorphicAxisPointsAt } from '@template/db';
+import { db, polymorphicKeyColumnOrThrow, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
 import {
   type TransferArtifactContent,
   type TransferArtifactResolutionInput,
   transferArtifactContentSchema,
   transferArtifactResolutionInputSchema,
 } from '@template/shared/inquiry';
+import type { ResourceBindingType } from '@template/shared/resourceBinding';
 import { makeError } from '#/lib/errors';
-import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
+import {
+  type OwnedArtifact,
+  ownerColumns,
+  sameArtifactOwner,
+} from '#/modules/artifact/lib/artifactOwner';
 import { copyArtifactInto } from '#/modules/artifact/services/artifactPlacements';
 import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
+import { openInquiryWhere } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 const PARTIES = [
   InquiryResourceModel.User,
@@ -39,18 +44,20 @@ const party = (inquiry: Partial<Inquiry>, axis: 'sourceModel' | 'targetModel'): 
   return target as Party;
 };
 
-const ownerOf = ({ model, id }: Party): OwnedArtifact => ({
-  ownerModel: model,
-  userId: model === 'User' ? id : null,
-  organizationId: model === 'Organization' ? id : null,
-  spaceId: model === 'Space' ? id : null,
-});
+const ownerOf = ({ model, id }: Party): OwnedArtifact =>
+  ownerColumns({
+    ownerModel: model,
+    [polymorphicKeyColumnOrThrow('Artifact', 'ownerModel', model)]: id,
+  });
 
-const loadOwnedObject = async (artifactId: string, source: Party): Promise<Artifact> => {
+const fetchOwnedObject = async (artifactId: string, source: Party): Promise<Artifact> => {
   const artifact = await db.artifact.findUnique({ where: { id: artifactId } });
   if (!artifact) throw makeError({ status: 404, message: 'Artifact not found' });
   if (!sameArtifactOwner(artifact, ownerOf(source))) {
     throw makeError({ status: 422, message: 'Only the owner of an artifact can transfer it' });
+  }
+  if (artifact.system) {
+    throw makeError({ status: 422, message: 'System artifacts cannot be transferred' });
   }
   const resolution = (await resolveArtifactAccess([artifact.id])).get(artifact.id);
   if (resolution?.memberScoped) {
@@ -69,30 +76,15 @@ const loadOwnedObject = async (artifactId: string, source: Party): Promise<Artif
   return artifact;
 };
 
-const managesParty = async (userId: string, target: Party): Promise<boolean> => {
-  if (target.model === 'User') return target.id === userId;
-  if (target.model === 'Organization') {
-    const membership = await db.organizationUser.findFirst({
-      where: { organizationId: target.id, userId, role: { in: ['owner', 'admin'] } },
-    });
-    return !!membership;
-  }
-  const membership = await db.spaceUser.findFirst({
-    where: { spaceId: target.id, userId, role: { in: ['owner', 'admin'] } },
-  });
-  return !!membership;
-};
-
 const grantSourceRead = async (artifactId: string, source: Party) => {
+  const bindingType: ResourceBindingType = 'tracking';
   await db.resourceBinding.create({
     data: {
       sourceModel: 'Artifact',
       sourceArtifactId: artifactId,
       resourceModel: source.model,
-      bindingType: 'tracking',
-      ...(source.model === 'User' ? { resourceUserId: source.id } : {}),
-      ...(source.model === 'Organization' ? { resourceOrganizationId: source.id } : {}),
-      ...(source.model === 'Space' ? { resourceSpaceId: source.id } : {}),
+      bindingType,
+      [polymorphicKeyColumnOrThrow('ResourceBinding', 'resourceModel', source.model)]: source.id,
     },
   });
   await db.artifactPermission.create({
@@ -100,9 +92,7 @@ const grantSourceRead = async (artifactId: string, source: Party) => {
       artifactId,
       granteeModel: source.model,
       role: 'viewer',
-      ...(source.model === 'User' ? { granteeUserId: source.id } : {}),
-      ...(source.model === 'Organization' ? { granteeOrganizationId: source.id } : {}),
-      ...(source.model === 'Space' ? { granteeSpaceId: source.id } : {}),
+      [polymorphicKeyColumnOrThrow('ArtifactPermission', 'granteeModel', source.model)]: source.id,
     },
   });
 };
@@ -119,11 +109,11 @@ export const transferArtifactService: InquiryService<
 
   validate: async (inquiry, content) => {
     const source = party(inquiry, 'sourceModel');
-    await loadOwnedObject(content.artifactId, source);
+    await fetchOwnedObject(content.artifactId, source);
     const open = await db.inquiry.count({
       where: {
+        ...openInquiryWhere(),
         type: 'transferArtifact',
-        status: { in: ['draft', 'sent', 'changesRequested'] },
         content: { path: ['artifactId'], equals: content.artifactId },
         ...(inquiry.id ? { id: { not: inquiry.id } } : {}),
       },
@@ -139,19 +129,13 @@ export const transferArtifactService: InquiryService<
     }
   },
 
-  autoApprove: async (inquiry) => {
-    const source = party(inquiry, 'sourceModel');
-    const actorUserId =
-      auditActorContext.currentActor()?.actorUserId ?? (source.model === 'User' ? source.id : null);
-    if (!actorUserId) return false;
-    return managesParty(actorUserId, party(inquiry, 'targetModel'));
-  },
+  autoApprove: async () => false,
 
   handleApprove: async (_c, inquiry, content, response) => {
     const source = party(inquiry, 'sourceModel');
     const target = party(inquiry, 'targetModel');
     await db.findForUpdate('Artifact', { id: content.artifactId });
-    const artifact = await loadOwnedObject(content.artifactId, source);
+    const artifact = await fetchOwnedObject(content.artifactId, source);
     const allowTracking = response.allowTracking ?? content.allowTracking;
     const tracked = content.keepTracking && allowTracking !== false;
 

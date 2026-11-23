@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { createRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 
 import {
   ARTIFACT_CREATE_IMMUTABLE_FIELDS,
@@ -18,6 +19,7 @@ export const meCreateArtifactRoute = createRoute({
   model: Modules.me,
   submodel: Modules.artifact,
   skipId: true,
+  middleware: [validatePermission('operate')],
   description:
     'Creates an artifact of a plain kind (no content table). Inside a container it inherits by default.',
   bodySchema: artifactCreateBodySchema,

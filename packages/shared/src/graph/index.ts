@@ -1,1 +1,1 @@
-export * from '@template/shared/graph/findReferenceCycle';
+export * from './findReferenceCycle';

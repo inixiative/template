@@ -15,8 +15,8 @@ import { keyBy } from 'lodash-es';
 import { isManyAction } from '#/hooks/shared/hookRows';
 import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
 import {
+  fetchParentDeliveries,
   fetchWebhookPartiesByRow,
-  parentDeliveries,
   type WebhookRow,
 } from '#/hooks/webhooks/parties';
 import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
@@ -68,7 +68,8 @@ const processSingleRecord = (
   model: string,
   webhookAction: WebhookAction,
   resultData: WebhookRow,
-  previousData?: Record<string, unknown>,
+  previousData: Record<string, unknown> | undefined,
+  origin: string | null,
 ) => {
   if (
     webhookAction === WebhookAction.update &&
@@ -77,7 +78,6 @@ const processSingleRecord = (
     return [];
   }
 
-  const origin = auditActorContext.currentActor()?.integrationId ?? null;
   const targets = origin
     ? subscriptions.filter((sub) => sub.integrationId !== origin)
     : subscriptions;
@@ -131,58 +131,64 @@ export const registerWebhookHook = () => {
         });
       }
 
-      const audiences = await fetchWebhookPartiesByRow(
-        model,
-        records.map(({ resultData }) => resultData),
-      );
+      if (records.length === 0) return;
+      const origin = auditActorContext.currentActor()?.integrationId ?? null;
 
-      let allCallbacks: (() => Promise<void>)[] = [];
-
-      for (const [webhookModel, partiesByRowId] of audiences) {
-        const subscriptions = await findPartySubscriptions(
-          webhookModel,
-          Object.values(partiesByRowId).flat(),
+      db.onCommit(async () => {
+        const audiences = await fetchWebhookPartiesByRow(
+          model,
+          records.map(({ resultData }) => resultData),
         );
-        if (subscriptions.length === 0) continue;
 
-        for (const { resultData, previousData } of records) {
-          const parties = partiesByRowId[resultData.id] ?? [];
-          const callbacks = processSingleRecord(
-            subscriptions.filter((sub) => isPartyTo(sub, parties)),
+        let allCallbacks: (() => Promise<void>)[] = [];
+
+        for (const [webhookModel, partiesByRowId] of audiences) {
+          const subscriptions = await findPartySubscriptions(
             webhookModel,
-            model,
-            dbActionToWebhookAction(dbAction, resultData, previousData),
-            resultData,
-            previousData,
+            Object.values(partiesByRowId).flat(),
           );
-          allCallbacks = allCallbacks.concat(callbacks);
-        }
-      }
+          if (subscriptions.length === 0) continue;
 
-      for (const { webhookModel, parents, partiesByRowId } of await parentDeliveries(
-        model,
-        records.map(({ resultData }) => resultData),
-      )) {
-        const subscriptions = await findPartySubscriptions(
-          webhookModel,
-          Object.values(partiesByRowId).flat(),
-        );
-        for (const parent of parents) {
-          allCallbacks = allCallbacks.concat(
-            processSingleRecord(
-              subscriptions.filter((sub) => isPartyTo(sub, partiesByRowId[parent.id] ?? [])),
+          for (const { resultData, previousData } of records) {
+            const parties = partiesByRowId[resultData.id] ?? [];
+            const callbacks = processSingleRecord(
+              subscriptions.filter((sub) => isPartyTo(sub, parties)),
               webhookModel,
-              webhookModel,
-              WebhookAction.update,
-              parent,
-            ),
+              model,
+              dbActionToWebhookAction(dbAction, resultData, previousData),
+              resultData,
+              previousData,
+              origin,
+            );
+            allCallbacks = allCallbacks.concat(callbacks);
+          }
+        }
+
+        for (const { webhookModel, parents, partiesByRowId } of await fetchParentDeliveries(
+          model,
+          records.map(({ resultData }) => resultData),
+        )) {
+          const subscriptions = await findPartySubscriptions(
+            webhookModel,
+            Object.values(partiesByRowId).flat(),
           );
+          for (const parent of parents) {
+            allCallbacks = allCallbacks.concat(
+              processSingleRecord(
+                subscriptions.filter((sub) => isPartyTo(sub, partiesByRowId[parent.id] ?? [])),
+                webhookModel,
+                webhookModel,
+                WebhookAction.update,
+                parent,
+                undefined,
+                origin,
+              ),
+            );
+          }
         }
-      }
 
-      if (allCallbacks.length === 0) return;
-
-      db.onCommit(allCallbacks, ConcurrencyType.queue);
+        for (const callback of allCallbacks) await callback();
+      }, ConcurrencyType.queue);
     },
     [auditActorStore],
   );
