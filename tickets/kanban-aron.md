@@ -8,6 +8,7 @@ config:
 ---
 kanban
   Todo
+    FEAT-027-status-changes-as-transitions
     BRAND-002-email-template-governance-business-plan
     INFRA-002-rules-builder
     INFRA-013-source-map-importer
@@ -55,6 +56,9 @@ kanban
 
 **Product:**
 - [BRAND-002: Email Template Governance — Business Plan](./BRAND-002-email-template-governance-business-plan.md) ⭐ - Stopgap SaaS launch plan (lens-gated template builder + API); sequences INFRA-002, INFRA-011, FEAT-009, COMM-001 + net-new billing/themes/builder
+
+**Permissions / lifecycle:**
+- [FEAT-027: Status and Role Changes as Transitions](./FEAT-027-status-changes-as-transitions.md) ⭐ - Integration resource status, re-registration and member role through `@inixiative/transitions` 0.9.0; one revive pattern (upsert)
 
 **Infrastructure:**
 - [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (rules-builder repo)
