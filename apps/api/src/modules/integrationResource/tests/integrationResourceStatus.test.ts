@@ -130,12 +130,12 @@ describe('integration resource status and removal', () => {
     ).toBe(0);
   });
 
-  it('refuses a caller setting missing, which only the system sets', async () => {
+  it("refuses a person setting missing: only the resource's own integration reports it", async () => {
     const { entity: resource } = await createIntegrationResource({}, { integration });
     const response = await fetch(
       patch(`/api/v1/integrationResource/${resource.id}`, { status: 'missing' }),
     );
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(403);
   });
 
   it('refuses filtering the main list by untracked', async () => {

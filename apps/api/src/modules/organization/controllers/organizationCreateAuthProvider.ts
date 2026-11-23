@@ -4,7 +4,8 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { db, revive } from '@template/db';
+import { db } from '@template/db';
+import type { AuthProvider } from '@template/db/generated/client/client';
 import { encryptField } from '@template/db/lib/encryption/fieldEncryption';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
@@ -17,27 +18,27 @@ export const organizationCreateAuthProviderController = makeController(
     const { secrets, ...body } = c.req.valid('json');
 
     const provider = await db.txn(async () => {
-      const [revived] = await revive(db.authProvider, {
-        organizationId: org.id,
-        provider: body.provider,
-        type: body.type,
-      });
-
+      const key = { organizationId: org.id, provider: body.provider, type: body.type };
+      const [existing] = await db.withDeleted(() =>
+        db.findForUpdate<AuthProvider>('AuthProvider', key, { upserting: true }),
+      );
       const data = {
         enabled: true,
         ...body,
-        id: revived?.id ?? Bun.randomUUIDv7(),
+        id: existing?.id ?? Bun.randomUUIDv7(),
         organizationId: org.id,
       };
-
       const encryptedData = await encryptField('authProvider', 'secrets', { ...data, secrets });
 
-      if (revived)
-        return db.authProvider.update({
-          where: { id: revived.id },
-          data: { enabled: data.enabled, ...body, ...encryptedData },
-        });
-      return db.authProvider.create({ data: { ...data, ...encryptedData } });
+      return db.withDeleted(() =>
+        db.authProvider.upsert({
+          where: { organizationId_provider_type: key },
+          create: { ...data, ...encryptedData },
+          update: existing?.deletedAt
+            ? { enabled: data.enabled, ...body, ...encryptedData, deletedAt: null }
+            : { ...body, ...encryptedData },
+        }),
+      );
     });
 
     const {

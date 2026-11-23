@@ -103,7 +103,7 @@ The template does not depend on this package; it is imported nowhere there yet. 
 
 Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
 
-- `@inixiative/transitions` adoption in template: the library is complete, the template's transition guards are in progress — ticket FEAT-018 (in progress)
+- `@inixiative/transitions` adoption in template: integration resource status, registration and member role go through `assertTransition` (`apps/api/src/lib/permissions/assertTransition.ts`, rules in `packages/permissions/src/transitions/`); Inquiry's lifecycle is not on it yet — ticket FEAT-028
 
 ## 3. Everything that exists here, by class
 
