@@ -49,7 +49,7 @@ export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly 
     .superRefine((rowRules, ctx) => {
       for (const [action, rule] of Object.entries(rowRules))
         for (const issue of validateActionRule(rule, {
-          map: schemaMap,
+          schemaMap,
           resource,
           action,
           rowRules,

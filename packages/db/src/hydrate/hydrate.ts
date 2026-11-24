@@ -5,9 +5,9 @@
  * @uses infrastructure:redis
  */
 import { makeHydrator } from '@inixiative/permissions';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { fetchCachedRecordWithTargetEntitlements } from '@template/db/hydrate/fetchCachedRecordWithTargetEntitlements';
 import type { HydratedRecord } from '@template/db/hydrate/types';
-import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import {
   type AccessorName,
   accessorOfResource,
@@ -15,7 +15,8 @@ import {
 } from '@template/db/utils/modelNames';
 
 const hydrator = makeHydrator({
-  map: schemaMapWithoutPermissions,
+  mapName: 'db',
+  fieldMap: prismaMap,
   load: (resource, where) =>
     fetchCachedRecordWithTargetEntitlements(
       accessorOfResource(resource),

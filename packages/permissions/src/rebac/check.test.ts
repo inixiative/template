@@ -798,7 +798,7 @@ describe('rebac check', () => {
         toFields: ['id'],
       });
       const cyclicCheck = makeRebacCheck({
-        maps: {
+        fieldMaps: {
           db: {
             models: Object.fromEntries(
               Object.entries(relations).map(([model, fields]) => [

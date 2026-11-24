@@ -5,7 +5,7 @@
  * @uses none
  */
 import { columnsOf, type FieldMap } from '@inixiative/field-map';
-import type { SchemaMapWithoutPermissions } from '@inixiative/permissions';
+import type { SchemaMap } from '@inixiative/permissions';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { sensitiveFieldsOf } from '@template/db/registries/sensitiveFields';
@@ -30,8 +30,12 @@ const actorMap: FieldMap = {
   enums: { ...prismaMap.enums, ActorModel: Object.values(ActorModel) },
 };
 
-export const schemaMapWithoutPermissions: SchemaMapWithoutPermissions = {
-  maps: { db: prismaMap },
-  supplied: { actor: actorMap },
-  polymorphism: { db: PolymorphismRegistry },
+// why: who is acting is given with each check, so every model of `db` reaches each actor model over a bridge with no join
+export const schemaMapWithoutPermissions: Omit<SchemaMap, 'permissions'> = {
+  fieldMaps: { db: prismaMap, actor: actorMap },
+  polymorphismRegistries: { db: PolymorphismRegistry },
+  bridges: Object.keys(actorMap.models).map((model) => ({
+    endpoints: [{ fieldMap: 'db' }, { fieldMap: 'actor', model }],
+    cardinality: 'oneToOne',
+  })),
 };

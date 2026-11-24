@@ -18,8 +18,10 @@ const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> 
     : {};
 };
 
-export const makeCheck = (map: SchemaMap) => {
-  const rebacCheck = makeRebacCheck(map, { additionalRules: tenantPermissionRulesAbove });
+export const makeCheck = (schemaMapOfTheCheck: SchemaMap) => {
+  const rebacCheck = makeRebacCheck(schemaMapOfTheCheck, {
+    additionalRules: tenantPermissionRulesAbove,
+  });
   return (
     permix: Permix,
     model: AccessorName,
