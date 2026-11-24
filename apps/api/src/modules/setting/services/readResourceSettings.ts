@@ -17,6 +17,7 @@ import { check } from '@template/permissions/rebac';
 import { settingDefinitionsForResourceModel } from '@template/shared/settings';
 import type { Context } from 'hono';
 import type { SettingListQuery } from '#/modules/setting/schemas/settingSchemas';
+import { settingIntegrationProvider } from '#/modules/setting/services/settingIntegrationProvider';
 import type { AppEnv } from '#/types/appEnv';
 
 /**
@@ -37,7 +38,10 @@ export const readResourceSettings = async (
   const resourceId = resource.id as string;
   const targetFks = polymorphicArmKeys('Setting', 'resourceModel', resourceModel, resource);
 
-  const definitions = settingDefinitionsForResourceModel(resourceModel).filter((definition) => {
+  const definitions = settingDefinitionsForResourceModel(
+    resourceModel,
+    await settingIntegrationProvider(resourceModel, resource),
+  ).filter((definition) => {
     if (query.category && definition.category !== query.category) return false;
     if (query.key && definition.key !== query.key) return false;
     return true;

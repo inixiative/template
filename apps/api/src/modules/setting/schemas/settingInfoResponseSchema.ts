@@ -5,7 +5,7 @@
  * @uses none
  */
 import { z } from '@hono/zod-openapi';
-import { SettingResourceModel } from '@template/db/generated/client/enums';
+import { Provider, SettingResourceModel } from '@template/db/generated/client/enums';
 import { AttributeValueTypeSchema } from '@template/shared/attributes';
 import {
   SettingCategoryKeySchema,
@@ -30,6 +30,12 @@ export const settingDefinitionInfoSchema = z.object({
   resourceModels: z
     .array(z.nativeEnum(SettingResourceModel))
     .describe('Resource models this setting may attach to.'),
+  integrationProviders: z
+    .array(z.nativeEnum(Provider))
+    .optional()
+    .describe(
+      'When present, the setting applies only to an Integration of one of these providers, or a ProjectIntegration linking to one.',
+    ),
   valueType: AttributeValueTypeSchema.describe(
     'Typed attribute storage kind (`boolean`, `text`, `number`, `date`, `json`, or `multiSelect`).',
   ),

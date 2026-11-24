@@ -20,6 +20,7 @@
     "./batchInterpolation": "./src/lib/batchInterpolation/index.ts",
     "./errors": "./src/errors/index.ts",
     "./auth/*": "./src/auth/*.ts",
+    "./integrations/*": "./src/integrations/*.ts",
     "./flows": "./src/flows/index.ts",
     "./rules": "./src/rules/index.ts",
     "./logger": "./src/logger/index.ts",

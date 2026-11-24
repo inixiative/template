@@ -108,12 +108,28 @@ export const settingPermissionForModel = (
   return resolved;
 };
 
-/** All setting definitions applicable to `resourceModel`, sorted by category order then setting order. */
+export const settingAppliesToIntegrationProvider = (
+  definition: SettingDefinition,
+  integrationProvider: string | undefined,
+): boolean =>
+  !definition.integrationProviders ||
+  (integrationProvider !== undefined &&
+    definition.integrationProviders.includes(integrationProvider));
+
+/**
+ * All setting definitions applicable to `resourceModel` (and, for an Integration or
+ * ProjectIntegration, to that integration's provider), sorted by category order then setting order.
+ */
 export const settingDefinitionsForResourceModel = (
   resourceModel: SettingResourceModelName,
+  integrationProvider?: string,
 ): SettingDefinition[] =>
   (Object.values(SETTING_DEFINITIONS) as SettingDefinition[])
-    .filter((definition) => definition.resourceModels.includes(resourceModel))
+    .filter(
+      (definition) =>
+        definition.resourceModels.includes(resourceModel) &&
+        settingAppliesToIntegrationProvider(definition, integrationProvider),
+    )
     .sort((left, right) => {
       const leftCatOrder = settingCategoriesByKey[left.category]?.order ?? 0;
       const rightCatOrder = settingCategoriesByKey[right.category]?.order ?? 0;

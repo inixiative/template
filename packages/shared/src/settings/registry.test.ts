@@ -6,13 +6,15 @@ import {
   SETTING_KEYS,
   SETTING_RESOURCE_MODELS,
   SettingPermissionSpecSchema,
+  settingAppliesToIntegrationProvider,
   settingCategoryForKey,
   settingDefinitionForKey,
   settingDefinitionForKeyOrThrow,
   settingDefinitionsForResourceModel,
   settingPermissionForModel,
 } from '@template/shared/settings';
-import type { z } from 'zod';
+import { defineSetting } from '@template/shared/settings/types';
+import { z } from 'zod';
 
 describe('SETTING_DEFINITIONS registry invariants', () => {
   it('every definition key matches its map key, points at a registered category, and resolves permissions for every listed resourceModel', () => {
@@ -102,5 +104,45 @@ describe('SETTING_DEFINITIONS registry invariants', () => {
     // Starter template has zero Integration/ProjectIntegration definitions until downstream apps add them
     expect(settingDefinitionsForResourceModel('Integration')).toEqual([]);
     expect(settingDefinitionsForResourceModel('ProjectIntegration')).toEqual([]);
+  });
+});
+
+describe('provider-scoped setting definitions', () => {
+  const scoped = defineSetting({
+    key: 'test.scopedToLinear',
+    category: 'general',
+    label: 'Scoped',
+    description: 'Applies only to Linear integrations and their project links.',
+    resourceModels: ['Integration', 'ProjectIntegration'],
+    integrationProviders: ['linear'],
+    valueType: 'boolean',
+    schema: z.boolean(),
+    defaultValue: false,
+    order: 99,
+    permission: 'manage',
+  });
+  const definitions = SETTING_DEFINITIONS as Record<string, unknown>;
+
+  it('applies an unscoped definition to every provider and a scoped one only to its own', () => {
+    const unscoped = SETTING_DEFINITIONS['general.defaultTimezone'];
+    expect(settingAppliesToIntegrationProvider(unscoped, undefined)).toBe(true);
+    expect(settingAppliesToIntegrationProvider(unscoped, 'slack')).toBe(true);
+    expect(settingAppliesToIntegrationProvider(scoped, 'linear')).toBe(true);
+    expect(settingAppliesToIntegrationProvider(scoped, 'slack')).toBe(false);
+    expect(settingAppliesToIntegrationProvider(scoped, undefined)).toBe(false);
+  });
+
+  it('lists a scoped definition only for its provider', () => {
+    definitions[scoped.key] = scoped;
+    try {
+      const keys = (model: 'Integration' | 'ProjectIntegration', provider?: string) =>
+        settingDefinitionsForResourceModel(model, provider).map((d) => d.key);
+      expect(keys('ProjectIntegration', 'linear')).toContain(scoped.key);
+      expect(keys('Integration', 'linear')).toContain(scoped.key);
+      expect(keys('ProjectIntegration', 'slack')).not.toContain(scoped.key);
+      expect(keys('ProjectIntegration')).not.toContain(scoped.key);
+    } finally {
+      delete definitions[scoped.key];
+    }
   });
 });

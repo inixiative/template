@@ -13,17 +13,23 @@ import {
 import type { Setting } from '@template/db/generated/client/client';
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
+import {
+  settingAppliesToIntegrationProvider,
+  settingDefinitionForKeyOrThrow,
+} from '@template/shared/settings';
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
 import type { SettingUpsertItem } from '#/modules/setting/schemas/settingSchemas';
+import { settingIntegrationProvider } from '#/modules/setting/services/settingIntegrationProvider';
 import type { AppEnv } from '#/types/appEnv';
 
 /**
  * Shared atomic batch writer for all 8 parent-scoped `PATCH /.../settings` routes:
  * 1. Rejects empty arrays (`[]`) and duplicate keys within the batch (422) before auth/locking.
- * 2. Authorizes EVERY item upfront (`db:Setting:manage`) — all-or-nothing (403 writes nothing).
- * 3. Sorts keys lexicographically to avoid lock-ordering deadlocks under concurrent writes.
- * 4. Inside one `db.txn`, locks each `(resourceModel, ...targetFks, key)` via
+ * 2. Rejects a key that does not apply to the Integration's (or ProjectIntegration's) provider (422).
+ * 3. Authorizes EVERY item upfront (`db:Setting:manage`) — all-or-nothing (403 writes nothing).
+ * 4. Sorts keys lexicographically to avoid lock-ordering deadlocks under concurrent writes.
+ * 5. Inside one `db.txn`, locks each `(resourceModel, ...targetFks, key)` via
  *    `db.findForUpdate(..., { upserting: true })`, updates the not-deleted row or creates a new row,
  *    and returns raw `Setting[]`.
  */
@@ -49,6 +55,20 @@ export const upsertResourceSettings = async (
   const resource = c.get('resource') as Record<string, unknown>;
   const resourceId = resource.id as string;
   const targetFks = polymorphicArmKeys('Setting', 'resourceModel', resourceModel, resource);
+
+  const integrationProvider = await settingIntegrationProvider(resourceModel, resource);
+  for (const item of items) {
+    if (
+      !settingAppliesToIntegrationProvider(
+        settingDefinitionForKeyOrThrow(item.key),
+        integrationProvider,
+      )
+    )
+      throw makeError({
+        status: 422,
+        message: `Setting '${item.key}' does not apply to a ${integrationProvider} integration`,
+      });
+  }
 
   const hydratedBase = await hydrate('setting', {
     id: '',

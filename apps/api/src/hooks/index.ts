@@ -10,6 +10,7 @@ import { registerValidateEntitlementLensHook } from '#/hooks/entitlementLens/hoo
 import { registerCarriedOwnerKeysHook } from '#/hooks/falsePolymorphism/carriedOwnerKeysHook';
 import { registerFullDelegateTakesNoRoleOrEntitlementsHook } from '#/hooks/fullDelegate/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
+import { registerIntegrationSingletonHook } from '#/hooks/integrationSingleton/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
@@ -38,6 +39,7 @@ export const registerHooks = () => {
     makeValidationError: (message) => makeError({ status: 422, message }),
   });
   registerAuditLogHook();
+  registerIntegrationSingletonHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();
   registerClearCacheHook();

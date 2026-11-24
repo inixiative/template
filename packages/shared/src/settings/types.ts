@@ -29,6 +29,7 @@ export type SettingDefinition<
   readonly key: TKey;
   readonly category: TCategory;
   readonly resourceModels: readonly SettingResourceModelName[];
+  readonly integrationProviders?: readonly string[];
   readonly valueType: AttributeValueType;
   readonly schema: z.ZodType<TValue>;
   readonly defaultValue: TValue | null;

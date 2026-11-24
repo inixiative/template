@@ -4,7 +4,7 @@
  * @partOf feature:setting
  * @uses primitive:routeTemplates
  */
-import type { SettingResourceModel } from '@template/db/generated/client/enums';
+import type { Provider, SettingResourceModel } from '@template/db/generated/client/enums';
 import {
   SETTING_CATEGORIES,
   SETTING_DEFINITIONS,
@@ -30,6 +30,9 @@ export const settingInfoController = makeController(settingInfoRoute, async (_c,
         label: definition.label,
         description: definition.description,
         resourceModels: [...definition.resourceModels] as SettingResourceModel[],
+        integrationProviders: (definition as SettingDefinition).integrationProviders as
+          | Provider[]
+          | undefined,
         valueType: definition.valueType,
         schema: toJsonSchema(definition.schema, 'input'),
         defaultValue: definition.defaultValue,
