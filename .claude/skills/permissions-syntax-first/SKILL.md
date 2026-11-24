@@ -99,7 +99,7 @@ An action on something that does not exist yet, or on a collection, is checked o
 
 | Built outside the system | The syntax answer |
 |---|---|
-| `token.create` copied onto six owner models | `create` on a pseudo record `db:token` |
+| `token.create` copied onto six owner models | `create` on a pseudo record `db:Token` |
 | actions named after other models (`organization.create` on user) | each action on its own model (test: a dotted action is named after its model) |
 | a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpaceYouManage('integration.')` |
 | `leave` as an alternative that skipped the role check | the role check always runs; "yours" is an extra requirement |
