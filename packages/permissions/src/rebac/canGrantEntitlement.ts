@@ -6,8 +6,8 @@
  */
 import { makeCanGrantEntitlement } from '@inixiative/permissions';
 import { schemaMap } from '@template/permissions/rebac/schema';
-import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
+import { storedPermissionRules } from '@template/permissions/rebac/storedPermissionRules';
 
 export const canGrantEntitlement = makeCanGrantEntitlement(schemaMap, {
-  additionalRules: tenantPermissionRulesAbove,
+  additionalRules: storedPermissionRules,
 });

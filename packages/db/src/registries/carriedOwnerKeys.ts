@@ -12,7 +12,7 @@ import {
 import type { ModelName } from '@template/db/utils/modelNames';
 import { polymorphicArmColumns } from '@template/db/utils/polymorphicArmKeys';
 
-const ownerAxisField = 'ownerModel';
+export const ownerAxisField = 'ownerModel';
 
 /** The record whose owner keys a row carries when its axis says `value`, or null when that value carries none. */
 export const modelWhoseOwnerKeysAreCarried = (

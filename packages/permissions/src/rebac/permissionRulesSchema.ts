@@ -12,6 +12,7 @@ import {
   resourceOfModel,
 } from '@template/db';
 import { schemaMap } from '@template/permissions/rebac/schema';
+import { reasonRuleIsOffItsOwnSide } from '@template/permissions/rebac/tenantPermissionRules';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { z } from 'zod';
 
@@ -90,6 +91,13 @@ export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) =>
             message: `not something a ${tenantModel} may extend`,
           });
         if (hidden.length) continue;
+        const offItsSide = Object.entries(rules).flatMap(([action, rule]) => {
+          const reason = reasonRuleIsOffItsOwnSide(tenantModel, resource, rule);
+          return reason ? [{ action, reason }] : [];
+        });
+        for (const { action, reason } of offItsSide)
+          ctx.addIssue({ code: 'custom', path: [resource, action], message: reason });
+        if (offItsSide.length) continue;
         const parsed = buildPermissionRulesSchema(accessorOfResource(resource)).safeParse(rules);
         if (!parsed.success)
           for (const issue of parsed.error.issues)

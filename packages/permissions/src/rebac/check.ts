@@ -8,7 +8,7 @@ import { makeRebacCheck } from '@inixiative/permissions';
 import { type AccessorName, type HydratedRecord, resourceOfModel } from '@template/db';
 import type { Permix } from '@template/permissions/client';
 import { schemaMap } from '@template/permissions/rebac/schema';
-import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
+import { storedPermissionRules } from '@template/permissions/rebac/storedPermissionRules';
 import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
 
 const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> => {
@@ -20,7 +20,7 @@ const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> 
 
 export const makeCheck = (schemaMapOfTheCheck: SchemaMap) => {
   const rebacCheck = makeRebacCheck(schemaMapOfTheCheck, {
-    additionalRules: tenantPermissionRulesAbove,
+    additionalRules: storedPermissionRules,
   });
   return (
     permix: Permix,

@@ -6,8 +6,15 @@
  */
 import { fieldAtPath } from '@inixiative/field-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import type { BindableOwnerModel } from '@template/db/registries/polymorphicAxisPointsAt';
+import {
+  type BindableOwnerModel,
+  isBindableOwnerModel,
+} from '@template/db/registries/polymorphicAxisPointsAt';
 import { type ModelName, modelNames } from '@template/db/utils/modelNames';
+import {
+  axesOtherThanOwnerOf,
+  relationToKindOnAxis,
+} from '@template/db/utils/polymorphicAxesOtherThanOwner';
 
 type Row = Record<string, unknown>;
 
@@ -35,6 +42,38 @@ export const tenantRowsAbove = (record: Row): { model: BindableOwnerModel; row: 
   return user ? [{ model: 'User', row: user }] : [];
 };
 
+/** The relations of a model that reach a tenant of this kind on its axes other than the owner, one per axis that can be one (`sourceOrganization`, `targetOrganization`). */
+export const relationsToTenantOnSides = (
+  model: ModelName,
+  tenantModel: BindableOwnerModel,
+): string[] =>
+  axesOtherThanOwnerOf(model).flatMap(
+    (axis) => relationToKindOnAxis(model, axis, tenantModel) ?? [],
+  );
+
+/**
+ * The tenants on each side of a record (its axes other than the owner), with the relation that
+ * reaches each: the party
+ * when it is itself a user, organization or space, and a space's organization above it. A side
+ * that is a member, or something a tenant holds, names none: what is addressed to a member is the
+ * member's.
+ */
+export const tenantRowsOnSides = (
+  model: ModelName,
+  record: Row,
+): { model: BindableOwnerModel; row: Row; relation: string }[] =>
+  axesOtherThanOwnerOf(model).flatMap((axis) => {
+    const party = record[axis.field];
+    if (typeof party !== 'string' || !isBindableOwnerModel(party)) return [];
+    const tenantModels: BindableOwnerModel[] =
+      party === 'Space' ? ['Space', 'Organization'] : [party];
+    return tenantModels.flatMap((tenantModel) => {
+      const relation = relationToKindOnAxis(model, axis, tenantModel);
+      const row = relation ? loaded(record[relation]) : undefined;
+      return relation && row ? [{ model: tenantModel, row, relation }] : [];
+    });
+  });
+
 /**
  * The models a tenant of this kind can hold, read off the tenant columns as `tenantRowsAbove`
  * reads a record: a space what has `spaceId`, an organization that and what has `organizationId`,
@@ -42,6 +81,7 @@ export const tenantRowsAbove = (record: Row): { model: BindableOwnerModel; row: 
  */
 export const modelsHeldUnderTenant = (tenantModel: BindableOwnerModel): ModelName[] =>
   modelNames.filter((model) => {
+    if (relationsToTenantOnSides(model, tenantModel).length) return true;
     const column = (name: (typeof TENANT_COLUMNS)[number]) => fieldAtPath(prismaMap, model, name);
     if (tenantModel === 'Space') return Boolean(column('spaceId'));
     if (tenantModel === 'Organization')
