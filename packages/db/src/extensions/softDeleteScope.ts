@@ -28,16 +28,18 @@ const mentionsDeletedAt = (where: unknown): boolean => {
 
 // A model without its own column has no query-time scope: the soft-delete
 // cascade hook keeps column-bearing descendants consistent at write time.
-const liveScope = (model: string): Record<string, unknown> | undefined =>
+const notDeletedScope = (model: string): Record<string, unknown> | undefined =>
   hasDeletedAt(model) ? { deletedAt: null } : undefined;
 
-const liveAt: NodeScope = ({ model }, node) => {
-  const live = liveScope(model);
-  return live && !mentionsDeletedAt(node) ? [live] : [];
+const notDeletedAtNode: NodeScope = ({ model }, node) => {
+  const notDeleted = notDeletedScope(model);
+  return notDeleted && !mentionsDeletedAt(node) ? [notDeleted] : [];
 };
 
-export const liveWhere = (model: string, where: Record<string, unknown>): Record<string, unknown> =>
-  walkWhere(model, where, liveAt);
+export const notDeletedWhere = (
+  model: string,
+  where: Record<string, unknown>,
+): Record<string, unknown> => walkWhere(model, where, notDeletedAtNode);
 
 const listRelationNames = (model: string): Record<string, true> =>
   Object.fromEntries(
@@ -46,7 +48,7 @@ const listRelationNames = (model: string): Record<string, true> =>
       .map(([name]) => [name, true as const]),
   );
 
-const liveCount = (model: string, count: unknown): unknown => {
+const notDeletedCount = (model: string, count: unknown): unknown => {
   const select =
     count === true
       ? listRelationNames(model)
@@ -57,27 +59,29 @@ const liveCount = (model: string, count: unknown): unknown => {
   const scoped: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(select)) {
     const field = fieldAtPath(prismaMap, model, name);
-    const live = field ? liveScope(field.type) : undefined;
-    if (!value || !field || !live) {
+    const notDeleted = field ? notDeletedScope(field.type) : undefined;
+    if (!value || !field || !notDeleted) {
       scoped[name] = value;
       continue;
     }
     const entry: Record<string, unknown> =
       value === true ? {} : { ...(value as Record<string, unknown>) };
-    entry.where = isPlainObject(entry.where) ? liveWhere(field.type, entry.where) : live;
+    entry.where = isPlainObject(entry.where)
+      ? notDeletedWhere(field.type, entry.where)
+      : notDeleted;
     scoped[name] = entry;
   }
   return { ...(isPlainObject(count) ? count : {}), select: scoped };
 };
 
-export const liveIncludes = (
+export const notDeletedIncludes = (
   model: string,
   tree: Record<string, unknown>,
 ): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(tree)) {
     if (name === '_count') {
-      out[name] = liveCount(model, value);
+      out[name] = notDeletedCount(model, value);
       continue;
     }
     const field = fieldAtPath(prismaMap, model, name);
@@ -88,14 +92,14 @@ export const liveIncludes = (
     const entry: Record<string, unknown> =
       value === true ? {} : { ...(value as Record<string, unknown>) };
     for (const key of ['include', 'select'] as const) {
-      if (isPlainObject(entry[key])) entry[key] = liveIncludes(field.type, entry[key]);
+      if (isPlainObject(entry[key])) entry[key] = notDeletedIncludes(field.type, entry[key]);
     }
     if (field.isList) {
       if (isPlainObject(entry.where)) {
-        entry.where = liveWhere(field.type, entry.where);
+        entry.where = notDeletedWhere(field.type, entry.where);
       } else {
-        const live = liveScope(field.type);
-        if (live) entry.where = live;
+        const notDeleted = notDeletedScope(field.type);
+        if (notDeleted) entry.where = notDeleted;
       }
     }
     out[name] = value === true && Object.keys(entry).length === 0 ? true : entry;

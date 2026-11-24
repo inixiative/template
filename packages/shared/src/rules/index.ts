@@ -1,3 +1,4 @@
+export { deleted, notDeleted } from './conditions';
 export { RuleDegradedError, RuleEvaluationError } from './errors';
 export { type LensField, lensFields } from './lensFields';
 export {

@@ -77,7 +77,7 @@ describe('tenantPermissionRules', () => {
     });
     expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(403);
 
-    expect((await open({ 'db:contact': { read: true } })).status).toBe(200);
+    expect((await open({ 'db:Contact': { read: true } })).status).toBe(200);
 
     expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(200);
     expect((await asStranger(get(`/api/v1/organization/${org.id}/contacts`))).status).toBe(200);
@@ -104,7 +104,7 @@ describe('tenantPermissionRules', () => {
       ownerModel: 'Organization',
       ...website(),
     });
-    await open({ 'db:contact': { read: true } });
+    await open({ 'db:Contact': { read: true } });
     expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(403);
   });
 
@@ -116,7 +116,7 @@ describe('tenantPermissionRules', () => {
       ...website(),
     });
     expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(403);
-    await open({ 'db:contact': { read: true } });
+    await open({ 'db:Contact': { read: true } });
     expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(200);
   });
 
@@ -126,23 +126,23 @@ describe('tenantPermissionRules', () => {
     const { entity: shared } = await make('public');
     const { entity: kept } = await make('private');
     await open({
-      'db:contact': { read: { rule: { field: 'label', operator: 'equals', value: 'public' } } },
+      'db:Contact': { read: { rule: { field: 'label', operator: 'equals', value: 'public' } } },
     });
     expect((await asStranger(get(`/api/v1/contact/${shared.id}`))).status).toBe(200);
     expect((await asStranger(get(`/api/v1/contact/${kept.id}`))).status).toBe(403);
   });
 
   it('is written only by an owner', async () => {
-    expect((await open({ 'db:contact': { read: true } }, asAdmin)).status).toBe(403);
-    expect((await open({ 'db:contact': { read: true } }, asStranger)).status).toBe(403);
+    expect((await open({ 'db:Contact': { read: true } }, asAdmin)).status).toBe(403);
+    expect((await open({ 'db:Contact': { read: true } }, asStranger)).status).toBe(403);
   });
 
   it('refuses a model, an action or a rule the schema does not accept', async () => {
     for (const rules of [
       { 'db:invoice': { read: true } },
-      { 'db:contact': { publish: true } },
-      { 'db:contact': { read: 'read' } },
-      { 'db:contact': { read: { rule: { field: 'label', operator: 'notEquals', value: 'x' } } } },
+      { 'db:Contact': { publish: true } },
+      { 'db:Contact': { read: 'read' } },
+      { 'db:Contact': { read: { rule: { field: 'label', operator: 'notEquals', value: 'x' } } } },
     ])
       expect((await open(rules)).status).toBe(422);
   });
@@ -158,23 +158,23 @@ describe('tenantPermissionRules', () => {
     const user = refusedFor('/api/v1/me/setTenantPermissionRules');
 
     for (const rules of [
-      { 'db:token': { create: true } },
-      { 'db:organizationUser': { operate: true } },
-      { 'db:integration': { delegateFull: true } },
-      { 'db:authProvider': { create: true } },
-      { 'db:space': { manage: true } },
-      { 'db:space': { own: true } },
-      { 'db:project': { read: true } },
-      { 'db:organization': { read: true } },
-      { 'db:contact': { own: true } },
+      { 'db:Token': { create: true } },
+      { 'db:OrganizationUser': { operate: true } },
+      { 'db:Integration': { delegateFull: true } },
+      { 'db:AuthProvider': { create: true } },
+      { 'db:Space': { manage: true } },
+      { 'db:Space': { own: true } },
+      { 'db:Project': { read: true } },
+      { 'db:Organization': { read: true } },
+      { 'db:Contact': { own: true } },
     ])
       expect(await organization(rules)).toBe(true);
-    expect(await organization({ 'db:segment': { read: true } })).toBe(false);
+    expect(await organization({ 'db:Segment': { read: true } })).toBe(false);
 
-    expect(await atSpace({ 'db:spaceUser': { operate: true } })).toBe(true);
-    expect(await atSpace({ 'db:space': { read: true } })).toBe(true);
-    expect(await user({ 'db:flow': { read: true } })).toBe(true);
-    expect(await user({ 'db:contact': { read: true } })).toBe(false);
+    expect(await atSpace({ 'db:SpaceUser': { operate: true } })).toBe(true);
+    expect(await atSpace({ 'db:Space': { read: true } })).toBe(true);
+    expect(await user({ 'db:Flow': { read: true } })).toBe(true);
+    expect(await user({ 'db:Contact': { read: true } })).toBe(false);
   });
 
   it('reads a stored rule through the lens too: one it hides widens nothing', async () => {
@@ -185,7 +185,7 @@ describe('tenantPermissionRules', () => {
     });
     await db.organization.update({
       where: { id: org.id },
-      data: { tenantPermissionRules: { 'db:contact': { own: true, read: true } } },
+      data: { tenantPermissionRules: { 'db:Contact': { own: true, read: true } } },
     });
     expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(200);
     expect((await asStranger(del(`/api/v1/contact/${contact.id}`))).status).toBe(403);
@@ -201,7 +201,7 @@ describe('tenantPermissionRules', () => {
       where: { id: org.id },
       data: {
         tenantPermissionRules: {
-          'db:contact': {
+          'db:Contact': {
             read: { rule: { field: 'columnThatWasRenamed', operator: 'equals', value: 'x' } },
           },
         },
@@ -233,11 +233,11 @@ describe('tenantPermissionRules', () => {
       fetch(get(`/api/v1/space/${space.id}/spaceUsers`));
     expect((await membersFor(asOrganizationViewer)).status).toBe(403);
     const toOrganizationReaders = { rel: 'organization', action: 'read' };
-    expect((await open({ 'db:space': { read: toOrganizationReaders } })).status).toBe(200);
+    expect((await open({ 'db:Space': { read: toOrganizationReaders } })).status).toBe(200);
     expect((await membersFor(asOrganizationViewer)).status).toBe(200);
     expect((await members()).status).toBe(403);
 
-    expect((await open({ 'db:space': { operate: true } })).status).toBe(200);
+    expect((await open({ 'db:Space': { operate: true } })).status).toBe(200);
     expect((await members()).status).toBe(200);
     for (const role of [null, 'viewer', 'member']) expect((await mint(role)).status).toBe(403);
   });
@@ -254,7 +254,7 @@ describe('tenantPermissionRules', () => {
       ownerModel: 'User',
       ...website(),
     });
-    const rules = { tenantPermissionRules: { 'db:contact': { read: true } } };
+    const rules = { tenantPermissionRules: { 'db:Contact': { read: true } } };
 
     expect(
       (await asOwner(post(`/api/v1/space/${space.id}/setTenantPermissionRules`, rules))).status,
@@ -274,7 +274,7 @@ describe('tenantPermissionRules', () => {
       ...website(),
     });
     await open({
-      'db:contact': { read: { rule: { field: 'label', operator: 'equals', value: 'public' } } },
+      'db:Contact': { read: { rule: { field: 'label', operator: 'equals', value: 'public' } } },
     });
     expect((await asStranger(get(`/api/v1/organization/${org.id}/contacts`))).status).toBe(403);
   });

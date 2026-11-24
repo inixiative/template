@@ -120,17 +120,17 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       const { user, organizationUser } = await asMember('owner');
       const integration = await memberIntegration(organizationUser, {
         entitlements: [
-          entitlementInputFor('db:space', ['db:space', space.id], ['read', 'operate', 'manage']),
+          entitlementInputFor('db:Space', ['db:Space', space.id], ['read', 'operate', 'manage']),
           entitlementInputFor(
-            'db:space',
-            ['db:space', otherSpace.id],
+            'db:Space',
+            ['db:Space', otherSpace.id],
             ['read', 'operate', 'manage'],
           ),
         ],
       });
       const { key } = await mintOn(integration, user, [organizationUser], {
         entitlements: [
-          entitlementInputFor('db:space', ['db:space', space.id], ['read', 'operate', 'manage']),
+          entitlementInputFor('db:Space', ['db:Space', space.id], ['read', 'operate', 'manage']),
         ],
       });
       expect(await holds(key!, 'space', space.id, 'manage')).toBe(true);
@@ -141,8 +141,8 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       const { user, organizationUser } = await asMember('owner');
       const integration = await memberIntegration(organizationUser, {
         entitlements: [
-          entitlementInputFor('db:space', ['db:space', space.id], ['read']),
-          entitlementInputFor('db:space', ['db:space', otherSpace.id], ['read']),
+          entitlementInputFor('db:Space', ['db:Space', space.id], ['read']),
+          entitlementInputFor('db:Space', ['db:Space', otherSpace.id], ['read']),
         ],
       });
       const { key } = await mintOn(integration, user, [organizationUser], { full: true });
@@ -176,8 +176,8 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       const { user, organizationUser } = await asMember('owner');
       const integration = await memberIntegration(organizationUser, { role: 'owner' });
       const nowhere = entitlementInputFor(
-        'db:space',
-        ['db:space', '01a17393-0000-7000-8000-000000000000'],
+        'db:Space',
+        ['db:Space', '01a17393-0000-7000-8000-000000000000'],
         ['read'],
       );
       expect(
@@ -299,7 +299,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
     it("only the user's own things: no role, one entry from the user", async () => {
       const { user, organizationUser } = await asMember('owner');
       const integration = await userIntegration(user, {
-        entitlements: [entitlementInputFor('db:user', ['db:user', user.id], ['read', 'operate'])],
+        entitlements: [entitlementInputFor('db:User', ['db:User', user.id], ['read', 'operate'])],
       });
       const { key } = await mintOn(integration, user, [organizationUser], { full: true });
       expect(await holds(key!, 'user', user.id, 'read')).toBe(true);
@@ -350,7 +350,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       {
         role: 'member',
         entitlements: [
-          entitlementInputFor('db:organization', ['db:organization', organization.id], ['manage']),
+          entitlementInputFor('db:Organization', ['db:Organization', organization.id], ['manage']),
         ],
       },
       { user, organization },

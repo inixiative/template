@@ -231,7 +231,7 @@ Called by `fetchAndHydrateMe`. Sets the Permix user id; a superadmin gets
 
 #### check(model, record, action)
 
-ReBAC check (`rebac/check` over `rebacSchema`) against the hydrated record:
+ReBAC check (`rebac/check` over `schemaMap`) against the hydrated record:
 
 ```typescript
 const canManage = permissions.check('organization', org, 'manage');

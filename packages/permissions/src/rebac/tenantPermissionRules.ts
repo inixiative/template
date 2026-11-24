@@ -4,12 +4,16 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import type { ActionRule, AdditionalRules } from '@inixiative/permissions';
-import { type BindableOwnerModel, type ModelName, relationsToTenantOnSides } from '@template/db';
-import { schemaMap } from '@template/db/schemaMap';
+import { type ActionRule, type AdditionalRules, validateActionRule } from '@inixiative/permissions';
+import {
+  accessorOfResource,
+  type BindableOwnerModel,
+  relationsToTenantOnSides,
+  toModelName,
+} from '@template/db';
 import { tenantRowsAbove, tenantRowsOnSides } from '@template/db/utils/tenantRowsAbove';
 import { StandardAction } from '@template/permissions/client';
-import { issuesWithStoredRule } from '@template/permissions/rebac/issuesWithStoredRule';
+import { schemaMap } from '@template/permissions/rebac/schema';
 import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { castArray, isPlainObject, pick, pickBy } from 'lodash-es';
@@ -36,10 +40,7 @@ export const reasonRuleIsOffItsOwnSide = (
   resource: string,
   rule: unknown,
 ): string | undefined => {
-  const ownSides = relationsToTenantOnSides(
-    schemaMap.resources[resource] as ModelName,
-    tenantModel,
-  );
+  const ownSides = relationsToTenantOnSides(toModelName(accessorOfResource(resource)), tenantModel);
   if (!ownSides.length || ownSides.includes(sideCheckHeldBy(rule)?.rel ?? '')) return undefined;
   const checks = ownSides.map((relation) => `{ rel: '${relation}', action }`).join(' or ');
   return `a ${tenantModel}'s rule here holds a check on its own side, asking read, operate, manage or own: ${checks}`;
@@ -60,7 +61,12 @@ const rulesOf = (
     actionsTenantMayExtend(tenantModel, resource),
   );
   for (const [action, rule] of Object.entries(rules)) {
-    const [issue] = issuesWithStoredRule(resource, action, rule, { additionalRules: [rules] });
+    const [issue] = validateActionRule(rule, {
+      schemaMap,
+      resource,
+      action,
+      additionalRules: [rules],
+    }).errors;
     const reason =
       reasonRuleIsOffItsOwnSide(tenantModel, resource, rule) ??
       (issue && `${issue.path}: ${issue.message}`);
@@ -80,7 +86,7 @@ const rulesOf = (
  */
 export const tenantPermissionRulesAbove: AdditionalRules = (resource, record) => [
   ...tenantRowsAbove(record).map(({ model, row }) => rulesOf(row, model, resource)),
-  ...tenantRowsOnSides(schemaMap.resources[resource] as ModelName, record).map(
+  ...tenantRowsOnSides(toModelName(accessorOfResource(resource)), record).map(
     ({ model, row, relation }) =>
       pickBy(rulesOf(row, model, resource), (rule) => sideCheckHeldBy(rule)?.rel === relation),
   ),

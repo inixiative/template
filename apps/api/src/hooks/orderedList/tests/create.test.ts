@@ -5,7 +5,7 @@ import { createUser, nextFactorySequenceNumber } from '@template/db/test';
 import {
   createEmailContact,
   createPhoneContact,
-  fetchLiveContactPositions,
+  fetchNotDeletedContactPositions,
   phoneContactData,
   positionOfContact,
   positions,
@@ -28,7 +28,7 @@ describe('create', () => {
     const d = await createPhoneContact(u.id, 2); // insert at 2
 
     expect(d.position).toBe(2);
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3, 4]);
     expect(positionOfContact(rows, a.id)).toBe(1);
     expect(positionOfContact(rows, d.id)).toBe(2);
@@ -42,7 +42,7 @@ describe('create', () => {
     await createPhoneContact(u.id);
     expect((await createPhoneContact(u.id, 999)).position).toBe(3);
     expect((await createPhoneContact(u.id, 0)).position).toBe(1);
-    expect(positions(await fetchLiveContactPositions(u.id))).toEqual([1, 2, 3, 4]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id))).toEqual([1, 2, 3, 4]);
   });
 
   it('scopes by type and owner independently', async () => {
@@ -73,7 +73,7 @@ describe('createManyAndReturn', () => {
     const res = await db.contact.createManyAndReturn({
       data: [phoneContactData(u.id, 1), phoneContactData(u.id, 2), phoneContactData(u.id, 3)],
     });
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3, 4, 5, 6]);
     const newIds = new Set(res.map((r) => r.id));
     expect(
@@ -97,7 +97,7 @@ describe('createManyAndReturn', () => {
     const res = await db.contact.createManyAndReturn({
       data: [phoneContactData(u.id, 1), phoneContactData(u.id, 1), phoneContactData(u.id, 1)],
     });
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3, 4, 5]);
     expect(positionOfContact(rows, res[2].id)).toBe(1);
     expect(positionOfContact(rows, res[1].id)).toBe(2);
@@ -112,7 +112,7 @@ describe('createManyAndReturn', () => {
     await db.contact.createManyAndReturn({
       data: [phoneContactData(u.id, 2), phoneContactData(u.id), phoneContactData(u.id, 1)],
     });
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
@@ -122,7 +122,7 @@ describe('createManyAndReturn', () => {
     const res = await db.contact.createManyAndReturn({
       data: [phoneContactData(u.id, 2), phoneContactData(u.id, 4)],
     });
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(positionOfContact(rows, res[0].id)).toBe(2);
     expect(positionOfContact(rows, res[1].id)).toBe(4);
@@ -139,8 +139,8 @@ describe('multi-scope isolation — createManyAndReturn', () => {
       data: [phoneContactData(u2.id), phoneContactData(u1.id), phoneContactData(u2.id)],
     });
 
-    expect(positions(await fetchLiveContactPositions(u1.id))).toEqual([1, 2]);
-    expect(positions(await fetchLiveContactPositions(u2.id))).toEqual([1, 2]);
+    expect(positions(await fetchNotDeletedContactPositions(u1.id))).toEqual([1, 2]);
+    expect(positions(await fetchNotDeletedContactPositions(u2.id))).toEqual([1, 2]);
   });
 
   it('rows for two different types (same owner) get independent sequences', async () => {
@@ -160,7 +160,11 @@ describe('multi-scope isolation — createManyAndReturn', () => {
       ],
     });
 
-    expect(positions(await fetchLiveContactPositions(u.id, ContactType.phone))).toEqual([1, 2, 3]);
-    expect(positions(await fetchLiveContactPositions(u.id, ContactType.email))).toEqual([1, 2]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id, ContactType.phone))).toEqual([
+      1, 2, 3,
+    ]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id, ContactType.email))).toEqual([
+      1, 2,
+    ]);
   });
 });

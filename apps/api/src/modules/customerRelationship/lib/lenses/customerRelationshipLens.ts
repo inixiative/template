@@ -14,11 +14,11 @@ import {
 import { conditionPolymorphicAxisPointsAtBoundRow } from '@template/db';
 import {
   lensFor,
-  live,
   omitForeignKeys,
   platformOrPointsAtBoundRow,
   pointsAtBoundRowAndIsNotDeleted,
 } from '@template/db/lens';
+import { notDeleted } from '@template/shared/rules';
 
 const tagOwned = platformOrPointsAtBoundRow('Tag', 'ownerModel');
 
@@ -34,12 +34,12 @@ const contacts: ModelNarrowing = {
     'verifiedAt',
     'createdAt',
   ],
-  where: live,
+  where: notDeleted,
 };
 
 const tagAttachments: ModelNarrowing = {
   picks: [],
-  where: live,
+  where: notDeleted,
   relations: {
     tag: { picks: ['id', 'name'], sources: { id: { from: 'mapDefaults' } } },
   },
@@ -71,17 +71,17 @@ export const customerRelationshipLens: LensNarrowing = omitForeignKeys({
     relations: {
       customerUser: {
         picks: ['id', 'name', 'email', 'emailVerified', 'lastLoginAt', 'createdAt'],
-        where: live,
+        where: notDeleted,
         relations: { contacts, tagAttachments, communicationsReceived },
       },
       customerOrganization: {
         picks: ['id', 'name', 'createdAt'],
-        where: live,
+        where: notDeleted,
         relations: { contacts, tagAttachments },
       },
       customerSpace: {
         picks: ['id', 'name', 'createdAt'],
-        where: live,
+        where: notDeleted,
         relations: { contacts, tagAttachments },
       },
       segmentMembers: {

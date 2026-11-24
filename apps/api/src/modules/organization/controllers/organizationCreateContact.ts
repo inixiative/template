@@ -7,7 +7,7 @@
 import { emitAppEvent } from '#/appEvents/emit';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { reviveOrCreateContact } from '#/modules/contact/services/reviveOrCreateContact';
+import { addContact } from '#/modules/contact/services/addContact';
 import { organizationCreateContactRoute } from '#/modules/organization/routes/organizationCreateContact';
 
 export const organizationCreateContactController = makeController(
@@ -16,7 +16,7 @@ export const organizationCreateContactController = makeController(
     const organization = contextResource<'organization'>(c);
     const body = c.req.valid('json');
 
-    const contact = await reviveOrCreateContact(
+    const contact = await addContact(
       { ownerModel: 'Organization', organizationId: organization.id },
       body,
     );

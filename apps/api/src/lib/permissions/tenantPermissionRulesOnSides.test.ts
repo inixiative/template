@@ -72,7 +72,7 @@ describe("a tenant rule on an inquiry walks through the tenant's own side", () =
     await db.organization.update({
       where: { id: organization.id },
       data: {
-        tenantPermissionRules: { 'db:inquiry': { read: whoeverReads('targetOrganization') } },
+        tenantPermissionRules: { 'db:Inquiry': { read: whoeverReads('targetOrganization') } },
       },
     });
     expect(await holds(key, 'inquiry', received.id, 'read')).toBe(true);
@@ -94,7 +94,7 @@ describe("a tenant rule on an inquiry walks through the tenant's own side", () =
 
     await db.space.update({
       where: { id: space.id },
-      data: { tenantPermissionRules: { 'db:inquiry': { read: whoeverReads('targetSpace') } } },
+      data: { tenantPermissionRules: { 'db:Inquiry': { read: whoeverReads('targetSpace') } } },
     });
     expect(await holds(spaceViewer, 'inquiry', toSpace.id, 'read')).toBe(true);
     expect(await holds(organizationViewer, 'inquiry', toSpace.id, 'read')).toBe(false);
@@ -102,7 +102,7 @@ describe("a tenant rule on an inquiry walks through the tenant's own side", () =
     await db.organization.update({
       where: { id: organization.id },
       data: {
-        tenantPermissionRules: { 'db:inquiry': { read: whoeverReads('targetOrganization') } },
+        tenantPermissionRules: { 'db:Inquiry': { read: whoeverReads('targetOrganization') } },
       },
     });
     expect(await holds(organizationViewer, 'inquiry', toSpace.id, 'read')).toBe(true);
@@ -114,7 +114,7 @@ describe("a tenant rule on an inquiry walks through the tenant's own side", () =
     await db.organization.update({
       where: { id: organization.id },
       data: {
-        tenantPermissionRules: { 'db:inquiry': { read: whoeverReads('sourceOrganization') } },
+        tenantPermissionRules: { 'db:Inquiry': { read: whoeverReads('sourceOrganization') } },
       },
     });
     expect(await holds(key, 'inquiry', received.id, 'read')).toBe(false);
@@ -135,9 +135,9 @@ describe("a tenant rule on an inquiry walks through the tenant's own side", () =
           }),
         )
       ).status;
-    expect(await set({ 'db:inquiry': { read: true } })).toBe(422);
-    expect(await set({ 'db:inquiry': { read: whoeverReads('targetUser') } })).toBe(422);
-    expect(await set({ 'db:inquiry': { resolve: whoeverReads('targetOrganization') } })).toBe(422);
-    expect(await set({ 'db:inquiry': { read: whoeverReads('targetOrganization') } })).toBe(200);
+    expect(await set({ 'db:Inquiry': { read: true } })).toBe(422);
+    expect(await set({ 'db:Inquiry': { read: whoeverReads('targetUser') } })).toBe(422);
+    expect(await set({ 'db:Inquiry': { resolve: whoeverReads('targetOrganization') } })).toBe(422);
+    expect(await set({ 'db:Inquiry': { read: whoeverReads('targetOrganization') } })).toBe(200);
   });
 });

@@ -241,7 +241,7 @@ every open stream every 45 seconds through the cheap `x-auth-probe` path (middle
 controller does not) with the connection's credential. A rejection closes the stream with
 `openRejected`; a retryable status closes it with a retryable `error`. The re-authorization runs on each
 connection's serialized queue and never queues a second recheck behind an unfinished one. Its
-probes carry a server-only system probe secret that the API rate limiter exempts, so the re-authorization
+probes carry a server-only system probe secret that every rate limit exempts, so the re-authorization
 spends no caller's or organization's HTTP budget; client-driven opens and subscribes still count.
 A probe that throws closes its stream as retryable and the re-authorization continues with the rest.
 

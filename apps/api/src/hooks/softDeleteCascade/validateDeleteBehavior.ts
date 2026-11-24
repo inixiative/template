@@ -105,7 +105,7 @@ export const unclassifiedChildViolations = (
       )
       .map(
         (child) =>
-          `${child.model}.${child.fromFields.join('+')} belongs to ${parent}, which is soft-deleted, but ${child.model} has no deletedAt and is in neither HARD_DELETE_ON_TOMBSTONE nor CLOSE_ON_PARENT_DELETE: tombstoning ${parent} would leave it live under a dead parent. Give it deletedAt, list it in one of those, or exempt the relation in CASCADE_EXEMPT.`,
+          `${child.model}.${child.fromFields.join('+')} belongs to ${parent}, which is soft-deleted, but ${child.model} has no deletedAt and is in neither HARD_DELETE_ON_TOMBSTONE nor CLOSE_ON_PARENT_DELETE: tombstoning ${parent} would leave it not-deleted under a deleted parent. Give it deletedAt, list it in one of those, or exempt the relation in CASCADE_EXEMPT.`,
       ),
   );
 

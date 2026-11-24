@@ -1,5 +1,5 @@
 import { hydrate } from '@template/db';
-import { type ActionRule, check, rebacSchema } from '@template/permissions/rebac';
+import { type ActionRule, check } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
@@ -13,7 +13,7 @@ export const validatePermission = makeMiddleware<ActionRule>((action) => async (
 
   const hydrated = await hydrate(resourceType, resource as { id: string });
 
-  if (!check(permix, rebacSchema, resourceType, hydrated, action)) {
+  if (!check(permix, resourceType, hydrated, action)) {
     throw makeError({ status: 403, message: 'Access denied' });
   }
 

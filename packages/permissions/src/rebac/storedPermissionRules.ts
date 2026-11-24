@@ -4,8 +4,8 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import type { ActionRule, AdditionalRules } from '@inixiative/permissions';
-import { issuesWithStoredRule } from '@template/permissions/rebac/issuesWithStoredRule';
+import { type ActionRule, type AdditionalRules, validateActionRule } from '@inixiative/permissions';
+import { schemaMap } from '@template/permissions/rebac/schema';
 import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
 import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
 import { isPlainObject } from 'lodash-es';
@@ -16,7 +16,7 @@ const throwIfTheRecordsOwnRulesAreRefused = (resource: string, record: Record<st
   if (recordsAlreadyRead.has(record) || !isPlainObject(record.permissionRules)) return;
   const rowRules = record.permissionRules as Record<string, ActionRule>;
   for (const [action, rule] of Object.entries(rowRules)) {
-    const [issue] = issuesWithStoredRule(resource, action, rule, { rowRules });
+    const [issue] = validateActionRule(rule, { schemaMap, resource, action, rowRules }).errors;
     if (issue)
       throw new StoredPermissionRuleRefusedError(
         `the record's own stored rule for \`${resource}.${action}\` is refused: ${issue.path}: ${issue.message}`,
@@ -30,7 +30,7 @@ const throwIfTheRecordsOwnRulesAreRefused = (resource: string, record: Record<st
  * after theirs and then the record's own `permissionRules` are checked. A refused one throws
  * `StoredPermissionRuleRefusedError` here, before the library reads it.
  */
-export const rulesStoredBesideTheSchema: AdditionalRules = (resource, record) => {
+export const storedPermissionRules: AdditionalRules = (resource, record) => {
   const rulesOfTenantsAbove = tenantPermissionRulesAbove(resource, record);
   throwIfTheRecordsOwnRulesAreRefused(resource, record);
   return rulesOfTenantsAbove;

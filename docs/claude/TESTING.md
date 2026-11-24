@@ -313,7 +313,7 @@ foreignKey: 'webhookSubscriptionId'
 
 Every API test runs with every production hook ([Hooks in tests](#hooks-in-tests)), so a row a test writes passes the same hooks and rules (`apps/api/src/hooks/rules/registry.ts`) as a row production writes:
 
-- **Members:** every `OrganizationUser` and `SpaceUser` holds its self-grant as an `Entitlement` row, which the `memberSelfGrant` hook writes after create. Expect it among a member's rows: `toEntitlementInput(memberSelfGrant('db:organizationUser', member))` beside `heldEntitlements`.
+- **Members:** every `OrganizationUser` and `SpaceUser` holds its self-grant as an `Entitlement` row, which the `memberSelfGrant` hook writes after create. Expect it among a member's rows: `toEntitlementInput(memberSelfGrant('db:OrganizationUser', member))` beside `heldEntitlements`.
 - **Integrations and tokens:** a delegate that is not `full` may have no role and no entitlement rows; it is not refused and holds nothing. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements. A `full` delegate keeps no role, and writing `full` tombstones its rows (`fullDelegate`).
 - **Users:** every user gets an email contact, first in its email list (`userEmailContact`).
 - **Soft-delete models:** `delete` and `deleteMany` are refused (`preventHardDelete`). Remove a row the way production does, with `deletedAt`.
@@ -362,7 +362,8 @@ afterEach(async () => {
 
 - **The tracker is always on.** `packages/db/src/client.ts` calls `registerTestTracker()` when the client loads; in a test environment it records every table a create/update/upsert/delete touches (outside test it's a no-op). Never call `registerTestTracker()` in a test file: `scripts/lint/check-test-tracker-registration.sh` fails it.
 - **`cleanupTouchedTables(db)` empties those tables** and resets the set (`packages/db/src/test/testTracker.ts`). It bypasses the soft-delete scope, so soft-deleted rows go too.
-- **Cleanup is per test.** Seed in `beforeEach` and clean in `afterEach`, so no test sees another test's rows and the order they run in does not matter. A `beforeAll` seed would be deleted by the first test's cleanup.
+- **Cleanup is per test by default.** Seed in `beforeEach` and clean in `afterEach`, so no test sees another test's rows and the order they run in does not matter. A `beforeAll` seed would be deleted by the first test's cleanup.
+- **A file may keep its rows until it ends.** Call `keepRowsUntilEndOfFile()` (`@template/db/test/keepRowsUntilEndOfFile`) at the top of the file, before any other `afterAll`: every `cleanupTouchedTables(db)` in that file, the suite's and the file's own, does nothing, and one cleanup runs when the file ends. Use it when every test builds on the same expensive setup: build that once and share it. Why: in Kingdom's conversation admission tests, building one paired Foundry for the file instead of one per test took the file from 30 s to 21 s. Later tests see earlier tests' rows, so a test that expects an empty table, counts or lists everything under the shared rows, or changes them (revokes, disables, deletes) builds its own. Only rows are kept: a file that flushes Redis per test loses the shared setup's tokens and cached state. An `afterAll` registered before the call that throws skips the end-of-file cleanup, and later files then keep their rows too.
 - **The API suite also cleans after every test on its own** (`apps/api/tests/globalSetup.ts`), so a test that writes rows through a shared fixture is covered even when its file has no cleanup.
 - **Never delete rows by hand** (`delete`/`deleteMany`/`TRUNCATE`/`DELETE FROM`) in an after hook: `scripts/lint/check-test-hand-cleanup.sh` fails it. A hand delete either duplicates the cleanup or hides a write the tracker missed; fix the blind spot instead. Ruling: [DB-004](../../tickets/DB-004-test-tracker-always-on.md).
 
@@ -450,20 +451,24 @@ export const createModel = modelFactory.create;
 
 ## VCR (external services)
 
-Tests never call a live provider. A client that talks to an external service wraps each call in `VCR` from `@template/shared/vcr`:
+Tests never call a live provider. External service clients use `@inixiative/vcr` directly (`createVcrRecorder`, `createVcrFetch`, `createScrubber`, `fetchCliVersion`, `fetchHttpVersion`, `assertCassettesFresh`):
 
 ```typescript
-readonly vcr = new VCR(FIXTURES_DIR, { service: 'resend', version: () => '…', sanitizers });
+import { createVcrRecorder } from '@inixiative/vcr';
+
+readonly vcr = createVcrRecorder(FIXTURES_DIR, { service: 'resend', version: () => '…', sanitizers });
 
 send(options) {
+  if (process.env.NODE_ENV !== 'test') return this.__send(options);
   return this.vcr.capture('send', () => this.__send(options));
 }
 ```
 
-- Outside tests `capture` calls straight through.
-- In tests the test queues a cassette per call (`client.vcr.queue('send', 'accepted')`); `capture` replays it, or records a sanitized one when the file is missing or its `version` differs from the service's current version.
+- Outside tests (`NODE_ENV !== 'test'`), clients call straight through without touching cassettes (`init/api/*` shares `captureInTest` in `init/api/capture.ts`).
+- In tests, queue a cassette per call (`client.vcr.queue('send', 'accepted')`), clear with `clearQueues()`, and assert exhaustion with `isQueueEmpty()`. Mode resolves via `VCR_MODE` (`replay` by default — fails closed on missing cassettes without hitting the network; `auto` records missing cassettes; `record` re-records live and holds back structural drift to `*.pending.json`).
 - A recorded `status >= 400` replays as a thrown error.
-- Sanitizers mask keys before a cassette is written; commit only sanitized cassettes.
+- Per-method sanitizers (`{ keys, transform, isArray, binaryExtension }`) and `@inixiative/vcr`'s built-in scrubber redact secrets, headers, URL credentials, and emails before writing, and `assertScrubbed` gates every cassette write.
+- For HTTP clients that take a `fetch` implementation, pass `client.vcr` (a `VcrRecorder`) to `createVcrFetch` for request-matched HTTP record/replay.
 
 Used by `packages/email` (Resend, Bouncer) and the `init/api/*` clients (all but `cloudflare` and `resend`).
 

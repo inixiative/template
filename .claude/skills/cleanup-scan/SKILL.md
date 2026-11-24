@@ -1,6 +1,6 @@
 ---
 name: cleanup-scan
-description: Use after finishing a piece of work and before pushing it (the cleanupScanGate hook refuses `git push` until this has run on HEAD). Scans the outgoing diff for duplicated or parallel machinery, names against the vocabulary, an adversarial review, the reviews Aron asks for most, collisions with in-flight branches and PRs, doctrine drift, template divergence and leftovers, fixes what it finds, then records the scan.
+description: Use after finishing a piece of work and before pushing it (the cleanupScanGate hook refuses `git push` until this has run on HEAD). Scans the outgoing diff for duplicated or parallel machinery, names against the vocabulary, an adversarial review, an architectural subtraction pass, the reviews Aron asks for most, collisions with in-flight branches and PRs, doctrine drift, template divergence and leftovers, fixes what it finds, then records the scan.
 ---
 
 # Cleanup Scan
@@ -37,6 +37,15 @@ note. Give it the code and the claim, not your conclusion. Fix what it confirms;
 it reports before relaying it. A plan or a change to what a primitive means is reviewed against
 Aron's stated principles before code is written.
 
+## 3.5. Architectural Subtractor
+
+Distinct from §1 (code-level duplicates across repo/libs), §3 (correctness/security bugs), and §4 (recurring feedback checks): a separate agent reads the **whole** plan or diff with an explicit deletion mandate — *assume this has 30–50% too much surface area, and try to cut it in half without losing any required behavior* (`docs/claude/GREAT_PROGRAMMER.md`).
+
+- **Two checkpoints:** run it **before coding** (on the 10-line prose flow and any diagram) and **before merge** (on the full outgoing diff, hunting turn-by-turn accretion).
+- **Primitive absorption:** for every new route, table/column, Redis store, middleware, flag, or wrapper, ask: *can an existing primitive (ReBAC, JWT claims, `rateLimit`, `transitions`, `fieldEncryption`, hooks, scoped DB) absorb this directly?*
+- **Fresh-eyes rebuild:** ignore sunk cost from earlier iterations. If a route, bridge token, or helper only exists to patch a mistake from an earlier design turn, cut it and simplify the whole flow.
+- **Cutout elimination:** reject bypass options or escape hatches bolted onto a primitive to accommodate a clumsy caller; collapse the requirement into the primitive's general rule instead.
+
 ## 4. The reviews Aron asks for most
 
 Each comes from a correction he has given more than once (`~/code/inixiative/FEEDBACK-LOG.md`).
@@ -69,12 +78,13 @@ Unused imports and exports, dead files, stale docs and comments, baselines or ex
 
 ## 9. Verify and record
 
-1. `bun run check` passes. A failure that predates the change is shown on the default branch, not assumed.
-2. Commit the fixes.
-3. Record the scan of the exact commit you will push:
+1. Commit the fixes.
+2. Record the scan of the exact commit you will push:
 
 ```bash
-git rev-parse HEAD > "$(git rev-parse --git-path cleanup-scan)"
+bun run cleanup-scan:record
 ```
+
+It refuses an uncommitted tree, runs `bun run check`, and records HEAD only when the check passes and the checkout did not change while it ran. A failure that predates the change is shown on the default branch, not assumed.
 
 The gate compares that file to HEAD, so any later commit needs a new scan. In the report, name what each step found and fixed, or that it found nothing.

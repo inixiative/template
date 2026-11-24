@@ -51,8 +51,8 @@ const perDefinition = (
 });
 
 /**
- * Compiles `db:setting` ReBAC rules directly from `SETTING_DEFINITIONS`.
- * Exactly two actions exist on `db:setting`:
+ * Compiles `db:Setting` ReBAC rules directly from `SETTING_DEFINITIONS`.
+ * Exactly two actions exist on `db:Setting`:
  * - `manage`: per-key, per-resourceModel write/delete authority resolved from `definition.permission`.
  * - `read`: anyone who can `manage` the setting, OR holds the resolved `definition.readPermission`
  *   (defaulting to `'read'`) on `resource${model}`.

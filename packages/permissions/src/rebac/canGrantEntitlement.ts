@@ -4,19 +4,10 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { createCanGrantEntitlement, type EntitlementEntry } from '@inixiative/permissions';
-import type { HydratedRecord } from '@template/db';
-import { schemaMap } from '@template/db/schemaMap';
-import type { Permix } from '@template/permissions/client';
-import { rulesStoredBesideTheSchema } from '@template/permissions/rebac/rulesStoredBesideTheSchema';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import { makeCanGrantEntitlement } from '@inixiative/permissions';
+import { schemaMap } from '@template/permissions/rebac/schema';
+import { storedPermissionRules } from '@template/permissions/rebac/storedPermissionRules';
 
-const canGrant = createCanGrantEntitlement(schemaMap, {
-  additionalRules: rulesStoredBesideTheSchema,
+export const canGrantEntitlement = makeCanGrantEntitlement(schemaMap, {
+  additionalRules: storedPermissionRules,
 });
-
-export const canGrantEntitlement = (
-  permix: Permix,
-  entry: EntitlementEntry,
-  placed: HydratedRecord,
-): boolean => canGrant(permix, rebacSchema, entry, placed);

@@ -4,14 +4,12 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { createRebacCheck } from '@inixiative/permissions';
-import type { AccessorName, HydratedRecord } from '@template/db';
-import { schemaMap } from '@template/db/schemaMap';
+import { makeRebacCheck } from '@inixiative/permissions';
+import { type AccessorName, type HydratedRecord, resourceOfModel } from '@template/db';
 import type { Permix } from '@template/permissions/client';
-import { rulesStoredBesideTheSchema } from '@template/permissions/rebac/rulesStoredBesideTheSchema';
-import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
-
-const rebacCheck = createRebacCheck(schemaMap, { additionalRules: rulesStoredBesideTheSchema });
+import { schemaMap } from '@template/permissions/rebac/schema';
+import { storedPermissionRules } from '@template/permissions/rebac/storedPermissionRules';
+import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
 
 const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> => {
   const actor = permix.getActor();
@@ -20,17 +18,26 @@ const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> 
     : {};
 };
 
-export const check = (
-  permix: Permix,
-  schema: RebacSchema,
-  model: AccessorName,
-  record: HydratedRecord,
-  actionOrRule: ActionRule,
-  data?: Record<string, HydratedRecord[]>,
-): boolean =>
-  rebacCheck(
-    permix,
-    schema,
-    { resource: `db:${model}`, record, data: { ...data, ...rowsOfActor(permix) } },
-    actionOrRule,
-  );
+export const makeCheck = (schemaMapOfTheCheck: SchemaMap) => {
+  const rebacCheck = makeRebacCheck(schemaMapOfTheCheck, {
+    additionalRules: storedPermissionRules,
+  });
+  return (
+    permix: Permix,
+    model: AccessorName,
+    record: HydratedRecord,
+    actionOrRule: ActionRule,
+    bridgeData?: Record<string, HydratedRecord[]>,
+  ): boolean =>
+    rebacCheck(
+      permix,
+      {
+        resource: resourceOfModel(model),
+        record,
+        bridgeData: { ...bridgeData, ...rowsOfActor(permix) },
+      },
+      actionOrRule,
+    );
+};
+
+export const check = makeCheck(schemaMap);

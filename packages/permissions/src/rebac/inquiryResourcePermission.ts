@@ -72,7 +72,7 @@ const rulesGrantingRead = (side: InquirySide, model: InquiryPartyModel): ActionR
   return [{ all: [{ any: [isPartyModel(side, model), sideKeysAreEmpty] }, rel] }];
 };
 
-// db:inquiry, built from the party declarations: send is a source party's level for that type,
+// db:Inquiry, built from the party declarations: send is a source party's level for that type,
 // resolve a target party's. Read is party-wide (INQUIRY_READ_LEVELS).
 export const inquiryResourcePermissionFromParties = (
   types: Record<InquiryType, InquiryTypeParties>,

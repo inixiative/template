@@ -64,6 +64,35 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
     expect(data.status).toBe(InquiryStatus.approved);
   });
 
+  it('approving an invite for someone already a not-deleted member leaves their role alone', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+    const { entity: member } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: invitee, organization: org },
+    );
+
+    const response = await createTestApp({ mockUser: invitee, mount }).fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    expect((await db.organizationUser.findUniqueOrThrow({ where: { id: member.id } })).role).toBe(
+      'owner',
+    );
+  });
+
   it('returns both sides in the response', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({

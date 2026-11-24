@@ -7,7 +7,7 @@
 import { emitAppEvent } from '#/appEvents/emit';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { reviveOrCreateContact } from '#/modules/contact/services/reviveOrCreateContact';
+import { addContact } from '#/modules/contact/services/addContact';
 import { spaceCreateContactRoute } from '#/modules/space/routes/spaceCreateContact';
 
 export const spaceCreateContactController = makeController(
@@ -16,7 +16,7 @@ export const spaceCreateContactController = makeController(
     const space = contextResource<'space'>(c);
     const body = c.req.valid('json');
 
-    const contact = await reviveOrCreateContact({ ownerModel: 'Space', spaceId: space.id }, body);
+    const contact = await addContact({ ownerModel: 'Space', spaceId: space.id }, body);
 
     await emitAppEvent('contact.created', { contact });
 

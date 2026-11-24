@@ -112,7 +112,7 @@ describe('integration resources', () => {
     expect(response.status).toBe(403);
   });
 
-  it('lists the live resources of the integration', async () => {
+  it('lists the not-deleted resources of the integration', async () => {
     const { entity: kept } = await createIntegrationResource({}, { integration });
     const { entity: removed } = await createIntegrationResource({}, { integration });
     await db.integrationResource.update({

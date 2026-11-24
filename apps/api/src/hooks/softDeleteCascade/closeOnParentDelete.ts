@@ -11,7 +11,7 @@ import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateI
 
 // Children a parent's delete closes instead of burying, keyed by the child. Each child row is put in
 // a category; a row whose category is a field/value map gets it written, a row with none is left.
-// Nothing is tombstoned, so every row stays live as the record of what happened. Every parent of a
+// Nothing is tombstoned, so every row stays not-deleted as the record of what happened. Every parent of a
 // model listed here must be soft-delete only (validateDeleteBehavior), so a hard delete can never
 // take the record with it.
 export const CLOSE_ON_PARENT_DELETE: Record<string, Categorization> = {

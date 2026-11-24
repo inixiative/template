@@ -3,7 +3,7 @@ import { db } from '@template/db';
 import { createUser } from '@template/db/test';
 import {
   createPhoneContact,
-  fetchLiveContactPositions,
+  fetchNotDeletedContactPositions,
   phoneContactData,
   positionOfContact,
   positions,
@@ -27,7 +27,7 @@ describe('unique constraint safety', () => {
     await db.contact.createManyAndReturn({
       data: [phoneContactData(u.id, 1), phoneContactData(u.id, 1)],
     });
-    expect(positions(await fetchLiveContactPositions(u.id))).toEqual([1, 2, 3, 4]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id))).toEqual([1, 2, 3, 4]);
   });
 
   it('direct position update reorders (no collision)', async () => {
@@ -36,7 +36,7 @@ describe('unique constraint safety', () => {
     const b = await createPhoneContact(u.id);
     await createPhoneContact(u.id);
     await db.contact.update({ where: { id: b.id }, data: { position: 1 } });
-    expect(positions(await fetchLiveContactPositions(u.id))).toEqual([1, 2, 3]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id))).toEqual([1, 2, 3]);
   });
 
   it('soft-delete + create at same position (no collision)', async () => {
@@ -45,7 +45,7 @@ describe('unique constraint safety', () => {
     const b = await createPhoneContact(u.id);
     await softDeleteContact(a.id);
     const c = await createPhoneContact(u.id, 1);
-    const rows = await fetchLiveContactPositions(u.id);
+    const rows = await fetchNotDeletedContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2]);
     expect(positionOfContact(rows, c.id)).toBe(1);
     expect(positionOfContact(rows, b.id)).toBe(2);
@@ -58,10 +58,10 @@ describe('density invariant', () => {
     const items = [];
     for (let i = 0; i < 5; i++) items.push(await createPhoneContact(u.id)); // [1..5]
 
-    await softDeleteContact(items[2]!.id); // live: [1,2,3,4]
-    await createPhoneContact(u.id, 2); // live: [1,2,3,4,5]
-    await restoreContact(items[2]!.id); // live: [1,2,3,4,5,6]
+    await softDeleteContact(items[2]!.id); // not-deleted: [1,2,3,4]
+    await createPhoneContact(u.id, 2); // not-deleted: [1,2,3,4,5]
+    await restoreContact(items[2]!.id); // not-deleted: [1,2,3,4,5,6]
 
-    expect(positions(await fetchLiveContactPositions(u.id))).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(positions(await fetchNotDeletedContactPositions(u.id))).toEqual([1, 2, 3, 4, 5, 6]);
   });
 });

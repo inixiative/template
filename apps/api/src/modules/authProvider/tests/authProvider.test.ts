@@ -357,6 +357,34 @@ describe('AuthProvider Endpoints', () => {
       });
       expect(secrets).toEqual({ clientSecret: 'gitlab-new-secret' });
     });
+    it('adding a not-deleted provider again refreshes it and leaves a disabled one disabled', async () => {
+      const body = {
+        type: 'OAUTH',
+        provider: 'bitbucket',
+        name: 'Bitbucket',
+        config: { clientId: 'bb-old' },
+        secrets: { clientSecret: 'bb-old-secret' },
+      };
+      const first = await parseSuccessBody<AuthProvider>(
+        await userFetch(post(`/api/v1/organization/${org.id}/authProviders`, body)),
+      );
+      await db.authProvider.update({ where: { id: first.data.id }, data: { enabled: false } });
+
+      const response = await userFetch(
+        post(`/api/v1/organization/${org.id}/authProviders`, {
+          ...body,
+          config: { clientId: 'bb-new' },
+        }),
+      );
+      const { data } = await parseSuccessBody<AuthProvider>(response);
+
+      expect(response.status).toBe(201);
+      expect(data).toMatchObject({
+        id: first.data.id,
+        enabled: false,
+        config: { clientId: 'bb-new' },
+      });
+    });
   });
 
   describe('PATCH /api/v1/authProvider/:id', () => {

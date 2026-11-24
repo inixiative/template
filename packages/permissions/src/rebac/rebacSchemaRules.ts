@@ -5,15 +5,15 @@
  * @uses none
  */
 import { type Condition, Operator } from '@inixiative/json-rules';
-import { makeKindRules } from '@inixiative/permissions';
-import { schemaMap } from '@template/db/schemaMap';
+import { makeKindRules, ruleFieldEqualsPath } from '@inixiative/permissions';
+import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
 import { omit } from 'lodash-es';
 
 export const privilegedRoles = ['owner', 'admin'];
 export const unprivilegedRoles = roleHierarchy.filter((role) => !privilegedRoles.includes(role));
-const kind = makeKindRules(schemaMap);
+const kind = makeKindRules(schemaMapWithoutPermissions);
 
 export const isNull = (field: string): Condition => ({
   field,
@@ -46,6 +46,24 @@ const everyOwner = ownerRelations.map(([ownerModel]) => ownerModel);
 const organizationOrSpace: OwnerModel[] = ['Organization', 'Space'];
 const members: OwnerModel[] = ['OrganizationUser', 'SpaceUser'];
 const notIntegration = everyOwner.filter((ownerModel) => ownerModel !== 'Integration');
+
+export const actingAsAPerson: ActionRule = kind.ruleForEachKind('actor:Acting', 'model', {
+  User: true,
+  Token: kind.ruleKindIsOneOf('actor:Token', 'ownerModel', notIntegration),
+});
+
+export const actingAsTheRecordsIntegration: ActionRule = kind.ruleForEachKind(
+  'actor:Acting',
+  'model',
+  {
+    Token: {
+      all: [
+        kind.ruleKindIsOneOf('actor:Token', 'ownerModel', ['Integration']),
+        ruleFieldEqualsPath('integrationId', 'actor:Token.integrationId'),
+      ],
+    },
+  },
+);
 
 export const ownerModelIsOneOf = (owners: OwnerModel[], at = ''): ActionRule => ({
   rule: { field: `${at}ownerModel`, operator: Operator.in, value: owners },

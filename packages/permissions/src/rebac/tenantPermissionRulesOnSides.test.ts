@@ -5,7 +5,6 @@ import { ActorModel, createPermissions, installPermissions } from '@template/per
 import { canGrantEntitlement } from '@template/permissions/rebac/canGrantEntitlement';
 import { check } from '@template/permissions/rebac/check';
 import { tenantPermissionRulesSchema } from '@template/permissions/rebac/permissionRulesSchema';
-import { rebacSchema } from '@template/permissions/rebac/schema';
 import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
 import type { ActionRule } from '@template/permissions/rebac/types';
 import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
@@ -29,7 +28,7 @@ const reads = async (seat: { o1?: Role; o2?: Role }, inquiry: object) => {
     ),
   );
   permix.setActor({ model: ActorModel.User, record: { id: 'u1' } });
-  return check(permix, rebacSchema, 'inquiry', inquiry as HydratedRecord, 'read');
+  return check(permix, 'inquiry', inquiry as HydratedRecord, 'read');
 };
 
 const between = (source: object & { id: string }, target: object & { id: string }) => ({
@@ -57,7 +56,7 @@ describe('a tenant rule on a two-sided record', () => {
   });
 
   it('opens what the tenant received to its own readers, through its own side', async () => {
-    const opened = receiver({ 'db:inquiry': { read: whoeverReads('targetOrganization') } });
+    const opened = receiver({ 'db:Inquiry': { read: whoeverReads('targetOrganization') } });
     expect(await reads({ o2: 'viewer' }, between(sender(), opened))).toBe(true);
     expect(await reads({ o1: 'viewer' }, between(sender(), opened))).toBe(false);
     expect(await reads({}, between(sender(), opened))).toBe(false);
@@ -67,7 +66,7 @@ describe('a tenant rule on a two-sided record', () => {
     const opened = {
       ...receiver(),
       id: 'o1',
-      tenantPermissionRules: { 'db:inquiry': { read: whoeverReads('targetOrganization') } },
+      tenantPermissionRules: { 'db:Inquiry': { read: whoeverReads('targetOrganization') } },
     };
     const sentByIt = between(opened, receiver());
     expect(await reads({ o2: 'viewer' }, sentByIt)).toBe(false);
@@ -82,21 +81,21 @@ describe('a tenant rule on a two-sided record', () => {
       { any: [whoeverReads('targetOrganization'), true] },
       whoeverReads('targetUser'),
     ] as ActionRule[]) {
-      const inquiry = between(sender(), receiver({ 'db:inquiry': { read: rule } }));
+      const inquiry = between(sender(), receiver({ 'db:Inquiry': { read: rule } }));
       for (const seat of [{}, { o1: 'viewer' }, { o2: 'viewer' }] as const)
         await expect(reads(seat, inquiry)).rejects.toBeInstanceOf(StoredPermissionRuleRefusedError);
     }
   });
 
   it('a rule for the side the tenant is not on here does nothing', async () => {
-    const opened = receiver({ 'db:inquiry': { read: whoeverReads('sourceOrganization') } });
+    const opened = receiver({ 'db:Inquiry': { read: whoeverReads('sourceOrganization') } });
     expect(await reads({ o2: 'viewer' }, between(sender(), opened))).toBe(false);
     expect(await reads({ o1: 'viewer' }, between(sender(), opened))).toBe(false);
   });
 
   it('each party opens its own side only, to its own readers only', async () => {
     const inquiry = between(
-      sender({ 'db:inquiry': { read: whoeverReads('sourceOrganization') } }),
+      sender({ 'db:Inquiry': { read: whoeverReads('sourceOrganization') } }),
       receiver(),
     );
     expect(await reads({ o1: 'viewer' }, inquiry)).toBe(true);
@@ -110,7 +109,7 @@ describe('a tenant rule on a two-sided record', () => {
         { rule: { field: 'type', operator: 'equals', value: 'transferSpace' } },
       ],
     };
-    const inquiry = between(sender(), receiver({ 'db:inquiry': { read: narrowed } }));
+    const inquiry = between(sender(), receiver({ 'db:Inquiry': { read: narrowed } }));
     expect(await reads({ o2: 'viewer' }, inquiry)).toBe(true);
     expect(await reads({}, inquiry)).toBe(false);
     expect(await reads({ o2: 'viewer' }, { ...inquiry, type: 'inviteOrganizationUser' })).toBe(
@@ -121,19 +120,19 @@ describe('a tenant rule on a two-sided record', () => {
   it("is refused on write unless it walks through one of the tenant kind's own sides", () => {
     const accepts = (rules: unknown) =>
       tenantPermissionRulesSchema('Organization').safeParse(rules).success;
-    expect(accepts({ 'db:inquiry': { read: whoeverReads('targetOrganization') } })).toBe(true);
-    expect(accepts({ 'db:inquiry': { read: whoeverReads('sourceOrganization') } })).toBe(true);
-    expect(accepts({ 'db:inquiry': { read: true } })).toBe(false);
-    expect(accepts({ 'db:inquiry': { read: whoeverReads('targetUser') } })).toBe(false);
-    expect(accepts({ 'db:inquiry': { resolve: whoeverReads('targetOrganization') } })).toBe(false);
-    expect(accepts({ 'db:inquiry': { send: whoeverReads('sourceOrganization') } })).toBe(false);
-    expect(accepts({ 'db:contact': { read: true } })).toBe(true);
+    expect(accepts({ 'db:Inquiry': { read: whoeverReads('targetOrganization') } })).toBe(true);
+    expect(accepts({ 'db:Inquiry': { read: whoeverReads('sourceOrganization') } })).toBe(true);
+    expect(accepts({ 'db:Inquiry': { read: true } })).toBe(false);
+    expect(accepts({ 'db:Inquiry': { read: whoeverReads('targetUser') } })).toBe(false);
+    expect(accepts({ 'db:Inquiry': { resolve: whoeverReads('targetOrganization') } })).toBe(false);
+    expect(accepts({ 'db:Inquiry': { send: whoeverReads('sourceOrganization') } })).toBe(false);
+    expect(accepts({ 'db:Contact': { read: true } })).toBe(true);
   });
 
   it("a user and a space each name their own side's relation", () => {
     const accepts = (tenantModel: 'User' | 'Space', relation: string) =>
       tenantPermissionRulesSchema(tenantModel).safeParse({
-        'db:inquiry': { read: whoeverReads(relation) },
+        'db:Inquiry': { read: whoeverReads(relation) },
       }).success;
     expect(accepts('User', 'targetUser')).toBe(true);
     expect(accepts('User', 'targetOrganization')).toBe(false);
@@ -143,7 +142,7 @@ describe('a tenant rule on a two-sided record', () => {
 
   it('saving refuses a rule with no check on its own side: an action anyone holds, an any, true', () => {
     const accepts = (read: unknown) =>
-      tenantPermissionRulesSchema('Organization').safeParse({ 'db:inquiry': { read } }).success;
+      tenantPermissionRulesSchema('Organization').safeParse({ 'db:Inquiry': { read } }).success;
     expect(accepts({ rel: 'targetOrganization', action: 'create' })).toBe(false);
     expect(accepts({ any: [whoeverReads('targetOrganization'), true] })).toBe(false);
     expect(accepts(true)).toBe(false);
@@ -151,7 +150,7 @@ describe('a tenant rule on a two-sided record', () => {
   });
 
   it("an organization's rule reaches what its space received, and never what is addressed to a member", async () => {
-    const opened = receiver({ 'db:inquiry': { read: whoeverReads('targetOrganization') } });
+    const opened = receiver({ 'db:Inquiry': { read: whoeverReads('targetOrganization') } });
     const toMember = {
       ...between(sender(), opened),
       targetModel: 'OrganizationUser',
@@ -173,17 +172,17 @@ describe('a tenant rule on a two-sided record', () => {
     const readsNothingThere = { rule: { field: 'noSuchColumn', operator: 'equals', value: 'x' } };
     const accepts = (rules: unknown) =>
       tenantPermissionRulesSchema('Organization').safeParse(rules).success;
-    expect(accepts({ 'db:contact': { read: readsNothingThere } })).toBe(false);
+    expect(accepts({ 'db:Contact': { read: readsNothingThere } })).toBe(false);
     expect(
       accepts({
-        'db:inquiry': { read: { all: [whoeverReads('targetOrganization'), readsNothingThere] } },
+        'db:Inquiry': { read: { all: [whoeverReads('targetOrganization'), readsNothingThere] } },
       }),
     ).toBe(false);
   });
 
   it('a stored rule the library refuses is a StoredPermissionRuleRefusedError, from the check and from the grant check', async () => {
     const refused = receiver({
-      'db:inquiry': {
+      'db:Inquiry': {
         read: {
           all: [
             whoeverReads('targetOrganization'),
@@ -200,8 +199,8 @@ describe('a tenant rule on a two-sided record', () => {
       canGrantEntitlement(
         createPermissions(),
         {
-          resource: 'db:inquiry',
-          anchor: { resource: 'db:inquiry', id: 'i1' },
+          resource: 'db:Inquiry',
+          anchor: { resource: 'db:Inquiry', id: 'i1' },
           actions: { read: true },
         },
         inquiry as HydratedRecord,

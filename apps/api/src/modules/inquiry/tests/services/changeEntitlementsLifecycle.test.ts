@@ -17,7 +17,7 @@ let token: Token;
 let requester: User;
 
 const onOrganization = (actions: string[]): EntitlementInput =>
-  entitlementInputFor('db:organization', ['db:organization', organization.id], actions);
+  entitlementInputFor('db:Organization', ['db:Organization', organization.id], actions);
 
 const rowsOf = async () =>
   (await db.entitlement.findMany({ where: { targetTokenId: token.id } })).map(({ id }) => id);

@@ -1,7 +1,8 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { execAsync, execFileAsync, execFileWithInput } from '../utils/exec';
+import { createVcrRecorder, fetchCliVersion } from '@inixiative/vcr';
+import { execAsync, execFileWithInput } from '../utils/exec';
+import { captureInTest } from './capture';
 
 export const infisicalSecretArgument = (key: string) => {
   if (!/^[A-Z][A-Z0-9_]*$/.test(key)) throw new Error(`Invalid secret name: ${key}`);
@@ -54,12 +55,12 @@ const maskSecrets = (s: unknown) =>
     : s;
 
 class InfisicalApi {
-  readonly vcr = new VCR(FIXTURES_DIR, {
+  readonly vcr = createVcrRecorder(FIXTURES_DIR, {
     service: 'infisical',
-    version: () => cliVersion('infisical'),
+    version: () => fetchCliVersion('infisical'),
     sanitizers: {
-      fetchSecret: { fn: maskSecrets },
-      setSecret: { fn: maskSecrets },
+      fetchSecret: { transform: maskSecrets },
+      setSecret: { transform: maskSecrets },
     },
   });
 
@@ -81,7 +82,7 @@ class InfisicalApi {
   }
 
   async listOrganizations(): Promise<InfisicalOrganization[]> {
-    return this.vcr.capture('listOrganizations', async () => {
+    return captureInTest(this.vcr, 'listOrganizations', async () => {
       const response = await this.request<{ organizations?: InfisicalOrganization[] }>(
         '/v1/organization',
       );
@@ -90,13 +91,13 @@ class InfisicalApi {
   }
 
   async fetchOrganization(organizationId: string): Promise<InfisicalOrganization> {
-    return this.vcr.capture('fetchOrganization', () =>
+    return captureInTest(this.vcr, 'fetchOrganization', () =>
       this.request<InfisicalOrganization>(`/v1/organization/${organizationId}`),
     );
   }
 
   async updateProjectSlug(projectId: string, slug: string): Promise<void> {
-    return this.vcr.capture('updateProjectSlug', async () => {
+    return captureInTest(this.vcr, 'updateProjectSlug', async () => {
       await this.request(`/v2/workspace/${projectId}`, {
         method: 'PATCH',
         body: JSON.stringify({ slug }),
@@ -105,7 +106,7 @@ class InfisicalApi {
   }
 
   async upsertProject(name: string): Promise<InfisicalProject> {
-    return this.vcr.capture('upsertProject', async () => {
+    return captureInTest(this.vcr, 'upsertProject', async () => {
       const token = await fetchInfisicalTokenOrThrow();
       const orgId = JSON.parse(atob(token.split('.')[1])).organizationId;
       const listResponse = await this.request<{ workspaces?: InfisicalProject[] }>(
@@ -132,7 +133,7 @@ class InfisicalApi {
     name: string,
     slug: string,
   ): Promise<InfisicalEnvironment> {
-    return this.vcr.capture('upsertEnvironment', async () => {
+    return captureInTest(this.vcr, 'upsertEnvironment', async () => {
       try {
         const createResponse = await this.request<{ environment: InfisicalEnvironment }>(
           `/v1/projects/${projectId}/environments`,
@@ -148,7 +149,7 @@ class InfisicalApi {
   }
 
   async deleteEnvironment(projectId: string, environmentId: string): Promise<void> {
-    return this.vcr.capture('deleteEnvironment', async () => {
+    return captureInTest(this.vcr, 'deleteEnvironment', async () => {
       await this.request(`/v1/projects/${projectId}/environments/${environmentId}`, {
         method: 'DELETE',
       });
@@ -160,7 +161,7 @@ class InfisicalApi {
     environmentId: string,
     updates: { name?: string; slug?: string; position?: number },
   ): Promise<InfisicalEnvironment> {
-    return this.vcr.capture('updateEnvironment', async () => {
+    return captureInTest(this.vcr, 'updateEnvironment', async () => {
       const response = await this.request<{ environment: InfisicalEnvironment }>(
         `/v1/projects/${projectId}/environments/${environmentId}`,
         { method: 'PATCH', body: JSON.stringify(updates) },
@@ -170,7 +171,7 @@ class InfisicalApi {
   }
 
   async fetchProject(projectId: string): Promise<InfisicalProject> {
-    return this.vcr.capture('fetchProject', () =>
+    return captureInTest(this.vcr, 'fetchProject', () =>
       this.request<InfisicalProject>(`/v1/workspace/${projectId}`),
     );
   }
@@ -181,7 +182,7 @@ class InfisicalApi {
     name: string,
     path: string = '/',
   ): Promise<unknown> {
-    return this.vcr.capture('createFolder', async () => {
+    return captureInTest(this.vcr, 'createFolder', async () => {
       try {
         return await this.request('/v2/folders', {
           method: 'POST',
@@ -201,7 +202,7 @@ class InfisicalApi {
     sourceEnvironment: string,
     sourcePath: string,
   ): Promise<void> {
-    return this.vcr.capture('createSecretImport', async () => {
+    return captureInTest(this.vcr, 'createSecretImport', async () => {
       try {
         await this.request('/v2/secret-imports', {
           method: 'POST',
@@ -227,7 +228,7 @@ class InfisicalApi {
     value: string,
     type: 'shared' | 'personal' = 'shared',
   ): Promise<void> {
-    return this.vcr.capture('setSecret', async () => {
+    return captureInTest(this.vcr, 'setSecret', async () => {
       try {
         await this.request('/v3/secrets/raw', {
           method: 'POST',
@@ -280,7 +281,7 @@ class InfisicalApi {
     key: string,
     path: string = '/',
   ): Promise<string> {
-    return this.vcr.capture('fetchSecret', async () => {
+    return captureInTest(this.vcr, 'fetchSecret', async () => {
       const response = await this.request<{ secret: { secretValue: string } }>(
         `/v3/secrets/raw/${key}?workspaceId=${projectId}&environment=${environment}&secretPath=${encodeURIComponent(path)}`,
       );

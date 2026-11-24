@@ -623,7 +623,7 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({});
     });
 
-    it('a lens that picks deletedAt makes it client-filterable — explicit wins over the live scope', () => {
+    it('a lens that picks deletedAt makes it client-filterable — explicit wins over the not-deleted scope', () => {
       const result = buildWhereClause({
         filterLens: { parent: lensFor('User'), root: { picks: ['deletedAt'] } },
         searchFields: { deletedAt: { not: null } },
