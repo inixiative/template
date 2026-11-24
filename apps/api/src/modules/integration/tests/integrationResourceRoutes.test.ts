@@ -112,6 +112,33 @@ describe('integration resources', () => {
     expect(response.status).toBe(403);
   });
 
+  it('takes only a kind the provider declares, with an identifier of that kind', async () => {
+    const { entity: github } = await createIntegration({
+      ownerModel: 'User',
+      userId: user.id,
+      provider: 'github',
+    });
+    const registerOnGithub = (body: Record<string, unknown>) =>
+      fetch(
+        post(`/api/v1/integration/${github.id}/integrationResources`, {
+          name: 'Repo',
+          kind: 'repository',
+          externalId: '123456',
+          ...body,
+        }),
+      );
+
+    expect((await registerOnGithub({ kind: 'channel' })).status).toBe(400);
+    expect((await registerOnGithub({ kind: 'constructor' })).status).toBe(400);
+    expect((await registerOnGithub({ externalId: 'owner/name' })).status).toBe(400);
+    expect((await registerOnGithub({})).status).toBe(201);
+  });
+
+  it('takes any kind with a plain identifier on an integration with no provider', async () => {
+    expect((await register({ kind: 'anything' })).status).toBe(201);
+    expect((await register({ externalId: '../x' })).status).toBe(400);
+  });
+
   it('lists the not-deleted resources of the integration', async () => {
     const { entity: kept } = await createIntegrationResource({}, { integration });
     const { entity: removed } = await createIntegrationResource({}, { integration });

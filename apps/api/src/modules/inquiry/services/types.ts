@@ -4,10 +4,8 @@
  * @partOf feature:inquiry
  * @uses primitive:appEvents
  */
-
 import type { Prisma, PrismaBaseArgs } from '@template/db';
 import type { InquiryResourceModel } from '@template/db/generated/client/enums';
-import type { Permix } from '@template/permissions/client';
 import type { BaseResolution } from '@template/shared/inquiry';
 import type { Context } from 'hono';
 import type { z } from 'zod';
@@ -49,7 +47,7 @@ export type InquiryService<
     content: TContent,
     response: TResolutionInput,
   ): Promise<Partial<TResolution> | undefined | void>;
-  validate?(inquiry: Partial<Inquiry>, content: TContent, asker: Permix): Promise<void>;
+  validate?(inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
   autoApprove(inquiry: Inquiry): Promise<boolean>;
   unique?: 'targeted' | 'untargeted';
   defaultExpirationDays?: number;

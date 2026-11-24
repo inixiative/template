@@ -5,7 +5,6 @@
  * @uses none
  */
 import type { InquiryType } from '@template/db/generated/client/enums';
-import type { Permix } from '@template/permissions/client';
 import type { InquirySourceFields } from '#/modules/inquiry/services/resolveInquirySource';
 import type { InquiryTargetFields } from '#/modules/inquiry/services/resolveInquiryTarget';
 import type { InquiryService } from '#/modules/inquiry/services/types';
@@ -17,8 +16,7 @@ export const validateInquiryPreCreate = async (
   source: InquirySourceFields,
   target: InquiryTargetFields,
   content: Record<string, unknown>,
-  asker: Permix,
 ): Promise<void> => {
-  if (service.validate) await service.validate({ ...source, ...target }, content, asker);
+  if (service.validate) await service.validate({ ...source, ...target }, content);
   if (service.unique) await validateUniqueInquiry({ type, ...source, ...target }, service.unique);
 };

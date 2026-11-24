@@ -26,7 +26,7 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
 
   const service = inquiryServices[inquiry.type];
   const effectiveContent = service.contentSchema.parse(content ?? inquiry.content);
-  if (service.validate) await service.validate(inquiry, effectiveContent, permix);
+  if (service.validate) await service.validate(inquiry, effectiveContent);
 
   const partial = await hydrate('inquiry', {
     ...inquiry,
