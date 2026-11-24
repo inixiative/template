@@ -1,21 +1,19 @@
 /**
  * @atlas
- * @kind schema
+ * @kind query
  * @partOf feature:integrations
  * @uses none
  */
-import { z } from 'zod';
+import type { Provider } from '@template/db/generated/client/enums';
+import { plainResourceKind } from '@template/shared/integrations/plainResourceKind';
+import { providerResourceKinds } from '@template/shared/integrations/providerResourceKinds';
+import type { ResourceKind } from '@template/shared/integrations/resourceKind';
 
-export type ResourceKindDefinition = { externalId: z.ZodType<string> };
-
-/** What one provider has: each resource kind it declares, by name. */
-export type ProviderResourceKinds = Record<string, ResourceKindDefinition>;
-
-export const providerIdentifierSchema = z
-  .string()
-  .min(1)
-  .max(250)
-  .regex(/^[a-zA-Z0-9_:@.-]+$/)
-  .refine((id) => id !== '.' && id !== '..');
-
-export const plainResourceKind: ResourceKindDefinition = { externalId: providerIdentifierSchema };
+export const resourceKindDefinition = (
+  provider: Provider | null,
+  kind: string,
+): ResourceKind | undefined => {
+  if (!provider) return plainResourceKind;
+  if (!Object.hasOwn(providerResourceKinds[provider], kind)) return undefined;
+  return providerResourceKinds[provider][kind];
+};

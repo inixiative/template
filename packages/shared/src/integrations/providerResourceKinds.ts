@@ -16,13 +16,9 @@ import { notionResourceKinds } from '@template/shared/integrations/providers/not
 import { openaiResourceKinds } from '@template/shared/integrations/providers/openai';
 import { slackResourceKinds } from '@template/shared/integrations/providers/slack';
 import { teamsResourceKinds } from '@template/shared/integrations/providers/teams';
-import {
-  type ProviderResourceKinds,
-  plainResourceKind,
-  type ResourceKindDefinition,
-} from '@template/shared/integrations/resourceKindDefinition';
+import type { ResourceKind } from '@template/shared/integrations/resourceKind';
 
-export const providerResourceKinds: Record<Provider, ProviderResourceKinds> = {
+export const providerResourceKinds: Record<Provider, Record<string, ResourceKind>> = {
   slack: slackResourceKinds,
   teams: teamsResourceKinds,
   linear: linearResourceKinds,
@@ -35,14 +31,3 @@ export const providerResourceKinds: Record<Provider, ProviderResourceKinds> = {
   archive: archiveResourceKinds,
   github: githubResourceKinds,
 };
-
-/** The resource kind an integration's provider declares, or any kind with a plain identifier when it has none. */
-export const resourceKindDefinition = (
-  provider: Provider | null,
-  kind: string,
-): ResourceKindDefinition | undefined =>
-  provider
-    ? Object.hasOwn(providerResourceKinds[provider], kind)
-      ? providerResourceKinds[provider][kind]
-      : undefined
-    : plainResourceKind;

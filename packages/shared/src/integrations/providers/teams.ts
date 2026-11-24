@@ -4,11 +4,9 @@
  * @partOf feature:integrations
  * @uses none
  */
-import {
-  type ProviderResourceKinds,
-  plainResourceKind,
-} from '@template/shared/integrations/resourceKindDefinition';
+import { plainResourceKind } from '@template/shared/integrations/plainResourceKind';
+import type { ResourceKind } from '@template/shared/integrations/resourceKind';
 
-export const teamsResourceKinds: ProviderResourceKinds = {
+export const teamsResourceKinds: Record<string, ResourceKind> = {
   channel: plainResourceKind,
 };

@@ -19,5 +19,5 @@ export const integrationCreateIntegrationResourceRoute = createRoute({
   bodySchema: integrationResourceCreateBodySchema,
   responseSchema: integrationResourceReadResponseSchema,
   description:
-    "Registers a provider resource on this integration, named by its `kind` and `externalId`, which must be a kind the integration's provider has and an identifier of that kind's shape (400 otherwise), and links it to `projectId` when one is named. Registering a kind and externalId the integration already holds refreshes its name and metadata; a removed one is revived, with the project links that were removed with it. A removed untracked resource comes back only when a person sends `status: 'tracked'` (409 otherwise).",
+    "Registers a provider resource on this integration, named by its `kind` and `externalId`, which must be a kind the integration's provider has and an identifier of that kind's shape (422 otherwise), and links it to `projectId` when one is named. Registering a kind and externalId the integration already holds refreshes its name and metadata; a removed one is revived, with the project links that were removed with it. A removed untracked resource comes back only when a person sends `status: 'tracked'` (409 otherwise).",
 });

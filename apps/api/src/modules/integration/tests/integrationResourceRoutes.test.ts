@@ -128,15 +128,15 @@ describe('integration resources', () => {
         }),
       );
 
-    expect((await registerOnGithub({ kind: 'channel' })).status).toBe(400);
-    expect((await registerOnGithub({ kind: 'constructor' })).status).toBe(400);
-    expect((await registerOnGithub({ externalId: 'owner/name' })).status).toBe(400);
+    expect((await registerOnGithub({ kind: 'channel' })).status).toBe(422);
+    expect((await registerOnGithub({ kind: 'constructor' })).status).toBe(422);
+    expect((await registerOnGithub({ externalId: 'owner/name' })).status).toBe(422);
     expect((await registerOnGithub({})).status).toBe(201);
   });
 
   it('takes any kind with a plain identifier on an integration with no provider', async () => {
     expect((await register({ kind: 'anything' })).status).toBe(201);
-    expect((await register({ externalId: '../x' })).status).toBe(400);
+    expect((await register({ externalId: '../x' })).status).toBe(422);
   });
 
   it('lists the not-deleted resources of the integration', async () => {
