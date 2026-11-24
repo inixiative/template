@@ -23,7 +23,7 @@ export const assertTransition = async (
 ): Promise<void> => {
   const current = await hydrate(model, record as HydratedRecord);
   const result = checkTransition(transitions, resourceOfModel(model), action, current, changes, {
-    authorize: (rule, row) => check(permix, schemaMap, model, row as HydratedRecord, rule),
+    authorize: (rule, row) => check(permix, model, row as HydratedRecord, rule),
   });
   if (result === true) return;
   if (failsOnlyOnPermission(result)) throw makeError({ status: 403, message: 'Access denied' });

@@ -44,7 +44,7 @@ const can = (
   model: 'organizationUser' | 'spaceUser',
   record: object,
   action: string,
-) => check(permix, schemaMap, model, record as HydratedRecord, action);
+) => check(permix, model, record as HydratedRecord, action);
 
 describe('a member row: operate is being the member, manage and own administer it (Aron, 2026-10-30)', () => {
   const mine = orgRow('r1', u1);

@@ -55,8 +55,8 @@ const heldBy = async (owner: Permix, granted: PermissionEntry[]) => {
   return permix;
 };
 
-const can = (permix: Permix, model: Parameters<typeof check>[2], record: object, action: string) =>
-  check(permix, schemaMap, model, record as HydratedRecord, action);
+const can = (permix: Permix, model: Parameters<typeof check>[1], record: object, action: string) =>
+  check(permix, model, record as HydratedRecord, action);
 
 const fromO1 = on('db:Organization', 'o1');
 const fromO9 = on('db:Organization', 'o9');

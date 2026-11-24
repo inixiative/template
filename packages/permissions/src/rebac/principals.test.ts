@@ -70,10 +70,10 @@ const relationToken = (row: { organizationId: string }, action: string) =>
 
 const can = (
   permix: Awaited<ReturnType<typeof table>>,
-  model: Parameters<typeof check>[2],
+  model: Parameters<typeof check>[1],
   record: object,
-  action: Parameters<typeof check>[4],
-) => check(permix, schemaMap, model, record as HydratedRecord, action);
+  action: Parameters<typeof check>[3],
+) => check(permix, model, record as HydratedRecord, action);
 
 const acting = (permix: Awaited<ReturnType<typeof table>>, model: ActorModel, id = 'who') => {
   permix.setActor({ model, record: { id } });

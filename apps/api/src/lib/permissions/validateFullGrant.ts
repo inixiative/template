@@ -15,7 +15,7 @@ export const validateFullGrant = (
   delegate: HydratedRecord,
 ): void => {
   if (
-    !check(writer, schemaMap, model, delegate, {
+    !check(writer, model, delegate, {
       rel: toAccessor(delegate.ownerModel as string),
       action: 'delegateFull',
     })

@@ -23,7 +23,7 @@ const validateTokenWriter = async (writer: Permix, token: Holder, { add, remove 
     await validateTokenWrite(writer, token);
     validateDelegateRole(row);
   }
-  if (remove.length && !check(writer, schemaMap, 'token', row, TokenAction.delete))
+  if (remove.length && !check(writer, 'token', row, TokenAction.delete))
     throw makeError({ status: 403, message: 'Access denied' });
 };
 

@@ -19,6 +19,6 @@ export const validateMemberGrant = async (
   member: HydratedRecord,
 ): Promise<void> => {
   const row = await hydrate(accessor, member);
-  if (!check(writer, schemaMap, accessor, row, memberRoleWrite(tenantOf[accessor])))
+  if (!check(writer, accessor, row, memberRoleWrite(tenantOf[accessor])))
     throw makeError({ status: 403, message: 'Access denied' });
 };

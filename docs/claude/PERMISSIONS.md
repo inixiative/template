@@ -90,7 +90,7 @@
 
 ## Overview
 
-The permission system is the rebac schema (`packages/permissions/src/rebac/schema.ts`) plus the check engine of `@inixiative/permissions`. A request installs what its principal holds into a permix (a table of grants plus entitlements), and every decision is `check(permix, schemaMap, model, record, action)` on a hydrated record, or on a pseudo record when the row does not exist yet.
+The permission system is the rebac schema (`packages/permissions/src/rebac/schema.ts`) plus the check engine of `@inixiative/permissions`. A request installs what its principal holds into a permix (a table of grants plus entitlements), and every decision is `check(permix, model, record, action)` on a hydrated record, or on a pseudo record when the row does not exist yet.
 
 | Layer | Where it lives | What it says |
 |---|---|---|
@@ -436,7 +436,7 @@ A delegate that is not `full` and has no role and no entitlements is not refused
 
 ### Hydration
 
-`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchCachedRecordWithTargetEntitlements` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. It owns those relations: a value the caller put under a to-one relation is dropped unless the hydrator loaded it, so attach a hand-made relation after hydrating. A list is left as given unless it is declared `down` ([Crossing a List](#crossing-a-list-down)). A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load goes through `fetchThroughCache()`, which computes inside `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchCachedRecordWithTargetEntitlements` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its not-deleted entitlement rows (`includeTargetEntitlements(model)`, ordered by `createdAt`, `id`) and caches it with those rows as stored, so a hydrated holder carries `targetEntitlements: Entitlement[]` and the cache holds one shape. `findUserWithRelations` and `fetchTokenContext` read the same way. The rows turn into the library's entries at check time, where a holder is handed to the library (`entitlementEntriesOfHolder` in `@template/permissions`, which also prunes them with `wellFormedEntitlements`). A write to an `Entitlement` row clears its target's cache keys (its parent edge, [HOOKS.md](HOOKS.md#parent-edges)), so a revoked row is gone on the very next request.
+`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `makeHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchCachedRecordWithTargetEntitlements` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. It owns those relations: a value the caller put under a to-one relation is dropped unless the hydrator loaded it, so attach a hand-made relation after hydrating. A list is left as given unless it is declared `down` ([Crossing a List](#crossing-a-list-down)). A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load goes through `fetchThroughCache()`, which computes inside `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchCachedRecordWithTargetEntitlements` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its not-deleted entitlement rows (`includeTargetEntitlements(model)`, ordered by `createdAt`, `id`) and caches it with those rows as stored, so a hydrated holder carries `targetEntitlements: Entitlement[]` and the cache holds one shape. `findUserWithRelations` and `fetchTokenContext` read the same way. The rows turn into the library's entries at check time, where a holder is handed to the library (`entitlementEntriesOfHolder` in `@template/permissions`, which also prunes them with `wellFormedEntitlements`). A write to an `Entitlement` row clears its target's cache keys (its parent edge, [HOOKS.md](HOOKS.md#parent-edges)), so a revoked row is gone on the very next request.
 
 ### installPermissions
 
@@ -645,7 +645,7 @@ Permix is the permission checker. Each request gets a fresh instance via `prepar
 - `permix.setActor(actor)` / `permix.getActor()` set and read who is acting.
 - `permix.setSuperadmin(value)` turns on the bypass; `installPermissions` sets it from `isSuperadmin(actingUser(c))`.
 
-The engine is `@inixiative/permissions`; `createPermissions` in `packages/permissions/src/client.ts` types it with the app's actions and actor. A check is always `check(permix, schemaMap, model, record, action)` from `@template/permissions/rebac` on a hydrated record.
+The engine is `@inixiative/permissions`; `createPermissions` in `packages/permissions/src/client.ts` types it with the app's actions and actor. A check is always `check(permix, model, record, action)` from `@template/permissions/rebac` on a hydrated record. `check` is `makeCheck(schemaMap)`: the map is bound once, in `packages/permissions/src/rebac/check.ts`, and a test with its own rules makes its own with `makeCheck(itsMap)`. The last argument is an action of the schema or a rule given on the spot.
 
 ---
 
@@ -723,7 +723,7 @@ model Resource {
 - **The declaration carries what the rule walks.** Every relation the `condition` walks, followed through the actions it lands on, must be inside a declared path. Above, `project.read` walks on to the organization, so the path is `project.organization`. A shorter declaration is a `validateSchema` error and the check refuses the schema on first use.
 - **One jump.** A list arm under an item denies. A list that is not declared is never crossed.
 - **Never on a stand-in.** A record that does not exist yet has no list, so a grant that rests on a list is anchored where a real list is (the record itself, or one below it), not above.
-- **Wiring.** `createHydrator` needs `loadMany` once any list is declared and refuses to build without it. Add it beside `load` in `packages/db/src/hydrate/hydrate.ts`, reading not-deleted rows through the same cache layer. Template declares no list today.
+- **Wiring.** `makeHydrator` needs `loadMany` once any list is declared and refuses to build without it. Add it beside `load` in `packages/db/src/hydrate/hydrate.ts`, reading not-deleted rows through the same cache layer. Template declares no list today.
 
 When the record holds the key itself, use a plain `rel`. The library README (`@inixiative/permissions`, "Crossing a list") has the full rules.
 
@@ -792,7 +792,7 @@ model Contact {
 
 ### How `check()` merges
 
-Inside the library's rebac check (`createRebacCheck` in `@inixiative/permissions`, bound by `packages/permissions/src/rebac/check.ts`), when resolving an action by name:
+Inside the library's rebac check (`makeRebacCheck` in `@inixiative/permissions`, bound by `packages/permissions/src/rebac/check.ts`), when resolving an action by name:
 
 ```typescript
 const schemaRule  = schema[model]?.actions[actionOrRule] ?? null;
@@ -935,7 +935,7 @@ router.patch('/:id', validatePermission('manage'), handler);
 
 1. Gets the loaded `resource` and `resourceType` from context.
 2. Hydrates the resource with the relations the check walks.
-3. Checks `check(permix, schemaMap, resourceType, hydrated, action)`.
+3. Checks `check(permix, resourceType, hydrated, action)`.
 4. Throws 403 when it fails.
 
 `resourceContextMiddleware` throws 404 (not found) or 409 (multiple matches) before `validatePermission` runs. Resource existence is not secret (ids appear in share links, emails, audit logs); privacy is enforced on field visibility and queries. A resource that must hide its existence needs a middleware that returns 404 when the check fails.
@@ -948,7 +948,7 @@ A route on a submodel (a create or a collection under an owner: `/organization/:
 // apps/api/src/middleware/validations/validateSubmodelPermission.ts
 const { submodel, pseudoRecord } = pseudoRecordOfSubmodel(c);
 const pseudo = await hydrate(submodel, { id: '', ...pseudoRecord });
-check(permix, schemaMap, submodel, pseudo, action);
+check(permix, submodel, pseudo, action);
 ```
 
 - `pseudoRecordOfSubmodel` (`apps/api/src/lib/permissions/pseudoRecordOfSubmodel.ts`) calls `pseudoRecordsBelowAnchor` (the library's, re-exported from `@template/permissions/rebac`), which builds the pseudo record along the owner's relation: the owner keys, the owner attached, the kind narrowed to the owner's model; `id: ''` never matches a grant keyed by a real row.

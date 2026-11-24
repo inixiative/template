@@ -48,7 +48,7 @@ export const createInquiry = async (
     ...source,
     ...target,
   } as HydratedRecord);
-  if (!check(permix, schemaMap, 'inquiry', partial, 'send'))
+  if (!check(permix, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 
   await validateInquiryPreCreate(service, body.type, source, target, content);

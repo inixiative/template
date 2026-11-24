@@ -13,5 +13,4 @@ export const holdsOnRecord = async (
   model: AccessorName,
   record: Record<string, unknown>,
   action: ActionRule,
-): Promise<boolean> =>
-  check(permix, schemaMap, model, await hydrate(model, record as HydratedRecord), action);
+): Promise<boolean> => check(permix, model, await hydrate(model, record as HydratedRecord), action);

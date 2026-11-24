@@ -15,7 +15,7 @@ export const validateTokenWrite = async (
   token: Record<string, unknown>,
 ): Promise<void> => {
   const row = await hydrate('token', token as HydratedRecord);
-  if (!check(writer, schemaMap, 'token', row, TokenAction.create))
+  if (!check(writer, 'token', row, TokenAction.create))
     throw makeError({ status: 403, message: 'Access denied' });
   if (row.full) validateFullGrant(writer, 'token', row);
 };

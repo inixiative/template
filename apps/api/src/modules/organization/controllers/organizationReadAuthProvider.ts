@@ -18,7 +18,7 @@ export const organizationReadAuthProviderController = makeController(
     const permix = c.get('permix');
 
     // Check if user has owner permissions - owners see all providers (enabled + disabled)
-    const isOwner = check(permix, schemaMap, 'organization', organization, 'own');
+    const isOwner = check(permix, 'organization', organization, 'own');
 
     const platformProviders = configuredPlatformProviders();
 

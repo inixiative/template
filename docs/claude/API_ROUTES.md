@@ -317,7 +317,7 @@ export const organizationReadAuthProviderController = makeController(
     const permix = c.get('permix');
 
     // Owners see all providers (enabled + disabled), others see only enabled
-    const isOwner = user && check(permix, schemaMap, 'organization', organization, 'own');
+    const isOwner = user && check(permix, 'organization', organization, 'own');
 
     const platformProviders = configuredPlatformProviders();
 

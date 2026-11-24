@@ -19,7 +19,7 @@ export const createTokenProbeApp = (...mount: MountFn[]) => {
           const row = await fetchCachedRecordWithTargetEntitlements<{ id: string }>(model, id);
           if (!row) return c.json({ holds: false });
           const record = await hydrate(model, row);
-          return c.json({ holds: check(c.get('permix'), schemaMap, model, record, action) });
+          return c.json({ holds: check(c.get('permix'), model, record, action) });
         });
       },
       ...mount,

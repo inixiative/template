@@ -10,7 +10,7 @@ import {
   installPermissions,
   type Permix,
 } from '@template/permissions/client';
-import { check } from '@template/permissions/rebac/check';
+import { check, makeCheck } from '@template/permissions/rebac/check';
 import { schemaMap } from '@template/permissions/rebac/schema';
 import {
   settingResourceModelRule,
@@ -224,7 +224,7 @@ describe('settingResourcePermission & db:ProjectIntegration through the real che
     record: object,
     action: 'manage' | 'read',
     schema: SchemaMap = schemaMap,
-  ) => check(permix, schema, 'setting', record as HydratedRecord, action);
+  ) => makeCheck(schema)(permix, 'setting', record as HydratedRecord, action);
 
   it('User settings: only the user reads and manages their own settings', async () => {
     const record = {
@@ -402,7 +402,7 @@ describe('settingResourcePermission & db:ProjectIntegration through the real che
     const orgViewer = await principal({ organization: Role.viewer }, 'u3');
 
     const checkPI = (permix: Permix, action: string, rec: object = projectIntegration) =>
-      check(permix, schemaMap, 'projectIntegration', rec as HydratedRecord, action);
+      check(permix, 'projectIntegration', rec as HydratedRecord, action);
 
     expect(checkPI(orgAdmin, 'create')).toBe(true);
     expect(checkPI(orgAdmin, 'manage')).toBe(true);

@@ -57,7 +57,6 @@ export const readResourceSettings = async (
       .filter((definition) =>
         check(
           permix,
-          schemaMap,
           'setting',
           { ...hydratedBase, key: definition.key } as HydratedRecord,
           'read',

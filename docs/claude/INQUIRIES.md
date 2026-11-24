@@ -391,7 +391,7 @@ Create routes do **not** use `validatePermission` middleware. Permissions are ch
 
 ```typescript
 const partial = await hydrate('inquiry', { id: '', type, content, ...source, ...target });
-if (!check(permix, schemaMap, 'inquiry', partial, 'send')) throw makeError({ status: 403, ... });
+if (!check(permix, 'inquiry', partial, 'send')) throw makeError({ status: 403, ... });
 ```
 
 This allows per-type permission rules (e.g. `inviteOrganizationUser` with a high role requires `own`, not just `manage`) without redundant middleware.

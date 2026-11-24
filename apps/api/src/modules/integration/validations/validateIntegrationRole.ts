@@ -17,7 +17,7 @@ export const validateIntegrationRole = async (
 ): Promise<HydratedRecord> => {
   const record = await hydrate('integration', { id: '', ...integration } as HydratedRecord);
   if (integration.full) validateFullGrant(writer, 'integration', record);
-  else if (!check(writer, schemaMap, 'integration', record, integrationRoleWrite))
+  else if (!check(writer, 'integration', record, integrationRoleWrite))
     throw makeError({ status: 403, message: 'Access denied' });
   return record;
 };

@@ -60,7 +60,6 @@ export const upsertResourceSettings = async (
   for (const item of items) {
     const allowed = check(
       permix,
-      schemaMap,
       'setting',
       { ...hydratedBase, key: item.key } as HydratedRecord,
       'manage',

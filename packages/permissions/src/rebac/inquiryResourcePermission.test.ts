@@ -188,7 +188,7 @@ describe('inquiryResourcePermissionFromParties through the real check, per inqui
   };
 
   const can = (permix: Permix, record: object, action: 'send' | 'resolve') =>
-    check(permix, schemaMap, 'inquiry', record as HydratedRecord, action);
+    check(permix, 'inquiry', record as HydratedRecord, action);
 
   const invite = (role: Role) => ({
     type: 'inviteOrganizationUser',
@@ -278,7 +278,7 @@ describe('inquiryResourcePermissionFromParties through the real check, per inqui
 
   it("an organization reads what its token received after the token is deleted, and never a member's", async () => {
     const reads = async (seat: Seat, record: object) =>
-      check(await principal(seat), schemaMap, 'inquiry', record as HydratedRecord, 'read');
+      check(await principal(seat), 'inquiry', record as HydratedRecord, 'read');
     const toToken = {
       id: 'i1',
       type: 'inviteOrganizationUser',

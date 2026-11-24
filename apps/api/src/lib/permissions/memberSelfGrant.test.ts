@@ -45,13 +45,7 @@ const operates = async (
   table: ReturnType<typeof narrowOwnerPermissionsToDelegate>,
   member: Member,
 ) =>
-  check(
-    await permixOf(table),
-    schemaMap,
-    'organizationUser',
-    member as unknown as HydratedRecord,
-    'operate',
-  );
+  check(await permixOf(table), 'organizationUser', member as unknown as HydratedRecord, 'operate');
 
 describe("only a member's self-grant is backed by its user", () => {
   it('a full token on M1 operates M1, and not M2 or M3', async () => {
@@ -91,10 +85,8 @@ describe("only a member's self-grant is backed by its user", () => {
     const full = await permixOf(
       narrowOwnerPermissionsToDelegate({ full: true }, permissionsOfUser(null, [wider], [])),
     );
-    expect(
-      check(full, schemaMap, 'organizationUser', m3 as unknown as HydratedRecord, 'operate'),
-    ).toBe(false);
-    expect(check(full, schemaMap, 'user', u1 as unknown as HydratedRecord, 'own')).toBe(false);
+    expect(check(full, 'organizationUser', m3 as unknown as HydratedRecord, 'operate')).toBe(false);
+    expect(check(full, 'user', u1 as unknown as HydratedRecord, 'own')).toBe(false);
   });
 
   it("M1's self-grant stored on M2 is backed by the tenant, not U1", async () => {

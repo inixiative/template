@@ -40,7 +40,7 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   const { name: _name, expiresAt: _expiresAt, ...row } = params;
   const permix = c.get('permix');
   const pseudo = await hydrate('token', { id: '', ...row } as HydratedRecord);
-  if (!check(permix, schemaMap, 'token', pseudo, TokenAction.create))
+  if (!check(permix, 'token', pseudo, TokenAction.create))
     throw makeError({ status: 403, message: 'Access denied' });
   validateDelegateRole(pseudo);
   if (row.full) validateFullGrant(permix, 'token', pseudo);

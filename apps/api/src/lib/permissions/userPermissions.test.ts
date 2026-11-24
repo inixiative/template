@@ -22,7 +22,7 @@ type Situation = { model: 'user' | 'organization' | 'space'; id: string; action:
 const answers = async (permix: Permix, situations: Situation[]) =>
   Promise.all(
     situations.map(async ({ model, id, action }) =>
-      check(permix, schemaMap, model, await hydrate(model, { id }), action),
+      check(permix, model, await hydrate(model, { id }), action),
     ),
   );
 

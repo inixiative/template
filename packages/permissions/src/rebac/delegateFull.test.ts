@@ -63,9 +63,9 @@ const token = (user: { id: string }, ...entries: PermissionEntry[]) =>
   tableOf(ActorModel.Token, user, ...entries);
 const holds = (
   permix: Awaited<ReturnType<typeof tableOf>>,
-  model: Parameters<typeof check>[2],
+  model: Parameters<typeof check>[1],
   record: object,
-) => check(permix, schemaMap, model, record as HydratedRecord, 'delegateFull');
+) => check(permix, model, record as HydratedRecord, 'delegateFull');
 
 describe('delegateFull: who may make a delegate of this thing full (Aron, 2026-10-30)', () => {
   const owner = () => person(u2, grant('db:Organization', o1.id, 'own'));

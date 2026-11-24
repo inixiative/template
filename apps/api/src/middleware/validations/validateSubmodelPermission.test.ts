@@ -385,10 +385,8 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       );
       const pseudo = await hydrate('contact', { id: '', ...pseudoRecord } as HydratedRecord);
       expect(pseudo.id).toBe('');
-      expect(check(permix, schemaMap, 'contact', pseudo, 'create')).toBe(false);
-      expect(check(permix, schemaMap, 'contact', { ...pseudo, id: contact.id }, 'create')).toBe(
-        true,
-      );
+      expect(check(permix, 'contact', pseudo, 'create')).toBe(false);
+      expect(check(permix, 'contact', { ...pseudo, id: contact.id }, 'create')).toBe(true);
     });
   });
 });
