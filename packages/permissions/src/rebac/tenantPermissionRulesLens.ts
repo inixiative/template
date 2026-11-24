@@ -7,9 +7,9 @@
 import type { FieldMap } from '@inixiative/field-map';
 import { createLens, type LensNarrowing, lensVisit } from '@inixiative/json-rules';
 import type { BindableOwnerModel } from '@template/db/registries/polymorphicAxisPointsAt';
-import { type ModelName, toAccessor } from '@template/db/utils/modelNames';
+import { type ModelName, resourceOfModel } from '@template/db/utils/modelNames';
 import { modelsHeldUnderTenant } from '@template/db/utils/tenantRowsAbove';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import { schemaMap } from '@template/permissions/rebac/schema';
 import { mapValues, memoize } from 'lodash-es';
 
 const root = 'TenantPermissionRules';
@@ -18,12 +18,12 @@ const root = 'TenantPermissionRules';
 const rebacSchemaAsFieldMap: FieldMap = {
   models: {
     [root]: {
-      fields: mapValues(rebacSchema.permissions, (_, resource) => ({
+      fields: mapValues(schemaMap.permissions, (_, resource) => ({
         kind: 'object' as const,
         type: resource,
       })),
     },
-    ...mapValues(rebacSchema.permissions, (permission) => ({
+    ...mapValues(schemaMap.permissions, (permission) => ({
       fields: mapValues(permission?.actions, () => ({ kind: 'scalar' as const, type: 'Boolean' })),
     })),
   },
@@ -63,7 +63,7 @@ export const tenantPermissionRulesLens = (tenantModel: BindableOwnerModel): Lens
     relations: Object.fromEntries(
       modelsHeldUnderTenant(tenantModel).flatMap((model) => {
         const narrowing = resourcesATenantMayExtend[model];
-        return narrowing ? [[`db:${toAccessor(model)}`, narrowing]] : [];
+        return narrowing ? [[resourceOfModel(model), narrowing]] : [];
       }),
     ),
   },

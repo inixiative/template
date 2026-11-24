@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { z } from '@hono/zod-openapi';
-import { db, type HydratedRecord, hydrate } from '@template/db';
+import { db, type HydratedRecord, hydrate, resourceOfModel } from '@template/db';
 import type { Organization, Role, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -13,7 +13,7 @@ import {
 } from '@template/db/test';
 import { toEntitlementInput } from '@template/permissions';
 import { createPermissions } from '@template/permissions/client';
-import { check, placeUnder, rebacSchema, schemaMap } from '@template/permissions/rebac';
+import { check, pseudoRecordsBelowAnchor, schemaMap } from '@template/permissions/rebac';
 import { app } from '#/app';
 import { readRoute } from '#/lib/routeTemplates';
 import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET } from '#/lib/utils/authProbe';
@@ -310,8 +310,8 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
           role: 'viewer',
           entitlements: [
             toEntitlementInput({
-              resource: 'db:organization',
-              anchor: { resource: 'db:organization', id: other.id },
+              resource: 'db:Organization',
+              anchor: { resource: 'db:Organization', id: other.id },
               actions: { manage: true },
             }),
           ],
@@ -329,8 +329,8 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
     it("an entitlement stored on one member and anchored at the user's other organization opens nothing there", async () => {
       const { entity: other } = await createOrganization();
       const contactsHere = toEntitlementInput({
-        resource: 'db:contact',
-        anchor: { resource: 'db:organization', id: organization.id, path: 'organization' },
+        resource: 'db:Contact',
+        anchor: { resource: 'db:Organization', id: organization.id, path: 'organization' },
         actions: { create: true },
       });
       const { context } = await createOrganizationUser(
@@ -353,8 +353,8 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
           role: 'viewer',
           entitlements: [
             toEntitlementInput({
-              resource: 'db:contact',
-              anchor: { resource: 'db:organization', id: other.id, path: 'organization' },
+              resource: 'db:Contact',
+              anchor: { resource: 'db:Organization', id: other.id, path: 'organization' },
               actions: { create: true },
             }),
           ],
@@ -374,32 +374,30 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         { organization },
       );
       const permix = createPermissions();
-      await permix.setup({ resource: 'db:contact', id: contact.id, actions: { create: true } });
-      const [placed] = placeUnder(
+      await permix.setup({ resource: 'db:Contact', id: contact.id, actions: { create: true } });
+      const [pseudoRecord] = pseudoRecordsBelowAnchor(
         schemaMap,
-        'db:contact',
+        'db:Contact',
         'organization',
-        'db:organization',
+        'db:Organization',
         organization,
         { field: 'ownerModel', operator: 'equals', value: 'Organization' },
       );
-      const pseudo = await hydrate('contact', { id: '', ...placed } as HydratedRecord);
+      const pseudo = await hydrate('contact', { id: '', ...pseudoRecord } as HydratedRecord);
       expect(pseudo.id).toBe('');
-      expect(check(permix, rebacSchema, 'contact', pseudo, 'create')).toBe(false);
-      expect(check(permix, rebacSchema, 'contact', { ...pseudo, id: contact.id }, 'create')).toBe(
-        true,
-      );
+      expect(check(permix, 'contact', pseudo, 'create')).toBe(false);
+      expect(check(permix, 'contact', { ...pseudo, id: contact.id }, 'create')).toBe(true);
     });
   });
 });
 
-describe("placeUnder places a child under its owner along the owner's relation", () => {
+describe("pseudoRecordsBelowAnchor places a child under its owner along the owner's relation", () => {
   const under = (child: string, owner: string, record: Record<string, unknown>, kind?: string) =>
-    placeUnder(
+    pseudoRecordsBelowAnchor(
       schemaMap,
-      `db:${child}`,
+      resourceOfModel(child),
       owner,
-      `db:${owner}`,
+      resourceOfModel(owner),
       record,
       kind ? { field: 'ownerModel', operator: 'equals', value: kind } : undefined,
     );
@@ -444,7 +442,7 @@ describe('validateSubmodelPermission on a route with no submodel is a configurat
       get: (key: string) => (key === 'routeConfig' ? route : undefined),
     } as unknown as Parameters<ReturnType<typeof validateSubmodelPermission>>[0];
     await expect(validateSubmodelPermission('read')(context, async () => {})).rejects.toThrow(
-      'placeSubmodel needs a route with a model submodel',
+      'pseudoRecordOfSubmodel needs a route with a model submodel',
     );
   });
 });

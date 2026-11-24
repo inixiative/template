@@ -90,7 +90,7 @@
 
 ## Overview
 
-The permission system is the rebac schema (`packages/permissions/src/rebac/schema.ts`) plus the check engine of `@inixiative/permissions`. A request installs what its principal holds into a permix (a table of grants plus entitlements), and every decision is `check(permix, rebacSchema, model, record, action)` on a hydrated record, or on a pseudo record when the row does not exist yet.
+The permission system is the rebac schema (`packages/permissions/src/rebac/schema.ts`) plus the check engine of `@inixiative/permissions`. A request installs what its principal holds into a permix (a table of grants plus entitlements), and every decision is `check(permix, model, record, action)` on a hydrated record, or on a pseudo record when the row does not exist yet.
 
 | Layer | Where it lives | What it says |
 |---|---|---|
@@ -215,9 +215,9 @@ An action in the schema is something you do to the record it is defined on, neve
 
 `read`, `operate`, `manage` and `own` are the standard actions. On a model that chains them, each one is implied by the one above it on the same record, so holding `own` is holding all four. `chainedStandardActions` builds this, and `ownerActions` uses it. Three kinds of model differ, each declared in `standardActionsChain.test.ts`:
 
-- **Member rows** (`db:organizationUser`, `db:spaceUser`): `manage` and `own` do not imply `operate`. Administering a member row is not being the member.
+- **Member rows** (`db:OrganizationUser`, `db:SpaceUser`): `manage` and `own` do not imply `operate`. Administering a member row is not being the member.
 - **Integrations** and **projects** have no `own`; `read`, `operate` and `manage` chain.
-- **Contacts** (`db:contact`): `manage` also requires the contact's `source` not to be `userCreation`, so it does not chain past `manage`.
+- **Contacts** (`db:Contact`): `manage` also requires the contact's `source` not to be `userCreation`, so it does not chain past `manage`.
 
 Actions outside the four (`create`, `delete`, `leave`, `delegateFull`, `send`, `resolve`, `user.redact`, ...) are not part of the chain; they delegate only where their rule says so.
 
@@ -236,11 +236,11 @@ Creating checks `create` on a pseudo record of the model being created (token cr
 
 ### Person-Only Actions
 
-Some actions are for a person, not a token: minting and updating a token (`create` on `db:token`), deleting an organization, `user.redact`, `user.rotateJwts`, `user.changePassword`, and `delegateFull` on every model that has it. Their rules include `actorIsUser` (`actor:Acting.model equals User`). Creating an organization takes a user behind the actor: `actorIsUser` or `actorIsDelegateOfUser` (a token owned by a user). A token holding `own` still cannot take a person-only action, and because the grant check runs with no actor, a person-only action can never be granted as an entitlement.
+Some actions are for a person, not a token: minting and updating a token (`create` on `db:Token`), deleting an organization, `user.redact`, `user.rotateJwts`, `user.changePassword`, and `delegateFull` on every model that has it. Their rules include `actorIsUser` (`actor:Acting.model equals User`). Creating an organization takes a user behind the actor: `actorIsUser` or `actorIsDelegateOfUser` (a token owned by a user). A token holding `own` still cannot take a person-only action, and because the grant check runs with no actor, a person-only action can never be granted as an entitlement.
 
 ### The Actor
 
-The table says what a principal holds. The actor says only who is acting: `permix.setActor(actorFromRecordOmittingSensitiveFields(model, record))` (`packages/permissions/src/actorFromRecordOmittingSensitiveFields.ts`) gives `{ model, record }`, with `model` `User` for a JWT or spoof and `Token` for any API token, and `record` the row's columns with its sensitive fields omitted. The check hands its rows to every rule as the supplied `actor` map (`packages/db/src/schemaMap.ts`): `actor:Acting.model` says which kind is acting, and `actor:User` or `actor:Token` is that kind's row. A token request gives no `actor:User` row, so a rule on one never passes for a token. Actor rules gate person-only actions and say which kind of party a [transition](#transitions) allows (`actingAsAPerson`, `actingAsTheRecordsIntegration`); who is related to what is decided by walking relations. With nobody acting, an actor rule denies and the table still answers everything else.
+The table says what a principal holds. The actor says only who is acting: `permix.setActor(actorFromRecordOmittingSensitiveFields(model, record))` (`packages/permissions/src/actorFromRecordOmittingSensitiveFields.ts`) gives `{ model, record }`, with `model` `User` for a JWT or spoof and `Token` for any API token, and `record` the row's columns with its sensitive fields omitted. The check hands its rows to every rule as the `actor` field map (`packages/db/src/schemaMap.ts`), which is supplied: the schema map declares a bridge with no join from every model of `db` to each actor model, so a rule on any record reads them and their rows are given with the check, never loaded. `actor:Acting.model` says which kind is acting, and `actor:User` or `actor:Token` is that kind's row. A token request gives no `actor:User` row, so a rule on one never passes for a token. Actor rules gate person-only actions and say which kind of party a [transition](#transitions) allows (`actingAsAPerson`, `actingAsTheRecordsIntegration`); who is related to what is decided by walking relations. With nobody acting, an actor rule denies and the table still answers everything else.
 
 ---
 
@@ -268,7 +268,7 @@ Registering (`register`; `POST /integration/:id/integrationResources`) is a new 
 
 ## Member Rows
 
-`memberRowActions(tenant)` in `packages/permissions/src/rebac/rebacSchemaRules.ts` gives `db:organizationUser` (tenant `organization`) and `db:spaceUser` (tenant `space`) their actions. The two sides of a member row are separate actions:
+`memberRowActions(tenant)` in `packages/permissions/src/rebac/rebacSchemaRules.ts` gives `db:OrganizationUser` (tenant `organization`) and `db:SpaceUser` (tenant `space`) their actions. The two sides of a member row are separate actions:
 
 | Action on M1 | Who holds it | Rule |
 |---|---|---|
@@ -286,10 +286,10 @@ So the owner of O1 owns M1 and still does not operate it: removing M1 is the own
 `operate` on M1 comes from U1 by the schema walk. A delegate holding M1's permissions has no U1 in its table, so M1 carries its own `operate` as a stored entitlement, the member self-grant (`packages/permissions/src/roles/memberSelfGrant.ts`):
 
 ```typescript
-memberSelfGrant('db:organizationUser', { id: M1.id })
+memberSelfGrant('db:OrganizationUser', { id: M1.id })
 // {
-//   resource: 'db:organizationUser',
-//   anchor: { resource: 'db:organizationUser', id: M1.id },
+//   resource: 'db:OrganizationUser',
+//   anchor: { resource: 'db:OrganizationUser', id: M1.id },
 //   actions: { operate: true },
 // }
 ```
@@ -328,7 +328,7 @@ Who administers a delegate depends on its owner's kind. Nobody owns an integrati
 
 ### Integrations
 
-`integrationAdministering` and `integrationAccess` (`rebacSchemaRules.ts`) make up `db:integration`:
+`integrationAdministering` and `integrationAccess` (`rebacSchemaRules.ts`) make up `db:Integration`:
 
 | Integration owned by | `read` | `operate` | `manage` | `delete` | `delegateFull` |
 |---|---|---|---|---|---|
@@ -361,7 +361,7 @@ So U1 adds I1 on M1 as a member of O1; a viewer of O1 adds none, and a role toke
 
 ### Tokens
 
-`db:token` has `leave`, `read`, `create` and `delete`; `read` and `delete` are `leave` or `tokenAdministering`, which follows the token's owner kind:
+`db:Token` has `leave`, `read`, `create` and `delete`; `read` and `delete` are `leave` or `tokenAdministering`, which follows the token's owner kind:
 
 | Token owned by | `read` and `delete` |
 |---|---|
@@ -399,7 +399,7 @@ An entitlement on a token is its own row, anchored at the resource: one an admin
 Setting `full` is the action `delegateFull` on the delegate's owner. `validateFullGrant` (`apps/api/src/lib/permissions/validateFullGrant.ts`) is one check:
 
 ```typescript
-check(writer, rebacSchema, model, delegate, {
+check(writer, schemaMap, model, delegate, {
   rel: toAccessor(delegate.ownerModel as string),
   action: 'delegateFull',
 });
@@ -414,7 +414,7 @@ check(writer, rebacSchema, model, delegate, {
 | a user's integration | that user |
 | a member's integration (I1) | the member's user (`operate` on M1) |
 | a tenant's integration (IO) | the tenant's owner (`own` on O1) |
-| a tenant (O1, S1) | nobody: `db:organization` and `db:space` have no `delegateFull` |
+| a tenant (O1, S1) | nobody: `db:Organization` and `db:Space` have no `delegateFull` |
 
 So U1 mints a full token on M1 and makes I1 full; the owner of O1 mints a full token on IO and an admin does not; nobody makes O1's own token or IO itself full; a token never sets `full`, even one holding everything its user holds (`packages/permissions/src/rebac/delegateFull.test.ts`). A refusal is 403.
 
@@ -436,7 +436,7 @@ A delegate that is not `full` and has no role and no entitlements is not refused
 
 ### Hydration
 
-`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchCachedRecordWithTargetEntitlements` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. It owns those relations: a value the caller put under a to-one relation is dropped unless the hydrator loaded it, so attach a hand-made relation after hydrating. A list is left as given unless it is declared `down` ([Crossing a List](#crossing-a-list-down)). A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load goes through `fetchThroughCache()`, which computes inside `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchCachedRecordWithTargetEntitlements` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its not-deleted entitlement rows (`includeTargetEntitlements(model)`, ordered by `createdAt`, `id`) and caches it with those rows as stored, so a hydrated holder carries `targetEntitlements: Entitlement[]` and the cache holds one shape. `findUserWithRelations` and `fetchTokenContext` read the same way. The rows turn into the library's entries at check time, where a holder is handed to the library (`entitlementEntriesOfHolder` in `@template/permissions`, which also prunes them with `wellFormedEntitlements`). A write to an `Entitlement` row clears its target's cache keys (its parent edge, [HOOKS.md](HOOKS.md#parent-edges)), so a revoked row is gone on the very next request.
+`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `makeHydrator` over the Prisma field map (`mapName: 'db'`, the same field map the checks walk; one hydrator per field map), loading each parent with `fetchCachedRecordWithTargetEntitlements` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. It owns those relations: a value the caller put under a to-one relation is dropped unless the hydrator loaded it, so attach a hand-made relation after hydrating. A list is left as given unless it is declared `down` ([Crossing a List](#crossing-a-list-down)). A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load goes through `fetchThroughCache()`, which computes inside `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchCachedRecordWithTargetEntitlements` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its not-deleted entitlement rows (`includeTargetEntitlements(model)`, ordered by `createdAt`, `id`) and caches it with those rows as stored, so a hydrated holder carries `targetEntitlements: Entitlement[]` and the cache holds one shape. `findUserWithRelations` and `fetchTokenContext` read the same way. The rows turn into the library's entries at check time, where a holder is handed to the library (`entitlementEntriesOfHolder` in `@template/permissions`, which also prunes them with `wellFormedEntitlements`). A write to an `Entitlement` row clears its target's cache keys (its parent edge, [HOOKS.md](HOOKS.md#parent-edges)), so a revoked row is gone on the very next request.
 
 ### installPermissions
 
@@ -475,7 +475,7 @@ The library's `delegate` resolves a delegate from its owner's permissions; the t
 
 ```typescript
 export const narrowOwnerPermissionsToDelegate = (delegated, owner) =>
-  delegate(rebacSchema, owner, {
+  delegate(schemaMap, owner, {
     full: delegated.full,
     ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
     entitlements: wellFormedEntitlements(delegated.entitlements),
@@ -496,7 +496,7 @@ A token on M1 acts as M1 only if it holds `operate` on M1:
 |---|---|---|---|
 | `full` | M1's permissions whole, self-grant included | M1's role | yes |
 | role `member`, no entitlements | O1 capped at `member` | `operate` | no: it is U1's personal org token |
-| role `viewer`, given `{ resource: 'db:organizationUser', anchor: { resource: 'db:organizationUser', id: M1 }, actions: { operate: true } }` | O1 at `read`, plus `operate` on M1 | `read` | yes |
+| role `viewer`, given `{ resource: 'db:OrganizationUser', anchor: { resource: 'db:OrganizationUser', id: M1 }, actions: { operate: true } }` | O1 at `read`, plus `operate` on M1 | `read` | yes |
 
 Acting as M1 is the entitlement, not the role: the viewer-role token given `operate` on M1 manages I1, the owner-role token without it does nothing on I1 (`integrationsUnderOrganization.test.ts`, "a token on your member row acts as you only if it holds operate on the row"). Neither reaches SM1's things or another member's.
 
@@ -540,7 +540,7 @@ Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on t
 
 ### Granting an Entitlement
 
-A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
+A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `pseudoRecordsOfEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
 
 1. **The writer's role table, and what it holds outright above the record.** The writer's table (no actor) takes each action on the pseudo record, and a field the record does not carry fails every rule on it. The pseudo record never carries its own key, so a rule that rests on an empty column (a null check beside `id exists`) is not grantable over many records. A rule on `actor:` rows never passes, so a person-only action is never grantable. An entitlement the writer holds counts here too, like a role on its record, when it is marked `grantsBelow` and sits on a real row above the pseudo record ([Granting below a held row](#granting-below-a-held-row)).
 2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed (an `all` holding every conjunct of the held `where` plus more: held `C`, granted `all: [A, B, C]`), and its granter still backing each action. The lens is never copied: lenses compose down the chain ([the lens](../../packages/permissions/src/rebac/ENTITLEMENTS.md#the-lens)). Held entitlements never combine: to pass on two, grant two.
@@ -627,7 +627,7 @@ A holder can be admitted along several delegation paths, each with its own lens 
 
 ## Adding a Model
 
-1. **Schema entry.** Add `db:<model>` to `rebacSchema.permissions` with its actions. A model owned through `user`/`organization`/`space` relations uses `ownerActions()` (or `ownerActions(['user'])` for a subset); a child of another model walks to its parent (`db:segmentMember` asks the same action of its `segment`). An action may also hold a condition on the record itself: `db:projectIntegrationResource` `create` is `all` of `manage` on the project, `operate` on the resource, and `{ rule: { field: 'integrationResource.status', operator: 'in', value: ['tracked', 'missing'] } }`, so an untracked resource cannot be linked. Build the four standard actions with `chainedStandardActions` so each implies the one below.
+1. **Schema entry.** Add `db:<model>` to `schemaMap.permissions` with its actions. A model owned through `user`/`organization`/`space` relations uses `ownerActions()` (or `ownerActions(['user'])` for a subset); a child of another model walks to its parent (`db:SegmentMember` asks the same action of its `segment`). An action may also hold a condition on the record itself: `db:ProjectIntegrationResource` `create` is `all` of `manage` on the project, `operate` on the resource, and `{ rule: { field: 'integrationResource.status', operator: 'in', value: ['tracked', 'missing'] } }`, so an untracked resource cannot be linked. Build the four standard actions with `chainedStandardActions` so each implies the one below.
 2. **Every action is on the record.** Name what a caller does to this model (`create`, `delete`, `send`), never what the model does elsewhere. A create rule goes on the created model and is checked on a pseudo record.
 3. **Person-only acts** add `actorIsUser` to their rule. Never use the actor to decide relationships.
 4. **Declare deviations.** If the model does not chain all four standard actions, list exactly which links it misses in `notStandard` in `standardActionsChain.test.ts`.
@@ -645,7 +645,7 @@ Permix is the permission checker. Each request gets a fresh instance via `prepar
 - `permix.setActor(actor)` / `permix.getActor()` set and read who is acting.
 - `permix.setSuperadmin(value)` turns on the bypass; `installPermissions` sets it from `isSuperadmin(actingUser(c))`.
 
-The engine is `@inixiative/permissions`; `createPermissions` in `packages/permissions/src/client.ts` types it with the app's actions and actor. A check is always `check(permix, rebacSchema, model, record, action)` from `@template/permissions/rebac` on a hydrated record.
+The engine is `@inixiative/permissions`; `createPermissions` in `packages/permissions/src/client.ts` types it with the app's actions and actor. A check is always `check(permix, model, record, action)` from `@template/permissions/rebac` on a hydrated record. `check` is `makeCheck(schemaMap)`: the map is bound once, in `packages/permissions/src/rebac/check.ts`, and a test with its own rules makes its own with `makeCheck(itsMap)`. The last argument is an action of the schema or a rule given on the spot.
 
 ---
 
@@ -653,7 +653,7 @@ The engine is `@inixiative/permissions`; `createPermissions` in `packages/permis
 
 ### Schema
 
-The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed by resource (`db:user`, `db:organization`, `db:token`, ...), each with its `actions`. Rules shared across models are named helpers in `rebacSchemaRules.ts`:
+The schema is `schemaMap` in `packages/permissions/src/rebac/schema.ts`, keyed by resource (`db:User`, `db:Organization`, `db:Token`, ...), each with its `actions`. Rules shared across models are named helpers in `rebacSchemaRules.ts`:
 
 | Helper | What it says |
 |---|---|
@@ -662,10 +662,10 @@ The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed
 | `actorManagesRecordUser(at?)` | `manage` on the record's `user` |
 | `memberRowActions(tenant)` | a member row's actions |
 | `memberRoleWrite(tenant)`, `memberRemoval(tenant)` | writing a member's role; removing a member |
-| `integrationAdministering`, `integrationAccess` | `db:integration`'s `create`, `manage`, `delete`, `delegateFull`; its `operate` and `read` |
-| `actionsForRecordOwnedByAnyOwnerModel` | the same by owner kind without `delegateFull`, for a model owned by any of the five owners (`db:project`) |
+| `integrationAdministering`, `integrationAccess` | `db:Integration`'s `create`, `manage`, `delete`, `delegateFull`; its `operate` and `read` |
+| `actionsForRecordOwnedByAnyOwnerModel` | the same by owner kind without `delegateFull`, for a model owned by any of the five owners (`db:Project`) |
 | `integrationRoleWrite`, `roleHeldAtOwner(at?)` | writing an integration's role; the role on the row held at its owner |
-| `actorMayCreateTokenAtOwnerWithRole`, `tokenAdministering` | `db:token`'s `create`; its `read` and `delete` |
+| `actorMayCreateTokenAtOwnerWithRole`, `tokenAdministering` | `db:Token`'s `create`; its `read` and `delete` |
 | `chainedStandardActions`, `ownerActions(rels?)` | the standard chain; the owner fan-out over it |
 
 `memberRoleWrite`, `memberRemoval` and `integrationRoleWrite` are rules that routes and controllers check, not named actions, so they cannot be granted as entitlements.
@@ -720,10 +720,10 @@ model Resource {
 
 - **`down` is a list of dotted to-one paths from an item**, each leaf by its full path (`[a.b, a.c]`). `down: []` loads the items alone.
 - **What loads.** Wherever the model is hydrated, the hydrator makes one `loadMany` read of the items, then loads only the declared paths under each. Nothing else loads from an item, so hydration goes one jump down and never back up into the record it came from. Any other to-one relation on an item ends empty.
-- **The declaration carries what the rule walks.** Every relation the `condition` walks, followed through the actions it lands on, must be inside a declared path. Above, `project.read` walks on to the organization, so the path is `project.organization`. A shorter declaration is a `validateSchema` error and the check refuses the schema on first use.
+- **The declaration carries what the rule walks.** Every relation the `condition` walks, followed through the actions it lands on, must be inside a declared path. Above, `project.read` walks on to the organization, so the path is `project.organization`. A shorter declaration is a `validateSchemaMap` error and the check refuses the schema on first use.
 - **One jump.** A list arm under an item denies. A list that is not declared is never crossed.
 - **Never on a stand-in.** A record that does not exist yet has no list, so a grant that rests on a list is anchored where a real list is (the record itself, or one below it), not above.
-- **Wiring.** `createHydrator` needs `loadMany` once any list is declared and refuses to build without it. Add it beside `load` in `packages/db/src/hydrate/hydrate.ts`, reading not-deleted rows through the same cache layer. Template declares no list today.
+- **Wiring.** `makeHydrator` needs `loadMany` once any list is declared and refuses to build without it. Add it beside `load` in `packages/db/src/hydrate/hydrate.ts`, reading not-deleted rows through the same cache layer. Template declares no list today.
 
 When the record holds the key itself, use a plain `rel`. The library README (`@inixiative/permissions`, "Crossing a list") has the full rules.
 
@@ -748,7 +748,7 @@ In the inquiry schema, `updateSpace` uses single-hop and `transferSpace` uses th
 
 ### Inquiry permissions
 
-`db:inquiry` is the `inquiryResourcePermission` object `inquiryResourcePermission.ts` builds from `INQUIRY_TYPES`; the schema imports it like any other resource. Each inquiry type declares, in `INQUIRY_TYPES` (`inquiryTypes.ts`), the party models that may stand on each side and the level each needs: `send` for a source, `resolve` for a target. A level is an action of that party model's own resource; `inquiryResourcePermission.test.ts` walks every send, resolve and read rule and fails when a relation, action or field it names, in a plain action or inside a rule-form level, does not exist. A level can instead be a plain rebac rule in the schema's own vocabulary, used as written, for a case one action cannot say: `transferSpace` is `{ rel: 'sourceSpace.organization', action: 'own' }`, and an invite picks `own` or `manage` with `any`/`all` over its role.
+`db:Inquiry` is the `inquiryResourcePermission` object `inquiryResourcePermission.ts` builds from `INQUIRY_TYPES`; the schema imports it like any other resource. Each inquiry type declares, in `INQUIRY_TYPES` (`inquiryTypes.ts`), the party models that may stand on each side and the level each needs: `send` for a source, `resolve` for a target. A level is an action of that party model's own resource; `inquiryResourcePermission.test.ts` walks every send, resolve and read rule and fails when a relation, action or field it names, in a plain action or inside a rule-form level, does not exist. A level can instead be a plain rebac rule in the schema's own vocabulary, used as written, for a case one action cannot say: `transferSpace` is `{ rel: 'sourceSpace.organization', action: 'own' }`, and an invite picks `own` or `manage` with `any`/`all` over its role.
 
 - **`read`** is party-wide, whatever the type, each party on its own ownership channel (`INQUIRY_READ_LEVELS`): a person reads the sides that name them (`read` on that user): what belongs to a member, or chains through one, is the member's and never the organization's; `manage` on an organization reads the sides on the organization alone (the side is the organization, or its space and user keys are empty), which includes its own integrations, tokens and projects; an entitlement over what the organization received is granted on the first form (`targetModel equals 'Organization'`), since a rule resting on empty keys is not grantable over many records; `manage` on a space reads the sides on the space with no user. Why: an inquiry carries its delegates' owner keys, so the organization is on every row beneath it; a member's own integration stays the member's and a space's inquiries the space's (Aron, 2026-11-16). See [INQUIRIES.md](INQUIRIES.md#permissions-rebac).
 - **`send`** and **`resolve`** are one branch per type, each gated on the type and on the party model, asking the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`).
@@ -763,8 +763,8 @@ The API reads the same declarations to check that a create's parties are ones th
 Models with nullable foreign keys to several owners (Contact, WebhookSubscription, Segment, Flow) use `ownerActions()`:
 
 ```typescript
-'db:webhookSubscription': { actions: { ...ownerActions(), create: 'operate' } },
-'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
+'db:WebhookSubscription': { actions: { ...ownerActions(), create: 'operate' } },
+'db:Flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 ```
 
 For each standard action the helper asks the same action of `user`, `organization` and `space`, chained. Only the populated relation is hydrated, so the others fail and the rule follows the actual owner. Integrations and tokens are owner-polymorphic too but follow their own owner-kind rules ([Integrations and Tokens by Owner Kind](#integrations-and-tokens-by-owner-kind)).
@@ -772,7 +772,7 @@ For each standard action the helper asks the same action of `user`, `organizatio
 `ownerActions()` reads the `user`, `organization` and `space` relations, so it can't tell a member's row from its tenant's: an OrganizationUser-owned row carries `organizationId` too, and `manage` on the organization would reach it. A model owned by any of the five owner kinds (User, OrganizationUser, Organization, Space, SpaceUser) uses `actionsForRecordOwnedByAnyOwnerModel` instead. It is the integration rules without `delegateFull`, keyed on `ownerModel` ([Integrations](#integrations)): an organization's admin manages its organization's rows but can't reach a member's own; the organization's owner can read and delete a member's row, not change it; only the member manages it.
 
 ```typescript
-'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
+'db:Project': { actions: actionsForRecordOwnedByAnyOwnerModel },
 ```
 
 ---
@@ -792,7 +792,7 @@ model Contact {
 
 ### How `check()` merges
 
-Inside the library's rebac check (`createRebacCheck` in `@inixiative/permissions`, bound by `packages/permissions/src/rebac/check.ts`), when resolving an action by name:
+Inside the library's rebac check (`makeRebacCheck` in `@inixiative/permissions`, bound by `packages/permissions/src/rebac/check.ts`), when resolving an action by name:
 
 ```typescript
 const schemaRule  = schema[model]?.actions[actionOrRule] ?? null;
@@ -808,7 +808,7 @@ A rule that is absent is left out. [Tenant rules](#tenant-rules) come in through
 
 ### Boundary validation
 
-Route schemas validate the shape before it lands in the database. Use `buildPermissionRulesSchema(model, pick?)` from `@template/permissions/rebac/permissionRulesSchema`; it derives the valid action keys from `rebacSchema[model].actions`:
+Route schemas validate the shape before it lands in the database. Use `buildPermissionRulesSchema(model, pick?)` from `@template/permissions/rebac/permissionRulesSchema`; it derives the valid action keys from `schemaMap[model].actions`:
 
 ```typescript
 // apps/api/src/modules/contact/schemas/contactSchemas.ts
@@ -843,7 +843,7 @@ model Organization {
 ```
 
 ```json
-{ "db:contact": { "read": true } }
+{ "db:Contact": { "read": true } }
 ```
 
 Every contact under this organization is now readable by anyone signed in. A rule can be any `ActionRule`: `true`, a relation walk, a json-rules condition on the record and on who is acting, or `any` / `all` of those. Per resource it is the same shape as a row's `permissionRules`.
@@ -883,7 +883,7 @@ The body is `{ tenantPermissionRules }`; `null` clears it. `tenantPermissionRule
 The default lens:
 
 - **Product records**, from a short list in that file (`resourcesATenantMayExtend`: contacts and segments; an app adds its own below the template line). Why a list: a resource added later is closed until someone turns it on.
-- **An organization's spaces, to `read` or `operate` only.** An organization that wants its spaces open says so once: `{ "db:space": { "read": { "rel": "organization", "action": "read" } } }` lets whoever reads the organization read every space (`true` would mean anyone signed in). `operate` makes them a member of each: they read its members and integrations and use its integrations.
+- **An organization's spaces, to `read` or `operate` only.** An organization that wants its spaces open says so once: `{ "db:Space": { "read": { "rel": "organization", "action": "read" } } }` lets whoever reads the organization read every space (`true` would mean anyone signed in). `operate` makes them a member of each: they read its members and integrations and use its integrations.
 - **Never `manage` on a space, and never the rest of the permission system's own**: a member row, a token, an integration, an inquiry, a sign-in provider. An action there is a gate on handing authority on. `manage` on a space is what minting its tokens, writing its members' roles, creating its integrations and resolving its inquiries ask, and rules are read at every row a check walks through, so a `manage` rule would open all of them through the space; a token minted that way would outlive the rule. `read` and `operate` mint no token, write no role and resolve no inquiry: minting a tenant's token takes `manage` ([Minting a Token](#minting-a-token)).
 - **Only what the tenant can hold**, read off the tenant columns (`modelsHeldUnderTenant`, beside `tenantRowsAbove`): a space names what has `spaceId`; an organization that and what has `organizationId`, so its tenancy and everything below it; a user what has `userId` and no organization or space is required to hold.
 - **Never `own`**, on any resource.
@@ -892,7 +892,7 @@ The default lens:
 
 **A rule counts as something its reader holds when they grant.** The grant check reads tenant rules too, so whoever a rule covers can put that access on a holder as an entitlement. On a token or an integration it is live only: it stops when the rule is cleared. On a member row it outlasts the rule, because a member row's entitlements are backed by the tenant's owner.
 
-Still open, on purpose: `manage` on a shown resource goes around a lock the schema sets (`"db:contact": { "manage": true }` opens the login-mirror contact), and whoever a rule covers can hand that access to their own tokens as an entitlement. An app that wants less narrows the lens.
+Still open, on purpose: `manage` on a shown resource goes around a lock the schema sets (`"db:Contact": { "manage": true }` opens the login-mirror contact), and whoever a rule covers can hand that access to their own tokens as an entitlement. An app that wants less narrows the lens.
 
 The lens applies twice: when the rules are written (a hidden resource or action is a 422), and when they are read (`tenantPermissionRulesAbove` cuts each tenant's stored rules to the actions its lens shows, so a rule stored before the lens narrowed widens nothing).
 
@@ -935,7 +935,7 @@ router.patch('/:id', validatePermission('manage'), handler);
 
 1. Gets the loaded `resource` and `resourceType` from context.
 2. Hydrates the resource with the relations the check walks.
-3. Checks `check(permix, rebacSchema, resourceType, hydrated, action)`.
+3. Checks `check(permix, resourceType, hydrated, action)`.
 4. Throws 403 when it fails.
 
 `resourceContextMiddleware` throws 404 (not found) or 409 (multiple matches) before `validatePermission` runs. Resource existence is not secret (ids appear in share links, emails, audit logs); privacy is enforced on field visibility and queries. A resource that must hide its existence needs a middleware that returns 404 when the check fails.
@@ -946,12 +946,12 @@ A route on a submodel (a create or a collection under an owner: `/organization/:
 
 ```typescript
 // apps/api/src/middleware/validations/validateSubmodelPermission.ts
-const { submodel, placed } = placeSubmodel(c);
-const pseudo = await hydrate(submodel, { id: '', ...placed });
-check(permix, rebacSchema, submodel, pseudo, action);
+const { submodel, pseudoRecord } = pseudoRecordOfSubmodel(c);
+const pseudo = await hydrate(submodel, { id: '', ...pseudoRecord });
+check(permix, submodel, pseudo, action);
 ```
 
-- `placeSubmodel` (`apps/api/src/lib/permissions/placeSubmodel.ts`) calls `placeUnder` (the library's, re-exported from `@template/permissions/rebac`), which builds the pseudo record along the owner's relation: the owner keys, the owner attached, the kind narrowed to the owner's model; `id: ''` never matches a grant keyed by a real row.
+- `pseudoRecordOfSubmodel` (`apps/api/src/lib/permissions/pseudoRecordOfSubmodel.ts`) calls `pseudoRecordsBelowAnchor` (the library's, re-exported from `@template/permissions/rebac`), which builds the pseudo record along the owner's relation: the owner keys, the owner attached, the kind narrowed to the owner's model; `id: ''` never matches a grant keyed by a real row.
 - It never reads the request body. Checks that depend on the body (a token's role or `full`, an integration's role, an inquiry's `send`) stay in their services.
 - Using it on a route with no submodel throws on each request to that route (`validateSubmodelPermission.test.ts`).
 

@@ -311,10 +311,10 @@ between them, only where a holder is handed to the library:
 
 | Library entry | Row |
 |---|---|
-| `anchor.resource` (`db:space`) | `sourceModel` (`Space`) and the typed FK `sourceSpaceId` |
+| `anchor.resource` (`db:Space`) | `sourceModel` (`Space`) and the typed FK `sourceSpaceId` |
 | `anchor.id` | `sourceId` |
 | `anchor.path` | `sourcePath` |
-| `resource` (`db:integration`) | `resource` (`Integration`) |
+| `resource` (`db:Integration`) | `resource` (`Integration`) |
 | `actions` (`{ read: true }`) | `actions` (`['read']`) |
 | the holder it is installed on | `targetModel`, `targetId` and the arm's keys: `targetTokenId`, `targetIntegrationId`, or a member's owner chain (`targetOrganizationId`, `targetSpaceId`, `targetUserId`, as `Inquiry`'s) |
 

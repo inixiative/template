@@ -53,16 +53,16 @@ const writer = async (role: Role) => {
 
 const ownIntegrations = (actions: string[]) => ({
   ...entitlementInputFor(
-    'db:integration',
-    ['db:organization', organization.id, 'organization'],
+    'db:Integration',
+    ['db:Organization', organization.id, 'organization'],
     actions,
   ),
   where: { field: 'ownerModel', operator: 'equals', value: 'Organization' },
 });
 const spaceIntegrations = (actions: string[]) =>
   entitlementInputFor(
-    'db:integration',
-    ['db:organization', organization.id, 'space.organization'],
+    'db:Integration',
+    ['db:Organization', organization.id, 'space.organization'],
     actions,
   );
 
@@ -76,7 +76,7 @@ const onMember = (target: OrganizationUser) => ({
 
 const stored = async (target: OrganizationUser): Promise<unknown> =>
   (await heldEntitlements(onMember(target))).filter(
-    (input) => !isMemberSelfGrant('db:organizationUser', target)(toEntitlementEntry(input)),
+    (input) => !isMemberSelfGrant('db:OrganizationUser', target)(toEntitlementEntry(input)),
   );
 
 const change = async (
@@ -123,7 +123,7 @@ describe("a member's entitlements change only through its entitlement rows: crea
 
   it('a row whose anchor is tombstoned is removed by whoever manages the member (Aron, 2026-11-16)', async () => {
     const { entity: space } = await createSpace({}, { organization });
-    const onSpace = entitlementInputFor('db:space', ['db:space', space.id], ['manage']);
+    const onSpace = entitlementInputFor('db:Space', ['db:Space', space.id], ['manage']);
     const target = await member();
     expect((await change('owner', target, { add: [onSpace] })).status).toBe(201);
     await db.space.update({ where: { id: space.id }, data: { deletedAt: new Date() } });
@@ -178,8 +178,8 @@ describe("a member's entitlements change only through its entitlement rows: crea
   it('a malformed entry is refused before anything is saved', async () => {
     const target = await member();
     const pathless = entitlementInputFor(
-      'db:integration',
-      ['db:organization', organization.id],
+      'db:Integration',
+      ['db:Organization', organization.id],
       ['read'],
     );
     expect((await change('owner', target, { add: [pathless] })).status).toBe(422);

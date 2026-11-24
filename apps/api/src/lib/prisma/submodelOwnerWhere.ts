@@ -7,8 +7,11 @@
 
 import type { Context } from 'hono';
 import { pickBy } from 'lodash-es';
-import { placeSubmodel } from '#/lib/permissions/placeSubmodel';
+import { pseudoRecordOfSubmodel } from '#/lib/permissions/pseudoRecordOfSubmodel';
 import type { AppEnv } from '#/types/appEnv';
 
 export const submodelOwnerWhere = (c: Context<AppEnv>): Record<string, string> =>
-  pickBy(placeSubmodel(c).placed, (value) => typeof value === 'string') as Record<string, string>;
+  pickBy(pseudoRecordOfSubmodel(c).pseudoRecord, (value) => typeof value === 'string') as Record<
+    string,
+    string
+  >;

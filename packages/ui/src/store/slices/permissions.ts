@@ -8,7 +8,6 @@
 import { actorFromRecordOmittingSensitiveFields } from '@template/permissions/actorFromRecordOmittingSensitiveFields';
 import { ActorModel, createPermissions, installPermissions } from '@template/permissions/client';
 import { check as rebacCheck } from '@template/permissions/rebac/check';
-import { rebacSchema } from '@template/permissions/rebac/schema';
 import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
 import { isSuperadmin } from '@template/permissions/roles/shared';
 import type { MeReadResponses } from '@template/sdk';
@@ -29,7 +28,7 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
       permix: createPermissions(),
       check: (model, record, action) => {
         const { permix } = get().permissions;
-        return rebacCheck(permix, rebacSchema, model, record, action);
+        return rebacCheck(permix, model, record, action);
       },
       clear: () => {
         set((state) => ({

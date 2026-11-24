@@ -45,7 +45,7 @@ model Contact {
 
   // Per-row override for the rebac action rules on this resource.
   // Shape: Record<Action, ActionRule>. Read by check() — row-level wins over
-  // the static rebacSchema for any action present here. Null = schema-only.
+  // the static schemaMap for any action present here. Null = schema-only.
   permissionRules Json?
 
   verifiedAt DateTime?

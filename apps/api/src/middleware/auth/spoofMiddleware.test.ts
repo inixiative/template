@@ -95,7 +95,7 @@ describe('spoofMiddleware via token auth', () => {
 
     const body = (await res.json()) as { grants: string[]; superadmin: boolean };
     expect(body.superadmin).toBe(false);
-    expect(body.grants).toEqual([`db:user:${target.id}`]);
+    expect(body.grants).toEqual([`db:User:${target.id}`]);
   });
   it('a superadmin cannot spoof another superadmin', async () => {
     const { entity: admin } = await createUser({ platformRole: 'superadmin' });
