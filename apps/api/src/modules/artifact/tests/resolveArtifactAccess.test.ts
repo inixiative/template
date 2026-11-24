@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { db, fetchCachedRecordWithTargetEntitlements } from '@template/db';
-import type { Artifact, Organization, Space, User } from '@template/db/generated/client/client';
+import { db, fetchCachedRecordWithTargetEntitlements, hydrate } from '@template/db';
+import type {
+  Artifact,
+  Integration,
+  Organization,
+  Space,
+  Token,
+  User,
+} from '@template/db/generated/client/client';
 import type { Role } from '@template/db/generated/client/enums';
 import {
   createArtifact,
@@ -19,6 +26,8 @@ import { createPermissions, installPermissions } from '@template/permissions/cli
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { ARTIFACT_MAX_DEPTH } from '#/hooks/artifactClosure/syncArtifactClosure';
+import type { TokenWithRelations } from '#/lib/context/types';
+import { installPermissionsFor } from '#/lib/permissions/userPermissions';
 import {
   artifactEffectiveRole,
   hydrateArtifact,
@@ -268,11 +277,12 @@ describe('artifact ReBAC & closure inheritance', () => {
     expect(actionsTenantMayExtend('Organization', 'db:artifact')).not.toContain('delete');
   });
 
-  it('Integration grantee enforces token role ceiling and rejects non-full null-role tokens', async () => {
+  it('Integration grantee grants only full Integration tokens via integration.act (role-only and entitlement-only tokens do not act as the integration)', async () => {
     const folder = await folderOf(organization);
     const { entity: integration } = await createIntegration({
       ownerModel: 'Organization',
       organizationId: organization.id,
+      role: 'viewer',
     });
     await createArtifactPermission({
       artifactId: folder.id,
@@ -289,13 +299,22 @@ describe('artifact ReBAC & closure inheritance', () => {
         full: opts.full,
         role: opts.role,
       });
+      const hydratedToken = (await hydrate(
+        'token',
+        token as Token,
+      )) as unknown as TokenWithRelations;
       const permix = createPermissions();
-      permix.setActor({ model: 'Token', record: token });
+      await installPermissionsFor(permix, {
+        user: null,
+        token: hydratedToken,
+        organizationUsers: [],
+        spaceUsers: [],
+      });
       return permix;
     };
 
     const viewerToken = await makeIntegrationTokenPermix({ full: false, role: 'viewer' });
-    expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'read')).toBe(true);
+    expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'read')).toBe(false);
     expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'operate')).toBe(false);
     expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'manage')).toBe(false);
     expect(check(viewerToken, rebacSchema, 'artifact', hydrated, 'own')).toBe(false);
@@ -307,6 +326,15 @@ describe('artifact ReBAC & closure inheritance', () => {
     const fullToken = await makeIntegrationTokenPermix({ full: true, role: null });
     expect(check(fullToken, rebacSchema, 'artifact', hydrated, 'own')).toBe(true);
     expect(check(fullToken, rebacSchema, 'artifact', hydrated, 'delete')).toBe(true);
+    expect(
+      check(
+        fullToken,
+        rebacSchema,
+        'integration',
+        await hydrate('integration', integration as Integration),
+        'manage',
+      ),
+    ).toBe(false);
   });
 
   it('admin-capped User token gets manage but not own or delete on member-owned and member-granted artifacts', async () => {

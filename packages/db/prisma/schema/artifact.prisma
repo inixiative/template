@@ -30,7 +30,7 @@ model Artifact {
   ancestors   ArtifactAncestor[] @relation("ArtifactAncestorDescendant")
   descendants ArtifactAncestor[] @relation("ArtifactAncestorAncestor")
 
-  /// @permissions(down: [permission.granteeUser, permission.granteeOrganization, permission.granteeSpace.organization, permission.granteeOrganizationUser.user, permission.granteeOrganizationUser.organization, permission.granteeSpaceUser.user, permission.granteeSpaceUser.space.organization, permission.granteeCustomerRelationship.customerUser, permission.granteeCustomerRelationship.customerOrganization, permission.granteeCustomerRelationship.customerSpace.organization])
+  /// @permissions(down: [permission.granteeUser, permission.granteeOrganization, permission.granteeSpace.organization, permission.granteeOrganizationUser.user, permission.granteeOrganizationUser.organization, permission.granteeSpaceUser.user, permission.granteeSpaceUser.space.organization, permission.granteeCustomerRelationship.customerUser, permission.granteeCustomerRelationship.customerOrganization, permission.granteeCustomerRelationship.customerSpace.organization, permission.granteeIntegration])
   effectivePermissions ArtifactEffectivePermission[]
 
   auditLogs          AuditLog[]

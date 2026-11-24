@@ -113,7 +113,13 @@ export const rebacSchema: RebacSchema = {
         read: { rel: 'segment', action: 'read' },
       }),
     },
-    'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
+    'db:integration': {
+      actions: {
+        ...integrationAdministering,
+        ...integrationAccess,
+        'integration.act': null,
+      },
+    },
     'db:integrationResource': {
       actions: {
         manage: { rel: 'integration', action: 'manage' },

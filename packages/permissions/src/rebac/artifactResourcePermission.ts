@@ -5,7 +5,7 @@
  * @uses none
  */
 import { DateOperator, Operator } from '@inixiative/json-rules';
-import { makeKindRules, ruleFieldEqualsPath } from '@inixiative/permissions';
+import { makeKindRules } from '@inixiative/permissions';
 import type { Role } from '@template/db/generated/client/enums';
 import { schemaMap } from '@template/db/schemaMap';
 import {
@@ -28,24 +28,23 @@ const rolesCovering: Record<StandardAction, readonly Role[]> = {
   read: roleHierarchy,
 };
 
-const tokenCovers = (action: StandardAction): ActionRule => ({
-  any: [
-    { rule: { field: 'actor:Token.full', operator: Operator.equals, value: true } },
-    {
-      rule: {
-        field: 'actor:Token.role',
-        operator: Operator.in,
-        value: [...rolesCovering[action]],
-      },
-    },
-  ],
+const actingAsNonUserToken: ActionRule = kind.ruleForEachKind('actor:Acting', 'model', {
+  Token: kind.ruleKindIsOneOf('actor:Token', 'ownerModel', [
+    'OrganizationUser',
+    'SpaceUser',
+    'Integration',
+  ]),
 });
 
-const actorCoversAction = (action: StandardAction): ActionRule =>
-  kind.ruleForEachKind('actor:Acting', 'model', {
-    User: true,
-    Token: tokenCovers(action),
-  });
+const memberOwns = (
+  rel: 'organizationUser' | 'spaceUser' | 'granteeOrganizationUser' | 'granteeSpaceUser',
+  prefix = '',
+): ActionRule => ({
+  any: [
+    { rel: `${prefix}${rel}.user`, action: 'own' },
+    { all: [actingAsNonUserToken, { rel: `${prefix}${rel}`, action: 'operate' }] },
+  ],
+});
 
 const granteeIs = (granteeModel: string): ActionRule => ({
   rule: { field: 'permission.granteeModel', operator: Operator.equals, value: granteeModel },
@@ -90,15 +89,17 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
           {
             all: [
               granteeIs('OrganizationUser'),
-              { rel: 'permission.granteeOrganizationUser', action: 'operate' },
-              ...(action === 'own' ? [actorCoversAction('own')] : []),
+              action === 'own'
+                ? memberOwns('granteeOrganizationUser', 'permission.')
+                : { rel: 'permission.granteeOrganizationUser', action: 'operate' },
             ],
           },
           {
             all: [
               granteeIs('SpaceUser'),
-              { rel: 'permission.granteeSpaceUser', action: 'operate' },
-              ...(action === 'own' ? [actorCoversAction('own')] : []),
+              action === 'own'
+                ? memberOwns('granteeSpaceUser', 'permission.')
+                : { rel: 'permission.granteeSpaceUser', action: 'operate' },
             ],
           },
           {
@@ -116,18 +117,7 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
           {
             all: [
               granteeIs('Integration'),
-              kind.ruleForEachKind('actor:Acting', 'model', {
-                Token: {
-                  all: [
-                    kind.ruleKindIsOneOf('actor:Token', 'ownerModel', ['Integration']),
-                    ruleFieldEqualsPath(
-                      'permission.granteeIntegrationId',
-                      'actor:Token.integrationId',
-                    ),
-                    tokenCovers(action),
-                  ],
-                },
-              }),
+              { rel: 'permission.granteeIntegration', action: 'integration.act' },
             ],
           },
         ],
@@ -175,12 +165,8 @@ export const artifactResourcePermission: ResourcePermission = {
     own: {
       any: [
         actorMayPerformActionOnOwner('own', '', ['User', 'Organization', 'Space']),
-        {
-          all: [
-            actorCoversAction('own'),
-            actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
-          ],
-        },
+        { all: [ownerModelIsOneOf(['OrganizationUser']), memberOwns('organizationUser')] },
+        { all: [ownerModelIsOneOf(['SpaceUser']), memberOwns('spaceUser')] },
         effectiveGrant('own'),
       ],
     },
