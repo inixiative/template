@@ -1,5 +1,7 @@
 export * from './accountFactory';
 export * from './appEventFactory';
+export * from './artifactAncestorFactory';
+export * from './artifactEffectivePermissionFactory';
 export * from './artifactFactory';
 export * from './artifactPermissionFactory';
 export * from './artifactPlacementFactory';

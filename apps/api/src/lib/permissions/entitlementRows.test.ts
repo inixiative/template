@@ -63,13 +63,24 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
+// why: Artifact models use ArtifactPermission for sharing and are intentionally outside EntitlementResourceModel for now.
+const RESOURCES_OUTSIDE_ENTITLEMENTS = new Set([
+  'db:artifact',
+  'db:artifactPermission',
+  'db:artifactPlacement',
+]);
+
 describe('the entitlement table: the source names the anchor, the target holds it (Aron, 2026-11-02)', () => {
   it('the source and resource models are the rebac resources, one for one', () => {
     expect(
       Object.values(EntitlementResourceModel)
         .map((model) => `db:${toAccessor(model)}`)
         .sort(),
-    ).toEqual(Object.keys(rebacSchema.permissions).sort());
+    ).toEqual(
+      Object.keys(rebacSchema.permissions)
+        .filter((resource) => !RESOURCES_OUTSIDE_ENTITLEMENTS.has(resource))
+        .sort(),
+    );
   });
 
   it('one audit entry per row, on create-many and on delete-many', async () => {
