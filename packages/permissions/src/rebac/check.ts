@@ -5,13 +5,15 @@
  * @uses infrastructure:prisma
  */
 import { createRebacCheck } from '@inixiative/permissions';
-import type { AccessorName, HydratedRecord } from '@template/db';
-import { schemaMap } from '@template/db/schemaMap';
+import { type AccessorName, type HydratedRecord, resourceOfModel } from '@template/db';
 import type { Permix } from '@template/permissions/client';
 import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
-import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
+import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
+import { memoize } from 'lodash-es';
 
-const rebacCheck = createRebacCheck(schemaMap, { additionalRules: tenantPermissionRulesAbove });
+const rebacCheckOf = memoize((map: SchemaMap) =>
+  createRebacCheck(map, { additionalRules: tenantPermissionRulesAbove }),
+);
 
 const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> => {
   const actor = permix.getActor();
@@ -22,15 +24,14 @@ const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> 
 
 export const check = (
   permix: Permix,
-  schema: RebacSchema,
+  map: SchemaMap,
   model: AccessorName,
   record: HydratedRecord,
   actionOrRule: ActionRule,
   data?: Record<string, HydratedRecord[]>,
 ): boolean =>
-  rebacCheck(
+  rebacCheckOf(map)(
     permix,
-    schema,
-    { resource: `db:${model}`, record, data: { ...data, ...rowsOfActor(permix) } },
+    { resource: resourceOfModel(model), record, data: { ...data, ...rowsOfActor(permix) } },
     actionOrRule,
   );

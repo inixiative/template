@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import { configuredPlatformProviders } from '#/lib/auth/platformProviders';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
@@ -18,7 +18,7 @@ export const organizationReadAuthProviderController = makeController(
     const permix = c.get('permix');
 
     // Check if user has owner permissions - owners see all providers (enabled + disabled)
-    const isOwner = check(permix, rebacSchema, 'organization', organization, 'own');
+    const isOwner = check(permix, schemaMap, 'organization', organization, 'own');
 
     const platformProviders = configuredPlatformProviders();
 

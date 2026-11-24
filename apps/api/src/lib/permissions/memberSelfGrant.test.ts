@@ -9,7 +9,7 @@ import {
   toEntitlementInput,
 } from '@template/permissions';
 import { check } from '@template/permissions/rebac/check';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import { schemaMap } from '@template/permissions/rebac/schema';
 import { narrowOwnerPermissionsToDelegate } from '#/lib/permissions/ownerPermissions';
 
 const o1 = { id: 'o1' };
@@ -32,7 +32,7 @@ type Member = typeof m1;
 
 const withSelfGrant = (member: Member) => ({
   ...member,
-  targetEntitlements: [toEntitlementInput(memberSelfGrant('db:organizationUser', member))],
+  targetEntitlements: [toEntitlementInput(memberSelfGrant('db:OrganizationUser', member))],
 });
 
 const permixOf = async (permissions: Permissions) => {
@@ -47,7 +47,7 @@ const operates = async (
 ) =>
   check(
     await permixOf(table),
-    rebacSchema,
+    schemaMap,
     'organizationUser',
     member as unknown as HydratedRecord,
     'operate',
@@ -77,13 +77,13 @@ describe("only a member's self-grant is backed by its user", () => {
       ...m1,
       targetEntitlements: [
         toEntitlementInput({
-          resource: 'db:organizationUser',
-          anchor: { resource: 'db:user', id: u1.id, path: 'user' },
+          resource: 'db:OrganizationUser',
+          anchor: { resource: 'db:User', id: u1.id, path: 'user' },
           actions: { operate: true },
         }),
         toEntitlementInput({
-          resource: 'db:user',
-          anchor: { resource: 'db:user', id: u1.id },
+          resource: 'db:User',
+          anchor: { resource: 'db:User', id: u1.id },
           actions: { own: true },
         }),
       ],
@@ -92,15 +92,15 @@ describe("only a member's self-grant is backed by its user", () => {
       narrowOwnerPermissionsToDelegate({ full: true }, permissionsOfUser(null, [wider], [])),
     );
     expect(
-      check(full, rebacSchema, 'organizationUser', m3 as unknown as HydratedRecord, 'operate'),
+      check(full, schemaMap, 'organizationUser', m3 as unknown as HydratedRecord, 'operate'),
     ).toBe(false);
-    expect(check(full, rebacSchema, 'user', u1 as unknown as HydratedRecord, 'own')).toBe(false);
+    expect(check(full, schemaMap, 'user', u1 as unknown as HydratedRecord, 'own')).toBe(false);
   });
 
   it("M1's self-grant stored on M2 is backed by the tenant, not U1", async () => {
     const borrowed = {
       ...m2,
-      targetEntitlements: [toEntitlementInput(memberSelfGrant('db:organizationUser', m1))],
+      targetEntitlements: [toEntitlementInput(memberSelfGrant('db:OrganizationUser', m1))],
     };
     const table = narrowOwnerPermissionsToDelegate(
       { full: true },

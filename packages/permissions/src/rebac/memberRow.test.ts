@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { HydratedRecord } from '@template/db';
 import { createPermissions, type PermissionEntry } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import { schemaMap } from '@template/permissions/rebac/schema';
 
 const o1 = { id: 'o1' };
 const s1 = { id: 's1', organizationId: 'o1', organization: o1 };
@@ -35,7 +35,7 @@ const grant = (resource: string, id: string, action: string): PermissionEntry =>
 
 const person = async (user: { id: string }, ...entries: PermissionEntry[]) => {
   const permix = createPermissions();
-  await permix.setup([grant('db:user', user.id, 'own'), ...entries]);
+  await permix.setup([grant('db:User', user.id, 'own'), ...entries]);
   return permix;
 };
 
@@ -44,7 +44,7 @@ const can = (
   model: 'organizationUser' | 'spaceUser',
   record: object,
   action: string,
-) => check(permix, rebacSchema, model, record as HydratedRecord, action);
+) => check(permix, schemaMap, model, record as HydratedRecord, action);
 
 describe('a member row: operate is being the member, manage and own administer it (Aron, 2026-10-30)', () => {
   const mine = orgRow('r1', u1);
@@ -53,7 +53,7 @@ describe('a member row: operate is being the member, manage and own administer i
   it('the member operates their own row, whatever their role', async () => {
     expect(
       can(
-        await person(u1, grant('db:organization', 'o1', 'operate')),
+        await person(u1, grant('db:Organization', 'o1', 'operate')),
         'organizationUser',
         mine,
         'operate',
@@ -61,7 +61,7 @@ describe('a member row: operate is being the member, manage and own administer i
     ).toBe(true);
     expect(
       can(
-        await person(u1, grant('db:organization', 'o1', 'read')),
+        await person(u1, grant('db:Organization', 'o1', 'read')),
         'organizationUser',
         orgRow('r1', u1, 'viewer'),
         'operate',
@@ -70,29 +70,29 @@ describe('a member row: operate is being the member, manage and own administer i
   });
 
   it("a member does not operate a peer's row", async () => {
-    const member = await person(u1, grant('db:organization', 'o1', 'operate'));
+    const member = await person(u1, grant('db:Organization', 'o1', 'operate'));
     expect(can(member, 'organizationUser', peers, 'operate')).toBe(false);
   });
 
   it("an admin does not operate a member's row", async () => {
-    const admin = await person(u1, grant('db:organization', 'o1', 'manage'));
+    const admin = await person(u1, grant('db:Organization', 'o1', 'manage'));
     expect(can(admin, 'organizationUser', peers, 'operate')).toBe(false);
   });
 
   it("the owner owns a member's row and does not operate it", async () => {
-    const owner = await person(u1, grant('db:organization', 'o1', 'own'));
+    const owner = await person(u1, grant('db:Organization', 'o1', 'own'));
     expect(can(owner, 'organizationUser', peers, 'own')).toBe(true);
     expect(can(owner, 'organizationUser', peers, 'manage')).toBe(true);
     expect(can(owner, 'organizationUser', peers, 'operate')).toBe(false);
   });
 
   it('the member does not administer their own row', async () => {
-    const member = await person(u1, grant('db:organization', 'o1', 'operate'));
+    const member = await person(u1, grant('db:Organization', 'o1', 'operate'));
     expect(can(member, 'organizationUser', mine, 'manage')).toBe(false);
   });
 
   it('the same on a space member row', async () => {
-    const admin = await person(u1, grant('db:space', 's1', 'manage'));
+    const admin = await person(u1, grant('db:Space', 's1', 'manage'));
     expect(can(admin, 'spaceUser', spaceRow('sr2', u2), 'manage')).toBe(true);
     expect(can(admin, 'spaceUser', spaceRow('sr2', u2), 'operate')).toBe(false);
     expect(can(await person(u2), 'spaceUser', spaceRow('sr2', u2), 'operate')).toBe(true);
@@ -100,11 +100,11 @@ describe('a member row: operate is being the member, manage and own administer i
 
   it("operate on the user stays in the user's own tenancy: it neither acts as their member nor leaves it; manage does (Aron, 2026-10-31)", async () => {
     const userOperate = createPermissions();
-    await userOperate.setup([grant('db:user', u1.id, 'operate')]);
+    await userOperate.setup([grant('db:User', u1.id, 'operate')]);
     expect(can(userOperate, 'organizationUser', mine, 'operate')).toBe(false);
     expect(can(userOperate, 'organizationUser', mine, 'leave')).toBe(false);
     const userManage = createPermissions();
-    await userManage.setup([grant('db:user', u1.id, 'manage')]);
+    await userManage.setup([grant('db:User', u1.id, 'manage')]);
     expect(can(userManage, 'organizationUser', mine, 'operate')).toBe(true);
     expect(can(userManage, 'organizationUser', mine, 'leave')).toBe(true);
   });

@@ -306,7 +306,7 @@ export const organizationCreateAuthProviderController = makeController(
 // organization/controllers/organizationReadAuthProvider.ts
 import { contextResource } from '#/lib/context/contextResource';
 import { configuredPlatformProviders } from '#/lib/auth/platformProviders';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 
 export const organizationReadAuthProviderController = makeController(
   organizationReadAuthProviderRoute,
@@ -317,7 +317,7 @@ export const organizationReadAuthProviderController = makeController(
     const permix = c.get('permix');
 
     // Owners see all providers (enabled + disabled), others see only enabled
-    const isOwner = user && check(permix, rebacSchema, 'organization', organization, 'own');
+    const isOwner = user && check(permix, schemaMap, 'organization', organization, 'own');
 
     const platformProviders = configuredPlatformProviders();
 

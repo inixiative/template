@@ -33,7 +33,7 @@ import {
   webhookEnabledModels,
 } from '../../packages/db/src/registries';
 import { type ModelName, toAccessor } from '../../packages/db/src/utils/modelNames';
-import { rebacSchema } from '../../packages/permissions/src/rebac/schema';
+import { schemaMap } from '../../packages/permissions/src/rebac/schema';
 
 export const CAPABILITIES_START = '<!-- capabilities:start -->';
 export const CAPABILITIES_END = '<!-- capabilities:end -->';
@@ -76,7 +76,7 @@ export const buildModelCapabilitiesRows = (): ModelCapabilitiesRow[] => {
   const attributes = attributeFieldsByModel();
   const encrypted = encryptedFieldsByModel();
   const webhookSet = new Set<string>(webhookEnabledModels);
-  const rebacResources = rebacSchema.permissions as Record<string, unknown>;
+  const rebacResources = schemaMap.permissions as Record<string, unknown>;
   const models = (Object.keys(prismaMap.models) as ModelName[]).sort();
 
   return models.map((model) => {

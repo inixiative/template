@@ -57,8 +57,8 @@ describe('the real schema map: a path admits every kind that carries its keys (R
     const placed = placeEntitlement(
       schemaMap,
       {
-        resource: 'db:token',
-        anchor: { resource: 'db:organization', id: 'a1', path: 'integration.space.organization' },
+        resource: 'db:Token',
+        anchor: { resource: 'db:Organization', id: 'a1', path: 'integration.space.organization' },
         actions: { read: true },
       } as EntitlementEntry,
       anchor,

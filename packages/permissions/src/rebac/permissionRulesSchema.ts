@@ -5,8 +5,13 @@
  * @uses none
  */
 import { validateActionRule } from '@inixiative/permissions';
-import type { AccessorName, BindableOwnerModel } from '@template/db';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import {
+  type AccessorName,
+  accessorOfResource,
+  type BindableOwnerModel,
+  resourceOfModel,
+} from '@template/db';
+import { schemaMap } from '@template/permissions/rebac/schema';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { z } from 'zod';
 
@@ -35,16 +40,16 @@ const withOpenApiRef = actionRuleBase as z.ZodType & {
 const actionRuleSchema: z.ZodType = withOpenApiRef.openapi?.('ActionRule') ?? actionRuleBase;
 
 export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly string[]) => {
-  const schemaActions = Object.keys(rebacSchema.permissions[`db:${model}`]?.actions ?? {});
+  const resource = resourceOfModel(model);
+  const schemaActions = Object.keys(schemaMap.permissions[resource]?.actions ?? {});
   const allowed = pick ? schemaActions.filter((a) => pick.includes(a)) : schemaActions;
   if (allowed.length === 0) return z.never().nullable().optional();
-  const resource = `db:${model}`;
   return z
     .partialRecord(z.enum(allowed as [string, ...string[]]), actionRuleSchema)
     .superRefine((rowRules, ctx) => {
       for (const [action, rule] of Object.entries(rowRules))
         for (const issue of validateActionRule(rule, {
-          schema: rebacSchema,
+          map: schemaMap,
           resource,
           action,
           rowRules,
@@ -78,8 +83,7 @@ export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) =>
             message: `not something a ${tenantModel} may extend`,
           });
         if (hidden.length) continue;
-        const model = resource.slice('db:'.length) as AccessorName;
-        const parsed = buildPermissionRulesSchema(model).safeParse(rules);
+        const parsed = buildPermissionRulesSchema(accessorOfResource(resource)).safeParse(rules);
         if (!parsed.success)
           for (const issue of parsed.error.issues)
             ctx.addIssue({

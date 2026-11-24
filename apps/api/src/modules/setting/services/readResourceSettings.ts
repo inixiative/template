@@ -13,7 +13,7 @@ import {
 } from '@template/db';
 import type { Setting } from '@template/db/generated/client/client';
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import { settingDefinitionsForResourceModel } from '@template/shared/settings';
 import type { Context } from 'hono';
 import type { SettingListQuery } from '#/modules/setting/schemas/settingSchemas';
@@ -24,7 +24,7 @@ import type { AppEnv } from '#/types/appEnv';
  * Parent `read` access is enforced on the route via `validatePermission('read')`;
  * raw not-deleted rows for `(resourceModel, resourceId)` are cached in Redis via `fetchThroughCache`
  * (invalidated automatically by `cacheKeysByModel.Setting`), then filtered in memory per key
- * through `db:setting:read` and optional `category`/`key` filters.
+ * through `db:Setting:read` and optional `category`/`key` filters.
  */
 export const readResourceSettings = async (
   c: Context<AppEnv>,
@@ -57,7 +57,7 @@ export const readResourceSettings = async (
       .filter((definition) =>
         check(
           permix,
-          rebacSchema,
+          schemaMap,
           'setting',
           { ...hydratedBase, key: definition.key } as HydratedRecord,
           'read',

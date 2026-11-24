@@ -8,7 +8,7 @@ import type { z } from '@hono/zod-openapi';
 import type { HydratedRecord, Prisma } from '@template/db';
 import { hydrate } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import type { ValidatedContext } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
@@ -48,7 +48,7 @@ export const createInquiry = async (
     ...source,
     ...target,
   } as HydratedRecord);
-  if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
+  if (!check(permix, schemaMap, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 
   await validateInquiryPreCreate(service, body.type, source, target, content);

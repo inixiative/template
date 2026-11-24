@@ -9,7 +9,7 @@ import { integrationResourceTransitions } from '@template/permissions/transition
 import { memberRoleTransitions } from '@template/permissions/transitions/memberRoleTransitions';
 
 export const transitions: TransitionMap = {
-  'db:integrationResource': integrationResourceTransitions,
-  'db:organizationUser': memberRoleTransitions('organization'),
-  'db:spaceUser': memberRoleTransitions('space'),
+  'db:IntegrationResource': integrationResourceTransitions,
+  'db:OrganizationUser': memberRoleTransitions('organization'),
+  'db:SpaceUser': memberRoleTransitions('space'),
 };

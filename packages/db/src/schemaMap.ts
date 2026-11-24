@@ -5,11 +5,11 @@
  * @uses none
  */
 import { columnsOf, type FieldMap } from '@inixiative/field-map';
-import type { SchemaMap } from '@inixiative/permissions';
+import type { SchemaMapWithoutPermissions } from '@inixiative/permissions';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { sensitiveFieldsOf } from '@template/db/registries/sensitiveFields';
-import { difference, lowerFirst, pick } from 'lodash-es';
+import { difference, pick } from 'lodash-es';
 
 export const ActorModel = { User: 'User', Token: 'Token' } as const;
 export type ActorModel = (typeof ActorModel)[keyof typeof ActorModel];
@@ -30,11 +30,8 @@ const actorMap: FieldMap = {
   enums: { ...prismaMap.enums, ActorModel: Object.values(ActorModel) },
 };
 
-export const schemaMap: SchemaMap = {
-  resources: Object.fromEntries(
-    Object.keys(prismaMap.models).map((model) => [`db:${lowerFirst(model)}`, model]),
-  ),
-  fieldMap: prismaMap,
-  polymorphism: PolymorphismRegistry,
-  supplied: { maps: { actor: actorMap } },
+export const schemaMapWithoutPermissions: SchemaMapWithoutPermissions = {
+  maps: { db: prismaMap },
+  supplied: { actor: actorMap },
+  polymorphism: { db: PolymorphismRegistry },
 };

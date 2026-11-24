@@ -42,7 +42,7 @@ const integrationOf = async (member: OrganizationUser) =>
   ).entity;
 
 const manageIt = (integration: Integration) =>
-  entitlementInputFor('db:integration', ['db:integration', integration.id], ['manage']);
+  entitlementInputFor('db:Integration', ['db:Integration', integration.id], ['manage']);
 
 describe("a member's operate on itself grants below it: its own integrations (Aron, 2026-11-14)", () => {
   let organization: Organization;
@@ -94,7 +94,7 @@ describe("a member's operate on itself grants below it: its own integrations (Ar
     );
     expect(response.status).toBe(403);
     expect(((await response.json()) as { message: string }).message).toBe(
-      `A delegate holds your permissions or less: you cannot give manage on db:integration at db:integration ${theirs.id}`,
+      `A delegate holds your permissions or less: you cannot give manage on db:Integration at db:Integration ${theirs.id}`,
     );
   });
 
@@ -109,8 +109,8 @@ describe("a member's operate on itself grants below it: its own integrations (Ar
         ),
       );
       const granted = {
-        resource: 'db:integration',
-        anchor: { resource: 'db:integration', id: own.id },
+        resource: 'db:Integration',
+        anchor: { resource: 'db:Integration', id: own.id },
         actions: { manage: true },
       };
       const anchor = await hydrate('integration', own as unknown as HydratedRecord);
@@ -122,7 +122,7 @@ describe("a member's operate on itself grants below it: its own integrations (Ar
     };
 
     const stored = (): EntitlementFields => ({
-      ...toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
+      ...toEntitlementInput(memberSelfGrant('db:OrganizationUser', member)),
       where: null,
       lens: null,
     });

@@ -11,7 +11,7 @@ import {
   type Permix,
 } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import { schemaMap } from '@template/permissions/rebac/schema';
 import {
   settingResourceModelRule,
   settingResourcePermissionFromDefinitions,
@@ -26,7 +26,7 @@ const modelAt = (path: string): string | undefined =>
   relationTarget(prismaMap, 'Setting', path) ?? undefined;
 
 const actionsOf = (model: string) =>
-  Object.keys(rebacSchema.permissions[`db:${lowerFirst(model)}`]?.actions ?? {});
+  Object.keys(schemaMap.permissions[`db:${lowerFirst(model)}`]?.actions ?? {});
 
 const leaves = (condition: Condition): Condition[] => {
   if (typeof condition !== 'object') return [];
@@ -85,18 +85,18 @@ const syntheticDefinitions = {
 };
 
 const syntheticRebacSchema: RebacSchema = {
-  ...rebacSchema,
+  ...schemaMap,
   permissions: {
-    ...rebacSchema.permissions,
-    'db:setting': settingResourcePermissionFromDefinitions(syntheticDefinitions),
+    ...schemaMap.permissions,
+    'db:Setting': settingResourcePermissionFromDefinitions(syntheticDefinitions),
   },
 };
 
 describe('settingResourcePermissionFromDefinitions', () => {
-  it('exposes exactly manage and read actions and serves them on db:setting', () => {
+  it('exposes exactly manage and read actions and serves them on db:Setting', () => {
     const compiled = settingResourcePermissionFromDefinitions(SETTING_DEFINITIONS);
     expect(Object.keys(compiled.actions).sort()).toEqual(['manage', 'read']);
-    expect(rebacSchema.permissions['db:setting']).toEqual(compiled);
+    expect(schemaMap.permissions['db:Setting']).toEqual(compiled);
   });
 
   it('names only relations, actions, and fields the schema actually has across starter and synthetic definitions (all 8 resourceModels)', () => {
@@ -140,7 +140,7 @@ describe('settingResourcePermissionFromDefinitions', () => {
   });
 });
 
-describe('settingResourcePermission & db:projectIntegration through the real check', () => {
+describe('settingResourcePermission & db:ProjectIntegration through the real check', () => {
   const u1 = { id: 'u1' };
   const u2 = { id: 'u2' };
   const organization = { id: 'o1' };
@@ -224,7 +224,7 @@ describe('settingResourcePermission & db:projectIntegration through the real che
     permix: Permix,
     record: object,
     action: 'manage' | 'read',
-    schema: RebacSchema = rebacSchema,
+    schema: RebacSchema = schemaMap,
   ) => check(permix, schema, 'setting', record as HydratedRecord, action);
 
   it('User settings: only the user reads and manages their own settings', async () => {
@@ -397,13 +397,13 @@ describe('settingResourcePermission & db:projectIntegration through the real che
     expect(can(orgAdmin, memberProjectRecord, 'manage')).toBe(false);
   });
 
-  it('db:projectIntegration enforces project:manage + integration:operate on create and project|integration:manage on delete', async () => {
+  it('db:ProjectIntegration enforces project:manage + integration:operate on create and project|integration:manage on delete', async () => {
     const orgAdmin = await principal({ organization: Role.admin }, u2.id);
     const orgMemberUser = await principal({ organization: Role.member }, u1.id);
     const orgViewer = await principal({ organization: Role.viewer }, 'u3');
 
     const checkPI = (permix: Permix, action: string, rec: object = projectIntegration) =>
-      check(permix, rebacSchema, 'projectIntegration', rec as HydratedRecord, action);
+      check(permix, schemaMap, 'projectIntegration', rec as HydratedRecord, action);
 
     expect(checkPI(orgAdmin, 'create')).toBe(true);
     expect(checkPI(orgAdmin, 'manage')).toBe(true);

@@ -55,13 +55,13 @@ createRebacCheck(resolveRelation);               // resolveRelation(resource, se
 **The rule that drove everything:** the `map:` prefix is an **identity + traversal-boundary** concern,
 not a "sprinkle it everywhere" one.
 
-- **Prefix lives on identity:** schema keys (`db:user`), permix grants, the far-resource identity the
+- **Prefix lives on identity:** schema keys (`db:User`), permix grants, the far-resource identity the
   resolver returns, bridge endpoints, and cross-source `subject.data` keys.
 - **Bare inside a fieldmap:** traversing *within* `db` uses the bare accessor — the resolver strips the
   prefix to look models up in `prismaMap`, and `hydrate()` already keys relations by bare accessor. The
   prefix is re-applied only to the far-resource *identity* it returns.
 
-**Casing:** `db:<accessor>` — lowercase, matching `AccessorName` (e.g. `db:user`, `db:organization`).
+**Casing:** `db:<accessor>` — lowercase, matching `AccessorName` (e.g. `db:User`, `db:Organization`).
 The resolver does the `upperFirst`/`lowerFirst` dance internally, since that's the seam to `prismaMap`'s
 PascalCase model keys. (We chose accessor-cased over `db:User` because rebac is the *permission* layer,
 which is accessor-cased throughout — grants, call sites, `AccessorName` — and only the data layer
@@ -76,21 +76,21 @@ a generic `${resource}:${id}` keyer. The engine is untouched.
 - `packages/permissions/package.json` — `@inixiative/permissions` `^0.1.0` → `^0.3.0`.
 - `rebac/types.ts` (+ package `index.ts`, `rebac/index.ts`) — `ModelPermission` → `ResourcePermission`;
   `RebacSchema = EngineRebacSchema` (resource generic left open `string` — consumer-extensible).
-- `rebac/schema.ts` — wrapped `{ bridges: [], permissions: { 'db:user': … } }`; top-level keys
+- `rebac/schema.ts` — wrapped `{ bridges: [], permissions: { 'db:User': … } }`; top-level keys
   `db:`-prefixed (lowercase). `rel:` targets, delegate strings, `path:`/`field:` stay bare.
 - `rebac/check.ts` — `ResolveModel` → `ResolveRelation`; resolver strips `db:` → `upperFirst` →
   `prismaMap` lookup → returns `db:${lowerFirst(field.type)}`. Wrapper builds the `Subject`
   (`resource: \`db:${model}\``) and gained an optional `data?` param for cross-bridge ABAC.
 - `client.ts` — `PermissionEntry.resource` and the permix wrapper's `check` resource → `string`; the
   wrapper stays **generic** (no `db:` logic). `AccessorName` import dropped.
-- `roles/{user,organization,space}.ts` — grants are explicit: `resource: 'db:user'` / `'db:organization'`
-  / `'db:space'` (covers backend setup *and* the frontend store, which use the same helpers).
+- `roles/{user,organization,space}.ts` — grants are explicit: `resource: 'db:User'` / `'db:Organization'`
+  / `'db:Space'` (covers backend setup *and* the frontend store, which use the same helpers).
 - `rebac/rebacSchemaRules.ts`, `rebac/permissionRulesSchema.ts` — type rename;
   `rebacSchema.permissions[\`db:${model}\`]`.
 - `rebac/check.test.ts` — fixtures wrapped + `db:`-keyed; grant setups qualified; **+2 bridge tests**.
 
 **Roles edits ("#4") were reopened deliberately:** with a `db:`-keyed schema the engine checks
-`permix.check('db:organization', …)`, so grants *must* carry the map to match — and stripping to a bare
+`permix.check('db:Organization', …)`, so grants *must* carry the map to match — and stripping to a bare
 model in the engine would collide (`db:User` vs `crm:User` → both `User:id`). The map is part of a
 grant's identity. So the grant *source* (roles) declares it, explicitly. The wrapper was the wrong layer.
 
@@ -98,7 +98,7 @@ grant's identity. So the grant *source* (roles) declares it, explicitly. The wra
 
 ## Bridges — supported & tested
 
-Two tests in `rebac/check.test.ts` prove cross-source walks end-to-end (`db:user` → `crm:account` via
+Two tests in `rebac/check.test.ts` prove cross-source walks end-to-end (`db:User` → `crm:account` via
 the `accountId` join scalar):
 
 - **rbac-terminal** — grant on the far (`crm:account`) resource; no `data` needed. (This test caught the

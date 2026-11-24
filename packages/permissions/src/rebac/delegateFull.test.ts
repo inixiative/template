@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { HydratedRecord } from '@template/db';
 import { ActorModel, createPermissions, type PermissionEntry } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import { schemaMap } from '@template/permissions/rebac/schema';
 
 const o1 = { id: 'o1' };
 const s1 = { id: 's1', organizationId: o1.id, organization: o1 };
@@ -53,7 +53,7 @@ const grant = (resource: string, id: string, action: string): PermissionEntry =>
 });
 const tableOf = async (actor: ActorModel, user: { id: string }, ...entries: PermissionEntry[]) => {
   const permix = createPermissions();
-  await permix.setup([grant('db:user', user.id, 'own'), ...entries]);
+  await permix.setup([grant('db:User', user.id, 'own'), ...entries]);
   permix.setActor({ model: actor, record: { id: actor === ActorModel.User ? user.id : 't1' } });
   return permix;
 };
@@ -65,15 +65,15 @@ const holds = (
   permix: Awaited<ReturnType<typeof tableOf>>,
   model: Parameters<typeof check>[2],
   record: object,
-) => check(permix, rebacSchema, model, record as HydratedRecord, 'delegateFull');
+) => check(permix, schemaMap, model, record as HydratedRecord, 'delegateFull');
 
 describe('delegateFull: who may make a delegate of this thing full (Aron, 2026-10-30)', () => {
-  const owner = () => person(u2, grant('db:organization', o1.id, 'own'));
-  const admin = () => person(u2, grant('db:organization', o1.id, 'manage'));
+  const owner = () => person(u2, grant('db:Organization', o1.id, 'own'));
+  const admin = () => person(u2, grant('db:Organization', o1.id, 'manage'));
 
   it('a member: its user, not the organization owner or an admin', async () => {
     expect(
-      holds(await person(u1, grant('db:organization', o1.id, 'operate')), 'organizationUser', m1),
+      holds(await person(u1, grant('db:Organization', o1.id, 'operate')), 'organizationUser', m1),
     ).toBe(true);
     expect(holds(await owner(), 'organizationUser', m1)).toBe(false);
     expect(holds(await admin(), 'organizationUser', m1)).toBe(false);
@@ -109,7 +109,7 @@ describe('delegateFull: who may make a delegate of this thing full (Aron, 2026-1
   });
 
   it('a token never holds it, even holding everything its user holds (Aron, 2026-10-30)', async () => {
-    const full = await token(u1, grant('db:organization', o1.id, 'own'));
+    const full = await token(u1, grant('db:Organization', o1.id, 'own'));
     expect(holds(full, 'organizationUser', m1)).toBe(false);
     expect(holds(full, 'integration', i.OrganizationUser)).toBe(false);
     expect(holds(full, 'integration', i.Organization)).toBe(false);

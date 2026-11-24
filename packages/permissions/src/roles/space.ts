@@ -17,7 +17,7 @@ export const spaceRoles = {
 export const permissionEntryForSpaceRole = (role: Role, spaceId: string): PermissionEntry => {
   const baseActions = spaceRoles[role].space;
   return {
-    resource: 'db:space',
+    resource: 'db:Space',
     id: spaceId,
     actions: baseActions,
   };

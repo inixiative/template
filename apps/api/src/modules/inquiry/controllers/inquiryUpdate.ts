@@ -7,7 +7,7 @@
 import type { HydratedRecord, Prisma } from '@template/db';
 import { hydrate } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -32,7 +32,7 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
     ...inquiry,
     content: effectiveContent,
   } as HydratedRecord);
-  if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
+  if (!check(permix, schemaMap, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 
   const updated = await db.txn(async () => {

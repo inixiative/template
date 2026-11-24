@@ -1,12 +1,11 @@
 export {
   entitlementProblem,
-  placeEntitlement,
-  placeUnder,
+  pseudoRecordsBelowAnchor,
+  pseudoRecordsOfEntitlement,
   validateActionRule,
 } from '@inixiative/permissions';
-export { schemaMap } from '@template/db/schemaMap';
 export { canGrantEntitlement } from './canGrantEntitlement';
 export { check } from './check';
 export { entitlementInputSchema, entitlementInputsSchema } from './entitlementInputSchema';
-export { rebacSchema } from './schema';
+export { schemaMap } from './schema';
 export type { ActionRule } from './types';

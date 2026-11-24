@@ -145,8 +145,8 @@ describe("a token given operate on its member row operates the member, whatever 
         role,
         entitlements: [
           entitlementInputFor(
-            'db:organizationUser',
-            ['db:organizationUser', member.id],
+            'db:OrganizationUser',
+            ['db:OrganizationUser', member.id],
             ['operate'],
           ),
         ],
@@ -188,8 +188,8 @@ describe("a token given operate on its member row operates the member, whatever 
         role: 'member',
         entitlements: [
           entitlementInputFor(
-            'db:organizationUser',
-            ['db:organizationUser', member.id],
+            'db:OrganizationUser',
+            ['db:OrganizationUser', member.id],
             ['operate'],
           ),
         ],
@@ -442,8 +442,8 @@ describe("a member writes any entitlement on their own member integration, cappe
         role: 'viewer',
         entitlements: [
           toEntitlementInput({
-            resource: 'db:organization',
-            anchor: { resource: 'db:organization', id: organization.id },
+            resource: 'db:Organization',
+            anchor: { resource: 'db:Organization', id: organization.id },
             actions: { manage: true },
           }),
         ],
@@ -466,8 +466,8 @@ describe("a member writes any entitlement on their own member integration, cappe
     const add = {
       add: [
         toEntitlementInput({
-          resource: 'db:organization',
-          anchor: { resource: 'db:organization', id: organization.id },
+          resource: 'db:Organization',
+          anchor: { resource: 'db:Organization', id: organization.id },
           actions: { read: true },
         }),
       ],

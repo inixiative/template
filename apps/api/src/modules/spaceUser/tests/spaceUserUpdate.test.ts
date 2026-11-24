@@ -45,7 +45,7 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
   };
 
   const onSpace = (...actions: string[]) => [
-    entitlementInputFor('db:space', ['db:space', space.id], actions),
+    entitlementInputFor('db:Space', ['db:Space', space.id], actions),
   ];
 
   const write = async (by: Role, target: SpaceUser, body: object) =>
@@ -65,7 +65,7 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
     expect((await grantTo('admin', target, onSpace('operate'))).status).toBe(201);
     expect(
       (await heldEntitlements({ model: 'SpaceUser', id: target.id })).filter(
-        (held) => !isMemberSelfGrant('db:spaceUser', target)(toEntitlementEntry(held)),
+        (held) => !isMemberSelfGrant('db:SpaceUser', target)(toEntitlementEntry(held)),
       ) as unknown,
     ).toEqual(onSpace('operate'));
   });

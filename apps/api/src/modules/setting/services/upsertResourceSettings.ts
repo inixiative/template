@@ -12,7 +12,7 @@ import {
 } from '@template/db';
 import type { Setting } from '@template/db/generated/client/client';
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
 import type { SettingUpsertItem } from '#/modules/setting/schemas/settingSchemas';
@@ -21,7 +21,7 @@ import type { AppEnv } from '#/types/appEnv';
 /**
  * Shared atomic batch writer for all 8 parent-scoped `PATCH /.../settings` routes:
  * 1. Rejects empty arrays (`[]`) and duplicate keys within the batch (422) before auth/locking.
- * 2. Authorizes EVERY item upfront (`db:setting:manage`) — all-or-nothing (403 writes nothing).
+ * 2. Authorizes EVERY item upfront (`db:Setting:manage`) — all-or-nothing (403 writes nothing).
  * 3. Sorts keys lexicographically to avoid lock-ordering deadlocks under concurrent writes.
  * 4. Inside one `db.txn`, locks each `(resourceModel, ...targetFks, key)` via
  *    `db.findForUpdate(..., { upserting: true })`, updates the not-deleted row or creates a new row,
@@ -60,7 +60,7 @@ export const upsertResourceSettings = async (
   for (const item of items) {
     const allowed = check(
       permix,
-      rebacSchema,
+      schemaMap,
       'setting',
       { ...hydratedBase, key: item.key } as HydratedRecord,
       'manage',
