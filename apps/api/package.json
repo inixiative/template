@@ -25,6 +25,7 @@
     "@bull-board/hono": "^6.20.3",
     "@hono/zod-openapi": "^1.6.3",
     "@inixiative/field-map": "^0.1.2",
+    "@inixiative/integrations": "^0.2.0",
     "@inixiative/json-rules": "^4.7.0",
     "@inixiative/transitions": "^0.10.0",
     "@sentry/bun": "^10.42.0",

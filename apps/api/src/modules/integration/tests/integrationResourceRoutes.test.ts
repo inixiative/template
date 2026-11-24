@@ -19,7 +19,9 @@ describe('integration resources', () => {
 
   beforeEach(async () => {
     user = (await createUser()).entity;
-    integration = (await createIntegration({ ownerModel: 'User', userId: user.id })).entity;
+    integration = (
+      await createIntegration({ ownerModel: 'User', userId: user.id, provider: 'slack' })
+    ).entity;
     const harness = createTestApp({
       mockUser: user,
       mount: [(app) => app.route('/api/v1/integration', integrationRouter)],
@@ -112,31 +114,45 @@ describe('integration resources', () => {
     expect(response.status).toBe(403);
   });
 
-  it('takes only a kind the provider declares, with an identifier of that kind', async () => {
-    const { entity: github } = await createIntegration({
+  it('takes only a kind the provider has in the catalog, with an identifier of its shape', async () => {
+    expect((await register({ kind: 'repository' })).status).toBe(422);
+    expect((await register({ kind: 'constructor' })).status).toBe(422);
+    expect((await register({ externalId: 'owner/name' })).status).toBe(422);
+    expect((await register({ externalId: '../x' })).status).toBe(422);
+    expect((await register({})).status).toBe(201);
+  });
+
+  it('takes only metadata of the shape the provider declares', async () => {
+    const { entity: teams } = await createIntegration({
       ownerModel: 'User',
       userId: user.id,
-      provider: 'github',
+      provider: 'teams',
     });
-    const registerOnGithub = (body: Record<string, unknown>) =>
+    const registerOnTeams = (metadata: unknown) =>
       fetch(
-        post(`/api/v1/integration/${github.id}/integrationResources`, {
-          name: 'Repo',
-          kind: 'repository',
-          externalId: '123456',
-          ...body,
+        post(`/api/v1/integration/${teams.id}/integrationResources`, {
+          name: 'General',
+          kind: 'channel',
+          externalId: 'C123',
+          metadata,
         }),
       );
 
-    expect((await registerOnGithub({ kind: 'channel' })).status).toBe(422);
-    expect((await registerOnGithub({ kind: 'constructor' })).status).toBe(422);
-    expect((await registerOnGithub({ externalId: 'owner/name' })).status).toBe(422);
-    expect((await registerOnGithub({})).status).toBe(201);
+    expect((await registerOnTeams({})).status).toBe(422);
+    expect((await registerOnTeams({ teamId: Bun.randomUUIDv7() })).status).toBe(201);
+    expect((await register({ metadata: { extra: true } })).status).toBe(422);
   });
 
-  it('takes any kind with a plain identifier on an integration with no provider', async () => {
-    expect((await register({ kind: 'anything' })).status).toBe(201);
-    expect((await register({ externalId: '../x' })).status).toBe(422);
+  it('takes no resources on an integration with no provider, since the catalog declares none', async () => {
+    const { entity: plain } = await createIntegration({ ownerModel: 'User', userId: user.id });
+    const response = await fetch(
+      post(`/api/v1/integration/${plain.id}/integrationResources`, {
+        name: 'General',
+        kind: 'channel',
+        externalId: 'C123',
+      }),
+    );
+    expect(response.status).toBe(422);
   });
 
   it('lists the not-deleted resources of the integration', async () => {

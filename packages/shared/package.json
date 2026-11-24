@@ -26,7 +26,6 @@
     "./logger/*": "./src/logger/*.ts",
     "./adapter": "./src/adapter/index.ts",
     "./contact": "./src/contact/index.ts",
-    "./integrations/*": "./src/integrations/*.ts",
     "./contact/parsers": "./src/contact/parsers/index.ts",
     "./contact/parsers/*": "./src/contact/parsers/*.ts",
     "./contact/constants": "./src/contact/constants/index.ts",
