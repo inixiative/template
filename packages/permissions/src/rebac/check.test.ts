@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { type JoinedBridge, Operator } from '@inixiative/json-rules';
 import { createRebacCheck } from '@inixiative/permissions';
 import type { AccessorName } from '@template/db';
+import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import { createPermissions, type Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
-import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
+import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
 
 describe('rebac check', () => {
   let permix: Permix;
@@ -14,7 +15,8 @@ describe('rebac check', () => {
   });
 
   describe('direct permissions', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: {
@@ -41,7 +43,8 @@ describe('rebac check', () => {
   });
 
   describe('action inheritance (string rule)', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: {
@@ -75,7 +78,8 @@ describe('rebac check', () => {
   });
 
   describe('relation traversal', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: {
@@ -137,7 +141,8 @@ describe('rebac check', () => {
   });
 
   describe('any (OR) logic', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: { own: null, manage: 'own', read: 'manage' },
@@ -194,7 +199,8 @@ describe('rebac check', () => {
   });
 
   describe('all (AND) logic', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: { own: null },
@@ -254,7 +260,8 @@ describe('rebac check', () => {
   });
 
   describe('json rules attribute checks', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Inquiry': {
           actions: {
@@ -297,7 +304,8 @@ describe('rebac check', () => {
   });
 
   describe('json rules nested attribute access', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: { own: null },
@@ -384,7 +392,8 @@ describe('rebac check', () => {
   describe('polymorphic CustomerRelationship - full example', () => {
     // CustomerRelationship has customer side (user/org/space) and provider side (space)
     // Customer can read their relationships, provider can manage them
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:User': {
           actions: { own: null },
@@ -481,7 +490,8 @@ describe('rebac check', () => {
     const isUser: ActionRule = {
       rule: { field: 'actor:Acting.model', operator: Operator.equals, value: 'User' },
     };
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:User': {
           actions: {
@@ -549,7 +559,8 @@ describe('rebac check', () => {
   });
 
   describe('superadmin bypass', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: { own: null },
@@ -566,7 +577,8 @@ describe('rebac check', () => {
   });
 
   describe('dot-path rel traversal (multi-hop)', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: {
@@ -658,7 +670,8 @@ describe('rebac check', () => {
   });
 
   describe('missing relation handling', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Space': {
           actions: {
@@ -682,7 +695,8 @@ describe('rebac check', () => {
   });
 
   describe('undefined model/action handling', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: { own: null },
@@ -705,7 +719,8 @@ describe('rebac check', () => {
   });
 
   describe('unhappy paths', () => {
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Organization': {
           actions: { own: null, manage: 'own' },
@@ -722,7 +737,8 @@ describe('rebac check', () => {
     });
 
     it('returns false when action delegates to non-existent action', () => {
-      const badSchema: RebacSchema = {
+      const badSchema: SchemaMap = {
+        ...schemaMapWithoutPermissions,
         permissions: { 'db:Organization': { actions: { manage: 'nonExistent' } } },
       };
       const record = { id: 'org-1' };
@@ -736,7 +752,8 @@ describe('rebac check', () => {
     });
 
     it('throws when a rule names a relation the schema map does not declare', () => {
-      const badSchema: RebacSchema = {
+      const badSchema: SchemaMap = {
+        ...schemaMapWithoutPermissions,
         permissions: { 'db:Space': { actions: { own: { rel: 'fakeRelation', action: 'own' } } } },
       };
       const record = { id: 'space-1', fakeRelation: { id: 'fake-1' } };
@@ -744,7 +761,8 @@ describe('rebac check', () => {
     });
 
     it('handles deeply nested delegation chains', async () => {
-      const deepSchema: RebacSchema = {
+      const deepSchema: SchemaMap = {
+        ...schemaMapWithoutPermissions,
         permissions: {
           'db:Organization': { actions: { own: null, a: 'own', b: 'a', c: 'b', d: 'c' } },
         },
@@ -755,7 +773,8 @@ describe('rebac check', () => {
     });
 
     it('handles deeply nested delegation without permission', () => {
-      const deepSchema: RebacSchema = {
+      const deepSchema: SchemaMap = {
+        ...schemaMapWithoutPermissions,
         permissions: {
           'db:Organization': { actions: { own: null, a: 'own', b: 'a', c: 'b', d: 'c' } },
         },
@@ -768,8 +787,8 @@ describe('rebac check', () => {
       // The prisma map template bakes into `check` has no cycle, so generate a relation map with a
       // real space <-> organization cycle and drive the imported engine with it directly.
       const relations: Record<string, Record<string, string>> = {
-        space: { organization: 'organization' },
-        organization: { parentSpace: 'space' },
+        Space: { organization: 'Organization' },
+        Organization: { parentSpace: 'Space' },
       };
       const toOne = (type: string, segment: string) => ({
         kind: 'object' as const,
@@ -779,35 +798,35 @@ describe('rebac check', () => {
         toFields: ['id'],
       });
       const cyclicCheck = createRebacCheck({
-        resources: { space: 'space', organization: 'organization' },
-        fieldMap: {
-          models: Object.fromEntries(
-            Object.entries(relations).map(([model, fields]) => [
-              model,
-              {
-                fields: Object.fromEntries(
-                  Object.entries(fields).map(([segment, type]) => [segment, toOne(type, segment)]),
-                ),
-              },
-            ]),
-          ),
+        maps: {
+          db: {
+            models: Object.fromEntries(
+              Object.entries(relations).map(([model, fields]) => [
+                model,
+                {
+                  fields: Object.fromEntries(
+                    Object.entries(fields).map(([segment, type]) => [
+                      segment,
+                      toOne(type, segment),
+                    ]),
+                  ),
+                },
+              ]),
+            ),
+          },
+        },
+        permissions: {
+          'db:Organization': { actions: { own: { rel: 'parentSpace', action: 'own' } } },
+          'db:Space': { actions: { own: { rel: 'organization', action: 'own' } } },
         },
       });
-      const cyclicSchema = {
-        permissions: {
-          organization: { actions: { own: { rel: 'parentSpace', action: 'own' } } },
-          space: { actions: { own: { rel: 'organization', action: 'own' } } },
-        },
-      };
       const space: Record<string, unknown> = { id: 'space-1' };
       const org: Record<string, unknown> = { id: 'org-1', parentSpace: space };
       space.organization = org;
 
       // No grants — forces schema evaluation down the cyclic relation walk.
       const noGrants = { check: () => false, isSuperadmin: () => false, getActor: () => null };
-      expect(cyclicCheck(noGrants, cyclicSchema, { resource: 'space', record: space }, 'own')).toBe(
-        false,
-      );
+      expect(cyclicCheck(noGrants, { resource: 'db:Space', record: space }, 'own')).toBe(false);
     });
   });
 
@@ -815,7 +834,8 @@ describe('rebac check', () => {
     // Contact-shaped schema: read inherits all the way up from manage from own.
     // The owner (through the user relation) and admins-via-org pass via schema. Row-level
     // permissionRules can grant additional read paths without restricting.
-    const schema: RebacSchema = {
+    const schema: SchemaMap = {
+      ...schemaMapWithoutPermissions,
       permissions: {
         'db:Contact': {
           actions: {
@@ -961,14 +981,15 @@ describe('rebac check', () => {
       {
         endpoints: [
           { fieldMap: 'crm', model: 'account', on: 'id' },
-          { fieldMap: 'db', model: 'user', on: 'accountId' },
+          { fieldMap: 'db', model: 'User', on: 'accountId' },
         ],
         cardinality: 'oneToMany',
       },
     ];
 
     it('rbac-terminal: walks the bridge via the join scalar to a grant on the far (crm) resource', async () => {
-      const schema: RebacSchema = {
+      const schema: SchemaMap = {
+        ...schemaMapWithoutPermissions,
         bridges,
         permissions: {
           'db:User': { actions: { read: { rel: 'crm:account', action: 'read' } } },
@@ -985,7 +1006,8 @@ describe('rebac check', () => {
     });
 
     it('abac-after-bridge: far (crm) record fields come from supplemental data', () => {
-      const schema: RebacSchema = {
+      const schema: SchemaMap = {
+        ...schemaMapWithoutPermissions,
         bridges,
         permissions: {
           'db:User': { actions: { read: { rel: 'crm:account', action: 'read' } } },

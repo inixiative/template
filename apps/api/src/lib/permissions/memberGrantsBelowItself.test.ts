@@ -20,7 +20,11 @@ import {
   toEntitlementInput,
 } from '@template/permissions';
 import type { EntitlementFields } from '@template/permissions/entitlementRows';
-import { canGrantEntitlement, placeEntitlement, schemaMap } from '@template/permissions/rebac';
+import {
+  canGrantEntitlement,
+  pseudoRecordsOfEntitlement,
+  schemaMap,
+} from '@template/permissions/rebac';
 import { narrowOwnerPermissionsToDelegate } from '#/lib/permissions/ownerPermissions';
 import { integrationRouter } from '#/modules/integration';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -114,10 +118,12 @@ describe("a member's operate on itself grants below it: its own integrations (Ar
         actions: { manage: true },
       };
       const anchor = await hydrate('integration', own as unknown as HydratedRecord);
-      const placed = placeEntitlement(schemaMap, granted, anchor) ?? [];
+      const pseudoRecords = pseudoRecordsOfEntitlement(schemaMap, granted, anchor) ?? [];
       return (
-        placed.length > 0 &&
-        placed.every((record) => canGrantEntitlement(permix, granted, record as HydratedRecord))
+        pseudoRecords.length > 0 &&
+        pseudoRecords.every((record) =>
+          canGrantEntitlement(permix, granted, record as HydratedRecord),
+        )
       );
     };
 

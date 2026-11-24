@@ -32,7 +32,7 @@ import {
   SENSITIVE_FIELDS,
   webhookEnabledModels,
 } from '../../packages/db/src/registries';
-import { type ModelName, toAccessor } from '../../packages/db/src/utils/modelNames';
+import { type ModelName, resourceOfModel } from '../../packages/db/src/utils/modelNames';
 import { schemaMap } from '../../packages/permissions/src/rebac/schema';
 
 export const CAPABILITIES_START = '<!-- capabilities:start -->';
@@ -103,7 +103,7 @@ export const buildModelCapabilitiesRows = (): ModelCapabilitiesRow[] => {
       ruleRefSource: isRuleReferenceSourceModel(model),
       cached: Object.hasOwn(cacheKeysByModel, model),
       webhook: webhookSet.has(model),
-      rebac: Object.hasOwn(rebacResources, `db:${toAccessor(model)}`),
+      rebac: Object.hasOwn(rebacResources, resourceOfModel(model)),
     };
   });
 };

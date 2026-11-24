@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { HydratedRecord } from '@template/db';
+import { accessorOfResource, type HydratedRecord } from '@template/db';
 import {
   ActorModel,
   createPermissions,
@@ -347,7 +347,7 @@ describe('every action lives on its own model (Aron, 2026-10-25)', () => {
     const strays = Object.entries(schemaMap.permissions).flatMap(([resource, permission]) =>
       Object.keys(permission?.actions ?? {})
         .filter((action) => action.includes('.'))
-        .filter((action) => `db:${action.split('.')[0]}` !== resource)
+        .filter((action) => action.split('.')[0] !== accessorOfResource(resource))
         .map((action) => `${resource} ${action}`),
     );
     expect(strays).toEqual([]);

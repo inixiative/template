@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { cacheKey, checkCache, db, type EntitlementInput, revive, toAccessor } from '@template/db';
+import {
+  cacheKey,
+  checkCache,
+  db,
+  type EntitlementInput,
+  resourceOfModel,
+  revive,
+} from '@template/db';
 import type {
   Entitlement,
   Organization,
@@ -65,11 +72,9 @@ afterEach(async () => {
 
 describe('the entitlement table: the source names the anchor, the target holds it (Aron, 2026-11-02)', () => {
   it('the source and resource models are the rebac resources, one for one', () => {
-    expect(
-      Object.values(EntitlementResourceModel)
-        .map((model) => `db:${toAccessor(model)}`)
-        .sort(),
-    ).toEqual(Object.keys(schemaMap.permissions).sort());
+    expect(Object.values(EntitlementResourceModel).map(resourceOfModel).sort()).toEqual(
+      Object.keys(schemaMap.permissions).sort(),
+    );
   });
 
   it('one audit entry per row, on create-many and on delete-many', async () => {

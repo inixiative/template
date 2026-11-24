@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { fieldOf, relationTarget } from '@inixiative/field-map';
 import { type Condition, Operator } from '@inixiative/json-rules';
-import type { HydratedRecord } from '@template/db';
+import { type HydratedRecord, resourceOfModel } from '@template/db';
 import { InquiryType, Role } from '@template/db/generated/client/enums';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import {
@@ -20,14 +20,13 @@ import { isNull, rowIsThereAnd } from '@template/permissions/rebac/rebacSchemaRu
 import { schemaMap } from '@template/permissions/rebac/schema';
 import type { ActionRule } from '@template/permissions/rebac/types';
 import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
-import { lowerFirst } from 'lodash-es';
 
 type Gated = { any: { all: [{ rule: { operator: string; value: string } }, unknown] }[] };
 const modelAt = (path: string): string | undefined =>
   relationTarget(prismaMap, 'Inquiry', path) ?? undefined;
 
 const actionsOf = (model: string) =>
-  Object.keys(schemaMap.permissions[`db:${lowerFirst(model)}`]?.actions ?? {});
+  Object.keys(schemaMap.permissions[resourceOfModel(model)]?.actions ?? {});
 
 const leaves = (condition: Condition): Condition[] => {
   if (typeof condition !== 'object') return [];

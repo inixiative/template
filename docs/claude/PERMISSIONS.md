@@ -540,7 +540,7 @@ Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on t
 
 ### Granting an Entitlement
 
-A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
+A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `pseudoRecordsOfEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
 
 1. **The writer's role table, and what it holds outright above the record.** The writer's table (no actor) takes each action on the pseudo record, and a field the record does not carry fails every rule on it. The pseudo record never carries its own key, so a rule that rests on an empty column (a null check beside `id exists`) is not grantable over many records. A rule on `actor:` rows never passes, so a person-only action is never grantable. An entitlement the writer holds counts here too, like a role on its record, when it is marked `grantsBelow` and sits on a real row above the pseudo record ([Granting below a held row](#granting-below-a-held-row)).
 2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed (an `all` holding every conjunct of the held `where` plus more: held `C`, granted `all: [A, B, C]`), and its granter still backing each action. The lens is never copied: lenses compose down the chain ([the lens](../../packages/permissions/src/rebac/ENTITLEMENTS.md#the-lens)). Held entitlements never combine: to pass on two, grant two.
@@ -946,12 +946,12 @@ A route on a submodel (a create or a collection under an owner: `/organization/:
 
 ```typescript
 // apps/api/src/middleware/validations/validateSubmodelPermission.ts
-const { submodel, placed } = placeSubmodel(c);
-const pseudo = await hydrate(submodel, { id: '', ...placed });
+const { submodel, pseudoRecord } = pseudoRecordOfSubmodel(c);
+const pseudo = await hydrate(submodel, { id: '', ...pseudoRecord });
 check(permix, schemaMap, submodel, pseudo, action);
 ```
 
-- `placeSubmodel` (`apps/api/src/lib/permissions/placeSubmodel.ts`) calls `placeUnder` (the library's, re-exported from `@template/permissions/rebac`), which builds the pseudo record along the owner's relation: the owner keys, the owner attached, the kind narrowed to the owner's model; `id: ''` never matches a grant keyed by a real row.
+- `pseudoRecordOfSubmodel` (`apps/api/src/lib/permissions/pseudoRecordOfSubmodel.ts`) calls `pseudoRecordsBelowAnchor` (the library's, re-exported from `@template/permissions/rebac`), which builds the pseudo record along the owner's relation: the owner keys, the owner attached, the kind narrowed to the owner's model; `id: ''` never matches a grant keyed by a real row.
 - It never reads the request body. Checks that depend on the body (a token's role or `full`, an integration's role, an inquiry's `send`) stay in their services.
 - Using it on a route with no submodel throws on each request to that route (`validateSubmodelPermission.test.ts`).
 

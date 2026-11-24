@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'bun:test';
-import { type EntitlementEntry, placeEntitlement } from '@inixiative/permissions';
-import { schemaMap } from '@template/db/schemaMap';
+import { type EntitlementEntry, pseudoRecordsOfEntitlement } from '@inixiative/permissions';
+import { resourceOfModel } from '@template/db';
+import { schemaMap } from '@template/permissions/rebac/schema';
 
 const anchor = { id: 'a1', organizationId: 'o1' };
 
 const kinds = (resource: string, anchorResource: string, path: string, field = 'ownerModel') =>
-  placeEntitlement(
+  pseudoRecordsOfEntitlement(
     schemaMap,
     {
-      resource: `db:${resource}`,
-      anchor: { resource: `db:${anchorResource}`, id: 'a1', path },
+      resource: resourceOfModel(resource),
+      anchor: { resource: resourceOfModel(anchorResource), id: 'a1', path },
       actions: { read: true },
     } as EntitlementEntry,
     anchor,
@@ -54,7 +55,7 @@ describe('the real schema map: a path admits every kind that carries its keys (R
   });
 
   it('a token owned by an integration: a kind at each step', () => {
-    const placed = placeEntitlement(
+    const placed = pseudoRecordsOfEntitlement(
       schemaMap,
       {
         resource: 'db:Token',

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 import { validateActionRule, validateSchema } from '@inixiative/permissions';
-import { schemaMap } from '@template/db/schemaMap';
 import { schemaMap } from '@template/permissions/rebac/schema';
 
 describe('schemaMap', () => {
@@ -14,6 +13,6 @@ describe('schemaMap', () => {
   });
 
   it('is valid against the schema map: every action a rule names exists, every read is inside the lens', () => {
-    expect(validateSchema(schemaMap, schemaMap).errors).toEqual([]);
+    expect(validateSchema(schemaMap).errors).toEqual([]);
   });
 });
