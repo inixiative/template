@@ -9,8 +9,6 @@ import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
 
-export const ARTIFACT_MAX_DEPTH = 50;
-
 type AncestorInfo = { inherits: boolean; depth: number };
 
 type TreeNode = OwnedArtifact & { access: ArtifactAccess; parents: string[] };
@@ -27,8 +25,10 @@ const collectDescendantIds = async (rootIds: string[]): Promise<Set<string>> => 
 
 type SubgraphContext = {
   nodes: Map<string, TreeNode>;
+  directPermsByArtifact: Map<string, string[]>;
   boundaryParents: Map<string, OwnedArtifact>;
   boundaryAncestors: Map<string, Map<string, AncestorInfo>>;
+  boundaryPermsByArtifact: Map<string, string[]>;
 };
 
 const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphContext> => {
@@ -42,9 +42,11 @@ const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphCont
       organizationId: true,
       spaceId: true,
       placements: { select: { containerArtifactId: true } },
+      permissions: { select: { id: true } },
     },
   });
   const nodes = new Map<string, TreeNode>();
+  const directPermsByArtifact = new Map<string, string[]>();
   const boundaryCandidateIds = new Set<string>();
   for (const row of rows) {
     const parents = row.placements.map((placement) => placement.containerArtifactId);
@@ -56,6 +58,12 @@ const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphCont
       spaceId: row.spaceId,
       parents,
     });
+    if (row.permissions.length > 0) {
+      directPermsByArtifact.set(
+        row.id,
+        row.permissions.map((permission) => permission.id),
+      );
+    }
   }
   for (const node of nodes.values()) {
     for (const parentId of node.parents) {
@@ -65,31 +73,49 @@ const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphCont
 
   const boundaryParents = new Map<string, OwnedArtifact>();
   const boundaryAncestors = new Map<string, Map<string, AncestorInfo>>();
+  const boundaryPermsByArtifact = new Map<string, string[]>();
   if (boundaryCandidateIds.size > 0) {
-    const candidateList = [...boundaryCandidateIds];
     const liveParents = await db.artifact.findMany({
-      where: { id: { in: candidateList } },
-      select: { id: true, ownerModel: true, userId: true, organizationId: true, spaceId: true },
+      where: { id: { in: [...boundaryCandidateIds] } },
+      select: {
+        id: true,
+        ownerModel: true,
+        userId: true,
+        organizationId: true,
+        spaceId: true,
+        ancestors: { select: { ancestorArtifactId: true, inherits: true, depth: true } },
+        effectivePermissions: { select: { permissionId: true } },
+      },
     });
-    for (const parent of liveParents) boundaryParents.set(parent.id, parent);
-
-    if (boundaryParents.size > 0) {
-      const ancestorRows = await db.artifactAncestor.findMany({
-        where: { artifactId: { in: [...boundaryParents.keys()] } },
-        select: { artifactId: true, ancestorArtifactId: true, inherits: true, depth: true },
-      });
-      for (const row of ancestorRows) {
-        let map = boundaryAncestors.get(row.artifactId);
-        if (!map) {
-          map = new Map();
-          boundaryAncestors.set(row.artifactId, map);
-        }
-        map.set(row.ancestorArtifactId, { inherits: row.inherits, depth: row.depth });
+    for (const parent of liveParents) {
+      boundaryParents.set(parent.id, parent);
+      if (parent.ancestors.length > 0) {
+        boundaryAncestors.set(
+          parent.id,
+          new Map(
+            parent.ancestors.map((row) => [
+              row.ancestorArtifactId,
+              { inherits: row.inherits, depth: row.depth },
+            ]),
+          ),
+        );
+      }
+      if (parent.effectivePermissions.length > 0) {
+        boundaryPermsByArtifact.set(
+          parent.id,
+          parent.effectivePermissions.map((row) => row.permissionId),
+        );
       }
     }
   }
 
-  return { nodes, boundaryParents, boundaryAncestors };
+  return {
+    nodes,
+    directPermsByArtifact,
+    boundaryParents,
+    boundaryAncestors,
+    boundaryPermsByArtifact,
+  };
 };
 
 const computeAncestorsMap = ({ nodes, boundaryParents, boundaryAncestors }: SubgraphContext) => {
@@ -188,37 +214,12 @@ const syncAncestors = async (
 
 const syncEffectivePermissions = async (
   artifactIds: string[],
-  boundaryParents: Map<string, OwnedArtifact>,
+  { directPermsByArtifact, boundaryParents, boundaryPermsByArtifact }: SubgraphContext,
   desiredByArtifact: Map<string, Map<string, AncestorInfo>>,
 ): Promise<void> => {
-  const directPermissions = await db.artifactPermission.findMany({
-    where: { artifactId: { in: artifactIds } },
-    select: { id: true, artifactId: true },
-  });
-  const boundaryIds = [...boundaryParents.keys()];
-  const boundaryEffectiveRows =
-    boundaryIds.length > 0
-      ? await db.artifactEffectivePermission.findMany({
-          where: { artifactId: { in: boundaryIds } },
-          select: { artifactId: true, permissionId: true },
-        })
-      : [];
   const existing = await db.artifactEffectivePermission.findMany({
     where: { artifactId: { in: artifactIds } },
   });
-
-  const directPermsByArtifact = new Map<string, string[]>();
-  for (const permission of directPermissions) {
-    const list = directPermsByArtifact.get(permission.artifactId) ?? [];
-    list.push(permission.id);
-    directPermsByArtifact.set(permission.artifactId, list);
-  }
-  const boundaryPermsByArtifact = new Map<string, string[]>();
-  for (const row of boundaryEffectiveRows) {
-    const list = boundaryPermsByArtifact.get(row.artifactId) ?? [];
-    list.push(row.permissionId);
-    boundaryPermsByArtifact.set(row.artifactId, list);
-  }
 
   const existingByKey = new Map(
     existing.map((row) => [`${row.artifactId}:${row.permissionId}`, row]),
@@ -278,7 +279,7 @@ export const syncArtifactSubgraph = async (rootIds: string[]): Promise<void> => 
     );
 
     await syncAncestors(liveIds, desiredByArtifact);
-    await syncEffectivePermissions(liveIds, context.boundaryParents, desiredByArtifact);
+    await syncEffectivePermissions(liveIds, context, desiredByArtifact);
   });
 };
 

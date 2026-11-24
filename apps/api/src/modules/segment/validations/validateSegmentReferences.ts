@@ -7,11 +7,13 @@
 import type { Condition } from '@inixiative/json-rules';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { findReferenceCycle } from '@template/shared/graph';
 import { makeError } from '#/lib/errors';
 import { ownedSegments } from '#/modules/customerRelationship/lib/ownedSegments';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
-import { targetSegmentIdsBySegmentId } from '#/modules/segment/services/segmentReferenceGraph';
+import {
+  findReferenceCycle,
+  targetSegmentIdsBySegmentId,
+} from '#/modules/segment/services/segmentReferenceGraph';
 
 type Owner = { ownerModel: ProviderModel } & Record<string, unknown>;
 

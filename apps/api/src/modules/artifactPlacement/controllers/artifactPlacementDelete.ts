@@ -6,7 +6,7 @@
  */
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { removeArtifactPlacement } from '#/modules/artifact/services/removeArtifactPlacement';
+import { removeArtifactPlacement } from '#/modules/artifact/services/artifactPlacements';
 import { artifactPlacementDeleteRoute } from '#/modules/artifactPlacement/routes/artifactPlacementDelete';
 
 export const artifactPlacementDeleteController = makeController(

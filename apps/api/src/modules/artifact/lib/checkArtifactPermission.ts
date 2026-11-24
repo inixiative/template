@@ -43,8 +43,10 @@ export const assertArtifactPermission = async (
 };
 
 export const artifactEffectiveRole = (permix: Permix, hydrated: HydratedRecord): Role | null => {
+  // why: public access is reported separately in `effectiveAccess.public`, not synthesized as a viewer role.
+  const withoutPublic = { ...hydrated, access: 'private' };
   for (const role of [...roleHierarchy].reverse()) {
-    if (check(permix, rebacSchema, 'artifact', hydrated, roleToStandardAction(role))) {
+    if (check(permix, rebacSchema, 'artifact', withoutPublic, roleToStandardAction(role))) {
       return role;
     }
   }

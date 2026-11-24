@@ -17,7 +17,7 @@ import { delegate, permissionsOfUser } from '@template/permissions';
 import { createPermissions, installPermissions } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
-import { ARTIFACT_MAX_DEPTH } from '#/hooks/artifactTree/syncArtifactTree';
+import { ARTIFACT_MAX_DEPTH } from '@template/shared/artifact';
 import {
   artifactEffectiveRole,
   hydrateArtifact,

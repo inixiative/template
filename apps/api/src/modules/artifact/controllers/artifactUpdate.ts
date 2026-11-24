@@ -4,12 +4,10 @@
  * @partOf feature:files
  * @uses primitive:routeTemplates, primitive:authz
  */
-import type { Artifact } from '@template/db/generated/client/client';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
-import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { makeController } from '#/lib/utils/makeController';
-import { artifactOwner } from '#/modules/artifact/lib/artifactOwner';
+import { withLockedArtifacts } from '#/modules/artifact/lib/artifactOwner';
 import { canActOnArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactUpdateRoute } from '#/modules/artifact/routes/artifactUpdate';
 
@@ -18,22 +16,14 @@ export const artifactUpdateController = makeController(artifactUpdateRoute, asyn
   const permix = c.get('permix');
   const artifact = contextResource<'artifact'>(c);
   const data = c.req.valid('json');
-  const updated = await withOwnerLock(artifactOwner(artifact), 'containers', () =>
-    db.txn(async () => {
-      const [locked] = await db.findForUpdate<Artifact>('Artifact', { id: artifact.id });
-      if (!locked || locked.deletedAt) {
-        throw makeError({ status: 404, message: 'Artifact not found' });
+  const updated = await withLockedArtifacts([artifact], async (locked) => {
+    const target = locked.get(artifact.id)!;
+    if (data.access !== undefined && data.access !== target.access) {
+      if (!(await canActOnArtifact(permix, target, 'manage'))) {
+        throw makeError({ status: 403, message: 'Forbidden' });
       }
-      if (data.access !== undefined && data.access !== locked.access) {
-        if (!(await canActOnArtifact(permix, locked, 'manage'))) {
-          throw makeError({ status: 403, message: 'Forbidden' });
-        }
-      }
-      return db.artifact.update({
-        where: { id: locked.id },
-        data,
-      });
-    }),
-  );
+    }
+    return db.artifact.update({ where: { id: target.id }, data });
+  });
   return respond.ok(updated);
 });

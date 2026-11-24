@@ -2,15 +2,25 @@
  * @atlas
  * @kind controller
  * @partOf feature:files
- * @uses primitive:routeTemplates, primitive:authz, primitive:batch
+ * @uses primitive:routeTemplates, primitive:authz
  */
 import { columnsOf } from '@inixiative/field-map';
-import type { ArtifactPermission, ResourceBinding } from '@template/db/generated/client/client';
+import {
+  type AccessorName,
+  db,
+  type HydratedRecord,
+  hydrate,
+  rowPolymorphicAxisPointsAt,
+} from '@template/db';
+import type {
+  Artifact,
+  ArtifactPermission,
+  ResourceBinding,
+} from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import type { Permix } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import type { Context } from 'hono';
 import { pick } from 'lodash-es';
-import { actingUser } from '#/lib/context/actingUser';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import {
@@ -19,28 +29,38 @@ import {
   isArtifactPublic,
 } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactReadRoute } from '#/modules/artifact/routes/artifactRead';
-import { fetchArtifactAncestors } from '#/modules/artifact/services/fetchArtifactAncestors';
 import { listableArtifacts } from '#/modules/artifact/services/listableArtifacts';
-import { fetchAsCaller } from '#/modules/batch/services/fetchAsCaller';
-import type { AppEnv } from '#/types/appEnv';
 
-const ownerReadPath: Partial<
-  Record<ResourceBinding['resourceModel'], (binding: ResourceBinding) => string>
-> = {
-  Organization: (binding) => `/api/v1/organization/${binding.resourceOrganizationId}`,
-  Space: (binding) => `/api/v1/space/${binding.resourceSpaceId}`,
+type BindingAccessor = Extract<AccessorName, 'user' | 'organization' | 'space'>;
+
+const bindingAccessorByModel: Partial<Record<ResourceBinding['resourceModel'], BindingAccessor>> = {
+  User: 'user',
+  Organization: 'organization',
+  Space: 'space',
 };
 
-const visibleToCaller = async (c: Context<AppEnv>, binding: ResourceBinding): Promise<boolean> => {
-  if (binding.resourceModel === 'User') return actingUser(c)?.id === binding.resourceUserId;
-  const path = ownerReadPath[binding.resourceModel]?.(binding);
-  if (!path) return false;
-  const { status } = await fetchAsCaller(c, path);
-  return status >= 200 && status < 300;
+const visibleBindingToCaller = async (
+  permix: Permix,
+  binding: ResourceBinding,
+): Promise<boolean> => {
+  const ref = rowPolymorphicAxisPointsAt(
+    binding as Record<string, unknown>,
+    'ResourceBinding',
+    'resourceModel',
+  );
+  if (!ref) return false;
+  const accessor = bindingAccessorByModel[ref.model as ResourceBinding['resourceModel']];
+  if (!accessor) return false;
+  const record = await db.delegate(accessor).findUnique({ where: { id: ref.id } });
+  if (!record) return false;
+  const hydrated = await hydrate(accessor, record as HydratedRecord);
+  return check(permix, rebacSchema, accessor, hydrated, 'read');
 };
 
+type HydratedAncestorItem = { ancestorArtifact?: Artifact | null };
 type EffectivePermItem = { permission?: ArtifactPermission | null };
 
+const artifactColumns = columnsOf(prismaMap, 'Artifact');
 const artifactPermissionColumns = columnsOf(prismaMap, 'ArtifactPermission');
 
 const activeEffectivePermissions = (items: EffectivePermItem[]): ArtifactPermission[] => {
@@ -57,46 +77,72 @@ const activeEffectivePermissions = (items: EffectivePermItem[]): ArtifactPermiss
 };
 
 export const artifactReadController = makeController(artifactReadRoute, async (c, respond) => {
-  const db = c.get('db');
   const permix = c.get('permix');
   const artifact = contextResource<'artifact'>(c);
   const hydrated = await hydrateArtifact(artifact);
   const canManage = check(permix, rebacSchema, 'artifact', hydrated, 'manage');
 
-  const rawParents = await db.artifact.findMany({
-    where: { contents: { some: { artifactId: artifact.id } } },
-    orderBy: { name: 'asc' },
-  });
-  const parents = await listableArtifacts(permix, rawParents);
-  const visibleParentIds = new Set(parents.map((parent) => parent.id));
-  const ancestors = await fetchArtifactAncestors(permix, artifact.id);
+  const candidateAncestors = ((hydrated.ancestors ?? []) as HydratedAncestorItem[])
+    .map((item) => item.ancestorArtifact)
+    .filter((row): row is Artifact => Boolean(row) && row!.deletedAt === null)
+    .map((row) => pick(row, artifactColumns) as Artifact);
+  const readableAncestors = await listableArtifacts(permix, candidateAncestors);
+  const readableById = new Map(readableAncestors.map((row) => [row.id, row]));
 
-  const rawPlacements = await db.artifactPlacement.findMany({
-    where: { artifactId: artifact.id },
-    orderBy: { createdAt: 'asc' },
-  });
-  const placements = rawPlacements.filter((placement) =>
-    visibleParentIds.has(placement.containerArtifactId),
-  );
+  const [allPlacements, permissions, rawBindings] = await Promise.all([
+    readableById.size > 0
+      ? db.artifactPlacement.findMany({
+          where: {
+            artifactId: { in: [artifact.id, ...readableById.keys()] },
+            containerArtifactId: { in: [...readableById.keys()] },
+          },
+          orderBy: { createdAt: 'asc' },
+        })
+      : Promise.resolve([]),
+    canManage
+      ? db.artifactPermission.findMany({
+          where: { artifactId: artifact.id },
+          orderBy: { createdAt: 'asc' },
+        })
+      : Promise.resolve([]),
+    db.resourceBinding.findMany({
+      where: { sourceArtifactId: artifact.id },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ]);
 
-  const permissions = canManage
-    ? await db.artifactPermission.findMany({
-        where: { artifactId: artifact.id },
-        orderBy: { createdAt: 'asc' },
-      })
-    : [];
+  const placements = allPlacements.filter((placement) => placement.artifactId === artifact.id);
+  const parents = [...new Set(placements.map((placement) => placement.containerArtifactId))]
+    .map((id) => readableById.get(id)!)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const parentsByNode = new Map<string, string[]>();
+  for (const placement of allPlacements) {
+    const list = parentsByNode.get(placement.artifactId) ?? [];
+    list.push(placement.containerArtifactId);
+    parentsByNode.set(placement.artifactId, list);
+  }
+  const reached = new Set<string>();
+  const edges: { artifactId: string; containerArtifactId: string }[] = [];
+  const visit = (nodeId: string) => {
+    for (const containerArtifactId of parentsByNode.get(nodeId) ?? []) {
+      edges.push({ artifactId: nodeId, containerArtifactId });
+      if (reached.has(containerArtifactId)) continue;
+      reached.add(containerArtifactId);
+      visit(containerArtifactId);
+    }
+  };
+  visit(artifact.id);
+  const ancestors = { artifacts: [...reached].map((id) => readableById.get(id)!), edges };
+
   const effectivePermissions = canManage
     ? activeEffectivePermissions((hydrated.effectivePermissions ?? []) as EffectivePermItem[])
     : [];
 
-  const rawBindings = await db.resourceBinding.findMany({
-    where: { sourceArtifactId: artifact.id },
-    orderBy: { createdAt: 'asc' },
-  });
-  const bindings: ResourceBinding[] = [];
-  for (const binding of rawBindings) {
-    if (await visibleToCaller(c, binding)) bindings.push(binding);
-  }
+  const bindingFlags = await Promise.all(
+    rawBindings.map((binding) => visibleBindingToCaller(permix, binding)),
+  );
+  const bindings = rawBindings.filter((_, index) => bindingFlags[index]);
 
   return respond.ok({
     ...artifact,

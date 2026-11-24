@@ -24,7 +24,7 @@ export const fetchRootArtifacts = async (permix: Permix, owner: OwnerRef): Promi
   ];
   const containers =
     containerIds.length > 0
-      ? await db.artifact.findMany({ where: { id: { in: containerIds } } })
+      ? await db.artifact.findMany({ where: { id: { in: containerIds }, ...ownerColumns(owner) } })
       : [];
   const visibleContainerIds = new Set(
     (await listableArtifacts(permix, containers)).map((container) => container.id),

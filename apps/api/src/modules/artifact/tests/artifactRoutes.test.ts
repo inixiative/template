@@ -414,6 +414,95 @@ describe('artifact routes', () => {
     expect((await adminFetch(del(`/api/v1/artifactPlacement/${edgeId}`))).status).toBe(204);
   });
 
+  it('cross-owner placements do not hide root artifacts or defeat inherit: false on same-owner placements', async () => {
+    const aliceFolder = await createFolder(outsiderFetch, '/api/v1/me/artifacts');
+    const alicePublic = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      access: 'public',
+    });
+    const aliceFile = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      containerArtifactId: aliceFolder.id,
+    });
+    expect(aliceFile.access).toBe('inherit');
+
+    await outsiderFetch(
+      post(`/api/v1/artifact/${aliceFile.id}/artifactPermissions`, {
+        granteeModel: 'User',
+        granteeUserId: admin.id,
+        role: 'viewer',
+      }),
+    );
+    const orgPublic = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { access: 'public' },
+    );
+    expect((await place(adminFetch, aliceFile, orgPublic)).status).toBe(201);
+
+    // Remove from aliceFolder: aliceFile must still show at outsider's root despite sitting in orgPublic
+    expect(
+      (
+        await outsiderFetch(
+          post(`/api/v1/artifact/${aliceFile.id}/move`, {
+            fromContainerArtifactId: aliceFolder.id,
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    const roots = await parseSuccessBody<Artifact[]>(
+      await outsiderFetch(get('/api/v1/me/artifacts')),
+    );
+    expect(roots.data.map((artifact) => artifact.id)).toContain(aliceFile.id);
+
+    // Placing into alicePublic with explicit inherit: false must reset access to private (not public!)
+    expect(
+      (
+        await outsiderFetch(
+          post(`/api/v1/artifact/${aliceFile.id}/artifactPlacements`, {
+            containerArtifactId: alicePublic.id,
+            inherit: false,
+          }),
+        )
+      ).status,
+    ).toBe(201);
+    const after = await db.artifact.findUniqueOrThrow({ where: { id: aliceFile.id } });
+    expect(after.access).toBe('private');
+    expect((await memberFetch(get(`/api/v1/artifact/${aliceFile.id}`))).status).toBe(403);
+  });
+
+  it('moveArtifact refuses cross-owner fromContainer when the artifact is not in it without leaking existence', async () => {
+    const victimPrivate = await createFolder(outsiderFetch, '/api/v1/me/artifacts');
+    const attackerFolder = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+    );
+    expect(
+      (
+        await adminFetch(
+          post(`/api/v1/artifact/${victimPrivate.id}/move`, {
+            fromContainerArtifactId: attackerFolder.id,
+          }),
+        )
+      ).status,
+    ).toBe(403);
+  });
+
+  it('GET /artifact/:id reports effectiveAccess.role as null for strangers on public artifacts', async () => {
+    const pub = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { access: 'public' },
+    );
+    const asOutsider = await parseSuccessBody<{
+      effectiveAccess: { role: string | null; public: boolean };
+    }>(await outsiderFetch(get(`/api/v1/artifact/${pub.id}`)));
+    expect(asOutsider.data.effectiveAccess).toEqual({ role: null, public: true });
+
+    const asAdmin = await parseSuccessBody<{
+      effectiveAccess: { role: string | null; public: boolean };
+    }>(await adminFetch(get(`/api/v1/artifact/${pub.id}`)));
+    expect(asAdmin.data.effectiveAccess).toEqual({ role: 'owner', public: true });
+  });
+
   it('PATCH /artifact/:id lets operate rename, requires manage to change access', async () => {
     // member has operate (member role) on shared via beforeEach
     expect(

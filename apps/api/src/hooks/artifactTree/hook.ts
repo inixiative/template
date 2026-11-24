@@ -84,8 +84,10 @@ export const registerArtifactTreeHook = () => {
         if (!result || typeof result.id !== 'string') continue;
         const { id } = result;
         const accessChanged = previous && result.access !== previous.access;
+        const inheritChanged =
+          accessChanged && (result.access === 'private') !== (previous.access === 'private');
         const revived = previous?.deletedAt != null && result.deletedAt == null;
-        if (accessChanged || revived) subgraphIds.push(id);
+        if (inheritChanged || revived) subgraphIds.push(id);
         if (accessChanged && (result.access === 'public' || previous.access === 'public')) {
           publicChangedIds.push(id);
         }

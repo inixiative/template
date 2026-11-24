@@ -50,7 +50,6 @@ export const fetchCachedRecordWithTargetEntitlements = async <T extends Hydrated
   accessor: AccessorName,
   identifier: Identifier,
   ttl: number = DEFAULT_TTL,
-  downInclude?: PrismaIncludeOfDown,
 ): Promise<T | null> => {
   const key = cacheKey(accessor, identifier);
   const delegate = db.delegate(accessor);
@@ -59,8 +58,8 @@ export const fetchCachedRecordWithTargetEntitlements = async <T extends Hydrated
   const targetInclude = isEntitlementTargetAccessor(accessor)
     ? includeTargetEntitlements(entitlementTargetModelOf(accessor))
     : undefined;
-  const resolvedDown = downInclude ?? downIncludeOfAccessor(accessor);
-  const include = targetInclude || resolvedDown ? { ...targetInclude, ...resolvedDown } : undefined;
+  const downInclude = downIncludeOfAccessor(accessor);
+  const include = targetInclude || downInclude ? { ...targetInclude, ...downInclude } : undefined;
   return fetchThroughCache<T | null>(
     key,
     () => delegate.findFirst({ where, include }) as Promise<T | null>,

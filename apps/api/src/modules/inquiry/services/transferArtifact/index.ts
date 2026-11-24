@@ -19,6 +19,7 @@ import {
   type OwnedArtifact,
   ownerColumns,
   sameArtifactOwner,
+  withArtifactOwnersLock,
 } from '#/modules/artifact/lib/artifactOwner';
 import { copyArtifactInto } from '#/modules/artifact/services/artifactPlacements';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
@@ -143,26 +144,50 @@ export const transferArtifactService: InquiryService<
     if (target.model === source.model && target.id === source.id) {
       throw makeError({ status: 422, message: 'The artifact already belongs to that owner' });
     }
-    await db.findForUpdate('Artifact', { id: content.artifactId });
-    const artifact = await fetchOwnedObject(content.artifactId, source);
     const sourceOwner = await fetchOwnerOf(source);
     const targetOwner = await fetchOwnerOf(target);
-    const allowTracking = response.allowTracking ?? content.allowTracking;
-    const tracked = content.keepTracking && allowTracking !== false;
+    const existingPlacements = await db.artifactPlacement.findMany({
+      where: { artifactId: content.artifactId },
+      include: {
+        containerArtifact: {
+          select: { ownerModel: true, userId: true, organizationId: true, spaceId: true },
+        },
+      },
+    });
+    const lockTargets: OwnedArtifact[] = [
+      sourceOwner,
+      targetOwner,
+      ...existingPlacements.map((placement) => placement.containerArtifact),
+    ];
 
-    if (content.keepTracking && allowTracking === false) {
-      await copyArtifactInto(artifact, sourceOwner, {});
-    }
-    await db.artifactPlacement.updateManyAndReturn({
-      where: { artifactId: artifact.id },
-      data: { deletedAt: new Date() },
+    await withArtifactOwnersLock(lockTargets, async () => {
+      const [artifact] = await db.findForUpdate<Artifact>('Artifact', { id: content.artifactId });
+      if (!artifact || artifact.deletedAt || !sameArtifactOwner(artifact, sourceOwner)) {
+        throw makeError({ status: 404, message: 'Artifact not found' });
+      }
+      if (artifact.type !== 'object') {
+        throw makeError({
+          status: 422,
+          message: 'Containers are not transferable yet; transfer what is inside them',
+        });
+      }
+      const allowTracking = response.allowTracking ?? content.allowTracking;
+      const tracked = content.keepTracking && allowTracking !== false;
+
+      if (content.keepTracking && allowTracking === false) {
+        await copyArtifactInto(artifact, sourceOwner, {});
+      }
+      await db.artifactPlacement.updateManyAndReturn({
+        where: { artifactId: artifact.id },
+        data: { deletedAt: new Date() },
+      });
+      await db.artifactPermission.updateManyAndReturn({
+        where: { artifactId: artifact.id },
+        data: { deletedAt: new Date() },
+      });
+      await db.artifact.update({ where: { id: artifact.id }, data: targetOwner });
+      if (tracked) await grantSourceRead(artifact.id, source);
     });
-    await db.artifactPermission.updateManyAndReturn({
-      where: { artifactId: artifact.id },
-      data: { deletedAt: new Date() },
-    });
-    await db.artifact.update({ where: { id: artifact.id }, data: targetOwner });
-    if (tracked) await grantSourceRead(artifact.id, source);
     return {};
   },
 };

@@ -136,7 +136,7 @@ export const actorOperatesOwnerUserOrManagesOwnerTenant: ActionRule = {
 
 const notMembers: OwnerModel[] = ['User', 'Organization', 'Space'];
 
-const operatesAtItsMembersTenant: ActionRule = {
+export const operatesAtItsMembersTenant: ActionRule = {
   any: [
     { all: [ownerModelIsOneOf(['OrganizationUser']), { rel: 'organization', action: 'operate' }] },
     { all: [ownerModelIsOneOf(['SpaceUser']), { rel: 'space', action: 'operate' }] },

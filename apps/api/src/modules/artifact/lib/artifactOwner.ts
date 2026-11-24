@@ -4,8 +4,9 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, mutex
  */
-import { emptySideKeyColumns, polymorphicAxis, polymorphicKeyColumns } from '@template/db';
+import { db, emptySideKeyColumns, polymorphicAxis, polymorphicKeyColumns } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
+import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 
 export type OwnedArtifact = Pick<Artifact, 'ownerModel' | 'userId' | 'organizationId' | 'spaceId'>;
@@ -42,6 +43,36 @@ export const withArtifactOwnersLock = <T>(
   };
   return acquire(0);
 };
+
+export const lockArtifactsInTxn = async (ids: string[]): Promise<Map<string, Artifact>> => {
+  const sorted = [...new Set(ids)].sort();
+  const locked = new Map<string, Artifact>();
+  for (const id of sorted) {
+    const [row] = await db.findForUpdate<Artifact>('Artifact', { id });
+    if (!row || row.deletedAt) throw makeError({ status: 404, message: 'Artifact not found' });
+    locked.set(id, row);
+  }
+  return locked;
+};
+
+export const withLockedArtifacts = <T>(
+  artifacts: Artifact[],
+  fn: (locked: Map<string, Artifact>) => Promise<T>,
+): Promise<T> =>
+  withArtifactOwnersLock(artifacts, () =>
+    db.txn(async () => {
+      const locked = await lockArtifactsInTxn(artifacts.map((artifact) => artifact.id));
+      for (const prelocked of artifacts) {
+        if (!sameArtifactOwner(locked.get(prelocked.id)!, prelocked)) {
+          throw makeError({
+            status: 409,
+            message: 'Artifact ownership changed while waiting for lock; please retry',
+          });
+        }
+      }
+      return fn(locked);
+    }),
+  );
 
 export type OwnerRef = Pick<OwnedArtifact, 'ownerModel'> & Partial<OwnedArtifact>;
 

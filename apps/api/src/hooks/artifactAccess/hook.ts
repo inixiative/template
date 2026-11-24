@@ -18,23 +18,17 @@ const stampKindType = (row: HookRow): void => {
 
 export const registerArtifactAccessHook = () => {
   registerDbHook(
-    'artifactAccess:create',
+    'artifactAccess',
     'Artifact',
     HookTiming.before,
-    [DbAction.create, DbAction.createManyAndReturn],
+    [DbAction.create, DbAction.createManyAndReturn, DbAction.upsert],
     async (options: HookOptions) => {
+      if (options.action === DbAction.upsert) {
+        const { create } = (options.args ?? {}) as { create?: HookRow };
+        if (create) stampKindType(create);
+        return;
+      }
       for (const row of rowsBeingWritten(options)) stampKindType(row);
-    },
-  );
-
-  registerDbHook(
-    'artifactAccess:upsert',
-    'Artifact',
-    HookTiming.before,
-    [DbAction.upsert],
-    async ({ args }: HookOptions) => {
-      const { create } = (args ?? {}) as { create?: HookRow };
-      if (create) stampKindType(create);
     },
   );
 };

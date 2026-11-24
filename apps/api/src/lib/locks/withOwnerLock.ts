@@ -11,7 +11,7 @@ import { makeError } from '#/lib/errors';
 // owner's rule graph, where segment A may name segment B and B may name A, and a save of either
 // validates against the graph and then writes into it. `entitlements` is a holder's set of
 // entitlement rows, which must keep holding something when two removals race. `containers` is the
-// owner's artifact placement graph (placements never cross owners). A new owner-wide, cross-row
+// owner's artifact placement graph (cross-owner writes acquire each involved owner's lock in sorted order). A new owner-wide, cross-row
 // invariant adds a scope here rather than a second lock helper.
 export type OwnerLockScope = 'rules' | 'entitlements' | 'containers';
 

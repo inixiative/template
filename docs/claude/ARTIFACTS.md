@@ -39,7 +39,7 @@ Why one table: a grant, a placement, and an audit entry each have a single kind 
 | Can this caller read / edit / manage / delete this artifact: "who can see this file", "is it public" | **`validatePermission(action)`** · middleware + **`assertArtifactPermission`** / **`canActOnArtifact`** (`db:artifact` in `rebacSchema` with `ArtifactAncestor` and `ArtifactEffectivePermission` `down` lists) | § Access | a custom permission walk outside `rebacSchema`; reading `artifact.access` alone to decide public |
 | Give an artifact to another user, org or space: "hand this file over", "move it to the client's workspace" | **`transferArtifact`** · Inquiry service `apps/api/src/modules/inquiry/services/transferArtifact/` | § Ownership | rewriting `organizationId` on the row; copying the file and deleting the original |
 | Read an artifact with its effective access, parents, ancestors, placements, bindings, and (for managers) grants | **`GET /artifact/:id`** (`artifactRead`) | § Navigating | joining placements, grants, and bindings by hand without the caller's view |
-| Delete a folder, or delete a folder and what is in it: "empty this folder", "remove the folder but keep the files" | **`deleteArtifact`** · service (`DELETE /artifact/:id`), **`GET /artifact/:id/artifacts?exclusive=true`**, **`/v1/batch`** | § Deleting | a delete that walks a container's members and removes them; a bespoke delete-many endpoint |
+| Delete a folder, or delete a folder and what is in it: "empty this folder", "remove the folder but keep the files" | **`DELETE /artifact/:id`** (`artifactDelete`), **`GET /artifact/:id/artifacts?exclusive=true`**, **`/v1/batch`** | § Deleting | a delete that walks a container's members and removes them; a bespoke delete-many endpoint |
 
 ---
 
@@ -116,7 +116,7 @@ Not in this cut: access per placement, row-level `permissionRules`, `Entitlement
 ## Ownership
 
 Ownership never changes as a side effect. **`transferArtifact`** is an Inquiry from the current owner (a user, organization or space) to the receiver; whoever manages the owner it is leaving may send it.
-- The receiver accepts or declines. On accept the artifact's owner changes, its placements in the old owner's containers are removed (it arrives at the receiver's root), and its old grants are revoked, so the receiver starts clean. Every step is in the audit log.
+- The receiver accepts or declines. On accept the artifact's owner changes, all of its placements are removed (it arrives at the receiver's root), and its old grants are revoked, so the receiver starts clean. Every step is in the audit log.
 - If the sender asked to keep tracking it (`keepTracking`), the sender keeps a pointer: a `tracking` `ResourceBinding` on the sender plus a `viewer` grant. If the receiver refuses the pointer (`allowTracking: false`), the sender keeps a copy instead. Copies happen only then.
 - Auto-approve is off for now (the receiver explicitly approves or declines).
 - Only objects transfer for now.
@@ -142,7 +142,7 @@ There is no "primary parent": with several parents, `GET /artifact/:id` returns 
 | Artifact detail (access, parents, ancestors, placements, permissions, bindings) | `GET /artifact/:id` |
 | Below: direct children (pass `?exclusive=true` for items only in this container) | `GET /artifact/:id/artifacts` |
 
-**A placement in a container the caller can't see doesn't count for them.** The item shows at that caller's root, and `GET /artifact/:id` only returns placements in containers the caller can read and bindings on resources the caller can read (organizations and spaces checked with `fetchAsCaller` against their own read routes; a user's bindings only to that user).
+**A placement in a container the caller can't see (or in another owner's container) doesn't hide an artifact from its owner's root.** `GET /artifact/:id` only returns placements in containers the caller can read and bindings on resources the caller can read via ReBAC (`db:user`, `db:organization`, `db:space`).
 
 No frontend is built yet.
 
@@ -156,9 +156,9 @@ No frontend is built yet.
 | Kind catalog | `packages/shared/src/artifact/kinds.ts` |
 | ReBAC rules | `packages/permissions/src/rebac/artifactResourcePermission.ts`, `apps/api/src/modules/artifact/lib/checkArtifactPermission.ts` |
 | Materialized tree | `apps/api/src/hooks/artifactTree/hook.ts`, `syncArtifactTree.ts` |
-| Placements | `apps/api/src/modules/artifact/services/artifactPlacements.ts`, `removeArtifactPlacement.ts`, `assertNoContainerCycle.ts` |
-| Navigation | `apps/api/src/modules/artifact/services/fetchRootArtifacts.ts`, `fetchArtifactAncestors.ts` |
+| Placements | `apps/api/src/modules/artifact/services/artifactPlacements.ts` |
+| Navigation | `apps/api/src/modules/artifact/services/fetchRootArtifacts.ts`, `apps/api/src/modules/artifact/controllers/artifactRead.ts` |
 | Ownership | `apps/api/src/modules/inquiry/services/transferArtifact/` |
-| Deleting | `apps/api/src/modules/artifact/services/deleteArtifact.ts` |
+| Deleting | `apps/api/src/modules/artifact/controllers/artifactDelete.ts` |
 | Hooks | `apps/api/src/hooks/artifactAccess/hook.ts`, `apps/api/src/hooks/artifactTree/hook.ts` |
 | Routes | `apps/api/src/modules/{artifact,artifactPlacement,artifactPermission}/`, `{me,organization,space,organizationUser,spaceUser}CreateArtifact`, `{me,organization,space,organizationUser,spaceUser}ReadManyArtifacts` |

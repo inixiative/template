@@ -4,6 +4,8 @@
  * @partOf feature:files
  * @uses none
  */
+export const ARTIFACT_MAX_DEPTH = 50;
+
 export type ArtifactTypeName = 'container' | 'object';
 
 export type ArtifactKindDef = {

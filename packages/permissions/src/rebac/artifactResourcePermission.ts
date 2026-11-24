@@ -11,6 +11,7 @@ import { schemaMap } from '@template/db/schemaMap';
 import {
   actorMayPerformActionOnOwner,
   isNull,
+  operatesAtItsMembersTenant,
   ownerModelIsOneOf,
   roleHeldVia,
   rowIsThereAnd,
@@ -144,13 +145,6 @@ const artifactIsPublic: ActionRule = {
   ],
 };
 
-const operatesAtItsMembersTenant: ActionRule = {
-  any: [
-    { all: [ownerModelIsOneOf(['OrganizationUser']), { rel: 'organization', action: 'operate' }] },
-    { all: [ownerModelIsOneOf(['SpaceUser']), { rel: 'space', action: 'operate' }] },
-  ],
-};
-
 export const artifactResourcePermission: ResourcePermission = {
   actions: {
     own: {
@@ -221,13 +215,6 @@ export const artifactPermissionResourcePermission: ResourcePermission = {
 
 export const artifactPlacementResourcePermission: ResourcePermission = {
   actions: {
-    create: {
-      all: [
-        { rel: 'artifact', action: 'read' },
-        { rel: 'containerArtifact', action: 'operate' },
-      ],
-    },
     delete: { rel: 'containerArtifact', action: 'operate' },
-    read: { rel: 'artifact', action: 'read' },
   },
 };
