@@ -7,61 +7,64 @@
 import { deduplicateMultiSelect } from '@template/shared/attributes/parsing/deduplicateMultiSelect';
 import { isStringArray } from '@template/shared/attributes/parsing/isStringArray';
 import { parseAttributeDate } from '@template/shared/attributes/parsing/parseAttributeDate';
+import { AttributeValidationError } from '@template/shared/attributes/typing/columns';
 import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 
-export type ParsedAttributeValue = { ok: true; value: unknown } | { ok: false; message: string };
+const invalidTypeError = (message: string, context?: string, path?: string[]) =>
+  new AttributeValidationError([
+    { code: 'invalid_attribute_type', message: context ? `${context}: ${message}` : message, path },
+  ]);
 
 /**
- * Canonical value parser for all 6 AttributeValueTypes.
- * Single source of truth reused by `encodeAttributeValue`, `attributeTypedColumnIssues`,
- * and DB attribute query operators (`attributeWhereEquals`, `attributeWhereIn`, `attributeWhereRange`).
+ * Canonical value parser for all 6 AttributeValueTypes. Throws `AttributeValidationError` on
+ * invalid input. Reused by `encodeAttributeValue`, `validateAttributeValue`, and DB query operators.
  */
 export const parseAttributeValue = (
   valueType: AttributeValueType,
   raw: unknown,
-): ParsedAttributeValue => {
+  context?: string,
+  path?: string[],
+): unknown => {
   switch (valueType) {
     case 'boolean':
-      return typeof raw === 'boolean'
-        ? { ok: true, value: raw }
-        : { ok: false, message: `Expected boolean value for attribute valueType 'boolean'` };
+      if (typeof raw === 'boolean') return raw;
+      throw invalidTypeError(
+        `Expected boolean value for attribute valueType 'boolean'`,
+        context,
+        path,
+      );
     case 'text':
-      return typeof raw === 'string'
-        ? { ok: true, value: raw }
-        : { ok: false, message: `Expected string value for attribute valueType 'text'` };
+      if (typeof raw === 'string') return raw;
+      throw invalidTypeError(`Expected string value for attribute valueType 'text'`, context, path);
     case 'number':
-      return typeof raw === 'number' && Number.isFinite(raw)
-        ? { ok: true, value: raw }
-        : { ok: false, message: `Expected finite number for attribute valueType 'number'` };
+      if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+      throw invalidTypeError(
+        `Expected finite number for attribute valueType 'number'`,
+        context,
+        path,
+      );
     case 'date': {
       const parsed = parseAttributeDate(raw);
-      return parsed
-        ? { ok: true, value: parsed }
-        : {
-            ok: false,
-            message: `Expected valid Date or ISO date string for attribute valueType 'date'`,
-          };
+      if (parsed) return parsed;
+      throw invalidTypeError(
+        `Expected valid Date or ISO date string for attribute valueType 'date'`,
+        context,
+        path,
+      );
     }
     case 'json':
-      return raw !== undefined && raw !== null
-        ? { ok: true, value: raw }
-        : { ok: false, message: `Expected non-null JSON value for attribute valueType 'json'` };
+      if (raw !== undefined && raw !== null) return raw;
+      throw invalidTypeError(
+        `Expected non-null JSON value for attribute valueType 'json'`,
+        context,
+        path,
+      );
     case 'multiSelect':
-      return isStringArray(raw)
-        ? { ok: true, value: deduplicateMultiSelect(raw) }
-        : { ok: false, message: `Expected string[] for attribute valueType 'multiSelect'` };
+      if (isStringArray(raw)) return deduplicateMultiSelect(raw);
+      throw invalidTypeError(
+        `Expected string[] for attribute valueType 'multiSelect'`,
+        context,
+        path,
+      );
   }
-};
-
-/** Parses `raw` for `valueType`, throwing an Error with optional `context` prefix on invalid input. */
-export const parseAttributeValueOrThrow = (
-  valueType: AttributeValueType,
-  raw: unknown,
-  context?: string,
-): unknown => {
-  const parsed = parseAttributeValue(valueType, raw);
-  if (!parsed.ok) {
-    throw new Error(context ? `${context}: ${parsed.message}` : parsed.message);
-  }
-  return parsed.value;
 };

@@ -62,7 +62,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   });
 
   const onOrganization = (...actions: string[]): EntitlementInput[] => [
-    entitlementInputFor('db:organization', ['db:organization', org.id], actions),
+    entitlementInputFor('db:Organization', ['db:Organization', org.id], actions),
   ];
 
   describe("a member's entitlements are library entries the writer could grant (Aron, 2026-10-26)", () => {
@@ -82,7 +82,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       heldEntitlements({ model: 'OrganizationUser', id: target.id });
 
     const selfGrantOf = (member: OrganizationUser) =>
-      toEntitlementInput(memberSelfGrant('db:organizationUser', member));
+      toEntitlementInput(memberSelfGrant('db:OrganizationUser', member));
 
     const grant = async (app: ReturnType<typeof createTestApp>, entitlements: unknown) => {
       const target = await newMember();
@@ -144,7 +144,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     describe('you write a role you hold, with manage at the organization (Aron, 2026-10-26)', () => {
       const holderOf = async (action: string) => {
         const { row, user } = await entitledMemberWith(
-          entitlementInputFor('db:organization', ['db:organization', org.id], [action]),
+          entitlementInputFor('db:Organization', ['db:Organization', org.id], [action]),
         );
         return { user, app: memberApp(user, row) };
       };
@@ -192,7 +192,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         const grantOn = (action: string) =>
           admin.fetch(
             post(`/api/v1/organizationUser/${target.id}/entitlements`, [
-              entitlementInputFor('db:organization', ['db:organization', org.id], [action]),
+              entitlementInputFor('db:Organization', ['db:Organization', org.id], [action]),
             ]),
           );
         expect((await grantOn('manage')).status).toBe(201);

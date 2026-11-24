@@ -48,6 +48,12 @@ export type AttributeValidationIssue = {
   path?: string[];
 };
 
-export type AttributeValidationResult<T = unknown> =
-  | { ok: true; value: T; columns: AttributeEncodedColumns }
-  | { ok: false; issues: AttributeValidationIssue[] };
+export class AttributeValidationError extends Error {
+  readonly issues: AttributeValidationIssue[];
+
+  constructor(issues: AttributeValidationIssue[], message?: string) {
+    super(message ?? issues.map((issue) => issue.message).join('; '));
+    this.name = 'AttributeValidationError';
+    this.issues = issues;
+  }
+}

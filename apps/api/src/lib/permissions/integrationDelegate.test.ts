@@ -128,7 +128,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     it('a full token on an integration entitled to one space reaches that space and no other (R114)', async () => {
       const member = await memberOf('owner', organization, (await createUser()).entity);
       const integration = await memberIntegration(member, null, [
-        entitlementInputFor('db:space', ['db:space', space.id], ['read', 'operate', 'manage']),
+        entitlementInputFor('db:Space', ['db:Space', space.id], ['read', 'operate', 'manage']),
       ]);
       const key = (
         await createKeyedToken(
@@ -252,7 +252,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
 
     it('its user cannot give their member integration an entitlement they do not hold (Aron, 2026-10-31)', async () => {
       const manage = [
-        entitlementInputFor('db:organization', ['db:organization', organization.id], ['manage']),
+        entitlementInputFor('db:Organization', ['db:Organization', organization.id], ['manage']),
       ];
       const { entity: writer } = await createUser();
       const member = await memberOf('member', organization, writer);
@@ -264,13 +264,13 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     });
 
     it('an admin-role member cannot give manage on a space it does not manage (Aron, 2026-10-31)', async () => {
-      const manageSpace = [entitlementInputFor('db:space', ['db:space', space.id], ['manage'])];
+      const manageSpace = [entitlementInputFor('db:Space', ['db:Space', space.id], ['manage'])];
       expect((await grant('admin', manageSpace)).status).toBe(403);
     });
 
     it('an entitlement from an organization the member is not in is refused (Aron, 2026-10-31)', async () => {
       const elsewhere = [
-        entitlementInputFor('db:organization', ['db:organization', otherOrganization.id], ['read']),
+        entitlementInputFor('db:Organization', ['db:Organization', otherOrganization.id], ['read']),
       ];
       const { entity: writer } = await createUser();
       const member = await memberOf('owner', organization, writer);
@@ -315,7 +315,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
 
     it('entitlements must be well formed', async () => {
       const response = await grant('owner', [
-        { resource: 'db:organization' },
+        { resource: 'db:Organization' },
       ] as unknown as EntitlementInput[]);
       expect(response.status).toBe(422);
     });

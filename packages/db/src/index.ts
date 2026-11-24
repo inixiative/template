@@ -167,12 +167,14 @@ export {
   type AccessorName,
   AccessorNames,
   accessorNames,
+  accessorOfResource,
   isAccessorName,
   isModelName,
   type ModelName,
   ModelNames,
   type ModelTypeMap,
   modelNames,
+  resourceOfModel,
   toAccessor,
   toModelName,
 } from './utils/modelNames';
@@ -206,8 +208,10 @@ export { sourceQueryWhere } from './utils/sourceQueryWhere';
 export { type RuleReferenceSource, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
 export {
   modelsHeldUnderTenant,
+  relationsToTenantOnSides,
   TENANT_COLUMNS,
   tenantRowsAbove,
+  tenantRowsOnSides,
 } from './utils/tenantRowsAbove';
 export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
 export { assertRuleReferencesExist } from './validations/assertRuleReferencesExist';

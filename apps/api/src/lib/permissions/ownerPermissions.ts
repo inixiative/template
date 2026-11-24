@@ -18,8 +18,8 @@ import {
   organizationOwnerPermissions,
   type Permissions,
   permissionsOfUser,
-  rebacSchema,
   roleToStandardAction,
+  schemaMap,
   spaceOwnerPermissions,
 } from '@template/permissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
@@ -46,7 +46,7 @@ export const narrowOwnerPermissionsToDelegate = (
   delegated: PermissionsRow,
   owner: Permissions,
 ): Permissions =>
-  delegate(rebacSchema, owner, {
+  delegate(schemaMap, owner, {
     full: delegated.full,
     ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
     entitlements: entitlementEntriesOfHolder(delegated),

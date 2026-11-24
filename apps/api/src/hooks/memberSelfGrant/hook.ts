@@ -30,8 +30,8 @@ type Member = Record<string, unknown> & { id: string; userId: string; deletedAt:
 const MEMBER_MODELS: readonly MemberModel[] = ['OrganizationUser', 'SpaceUser'];
 
 const resourceOf: Record<MemberModel, MemberResource> = {
-  OrganizationUser: 'db:organizationUser',
-  SpaceUser: 'db:spaceUser',
+  OrganizationUser: 'db:OrganizationUser',
+  SpaceUser: 'db:SpaceUser',
 };
 
 const isMemberModel = (model: string): model is MemberModel =>

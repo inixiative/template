@@ -8,7 +8,7 @@ import type { AttributeModelName } from '@template/db/lib/attributes/registry';
 import { resolveAttributeTarget } from '@template/db/lib/attributes/resolveAttributeTarget';
 import type { AttributeOperatorOptions, AttributeRange } from '@template/db/lib/attributes/types';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { parseAttributeValueOrThrow } from '@template/shared/attributes';
+import { parseAttributeValue } from '@template/shared/attributes';
 
 /** Prisma `where` matching a `number` or `date` attribute within a `gt`/`gte`/`lt`/`lte` range. */
 export const attributeWhereRange = (
@@ -29,7 +29,7 @@ export const attributeWhereRange = (
   for (const bound of ['gt', 'gte', 'lt', 'lte'] as const) {
     const raw = range[bound];
     if (raw === undefined) continue;
-    filter[bound] = parseAttributeValueOrThrow(
+    filter[bound] = parseAttributeValue(
       valueType,
       raw,
       `attributeWhereRange.${bound}(${model}, '${locator}')`,

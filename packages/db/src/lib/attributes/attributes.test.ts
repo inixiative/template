@@ -8,7 +8,6 @@ import {
   attributeWhereMultiSelectContainsAll,
   attributeWhereMultiSelectContainsAny,
   attributeWhereRange,
-  attributeWriteInspection,
   buildAttributeUpsertData,
   decodeAttributeValue,
   decodeStoredAttributeValue,
@@ -125,12 +124,6 @@ describe('Attribute model capability (5-column codec, operators, Postgres GIN in
         encodeAttributeColumns('setting', 'general.defaultTimezone', 'Not/A_Zone'),
       ).toThrow('Invalid value');
 
-      const disallowed = attributeWriteInspection('setting', {
-        resourceModel: 'Project',
-        key: 'general.displayLocale',
-        valueText: 'en',
-      });
-      expect(disallowed.ok).toBe(false);
       expect(() =>
         validateAttributeWrite('setting', {
           resourceModel: 'Project',
@@ -139,35 +132,35 @@ describe('Attribute model capability (5-column codec, operators, Postgres GIN in
         }),
       ).toThrow(/not valid for resourceModel='Project'/);
 
-      const mixed = attributeWriteInspection('setting', {
-        resourceModel: 'User',
-        key: 'general.defaultTimezone',
-        valueText: 'UTC',
-        valueDate: new Date('2026-01-01T00:00:00.000Z'),
-      });
-      expect(mixed.ok).toBe(false);
-
-      const mixedWithJsonNull = attributeWriteInspection('setting', {
-        resourceModel: 'User',
-        key: 'general.defaultTimezone',
-        valueText: 'UTC',
-        valueJson: Prisma.JsonNull,
-      });
-      expect(mixedWithJsonNull.ok).toBe(false);
-      if (!mixedWithJsonNull.ok) {
-        expect(mixedWithJsonNull.errors.some((e) => e.includes('Prisma.JsonNull'))).toBe(true);
-      }
-
-      const standaloneJsonNull = attributeWriteInspection(
-        'setting',
-        {
+      expect(() =>
+        validateAttributeWrite('setting', {
           resourceModel: 'User',
-          key: syntheticJsonDef.key,
+          key: 'general.defaultTimezone',
+          valueText: 'UTC',
+          valueDate: new Date('2026-01-01T00:00:00.000Z'),
+        }),
+      ).toThrow(/must be null/);
+
+      expect(() =>
+        validateAttributeWrite('setting', {
+          resourceModel: 'User',
+          key: 'general.defaultTimezone',
+          valueText: 'UTC',
           valueJson: Prisma.JsonNull,
-        },
-        { resolveDefinition: () => syntheticJsonDef },
-      );
-      expect(standaloneJsonNull.ok).toBe(false);
+        }),
+      ).toThrow(/Prisma\.JsonNull/);
+
+      expect(() =>
+        validateAttributeWrite(
+          'setting',
+          {
+            resourceModel: 'User',
+            key: syntheticJsonDef.key,
+            valueJson: Prisma.JsonNull,
+          },
+          { resolveDefinition: () => syntheticJsonDef },
+        ),
+      ).toThrow(/Prisma\.JsonNull/);
     });
 
     it('preserves plain json string[] payloads verbatim while canonicalizing multiSelect arrays', () => {

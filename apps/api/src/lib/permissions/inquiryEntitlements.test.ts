@@ -51,7 +51,7 @@ const entitledKey = async (entitlements: EntitlementInput[]) => {
 // why: a path admits every kind that carries its keys (R81); the where keeps the grant to the tenant's own side
 const inquiries = (path: string, actions: string[] = ['read']) => {
   const side = path.startsWith('source') ? 'source' : 'target';
-  return entitlementInputFor('db:inquiry', ['db:organization', organization.id, path], actions, {
+  return entitlementInputFor('db:Inquiry', ['db:Organization', organization.id, path], actions, {
     field: `${side}Model`,
     operator: Operator.equals,
     value: path.includes('Space') ? 'Space' : 'Organization',

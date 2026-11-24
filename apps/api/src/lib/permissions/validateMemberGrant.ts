@@ -6,7 +6,7 @@
  */
 import { type HydratedRecord, hydrate } from '@template/db';
 import type { Permix } from '@template/permissions';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import { memberRoleWrite } from '@template/permissions/rebac/rebacSchemaRules';
 import { makeError } from '#/lib/errors';
 
@@ -19,6 +19,6 @@ export const validateMemberGrant = async (
   member: HydratedRecord,
 ): Promise<void> => {
   const row = await hydrate(accessor, member);
-  if (!check(writer, rebacSchema, accessor, row, memberRoleWrite(tenantOf[accessor])))
+  if (!check(writer, accessor, row, memberRoleWrite(tenantOf[accessor])))
     throw makeError({ status: 403, message: 'Access denied' });
 };

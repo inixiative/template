@@ -5,7 +5,7 @@
  * @uses none
  */
 import { attributeColumnForValueType } from '@template/shared/attributes/parsing/attributeColumnForValueType';
-import { parseAttributeValueOrThrow } from '@template/shared/attributes/parsing/parseAttributeValue';
+import { parseAttributeValue } from '@template/shared/attributes/parsing/parseAttributeValue';
 import {
   type AttributeEncodedColumns,
   EMPTY_ATTRIBUTE_COLUMNS,
@@ -17,7 +17,7 @@ export const encodeAttributeValue = (
   valueType: AttributeValueType,
   value: unknown,
 ): AttributeEncodedColumns => {
-  const parsed = parseAttributeValueOrThrow(valueType, value);
+  const parsed = parseAttributeValue(valueType, value);
   const column = attributeColumnForValueType(valueType);
   return { ...EMPTY_ATTRIBUTE_COLUMNS, [column]: parsed };
 };

@@ -36,7 +36,7 @@ beforeEach(async () => {
     organizationId: organization.id,
     role: null,
     entitlements: [
-      entitlementInputFor('db:organization', ['db:organization', organization.id], ['manage']),
+      entitlementInputFor('db:Organization', ['db:Organization', organization.id], ['manage']),
     ],
   }));
 });

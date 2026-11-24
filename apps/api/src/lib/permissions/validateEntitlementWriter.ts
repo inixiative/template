@@ -6,7 +6,7 @@
  */
 import { type EntitlementTarget, type HydratedRecord, hydrate } from '@template/db';
 import { type Permix, TokenAction } from '@template/permissions';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import type { EntitlementChanges } from '#/lib/permissions/changeEntitlements';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
@@ -23,7 +23,7 @@ const validateTokenWriter = async (writer: Permix, token: Holder, { add, remove 
     await validateTokenWrite(writer, token);
     validateDelegateRole(row);
   }
-  if (remove.length && !check(writer, rebacSchema, 'token', row, TokenAction.delete))
+  if (remove.length && !check(writer, 'token', row, TokenAction.delete))
     throw makeError({ status: 403, message: 'Access denied' });
 };
 

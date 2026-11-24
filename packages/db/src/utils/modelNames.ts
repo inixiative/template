@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { endpointKey, parseEndpointKey } from '@inixiative/json-rules';
 import { Prisma as PrismaBrowser } from '@template/db/generated/client/browser';
 import type { Prisma } from '@template/db/generated/client/client';
 import { lowerFirst, upperFirst } from 'lodash-es';
@@ -59,3 +60,13 @@ export const toAccessor = (model: string): AccessorName => {
   if (!isAccessorName(accessor)) throw new Error(`Unknown model '${model}'`);
   return accessor;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Permission resource names (`db:Model`)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const resourceOfModel = (model: string): string =>
+  endpointKey({ fieldMap: 'db', model: toModelName(model) });
+
+export const accessorOfResource = (resource: string): AccessorName =>
+  toAccessor(parseEndpointKey(resource, 'db').modelName);

@@ -11,7 +11,7 @@ import {
   createUser,
 } from '@template/db/test';
 import type { Permix } from '@template/permissions/client';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import { fetchPermixForUser } from '#/lib/permissions/userPermissions';
 import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
@@ -22,7 +22,7 @@ type Situation = { model: 'user' | 'organization' | 'space'; id: string; action:
 const answers = async (permix: Permix, situations: Situation[]) =>
   Promise.all(
     situations.map(async ({ model, id, action }) =>
-      check(permix, rebacSchema, model, await hydrate(model, { id }), action),
+      check(permix, model, await hydrate(model, { id }), action),
     ),
   );
 

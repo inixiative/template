@@ -417,7 +417,7 @@ describe('ResourceSettingsSection & SettingField', () => {
     const serializedOrg = org.__serialize();
     const serializedSpace = space.__serialize();
 
-    // 1. User context: own settings editable via real db:setting:manage
+    // 1. User context: own settings editable via real db:Setting:manage
     const userContext = { type: 'user' } as AuthenticatedContext;
     await installRealSession({ user: serializedUser, context: userContext });
     renderSection({ context: userContext, category: 'general' });

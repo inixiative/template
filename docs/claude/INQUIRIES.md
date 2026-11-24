@@ -354,7 +354,7 @@ There is one response, `inquiryResponseSchema` (`InquiryItem`, `modules/inquiry/
 
 Reading is by ownership channel because carried keys put the organization on every row beneath it. An organization's managers see what is the organization's, including its own integrations and tokens; a member's own integration is the member's, and a space's inquiries are the space's (Aron, 2026-11-16). Seeing is not resolving: `resolve` stays the per-type level. An inquiry entitlement by a tenant path (`targetOrganization`) admits every kind that carries the key, so a grant kept to the tenant's own channel says so in its `where` (`targetSpaceId` and `targetUserId` equal null); without it the granter must be able to read every kind the path reaches.
 
-`db:inquiry` is the `inquiryResourcePermission` object built by `inquiryResourcePermissionFromParties(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
+`db:Inquiry` is the `inquiryResourcePermission` object built by `inquiryResourcePermissionFromParties(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
 
 ## Adding a New Service
 
@@ -391,7 +391,7 @@ Create routes do **not** use `validatePermission` middleware. Permissions are ch
 
 ```typescript
 const partial = await hydrate('inquiry', { id: '', type, content, ...source, ...target });
-if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) throw makeError({ status: 403, ... });
+if (!check(permix, 'inquiry', partial, 'send')) throw makeError({ status: 403, ... });
 ```
 
 This allows per-type permission rules (e.g. `inviteOrganizationUser` with a high role requires `own`, not just `manage`) without redundant middleware.
@@ -450,7 +450,7 @@ Side-aware permission check. `side` determines which side of the inquiry the cur
 
 The inquiry object carries the other side's FK data. This is needed because inquiries only partially hydrate relations in list responses (sent = targets only, received = sources only).
 
-`db:inquiry` gates every send and resolve branch on `sourceModel` / `targetModel`, so a check needs both models and the type. A form that offers sending an inquiry not yet created passes a draft (`{ type: 'transferSpace', sourceModel: 'Space', targetModel: 'Organization' }`). Where the parties come from a prop or the check runs per option (the invite form checks each role), build the record with `inquiryRecordForPermissionCheck(inquiry, side, parties)` (`packages/ui/src/lib/inquiries/inquiryRecordForPermissionCheck.ts`), the builder the hook uses, and pass it to `canActOnRecordIfPresent`. Never hand-roll the record.
+`db:Inquiry` gates every send and resolve branch on `sourceModel` / `targetModel`, so a check needs both models and the type. A form that offers sending an inquiry not yet created passes a draft (`{ type: 'transferSpace', sourceModel: 'Space', targetModel: 'Organization' }`). Where the parties come from a prop or the check runs per option (the invite form checks each role), build the record with `inquiryRecordForPermissionCheck(inquiry, side, parties)` (`packages/ui/src/lib/inquiries/inquiryRecordForPermissionCheck.ts`), the builder the hook uses, and pass it to `canActOnRecordIfPresent`. Never hand-roll the record.
 
 ### UI Components
 

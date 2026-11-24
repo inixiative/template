@@ -195,7 +195,7 @@ const hydrateOwnedRecordForPermissions = (
 
 /**
  * Hydrates a flat frontend scalar record with parent/owner relations from Zustand store state
- * so client-side `permissions.check(..., rebacSchema, ...)` walks every relation identically
+ * so client-side `permissions.check(..., schemaMap, ...)` walks every relation identically
  * to backend `hydrate()` (e.g. `Space.organization`, `OrganizationUser.user/organization`,
  * `SpaceUser.user/space.organization`, `Integration` & `Project` owners, `ProjectIntegration.project`).
  */

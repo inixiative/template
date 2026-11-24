@@ -8,8 +8,8 @@ The examples use one cast: user U1, organization O1, space S1 under O1, M1 U1's 
 
 ```ts
 {
-  resource: 'db:integration',                                         // what it acts on
-  anchor: { resource: 'db:organization', id: O1, path: 'organization' }, // where it acts from
+  resource: 'db:Integration',                                         // what it acts on
+  anchor: { resource: 'db:Organization', id: O1, path: 'organization' }, // where it acts from
   where: { field: 'ownerModel', operator: 'equals', value: 'Organization' }, // optional narrowing
   actions: { manage: true },                                          // what it holds
 }
@@ -32,7 +32,7 @@ A stored row may also carry a `lens` (`Entitlement.lens`, a json-rules lens narr
 
 Choose, in order:
 
-1. **The resource and the action.** What should the holder do, to what? "Administer O1's own integrations" is `manage` on `db:integration`.
+1. **The resource and the action.** What should the holder do, to what? "Administer O1's own integrations" is `manage` on `db:Integration`.
 2. **The anchor and the path.** Where does it act from? O1, reached from an integration by `organization`. A polymorphic step reaches every kind that carries its keys: from an integration, `organization` reaches O1's own integrations, its spaces', its members' and its space members'.
 3. **The `where`, to narrow.** `ownerModel equals Organization` keeps only O1's own. Only a literal leaf on the kind field, at the root or directly under a root `all`, narrows what the grant check judges; anything else narrows at read time only.
 
@@ -40,21 +40,21 @@ Examples:
 
 ```ts
 // T on M1 acts as M1: operate on M1 itself (self anchor, no path)
-{ resource: 'db:organizationUser', anchor: { resource: 'db:organizationUser', id: M1 }, actions: { operate: true } }
+{ resource: 'db:OrganizationUser', anchor: { resource: 'db:OrganizationUser', id: M1 }, actions: { operate: true } }
 
 // M1 manages S1
-{ resource: 'db:space', anchor: { resource: 'db:space', id: S1 }, actions: { manage: true } }
+{ resource: 'db:Space', anchor: { resource: 'db:Space', id: S1 }, actions: { manage: true } }
 
 // O1's own integrations, managed
 {
-  resource: 'db:integration',
-  anchor: { resource: 'db:organization', id: O1, path: 'organization' },
+  resource: 'db:Integration',
+  anchor: { resource: 'db:Organization', id: O1, path: 'organization' },
   where: { field: 'ownerModel', operator: 'equals', value: 'Organization' },
   actions: { manage: true },
 }
 
 // the member self-grant on M1: written by the memberSelfGrant hook, never by hand
-{ resource: 'db:organizationUser', anchor: { resource: 'db:organizationUser', id: M1 }, actions: { operate: true } }
+{ resource: 'db:OrganizationUser', anchor: { resource: 'db:OrganizationUser', id: M1 }, actions: { operate: true } }
 ```
 
 ## Who backs it
@@ -67,7 +67,7 @@ Every entitlement is installed with an owner, and holds an action on a record on
 
 ## Granting one
 
-Entitlements are read on their holder (`targetEntitlements`, the rows as stored) and change only through its sub-resource: `POST …/:id/entitlements` with an array of rows grants them, `DELETE …/:id/entitlements` with an array of row ids removes them, both through the one writer (`changeEntitlements`). Each row becomes the library's entry at this boundary (`toEntitlementEntry`, `packages/permissions/src/entitlementRows.ts`). Every added entry, and every removed row, is one check: `placeEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action (counting, like a role on its record, an entitlement the writer holds with no `where` and no lens on a row above the granted one: [granting below a held row](../../../../docs/claude/PERMISSIONS.md#granting-below-a-held-row)), or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Narrowed has one form: the entry's `where` is an `all` holding every conjunct of the held `where` plus more (held `C`, granted `all: [A, B, C]`; held `all: [C1, C2]`, granted `all: [A, C1, C2]`). Anything else is refused. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
+Entitlements are read on their holder (`targetEntitlements`, the rows as stored) and change only through its sub-resource: `POST …/:id/entitlements` with an array of rows grants them, `DELETE …/:id/entitlements` with an array of row ids removes them, both through the one writer (`changeEntitlements`). Each row becomes the library's entry at this boundary (`toEntitlementEntry`, `packages/permissions/src/entitlementRows.ts`). Every added entry, and every removed row, is one check: `pseudoRecordsOfEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action (counting, like a role on its record, an entitlement the writer holds with no `where` and no lens on a row above the granted one: [granting below a held row](../../../../docs/claude/PERMISSIONS.md#granting-below-a-held-row)), or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Narrowed has one form: the entry's `where` is an `all` holding every conjunct of the held `where` plus more (held `C`, granted `all: [A, B, C]`; held `all: [C1, C2]`, granted `all: [A, C1, C2]`). Anything else is refused. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
 
 ## The standard chain
 
@@ -94,9 +94,9 @@ A rule that only walks to the owner for the same action (`{ rel: 'organization',
 
 Not every model has all four, and not every model chains all of them. Each is declared in `notStandard` in `standardActionsChain.test.ts` with the exact links it misses; any undeclared gap fails that test.
 
-- **Member rows** (`db:organizationUser`, `db:spaceUser`): `operate` is being the member and `manage`/`own` administer the row, so `manage` and `own` do not imply `operate`. An entitlement holding `manage` on M1 does not act as M1.
+- **Member rows** (`db:OrganizationUser`, `db:SpaceUser`): `operate` is being the member and `manage`/`own` administer the row, so `manage` and `own` do not imply `operate`. An entitlement holding `manage` on M1 does not act as M1.
 - **Integrations** and **projects** have no `own`. `read`, `operate` and `manage` chain; who holds them depends on the record's owner kind.
-- **Contacts** (`db:contact`): `manage` also requires the contact's `source`, so it does not chain past `manage`.
+- **Contacts** (`db:Contact`): `manage` also requires the contact's `source`, so it does not chain past `manage`.
 
 ## Non-standard actions
 
