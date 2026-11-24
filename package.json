@@ -55,7 +55,7 @@
     "generate:routes": "bun --cwd apps/web generate:routes && bun --cwd apps/admin generate:routes && bun --cwd apps/superadmin generate:routes",
     "generate:sdk": "bun run with ${SDK_ENVIRONMENT:-local} api bash ./scripts/generate-sdk.sh",
     "deploy": "./scripts/deployment/deploy.sh",
-    "check:all": "bun run check:setup && bun run lint && bun run typecheck && bun run test && bun run test:fe && bash scripts/ci/run-ci-rules.sh",
+    "check:all": "bun run check:setup && bun run lint && bun run typecheck && bun run test && bun run test:fe && bun run build && bash scripts/ci/run-ci-rules.sh",
     "check": "inixiative-config bounded -- bun run check:all",
     "cleanup-scan:record": "./scripts/cleanup-scan/record.sh",
     "check:setup": "bun run generate:routes && bun run db:generate && bun run generate:sdk",

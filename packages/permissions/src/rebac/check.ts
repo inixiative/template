@@ -5,7 +5,8 @@
  * @uses infrastructure:prisma
  */
 import { makeRebacCheck } from '@inixiative/permissions';
-import { type AccessorName, type HydratedRecord, resourceOfModel } from '@template/db';
+import type { AccessorName, HydratedRecord } from '@template/db';
+import { resourceOfModel } from '@template/db/utils/modelNames';
 import type { Permix } from '@template/permissions/client';
 import { schemaMap } from '@template/permissions/rebac/schema';
 import { storedPermissionRules } from '@template/permissions/rebac/storedPermissionRules';
