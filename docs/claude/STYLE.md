@@ -24,6 +24,8 @@
 
 <!-- toc:end -->
 
+Craft principles and falsifiable rejection tests live in [GREAT_PROGRAMMER.md](GREAT_PROGRAMMER.md).
+
 
 ---
 
