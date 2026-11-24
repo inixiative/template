@@ -14,11 +14,4 @@ export const inquirySent = makeAppEvent<InquirySentPayload>({
   email: (inquiry) => inquiryServices[inquiry.type]?.appEvents?.sent?.email?.(inquiry) ?? null,
   websocket: (inquiry) =>
     inquiryServices[inquiry.type]?.appEvents?.sent?.websocket?.(inquiry) ?? null,
-  cb: [
-    async (inquiry) => {
-      for (const callback of inquiryServices[inquiry.type]?.appEvents?.sent?.cb ?? []) {
-        await callback(inquiry);
-      }
-    },
-  ],
 });

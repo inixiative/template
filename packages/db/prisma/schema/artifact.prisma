@@ -7,7 +7,7 @@ model Artifact {
   kind   String
   type   ArtifactType
   name   String
-  access ArtifactAccess @default(inherit)
+  access ArtifactAccess @default(private)
 
   ownerModel     ArtifactOwnerModel
   userId         String?            @db.VarChar(36)
@@ -33,8 +33,7 @@ model Artifact {
   /// @permissions(down: [permission.granteeUser, permission.granteeOrganization, permission.granteeSpace.organization, permission.granteeOrganizationUser.user, permission.granteeOrganizationUser.organization, permission.granteeSpaceUser.user, permission.granteeSpaceUser.space.organization, permission.granteeCustomerRelationship.customerUser, permission.granteeCustomerRelationship.customerOrganization, permission.granteeCustomerRelationship.customerSpace.organization])
   effectivePermissions ArtifactEffectivePermission[]
 
-  auditLogs          AuditLog[]
-  integrationRecords IntegrationRecord[]
+  auditLogs AuditLog[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -59,8 +58,7 @@ model ArtifactAncestor {
   ancestorArtifact Artifact @relation("ArtifactAncestorAncestor", fields: [ancestorArtifactId], references: [id], onDelete: Cascade)
 
   @@unique([artifactId, ancestorArtifactId], map: "ArtifactAncestor_pair_key")
-  @@index([artifactId])
-  @@index([ancestorArtifactId])
+  @@index([ancestorArtifactId, inherits])
 }
 
 model ArtifactEffectivePermission {
@@ -72,7 +70,6 @@ model ArtifactEffectivePermission {
   permission ArtifactPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([artifactId, permissionId], map: "ArtifactEffectivePermission_pair_key")
-  @@index([artifactId])
   @@index([permissionId])
 }
 

@@ -9,12 +9,11 @@ import { artifactKindDef } from '@template/shared/artifact';
 import { type HookRow, rowsBeingWritten } from '#/hooks/shared/hookRows';
 import { makeError } from '#/lib/errors';
 
-const stampCreationAccess = (row: HookRow): void => {
+const stampKindType = (row: HookRow): void => {
   const kind = artifactKindDef(String(row.kind));
   if (!kind)
     throw makeError({ status: 422, message: `Unknown artifact kind: ${String(row.kind)}` });
   row.type = kind.type;
-  if (row.access === undefined || row.access === 'inherit') row.access = kind.defaultAccess;
 };
 
 export const registerArtifactAccessHook = () => {
@@ -24,7 +23,7 @@ export const registerArtifactAccessHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async (options: HookOptions) => {
-      for (const row of rowsBeingWritten(options)) stampCreationAccess(row);
+      for (const row of rowsBeingWritten(options)) stampKindType(row);
     },
   );
 
@@ -35,7 +34,7 @@ export const registerArtifactAccessHook = () => {
     [DbAction.upsert],
     async ({ args }: HookOptions) => {
       const { create } = (args ?? {}) as { create?: HookRow };
-      if (create) stampCreationAccess(create);
+      if (create) stampKindType(create);
     },
   );
 };

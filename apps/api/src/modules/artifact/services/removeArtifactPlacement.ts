@@ -8,29 +8,38 @@ import { db } from '@template/db';
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions/client';
 import { makeError } from '#/lib/errors';
-import { withOwnerLock } from '#/lib/locks/withOwnerLock';
-import { artifactOwner } from '#/modules/artifact/lib/artifactOwner';
+import { withArtifactOwnersLock } from '#/modules/artifact/lib/artifactOwner';
 import { assertEdgeAuthority } from '#/modules/artifact/lib/assertEdgeAuthority';
 
 export const removeArtifactPlacement = async (
   permix: Permix,
   placement: ArtifactPlacement,
 ): Promise<void> => {
-  await assertEdgeAuthority(permix, placement.artifactId, placement.containerArtifactId);
   const member = await db.artifact.findUniqueOrThrow({ where: { id: placement.artifactId } });
-  await withOwnerLock(artifactOwner(member), 'containers', () =>
+  const container = await db.artifact.findUniqueOrThrow({
+    where: { id: placement.containerArtifactId },
+  });
+  await assertEdgeAuthority(permix, member, container, 'remove');
+  await withArtifactOwnersLock([member, container], () =>
     db.txn(async () => {
+      const locked = new Map<string, Artifact>();
       for (const id of [...new Set([placement.artifactId, placement.containerArtifactId])].sort()) {
-        const [locked] = await db.findForUpdate<Artifact>('Artifact', { id });
-        if (!locked || locked.deletedAt) {
+        const [row] = await db.findForUpdate<Artifact>('Artifact', { id });
+        if (!row || row.deletedAt) {
           throw makeError({ status: 404, message: 'Artifact not found' });
         }
+        locked.set(id, row);
       }
       const current = await db.artifactPlacement.findUnique({ where: { id: placement.id } });
       if (!current) {
         throw makeError({ status: 404, message: 'The artifact is not in that container' });
       }
-      await assertEdgeAuthority(permix, current.artifactId, current.containerArtifactId);
+      await assertEdgeAuthority(
+        permix,
+        locked.get(current.artifactId)!,
+        locked.get(current.containerArtifactId)!,
+        'remove',
+      );
       await db.artifactPlacement.update({
         where: { id: current.id },
         data: { deletedAt: new Date() },

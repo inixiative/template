@@ -5,7 +5,13 @@
  * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
-import { ArtifactScalarInputSchema, ArtifactScalarSchema } from '@template/db';
+import {
+  ArtifactPermissionScalarSchema,
+  ArtifactPlacementScalarSchema,
+  ArtifactScalarInputSchema,
+  ArtifactScalarSchema,
+  ResourceBindingScalarSchema,
+} from '@template/db';
 import { ArtifactAccess, Role } from '@template/db/generated/client/enums';
 import { type ArtifactKind, plainArtifactKinds } from '@template/shared/artifact';
 
@@ -32,6 +38,19 @@ export const artifactReadResponseSchema = ArtifactScalarSchema;
 export const artifactAccessResponseSchema = z.object({
   role: z.enum(Role).nullable(),
   public: z.boolean(),
+});
+
+export const artifactDetailResponseSchema = ArtifactScalarSchema.extend({
+  effectiveAccess: artifactAccessResponseSchema,
+  parents: z.array(ArtifactScalarSchema),
+  ancestors: z.object({
+    artifacts: z.array(ArtifactScalarSchema),
+    edges: z.array(z.object({ artifactId: z.string(), containerArtifactId: z.string() })),
+  }),
+  placements: z.array(ArtifactPlacementScalarSchema),
+  permissions: z.array(ArtifactPermissionScalarSchema),
+  effectivePermissions: z.array(ArtifactPermissionScalarSchema),
+  bindings: z.array(ResourceBindingScalarSchema),
 });
 
 export const artifactMoveBodySchema = z.object({

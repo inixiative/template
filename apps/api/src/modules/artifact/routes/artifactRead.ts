@@ -6,11 +6,13 @@
  */
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
-import { artifactReadResponseSchema } from '#/modules/artifact/schemas/artifactSchemas';
+import { artifactDetailResponseSchema } from '#/modules/artifact/schemas/artifactSchemas';
 import { Modules } from '#/modules/modules';
 
 export const artifactReadRoute = readRoute({
   model: Modules.artifact,
-  responseSchema: artifactReadResponseSchema,
+  description:
+    'Reads an artifact along with its effective access, readable parents and ancestors, visible placements and bindings, and (for managers) direct and effective permissions.',
+  responseSchema: artifactDetailResponseSchema,
   middleware: [validatePermission('read')],
 });

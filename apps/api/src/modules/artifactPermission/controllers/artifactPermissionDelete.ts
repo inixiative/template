@@ -2,15 +2,15 @@
  * @atlas
  * @kind controller
  * @partOf feature:files
- * @uses primitive:routeTemplates
+ * @uses primitive:routeTemplates, primitive:authz
  */
 import type { Artifact } from '@template/db/generated/client/client';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactOwner } from '#/modules/artifact/lib/artifactOwner';
-import { assertGrantableRole } from '#/modules/artifact/lib/assertGrantableRole';
 import { hydrateArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactPermissionDeleteRoute } from '#/modules/artifactPermission/routes/artifactPermissionDelete';
 
@@ -36,7 +36,18 @@ export const artifactPermissionDeleteController = makeController(
         if (!current || current.artifactId !== locked.id) {
           throw makeError({ status: 404, message: 'ArtifactPermission not found' });
         }
-        assertGrantableRole(permix, await hydrateArtifact(locked), current.role);
+        const hydrated = await hydrateArtifact(locked);
+        if (
+          !check(
+            permix,
+            rebacSchema,
+            'artifactPermission',
+            { ...current, artifact: hydrated },
+            'delete',
+          )
+        ) {
+          throw makeError({ status: 403, message: 'Forbidden' });
+        }
         await db.artifactPermission.update({
           where: { id: current.id },
           data: { deletedAt: new Date() },

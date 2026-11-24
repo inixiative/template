@@ -10,11 +10,11 @@ import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
 import { artifactKindDef } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
-import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import {
-  artifactOwner,
   type OwnedArtifact,
   ownerColumns,
+  sameArtifactOwner,
+  withArtifactOwnersLock,
 } from '#/modules/artifact/lib/artifactOwner';
 import { assertContainable } from '#/modules/artifact/lib/assertContainable';
 import { assertEdgeAuthority } from '#/modules/artifact/lib/assertEdgeAuthority';
@@ -78,14 +78,16 @@ const writePlacement = async (
 ): Promise<ArtifactPlacement> => {
   assertContainable(container, member);
   if (member.type === 'container') await assertNoContainerCycle(container.id, member.id);
-  const placed = await hasPlacement(member.id);
-  if (inherit === false && member.access === 'inherit' && !placed) {
-    await db.artifact.update({
-      where: { id: member.id },
-      data: { access: artifactKindDef(member.kind)?.defaultAccess ?? 'private' },
-    });
-  } else if ((inherit ?? !placed) && member.access !== 'inherit') {
-    await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
+  if (sameArtifactOwner(container, member)) {
+    const placed = await hasPlacement(member.id);
+    if (inherit === false && member.access === 'inherit' && !placed) {
+      await db.artifact.update({
+        where: { id: member.id },
+        data: { access: artifactKindDef(member.kind)?.defaultAccess ?? 'private' },
+      });
+    } else if ((inherit ?? !placed) && member.access !== 'inherit') {
+      await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
+    }
   }
   return db.artifactPlacement.create({
     data: { artifactId: member.id, containerArtifactId: container.id },
@@ -108,12 +110,18 @@ export const placeArtifact = async (
   permix: Permix,
   { artifactId, containerArtifactId, inherit }: PlaceArtifactInput,
 ): Promise<ArtifactPlacement> => {
-  await assertEdgeAuthority(permix, artifactId, containerArtifactId);
+  await assertEdgeAuthority(permix, artifactId, containerArtifactId, 'create');
   const member = await fetchArtifact(artifactId);
-  return withOwnerLock(artifactOwner(member), 'containers', () =>
+  const container = await fetchArtifact(containerArtifactId);
+  return withArtifactOwnersLock([member, container], () =>
     db.txn(async () => {
       const locked = await lockArtifacts([artifactId, containerArtifactId]);
-      await assertEdgeAuthority(permix, artifactId, containerArtifactId);
+      await assertEdgeAuthority(
+        permix,
+        locked.get(artifactId)!,
+        locked.get(containerArtifactId)!,
+        'create',
+      );
       return writePlacement(locked.get(artifactId)!, locked.get(containerArtifactId)!, inherit);
     }),
   );
@@ -123,19 +131,38 @@ export const moveArtifact = async (
   permix: Permix,
   { artifactId, fromContainerArtifactId, toContainerArtifactId }: MoveArtifactInput,
 ): Promise<Artifact> => {
-  const assertMoveAuthority = async () => {
-    if (fromContainerArtifactId)
-      await assertEdgeAuthority(permix, artifactId, fromContainerArtifactId);
-    if (toContainerArtifactId) await assertEdgeAuthority(permix, artifactId, toContainerArtifactId);
-    if (!fromContainerArtifactId) await assertArtifactPermission(permix, artifactId, 'manage');
+  const assertMoveAuthority = async (locked?: Map<string, Artifact>) => {
+    const member = locked?.get(artifactId) ?? artifactId;
+    if (fromContainerArtifactId) {
+      await assertEdgeAuthority(
+        permix,
+        member,
+        locked?.get(fromContainerArtifactId) ?? fromContainerArtifactId,
+        'remove',
+      );
+    }
+    if (toContainerArtifactId) {
+      await assertEdgeAuthority(
+        permix,
+        member,
+        locked?.get(toContainerArtifactId) ?? toContainerArtifactId,
+        'create',
+      );
+    }
+    if (!fromContainerArtifactId && !toContainerArtifactId) {
+      await assertArtifactPermission(permix, artifactId, 'manage');
+    }
   };
   await assertMoveAuthority();
   if (fromContainerArtifactId === toContainerArtifactId) {
     throw makeError({ status: 422, message: 'A move needs a different destination' });
   }
   const member = await fetchArtifact(artifactId);
+  const lockTargets: OwnedArtifact[] = [member];
+  if (fromContainerArtifactId) lockTargets.push(await fetchArtifact(fromContainerArtifactId));
+  if (toContainerArtifactId) lockTargets.push(await fetchArtifact(toContainerArtifactId));
 
-  return withOwnerLock(artifactOwner(member), 'containers', () =>
+  return withArtifactOwnersLock(lockTargets, () =>
     db.txn(async () => {
       const idsToLock = [
         artifactId,
@@ -143,7 +170,7 @@ export const moveArtifact = async (
         ...(fromContainerArtifactId ? [fromContainerArtifactId] : []),
       ];
       const locked = await lockArtifacts(idsToLock);
-      await assertMoveAuthority();
+      await assertMoveAuthority(locked);
       if (toContainerArtifactId) {
         await writePlacement(
           locked.get(artifactId)!,
@@ -170,14 +197,16 @@ const insertArtifact = async (
     const locked = await lockArtifacts([containerArtifactId]);
     container = locked.get(containerArtifactId)!;
     if (permix) await assertArtifactPermission(permix, container.id, 'operate');
-    assertContainable(container, { ...candidateOwner, id: '', kind: data.kind });
+    assertContainable(container, { id: '', kind: data.kind });
   }
 
+  const sameOwner = container ? sameArtifactOwner(container, candidateOwner) : false;
+  const resolvedAccess = access ?? (sameOwner ? 'inherit' : kind.defaultAccess);
   const artifact = await db.artifact.create({
     data: {
       ...data,
       type: kind.type,
-      ...(access && access !== 'inherit' ? { access } : {}),
+      access: resolvedAccess,
     },
   });
   if (creatorGrant) {
@@ -195,12 +224,12 @@ export const createArtifact = async (
   permix: Permix,
   input: CreateArtifactInput,
 ): Promise<Artifact> => {
+  const lockTargets: OwnedArtifact[] = [ownerColumns(input)];
   if (input.containerArtifactId) {
     await assertArtifactPermission(permix, input.containerArtifactId, 'operate');
+    lockTargets.push(await fetchArtifact(input.containerArtifactId));
   }
-  return withOwnerLock(artifactOwner(ownerColumns(input)), 'containers', () =>
-    db.txn(() => insertArtifact(input, permix)),
-  );
+  return withArtifactOwnersLock(lockTargets, () => db.txn(() => insertArtifact(input, permix)));
 };
 
 export const copyArtifactInto = async (
@@ -255,7 +284,7 @@ export const copyArtifact = async (
   await assertArtifactPermission(permix, artifactId, 'read');
   await assertArtifactPermission(permix, containerArtifactId, 'operate');
   const initialContainer = await fetchArtifact(containerArtifactId);
-  return withOwnerLock(artifactOwner(initialContainer), 'containers', () =>
+  return withArtifactOwnersLock([initialContainer], () =>
     db.txn(async () => {
       const locked = await lockArtifacts([artifactId, containerArtifactId]);
       const source = locked.get(artifactId)!;

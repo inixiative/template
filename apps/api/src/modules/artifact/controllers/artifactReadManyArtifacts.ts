@@ -14,8 +14,16 @@ export const artifactReadManyArtifactsController = makeController(
   async (c, respond) => {
     const db = c.get('db');
     const container = contextResource<'artifact'>(c);
+    const exclusive = c.req.valid('query').exclusive === 'true';
     const members = await db.artifact.findMany({
-      where: { placements: { some: { containerArtifactId: container.id } } },
+      where: {
+        placements: exclusive
+          ? {
+              some: { containerArtifactId: container.id },
+              every: { containerArtifactId: container.id },
+            }
+          : { some: { containerArtifactId: container.id } },
+      },
       orderBy: { name: 'asc' },
     });
     return respond.ok(await listableArtifacts(c.get('permix'), members));

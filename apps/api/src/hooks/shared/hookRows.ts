@@ -8,6 +8,16 @@ import { castArray, isPlainObject } from 'lodash-es';
 
 export type HookRow = Record<string, unknown>;
 
+export const ALL_MUTATION_ACTIONS: DbAction[] = [
+  DbAction.create,
+  DbAction.update,
+  DbAction.delete,
+  DbAction.upsert,
+  DbAction.createManyAndReturn,
+  DbAction.updateManyAndReturn,
+  DbAction.deleteMany,
+];
+
 export const isManyAction = (action: DbAction): action is ManyAction =>
   action === DbAction.createManyAndReturn ||
   action === DbAction.updateManyAndReturn ||

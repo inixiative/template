@@ -12,6 +12,7 @@ import {
   actorMayPerformActionOnOwner,
   isNull,
   ownerModelIsOneOf,
+  roleHeldVia,
   rowIsThereAnd,
 } from '@template/permissions/rebac/rebacSchemaRules';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
@@ -202,12 +203,19 @@ export const artifactResourcePermission: ResourcePermission = {
   },
 };
 
+const artifactPermissionRoleWrite: ActionRule = {
+  all: [
+    { rel: 'artifact', action: 'manage' },
+    roleHeldVia((action) => ({ rel: 'artifact', action })),
+  ],
+};
+
 export const artifactPermissionResourcePermission: ResourcePermission = {
   actions: {
-    manage: { rel: 'artifact', action: 'manage' },
-    read: 'manage',
-    create: 'manage',
-    delete: 'manage',
+    manage: artifactPermissionRoleWrite,
+    read: { any: ['manage', { rel: 'artifact', action: 'manage' }] },
+    create: artifactPermissionRoleWrite,
+    delete: artifactPermissionRoleWrite,
   },
 };
 
@@ -215,16 +223,11 @@ export const artifactPlacementResourcePermission: ResourcePermission = {
   actions: {
     create: {
       all: [
-        { rel: 'artifact', action: 'manage' },
+        { rel: 'artifact', action: 'read' },
         { rel: 'containerArtifact', action: 'operate' },
       ],
     },
-    delete: {
-      all: [
-        { rel: 'artifact', action: 'manage' },
-        { rel: 'containerArtifact', action: 'operate' },
-      ],
-    },
+    delete: { rel: 'containerArtifact', action: 'operate' },
     read: { rel: 'artifact', action: 'read' },
   },
 };

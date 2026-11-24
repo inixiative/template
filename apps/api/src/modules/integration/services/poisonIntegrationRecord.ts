@@ -15,9 +15,6 @@ const recordUniqueKeyForModel: Record<
   CustomerRelationship: (integrationId, recordCustomerRelationshipId) => ({
     integrationId_recordCustomerRelationshipId: { integrationId, recordCustomerRelationshipId },
   }),
-  Artifact: (integrationId, recordArtifactId) => ({
-    integrationId_recordArtifactId: { integrationId, recordArtifactId },
-  }),
 };
 
 export const poisonIntegrationRecord = (input: {

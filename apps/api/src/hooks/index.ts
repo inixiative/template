@@ -1,6 +1,6 @@
 import { registerAttributeValidationHook } from '@template/db';
 import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
-import { registerArtifactClosureHook } from '#/hooks/artifactClosure/hook';
+import { registerArtifactTreeHook } from '#/hooks/artifactTree/hook';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
@@ -55,7 +55,7 @@ export const registerHooks = () => {
   registerSegmentConditionsHook();
   registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook();
   registerSoftDeleteCascadeHook();
-  registerArtifactClosureHook();
+  registerArtifactTreeHook();
   registerTagOwnerCategoryHook();
   registerUserEmailAddressValidationHook();
   registerUserEmailContactHook();

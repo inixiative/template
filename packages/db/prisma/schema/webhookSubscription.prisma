@@ -45,7 +45,6 @@ model WebhookSubscription {
 
 enum WebhookModel {
   CustomerRelationship
-  Artifact
 }
 
 enum WebhookOwnerModel {

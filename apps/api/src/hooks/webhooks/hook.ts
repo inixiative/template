@@ -7,7 +7,6 @@ import {
   omitRegisteredFields,
   registerDbHook,
   WEBHOOK_EXCLUDED_FIELDS,
-  webhookRelatedModels,
 } from '@template/db';
 import type { WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
@@ -15,12 +14,7 @@ import { ConcurrencyType } from '@template/shared/utils';
 import { keyBy } from 'lodash-es';
 import { isManyAction } from '#/hooks/shared/hookRows';
 import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
-import {
-  fetchParentDeliveries,
-  fetchWebhookPartiesByRow,
-  isWebhookModel,
-  type WebhookRow,
-} from '#/hooks/webhooks/parties';
+import { fetchWebhookPartiesByRow, type WebhookRow } from '#/hooks/webhooks/parties';
 import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -70,8 +64,7 @@ const processSingleRecord = (
   model: string,
   webhookAction: WebhookAction,
   resultData: WebhookRow,
-  previousData: Record<string, unknown> | undefined,
-  origin: string | null,
+  previousData?: Record<string, unknown>,
 ) => {
   if (
     webhookAction === WebhookAction.update &&
@@ -80,6 +73,7 @@ const processSingleRecord = (
     return [];
   }
 
+  const origin = auditActorContext.currentActor()?.integrationId ?? null;
   const targets = origin
     ? subscriptions.filter((sub) => sub.integrationId !== origin)
     : subscriptions;
@@ -117,7 +111,6 @@ export const registerWebhookHook = () => {
     actions,
     async (options: HookOptions) => {
       const { model, action: dbAction } = options;
-      if (!isWebhookModel(model) && !webhookRelatedModels[model]?.length) return;
 
       const records: { resultData: WebhookRow; previousData?: Record<string, unknown> }[] = [];
       if (isManyAction(dbAction)) {
@@ -134,64 +127,37 @@ export const registerWebhookHook = () => {
         });
       }
 
-      if (records.length === 0) return;
-      const origin = auditActorContext.currentActor()?.integrationId ?? null;
+      const audiences = await fetchWebhookPartiesByRow(
+        model,
+        records.map(({ resultData }) => resultData),
+      );
 
-      db.onCommit(async () => {
-        const audiences = await fetchWebhookPartiesByRow(
-          model,
-          records.map(({ resultData }) => resultData),
+      let allCallbacks: (() => Promise<void>)[] = [];
+
+      for (const [webhookModel, partiesByRowId] of audiences) {
+        const subscriptions = await findPartySubscriptions(
+          webhookModel,
+          Object.values(partiesByRowId).flat(),
         );
+        if (subscriptions.length === 0) continue;
 
-        let allCallbacks: (() => Promise<void>)[] = [];
-
-        for (const [webhookModel, partiesByRowId] of audiences) {
-          const subscriptions = await findPartySubscriptions(
+        for (const { resultData, previousData } of records) {
+          const parties = partiesByRowId[resultData.id] ?? [];
+          const callbacks = processSingleRecord(
+            subscriptions.filter((sub) => isPartyTo(sub, parties)),
             webhookModel,
-            Object.values(partiesByRowId).flat(),
+            model,
+            dbActionToWebhookAction(dbAction, resultData, previousData),
+            resultData,
+            previousData,
           );
-          if (subscriptions.length === 0) continue;
-
-          for (const { resultData, previousData } of records) {
-            const parties = partiesByRowId[resultData.id] ?? [];
-            const callbacks = processSingleRecord(
-              subscriptions.filter((sub) => isPartyTo(sub, parties)),
-              webhookModel,
-              model,
-              dbActionToWebhookAction(dbAction, resultData, previousData),
-              resultData,
-              previousData,
-              origin,
-            );
-            allCallbacks = allCallbacks.concat(callbacks);
-          }
+          allCallbacks = allCallbacks.concat(callbacks);
         }
+      }
 
-        for (const { webhookModel, parents, partiesByRowId } of await fetchParentDeliveries(
-          model,
-          records.map(({ resultData }) => resultData),
-        )) {
-          const subscriptions = await findPartySubscriptions(
-            webhookModel,
-            Object.values(partiesByRowId).flat(),
-          );
-          for (const parent of parents) {
-            allCallbacks = allCallbacks.concat(
-              processSingleRecord(
-                subscriptions.filter((sub) => isPartyTo(sub, partiesByRowId[parent.id] ?? [])),
-                webhookModel,
-                webhookModel,
-                WebhookAction.update,
-                parent,
-                undefined,
-                origin,
-              ),
-            );
-          }
-        }
+      if (allCallbacks.length === 0) return;
 
-        for (const callback of allCallbacks) await callback();
-      }, ConcurrencyType.queue);
+      db.onCommit(allCallbacks, ConcurrencyType.queue);
     },
     [auditActorStore],
   );

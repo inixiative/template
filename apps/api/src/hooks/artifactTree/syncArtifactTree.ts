@@ -7,10 +7,13 @@
 import { db } from '@template/db';
 import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
+import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
 
 export const ARTIFACT_MAX_DEPTH = 50;
 
 type AncestorInfo = { inherits: boolean; depth: number };
+
+type TreeNode = OwnedArtifact & { access: ArtifactAccess; parents: string[] };
 
 const collectDescendantIds = async (rootIds: string[]): Promise<Set<string>> => {
   const rows = await db.artifactAncestor.findMany({
@@ -23,8 +26,8 @@ const collectDescendantIds = async (rootIds: string[]): Promise<Set<string>> => 
 };
 
 type SubgraphContext = {
-  nodes: Map<string, { access: ArtifactAccess; parents: string[] }>;
-  liveBoundaryParents: Set<string>;
+  nodes: Map<string, TreeNode>;
+  boundaryParents: Map<string, OwnedArtifact>;
   boundaryAncestors: Map<string, Map<string, AncestorInfo>>;
 };
 
@@ -34,14 +37,25 @@ const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphCont
     select: {
       id: true,
       access: true,
+      ownerModel: true,
+      userId: true,
+      organizationId: true,
+      spaceId: true,
       placements: { select: { containerArtifactId: true } },
     },
   });
-  const nodes = new Map<string, { access: ArtifactAccess; parents: string[] }>();
+  const nodes = new Map<string, TreeNode>();
   const boundaryCandidateIds = new Set<string>();
   for (const row of rows) {
     const parents = row.placements.map((placement) => placement.containerArtifactId);
-    nodes.set(row.id, { access: row.access, parents });
+    nodes.set(row.id, {
+      access: row.access,
+      ownerModel: row.ownerModel,
+      userId: row.userId,
+      organizationId: row.organizationId,
+      spaceId: row.spaceId,
+      parents,
+    });
   }
   for (const node of nodes.values()) {
     for (const parentId of node.parents) {
@@ -49,40 +63,36 @@ const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphCont
     }
   }
 
+  const boundaryParents = new Map<string, OwnedArtifact>();
   const boundaryAncestors = new Map<string, Map<string, AncestorInfo>>();
-  const liveBoundaryParents = new Set<string>();
   if (boundaryCandidateIds.size > 0) {
     const candidateList = [...boundaryCandidateIds];
-    const [liveParents, ancestorRows] = await Promise.all([
-      db.artifact.findMany({
-        where: { id: { in: candidateList } },
-        select: { id: true },
-      }),
-      db.artifactAncestor.findMany({
-        where: { artifactId: { in: candidateList } },
+    const liveParents = await db.artifact.findMany({
+      where: { id: { in: candidateList } },
+      select: { id: true, ownerModel: true, userId: true, organizationId: true, spaceId: true },
+    });
+    for (const parent of liveParents) boundaryParents.set(parent.id, parent);
+
+    if (boundaryParents.size > 0) {
+      const ancestorRows = await db.artifactAncestor.findMany({
+        where: { artifactId: { in: [...boundaryParents.keys()] } },
         select: { artifactId: true, ancestorArtifactId: true, inherits: true, depth: true },
-      }),
-    ]);
-    for (const { id } of liveParents) liveBoundaryParents.add(id);
-    for (const row of ancestorRows) {
-      if (!liveBoundaryParents.has(row.artifactId)) continue;
-      let map = boundaryAncestors.get(row.artifactId);
-      if (!map) {
-        map = new Map();
-        boundaryAncestors.set(row.artifactId, map);
+      });
+      for (const row of ancestorRows) {
+        let map = boundaryAncestors.get(row.artifactId);
+        if (!map) {
+          map = new Map();
+          boundaryAncestors.set(row.artifactId, map);
+        }
+        map.set(row.ancestorArtifactId, { inherits: row.inherits, depth: row.depth });
       }
-      map.set(row.ancestorArtifactId, { inherits: row.inherits, depth: row.depth });
     }
   }
 
-  return { nodes, liveBoundaryParents, boundaryAncestors };
+  return { nodes, boundaryParents, boundaryAncestors };
 };
 
-const computeAncestorsMap = ({
-  nodes,
-  liveBoundaryParents,
-  boundaryAncestors,
-}: SubgraphContext) => {
+const computeAncestorsMap = ({ nodes, boundaryParents, boundaryAncestors }: SubgraphContext) => {
   const memo = new Map<string, Map<string, AncestorInfo>>();
   const visit = (artifactId: string, walking: Set<string>): Map<string, AncestorInfo> => {
     const cached = memo.get(artifactId);
@@ -107,17 +117,21 @@ const computeAncestorsMap = ({
     };
 
     for (const parentId of node.parents) {
-      const parentAncestors = nodes.has(parentId)
+      const internalParent = nodes.get(parentId);
+      const boundaryParent = internalParent ? undefined : boundaryParents.get(parentId);
+      const parentOwner = internalParent ?? boundaryParent;
+      if (!parentOwner) continue;
+
+      const parentAncestors = internalParent
         ? visit(parentId, nextWalking)
-        : liveBoundaryParents.has(parentId)
-          ? (boundaryAncestors.get(parentId) ?? new Map<string, AncestorInfo>())
-          : null;
-      if (!parentAncestors) continue;
-      merge(parentId, { inherits: canInherit, depth: 1 });
+        : (boundaryAncestors.get(parentId) ?? new Map<string, AncestorInfo>());
+      // why: cross-owner placements organize without leaking permissions or public status across tenants.
+      const edgeInherits = canInherit && sameArtifactOwner(node, parentOwner);
+      merge(parentId, { inherits: edgeInherits, depth: 1 });
       for (const [ancestorId, ancestorInfo] of parentAncestors) {
         if (ancestorId === artifactId) continue;
         merge(ancestorId, {
-          inherits: canInherit && ancestorInfo.inherits,
+          inherits: edgeInherits && ancestorInfo.inherits,
           depth: ancestorInfo.depth + 1,
         });
       }
@@ -174,25 +188,24 @@ const syncAncestors = async (
 
 const syncEffectivePermissions = async (
   artifactIds: string[],
-  liveBoundaryParents: Set<string>,
+  boundaryParents: Map<string, OwnedArtifact>,
   desiredByArtifact: Map<string, Map<string, AncestorInfo>>,
 ): Promise<void> => {
-  const boundaryIds = [...liveBoundaryParents];
-  const [directPermissions, boundaryEffectiveRows, existing] = await Promise.all([
-    db.artifactPermission.findMany({
-      where: { artifactId: { in: artifactIds } },
-      select: { id: true, artifactId: true },
-    }),
+  const directPermissions = await db.artifactPermission.findMany({
+    where: { artifactId: { in: artifactIds } },
+    select: { id: true, artifactId: true },
+  });
+  const boundaryIds = [...boundaryParents.keys()];
+  const boundaryEffectiveRows =
     boundaryIds.length > 0
-      ? db.artifactEffectivePermission.findMany({
+      ? await db.artifactEffectivePermission.findMany({
           where: { artifactId: { in: boundaryIds } },
           select: { artifactId: true, permissionId: true },
         })
-      : Promise.resolve([]),
-    db.artifactEffectivePermission.findMany({
-      where: { artifactId: { in: artifactIds } },
-    }),
-  ]);
+      : [];
+  const existing = await db.artifactEffectivePermission.findMany({
+    where: { artifactId: { in: artifactIds } },
+  });
 
   const directPermsByArtifact = new Map<string, string[]>();
   for (const permission of directPermissions) {
@@ -219,7 +232,7 @@ const syncEffectivePermissions = async (
       if (!info.inherits) continue;
       const sourcePerms = internalSet.has(ancestorId)
         ? directPermsByArtifact.get(ancestorId)
-        : liveBoundaryParents.has(ancestorId)
+        : boundaryParents.has(ancestorId)
           ? boundaryPermsByArtifact.get(ancestorId)
           : undefined;
       for (const permId of sourcePerms ?? []) desiredPermIds.add(permId);
@@ -265,7 +278,7 @@ export const syncArtifactSubgraph = async (rootIds: string[]): Promise<void> => 
     );
 
     await syncAncestors(liveIds, desiredByArtifact);
-    await syncEffectivePermissions(liveIds, context.liveBoundaryParents, desiredByArtifact);
+    await syncEffectivePermissions(liveIds, context.boundaryParents, desiredByArtifact);
   });
 };
 
@@ -274,15 +287,13 @@ export const syncArtifactPermissionEffective = async (permissionIds: string[]): 
   if (uniqueIds.length === 0) return;
 
   await db.withoutDeleted(async () => {
-    const [livePermissions, existingRows] = await Promise.all([
-      db.artifactPermission.findMany({
-        where: { id: { in: uniqueIds } },
-        select: { id: true, artifactId: true },
-      }),
-      db.artifactEffectivePermission.findMany({
-        where: { permissionId: { in: uniqueIds } },
-      }),
-    ]);
+    const livePermissions = await db.artifactPermission.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, artifactId: true },
+    });
+    const existingRows = await db.artifactEffectivePermission.findMany({
+      where: { permissionId: { in: uniqueIds } },
+    });
 
     const liveById = new Map(livePermissions.map((permission) => [permission.id, permission]));
     const existingByKey = new Map(

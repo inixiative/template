@@ -459,7 +459,6 @@ export const PolymorphismRegistry = {
         field: 'recordModel',
         fkMap: {
           CustomerRelationship: ['recordCustomerRelationshipId'],
-          Artifact: ['recordArtifactId'],
         },
       },
     ],

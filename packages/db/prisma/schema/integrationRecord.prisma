@@ -21,10 +21,8 @@ model IntegrationRecord {
   // Record — false polymorphism, exactly one FK matches the discriminator.
   recordModel                  WebhookModel
   recordCustomerRelationshipId String?      @db.VarChar(36)
-  recordArtifactId             String?      @db.VarChar(36)
 
   recordCustomerRelationship CustomerRelationship? @relation(fields: [recordCustomerRelationshipId], references: [id], onDelete: Cascade)
-  recordArtifact             Artifact?             @relation(fields: [recordArtifactId], references: [id], onDelete: Cascade)
 
   poisonedAt     DateTime?
   poisonedReason String?
@@ -37,8 +35,6 @@ model IntegrationRecord {
   // leaves the other arms unconstrained, tombstones keep their key and `upsert` revives them. Each
   // doubles as the lookup index for that record column.
   @@unique([integrationId, recordCustomerRelationshipId], map: "IntegrationRecord_integration_recordCustomerRelationship_key")
-  @@unique([integrationId, recordArtifactId], map: "IntegrationRecord_integration_recordArtifact_key")
   @@index([integrationId])
   @@index([recordCustomerRelationshipId])
-  @@index([recordArtifactId])
 }

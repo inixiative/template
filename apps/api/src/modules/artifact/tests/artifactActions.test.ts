@@ -190,16 +190,20 @@ describe('artifact actions', () => {
     ]);
   });
 
-  it("placements stay within one owner: a file can't be placed in another owner's folder", async () => {
+  it('cross-owner placement allows placing a file in another owner folder without inheriting permissions', async () => {
     const file = await userFile(admin);
     const folder = await orgFolder();
     const response = await adminFetch(
       post(`/api/v1/artifact/${file.id}/artifactPlacements`, { containerArtifactId: folder.id }),
     );
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(201);
+    const ancestor = await db.artifactAncestor.findFirstOrThrow({
+      where: { artifactId: file.id, ancestorArtifactId: folder.id },
+    });
+    expect(ancestor.inherits).toBe(false);
   });
 
-  it('uses shows only what the caller can see, with the owner and who has access', async () => {
+  it('GET /artifact/:id shows only visible placements/bindings and grants only for managers', async () => {
     const hidden = await orgFolder();
     const shown = await orgFolder();
     const logo = await orgFolder();
@@ -222,20 +226,24 @@ describe('artifact actions', () => {
       bindingType: 'logo',
     });
     const { data } = await parseSuccessBody<{
-      owner: { ownerModel: string };
-      access: { grants: unknown[] };
+      ownerModel: string;
+      permissions: unknown[];
+      effectivePermissions: unknown[];
       placements: { containerArtifactId: string }[];
       bindings: { bindingType: string }[];
-    }>(await memberFetch(get(`/api/v1/artifact/${logo.id}/uses`)));
-    expect(data.owner.ownerModel).toBe('Organization');
-    expect(data.access.grants).toEqual([]);
+    }>(await memberFetch(get(`/api/v1/artifact/${logo.id}`)));
+    expect(data.ownerModel).toBe('Organization');
+    expect(data.permissions).toEqual([]);
+    expect(data.effectivePermissions).toEqual([]);
     expect(data.placements.map((placement) => placement.containerArtifactId)).toEqual([shown.id]);
     expect(data.bindings.map((binding) => binding.bindingType)).toEqual(['logo']);
 
-    const { data: adminUses } = await parseSuccessBody<{
-      access: { grants: unknown[] };
-    }>(await adminFetch(get(`/api/v1/artifact/${logo.id}/uses`)));
-    expect(adminUses.access.grants.length).toBeGreaterThan(0);
+    const { data: adminDetail } = await parseSuccessBody<{
+      permissions: unknown[];
+      effectivePermissions: unknown[];
+    }>(await adminFetch(get(`/api/v1/artifact/${logo.id}`)));
+    expect(adminDetail.permissions.length).toBeGreaterThan(0);
+    expect(adminDetail.effectivePermissions.length).toBeGreaterThan(0);
   });
 
   describe('transferArtifact', () => {
@@ -274,10 +282,10 @@ describe('artifact actions', () => {
       expect(tracking.map((binding) => [binding.bindingType, binding.resourceUserId])).toEqual([
         ['tracking', stranger.id],
       ]);
-      const access = await parseSuccessBody<{ role: string }>(
-        await strangerFetch(get(`/api/v1/artifact/${file.id}/access`)),
+      const detail = await parseSuccessBody<{ effectiveAccess: { role: string } }>(
+        await strangerFetch(get(`/api/v1/artifact/${file.id}`)),
       );
-      expect(access.data.role).toBe('viewer');
+      expect(detail.data.effectiveAccess.role).toBe('viewer');
       expect(
         (await strangerFetch(patch(`/api/v1/artifact/${file.id}`, { name: 'x' }))).status,
       ).toBe(403);

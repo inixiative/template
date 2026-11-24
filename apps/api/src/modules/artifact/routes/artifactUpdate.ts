@@ -14,7 +14,8 @@ import { Modules } from '#/modules/modules';
 
 export const artifactUpdateRoute = updateRoute({
   model: Modules.artifact,
+  description: 'Updates an artifact. Renaming needs operate; changing access needs manage.',
   bodySchema: artifactUpdateBodySchema,
   responseSchema: artifactReadResponseSchema,
-  middleware: [validatePermission('manage')],
+  middleware: [validatePermission('operate')],
 });

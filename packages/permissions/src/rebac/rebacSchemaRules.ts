@@ -86,7 +86,7 @@ export const actorManagesRecordUser = (at = ''): ActionRule => ({
   action: 'manage',
 });
 
-const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
+export const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   any: [
     { all: [rowIsThereAnd('id', isNull('role')), heldAt('read')] },
     ...roleHierarchy.map((role) => ({

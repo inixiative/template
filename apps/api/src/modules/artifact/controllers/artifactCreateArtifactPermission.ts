@@ -2,16 +2,16 @@
  * @atlas
  * @kind controller
  * @partOf feature:files
- * @uses primitive:routeTemplates
+ * @uses primitive:routeTemplates, primitive:authz
  */
 import type { Prisma } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactOwner } from '#/modules/artifact/lib/artifactOwner';
-import { assertGrantableRole } from '#/modules/artifact/lib/assertGrantableRole';
 import { hydrateArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactCreateArtifactPermissionRoute } from '#/modules/artifact/routes/artifactCreateArtifactPermission';
 
@@ -28,7 +28,18 @@ export const artifactCreateArtifactPermissionController = makeController(
         if (!locked || locked.deletedAt) {
           throw makeError({ status: 404, message: 'Artifact not found' });
         }
-        assertGrantableRole(permix, await hydrateArtifact(locked), body.role);
+        const hydrated = await hydrateArtifact(locked);
+        if (
+          !check(
+            permix,
+            rebacSchema,
+            'artifactPermission',
+            { id: '', artifactId: locked.id, role: body.role, artifact: hydrated },
+            'create',
+          )
+        ) {
+          throw makeError({ status: 403, message: 'Forbidden' });
+        }
         return db.artifactPermission.create({
           data: { ...body, artifactId: locked.id } as Prisma.ArtifactPermissionUncheckedCreateInput,
         });

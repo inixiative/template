@@ -19,9 +19,11 @@ describe('artifactAccess hook', () => {
       })
     ).entity;
 
-  it('stamps the kind default on an artifact created without a container', async () => {
-    expect((await folder()).access).toBe('private');
-    expect((await folder('inherit')).access).toBe('private');
+  it('stamps type from the kind catalog and respects explicit access with private default', async () => {
+    const defaultFolder = await folder();
+    expect(defaultFolder.type).toBe('container');
+    expect(defaultFolder.access).toBe('private');
+    expect((await folder('inherit')).access).toBe('inherit');
     expect((await folder('public')).access).toBe('public');
   });
 

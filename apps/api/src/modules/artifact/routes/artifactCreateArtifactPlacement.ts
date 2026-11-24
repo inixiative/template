@@ -15,7 +15,7 @@ export const artifactCreateArtifactPlacementRoute = createRoute({
   model: Modules.artifact,
   submodel: Modules.artifactPlacement,
   description:
-    'Places an artifact in a container. Needs manage on the artifact and operate on the container.',
+    'Places an artifact in a container. Same-owner placements need manage on the artifact and operate on the container; cross-owner placements need read on the artifact and operate on the container and never inherit permissions.',
   bodySchema: artifactPlacementCreateBodySchema,
   responseSchema: artifactPlacementReadResponseSchema,
 });

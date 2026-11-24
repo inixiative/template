@@ -17,8 +17,8 @@ import {
   invalidateInheritingDescendants,
   syncArtifactPermissionEffective,
   syncArtifactSubgraph,
-} from '#/hooks/artifactClosure/syncArtifactClosure';
-import { isManyAction } from '#/hooks/shared/hookRows';
+} from '#/hooks/artifactTree/syncArtifactTree';
+import { ALL_MUTATION_ACTIONS, isManyAction } from '#/hooks/shared/hookRows';
 
 type Row = Record<string, unknown> & { id?: string };
 
@@ -40,22 +40,12 @@ const changedPairs = (options: HookOptions): { result?: Row; previous?: Row }[] 
   return [{ result: result as Row | undefined, previous: previous as Row | undefined }];
 };
 
-const ALL_MUTATIONS = [
-  DbAction.create,
-  DbAction.update,
-  DbAction.delete,
-  DbAction.upsert,
-  DbAction.createManyAndReturn,
-  DbAction.updateManyAndReturn,
-  DbAction.deleteMany,
-];
-
-export const registerArtifactClosureHook = () => {
+export const registerArtifactTreeHook = () => {
   registerDbHook(
-    'artifactClosure:placement',
+    'artifactTree:placement',
     'ArtifactPlacement',
     HookTiming.after,
-    ALL_MUTATIONS,
+    ALL_MUTATION_ACTIONS,
     async (options: HookOptions) => {
       const artifactIds = changedPairs(options).flatMap(({ result, previous }) => {
         const ids: string[] = [];
@@ -68,10 +58,10 @@ export const registerArtifactClosureHook = () => {
   );
 
   registerDbHook(
-    'artifactClosure:permission',
+    'artifactTree:permission',
     'ArtifactPermission',
     HookTiming.after,
-    ALL_MUTATIONS,
+    ALL_MUTATION_ACTIONS,
     async (options: HookOptions) => {
       const permissionIds = changedPairs(options).flatMap(({ result, previous }) => {
         const id = result?.id ?? previous?.id;
@@ -82,7 +72,7 @@ export const registerArtifactClosureHook = () => {
   );
 
   registerDbHook(
-    'artifactClosure:artifact',
+    'artifactTree:artifact',
     'Artifact',
     HookTiming.after,
     [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],

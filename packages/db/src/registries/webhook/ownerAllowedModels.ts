@@ -7,9 +7,9 @@
 import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
 
 export const webhookOwnerAllowedModels: Record<WebhookOwnerModel, WebhookModel[]> = {
-  [WebhookOwnerModel.User]: [WebhookModel.CustomerRelationship, WebhookModel.Artifact],
-  [WebhookOwnerModel.Organization]: [WebhookModel.CustomerRelationship, WebhookModel.Artifact],
-  [WebhookOwnerModel.Space]: [WebhookModel.CustomerRelationship, WebhookModel.Artifact],
+  [WebhookOwnerModel.User]: [WebhookModel.CustomerRelationship],
+  [WebhookOwnerModel.Organization]: [WebhookModel.CustomerRelationship],
+  [WebhookOwnerModel.Space]: [WebhookModel.CustomerRelationship],
 };
 
 export const webhookModelSubscribers = Object.entries(webhookOwnerAllowedModels).reduce(

@@ -2,38 +2,45 @@
  * @atlas
  * @kind utils
  * @partOf feature:files
- * @uses infrastructure:prisma
+ * @uses infrastructure:prisma, mutex
  */
-import { emptySideKeyColumns, polymorphicAxis } from '@template/db';
+import { emptySideKeyColumns, polymorphicAxis, polymorphicKeyColumns } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
+import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 
 export type OwnedArtifact = Pick<Artifact, 'ownerModel' | 'userId' | 'organizationId' | 'spaceId'>;
 
-export const sameArtifactOwner = (a: OwnedArtifact, b: OwnedArtifact): boolean =>
-  a.ownerModel === b.ownerModel &&
-  a.userId === b.userId &&
-  a.organizationId === b.organizationId &&
-  a.spaceId === b.spaceId;
+export const artifactOwner = (
+  artifact: OwnedArtifact,
+): { ownerModel: string; ownerId: string } => ({
+  ownerModel: artifact.ownerModel,
+  ownerId: polymorphicKeyColumns('Artifact', 'ownerModel', artifact.ownerModel)
+    .map((column) => String(artifact[column as keyof OwnedArtifact]))
+    .join(':'),
+});
 
-export const artifactOwner = (artifact: OwnedArtifact): { ownerModel: string; ownerId: string } => {
-  switch (artifact.ownerModel) {
-    case 'User':
-      return { ownerModel: 'User', ownerId: artifact.userId! };
-    case 'Organization':
-      return { ownerModel: 'Organization', ownerId: artifact.organizationId! };
-    case 'Space':
-      return { ownerModel: 'Space', ownerId: artifact.spaceId! };
-    case 'OrganizationUser':
-      return {
-        ownerModel: 'OrganizationUser',
-        ownerId: `${artifact.organizationId}:${artifact.userId}`,
-      };
-    case 'SpaceUser':
-      return {
-        ownerModel: 'SpaceUser',
-        ownerId: `${artifact.organizationId}:${artifact.spaceId}:${artifact.userId}`,
-      };
+export const sameArtifactOwner = (a: OwnedArtifact, b: OwnedArtifact): boolean => {
+  const left = artifactOwner(a);
+  const right = artifactOwner(b);
+  return left.ownerModel === right.ownerModel && left.ownerId === right.ownerId;
+};
+
+export const withArtifactOwnersLock = <T>(
+  artifacts: OwnedArtifact[],
+  fn: () => Promise<T>,
+): Promise<T> => {
+  const unique = new Map<string, { ownerModel: string; ownerId: string }>();
+  for (const artifact of artifacts) {
+    const owner = artifactOwner(artifact);
+    unique.set(`${owner.ownerModel}:${owner.ownerId}`, owner);
   }
+  const ordered = [...unique.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
+  const acquire = (index: number): Promise<T> => {
+    const owner = ordered[index];
+    if (!owner) return fn();
+    return withOwnerLock(owner, 'containers', () => acquire(index + 1));
+  };
+  return acquire(0);
 };
 
 export type OwnerRef = Pick<OwnedArtifact, 'ownerModel'> & Partial<OwnedArtifact>;

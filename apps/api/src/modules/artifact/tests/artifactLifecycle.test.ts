@@ -67,7 +67,7 @@ describe('artifact lifecycle', () => {
   };
 
   const status = async (fetch: Fetch, artifact: Artifact) =>
-    (await fetch(get(`/api/v1/artifact/${artifact.id}/access`))).status;
+    (await fetch(get(`/api/v1/artifact/${artifact.id}`))).status;
 
   beforeEach(async () => {
     const first = await createOrganizationUser({ role: 'owner' });
@@ -178,21 +178,19 @@ describe('artifact lifecycle', () => {
       await placeInside(compliance, operations);
     });
 
-    it('parents lists both direct containers', async () => {
-      const { data } = await parseSuccessBody<Artifact[]>(
-        await ownerFetch(get(`/api/v1/artifact/${compliance.id}/parents`)),
+    it('GET /artifact/:id returns parents, ancestors, and hides unreadable containers', async () => {
+      const { data } = await parseSuccessBody<{ parents: Artifact[]; ancestors: Ancestry }>(
+        await ownerFetch(get(`/api/v1/artifact/${compliance.id}`)),
       );
-      expect(data.map((artifact) => artifact.id).sort()).toEqual([legal.id, operations.id].sort());
-    });
-
-    it('ancestors returns the upward graph with the shared folder once, up to the root', async () => {
-      const { data } = await parseSuccessBody<Ancestry>(
-        await ownerFetch(get(`/api/v1/artifact/${compliance.id}/ancestors`)),
+      expect(data.parents.map((artifact) => artifact.id).sort()).toEqual(
+        [legal.id, operations.id].sort(),
       );
-      expect(data.artifacts.map((artifact) => artifact.id).sort()).toEqual(
+      expect(data.ancestors.artifacts.map((artifact) => artifact.id).sort()).toEqual(
         [root.id, legal.id, operations.id].sort(),
       );
-      const edgeKeys = data.edges.map((edge) => `${edge.artifactId}>${edge.containerArtifactId}`);
+      const edgeKeys = data.ancestors.edges.map(
+        (edge) => `${edge.artifactId}>${edge.containerArtifactId}`,
+      );
       expect(edgeKeys.sort()).toEqual(
         [
           `${compliance.id}>${legal.id}`,
@@ -201,9 +199,7 @@ describe('artifact lifecycle', () => {
           `${operations.id}>${root.id}`,
         ].sort(),
       );
-    });
 
-    it('ancestors and parents only show containers the caller can read', async () => {
       await db.artifact.update({ where: { id: compliance.id }, data: { access: 'private' } });
       await createArtifactPermission({
         artifactId: compliance.id,
@@ -211,14 +207,11 @@ describe('artifact lifecycle', () => {
         granteeUserId: member.id,
         role: 'viewer',
       });
-      const ancestry = await parseSuccessBody<Ancestry>(
-        await memberFetch(get(`/api/v1/artifact/${compliance.id}/ancestors`)),
+      const asMember = await parseSuccessBody<{ parents: Artifact[]; ancestors: Ancestry }>(
+        await memberFetch(get(`/api/v1/artifact/${compliance.id}`)),
       );
-      expect(ancestry.data).toEqual({ artifacts: [], edges: [] });
-      const parents = await parseSuccessBody<Artifact[]>(
-        await memberFetch(get(`/api/v1/artifact/${compliance.id}/parents`)),
-      );
-      expect(parents.data).toEqual([]);
+      expect(asMember.data.ancestors).toEqual({ artifacts: [], edges: [] });
+      expect(asMember.data.parents).toEqual([]);
     });
 
     it("the owner's root listing holds artifacts in no container", async () => {
@@ -294,7 +287,7 @@ describe('artifact lifecycle', () => {
       await placeInside(alsoElsewhere, other);
 
       const listing = await parseSuccessBody<Artifact[]>(
-        await ownerFetch(get(`/api/v1/artifact/${box.id}/exclusiveContents`)),
+        await ownerFetch(get(`/api/v1/artifact/${box.id}/artifacts?exclusive=true`)),
       );
       expect(listing.data.map((artifact) => artifact.id)).toEqual([onlyHere.id]);
 
@@ -378,6 +371,6 @@ describe('artifact lifecycle', () => {
       }),
     );
     expect(placed.status).toBe(201);
-    expect((await outsiderFetch(get(`/api/v1/artifact/${file.id}/access`))).status).toBe(403);
+    expect((await outsiderFetch(get(`/api/v1/artifact/${file.id}`))).status).toBe(403);
   });
 });

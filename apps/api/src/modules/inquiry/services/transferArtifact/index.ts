@@ -56,10 +56,8 @@ const fetchOwnerOf = async ({ model, id }: Party): Promise<OwnedArtifact> => {
 };
 
 const fetchOwnedObject = async (artifactId: string, source: Party): Promise<Artifact> => {
-  const [artifact, expectedOwner] = await Promise.all([
-    db.artifact.findUnique({ where: { id: artifactId } }),
-    fetchOwnerOf(source),
-  ]);
+  const artifact = await db.artifact.findUnique({ where: { id: artifactId } });
+  const expectedOwner = await fetchOwnerOf(source);
   if (!artifact || !sameArtifactOwner(artifact, expectedOwner)) {
     throw makeError({ status: 404, message: 'Artifact not found' });
   }
@@ -147,10 +145,8 @@ export const transferArtifactService: InquiryService<
     }
     await db.findForUpdate('Artifact', { id: content.artifactId });
     const artifact = await fetchOwnedObject(content.artifactId, source);
-    const [sourceOwner, targetOwner] = await Promise.all([
-      fetchOwnerOf(source),
-      fetchOwnerOf(target),
-    ]);
+    const sourceOwner = await fetchOwnerOf(source);
+    const targetOwner = await fetchOwnerOf(target);
     const allowTracking = response.allowTracking ?? content.allowTracking;
     const tracked = content.keepTracking && allowTracking !== false;
 
