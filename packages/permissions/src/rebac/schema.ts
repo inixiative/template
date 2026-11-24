@@ -13,11 +13,11 @@ import {
   actorIsDelegateOfUser,
   actorIsUser,
   actorMayCreateTokenAtOwnerWithRole,
-  actorOperatesOwnerUserOrManagesOwnerTenant,
   chainedStandardActions,
   integrationAccess,
   integrationAdministering,
   isNull,
+  makeOwnerRules,
   memberRowActions,
   ownerActions,
   rowIsThereAnd,
@@ -99,7 +99,10 @@ export const schemaMap: SchemaMap = {
     },
     'db:WebhookSubscription': { actions: { ...ownerActions(), create: 'operate' } },
     'db:Segment': {
-      actions: { ...ownerActions(), create: actorOperatesOwnerUserOrManagesOwnerTenant },
+      actions: {
+        ...ownerActions(),
+        create: makeOwnerRules('db:Segment').actorOperatesOwnerUserOrManagesOwnerTenant,
+      },
     },
     'db:SegmentMember': {
       actions: chainedStandardActions({
@@ -119,7 +122,7 @@ export const schemaMap: SchemaMap = {
         delete: { any: ['manage', { rel: 'integration', action: 'delete' }] },
       },
     },
-    'db:Project': { actions: actionsForRecordOwnedByAnyOwnerModel },
+    'db:Project': { actions: actionsForRecordOwnedByAnyOwnerModel('db:Project') },
     'db:ProjectIntegration': {
       actions: {
         create: {

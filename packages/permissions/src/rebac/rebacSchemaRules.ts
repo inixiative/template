@@ -31,21 +31,11 @@ export const actorIsDelegateOfUser: ActionRule = kind.ruleForEachKind('actor:Act
   Token: kind.ruleKindIsOneOf('actor:Token', 'ownerModel', ['User']),
 });
 
-export const ownerRelations = [
-  ['User', 'user'],
-  ['Organization', 'organization'],
-  ['OrganizationUser', 'organizationUser'],
-  ['Space', 'space'],
-  ['SpaceUser', 'spaceUser'],
-  ['Integration', 'integration'],
-] as const;
-
-type OwnerModel = (typeof ownerRelations)[number][0];
-
-const everyOwner = ownerRelations.map(([ownerModel]) => ownerModel);
-const organizationOrSpace: OwnerModel[] = ['Organization', 'Space'];
-const members: OwnerModel[] = ['OrganizationUser', 'SpaceUser'];
-const notIntegration = everyOwner.filter((ownerModel) => ownerModel !== 'Integration');
+const ownerAxis = 'ownerModel';
+const organizationOrSpace = ['Organization', 'Space'];
+const members = ['OrganizationUser', 'SpaceUser'];
+const notMembers = ['User', ...organizationOrSpace];
+const notIntegration = [...notMembers, ...members];
 
 export const actingAsAPerson: ActionRule = kind.ruleForEachKind('actor:Acting', 'model', {
   User: true,
@@ -65,22 +55,6 @@ export const actingAsTheRecordsIntegration: ActionRule = kind.ruleForEachKind(
   },
 );
 
-export const ownerModelIsOneOf = (owners: OwnerModel[], at = ''): ActionRule => ({
-  rule: { field: `${at}ownerModel`, operator: Operator.in, value: owners },
-});
-
-export const actorMayPerformActionOnOwner = (
-  action: string,
-  at = '',
-  owners: OwnerModel[] = everyOwner,
-): ActionRule => ({
-  any: ownerRelations
-    .filter(([ownerModel]) => owners.includes(ownerModel))
-    .map(([ownerModel, rel]) => ({
-      all: [ownerModelIsOneOf([ownerModel], at), { rel: `${at}${rel}`, action }],
-    })),
-});
-
 export const actorManagesRecordUser = (at = ''): ActionRule => ({
   rel: `${at}user`,
   action: 'manage',
@@ -98,8 +72,31 @@ const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   ],
 });
 
-export const roleHeldAtOwner = (at = '', owners: OwnerModel[] = everyOwner): ActionRule =>
-  roleHeldVia((action) => actorMayPerformActionOnOwner(action, at, owners));
+/** The owner rules of `resource`, read where `at` reaches it (`'db:Integration'` at `'integration.'`): its owner kinds and each kind's relation come from the polymorphism registry. */
+export const makeOwnerRules = (resource: string, at = '') => {
+  const ownerModelIsOneOf = (owners: readonly string[]): ActionRule =>
+    kind.ruleKindIsOneOf(resource, ownerAxis, owners, at);
+  const actorMayPerformActionOnOwner = (action: string, owners?: readonly string[]): ActionRule =>
+    kind.ruleActionThroughEachKind(resource, ownerAxis, action, owners, at);
+  return {
+    ownerModelIsOneOf,
+    actorMayPerformActionOnOwner,
+    roleHeldAtOwner: (owners?: readonly string[]): ActionRule =>
+      roleHeldVia((action) => actorMayPerformActionOnOwner(action, owners)),
+    ownedByYouOrOrganizationOrSpaceYouManage: {
+      any: [
+        actorMayPerformActionOnOwner('manage', organizationOrSpace),
+        actorManagesRecordUser(at),
+      ],
+    } satisfies ActionRule,
+    actorOperatesOwnerUserOrManagesOwnerTenant: {
+      any: [
+        actorMayPerformActionOnOwner('operate', ['User']),
+        actorMayPerformActionOnOwner('manage', organizationOrSpace),
+      ],
+    } satisfies ActionRule,
+  };
+};
 
 export const memberRoleWrite = (tenant: 'organization' | 'space'): ActionRule => ({
   all: [{ rel: tenant, action: 'manage' }, roleHeldVia((action) => ({ rel: tenant, action }))],
@@ -120,85 +117,78 @@ export const memberRowActions = (tenant: 'organization' | 'space') => ({
   delegateFull: { all: [actorIsUser, 'operate'] },
 });
 
-export const ownedByYouOrOrganizationOrSpaceYouManage = (at = ''): ActionRule => ({
-  any: [
-    actorMayPerformActionOnOwner('manage', at, organizationOrSpace),
-    actorManagesRecordUser(at),
-  ],
-});
-
-export const actorOperatesOwnerUserOrManagesOwnerTenant: ActionRule = {
-  any: [
-    actorMayPerformActionOnOwner('operate', '', ['User']),
-    actorMayPerformActionOnOwner('manage', '', organizationOrSpace),
-  ],
+const administeringOfRecordOwnedByAnyOwnerModel = (resource: string) => {
+  const owner = makeOwnerRules(resource);
+  return {
+    create: {
+      any: [
+        owner.actorOperatesOwnerUserOrManagesOwnerTenant,
+        {
+          all: [
+            owner.ownerModelIsOneOf(members),
+            owner.actorMayPerformActionOnOwner('operate', members),
+            kind.ruleForEachKind(resource, ownerAxis, {
+              OrganizationUser: { rel: 'organization', action: 'operate' },
+              SpaceUser: { rel: 'space', action: 'operate' },
+            }),
+          ],
+        },
+      ],
+    },
+    manage: {
+      any: [
+        owner.actorMayPerformActionOnOwner('manage', ['User']),
+        owner.actorMayPerformActionOnOwner('manage', organizationOrSpace),
+        owner.actorMayPerformActionOnOwner('operate', members),
+      ],
+    },
+    delete: { any: ['manage', owner.actorMayPerformActionOnOwner('own', members)] },
+    delegateFull: {
+      all: [
+        actorIsUser,
+        {
+          any: [
+            owner.actorMayPerformActionOnOwner('manage', ['User']),
+            owner.actorMayPerformActionOnOwner('own', organizationOrSpace),
+            owner.actorMayPerformActionOnOwner('operate', members),
+          ],
+        },
+      ],
+    },
+  } satisfies Record<string, ActionRule>;
 };
 
-const notMembers: OwnerModel[] = ['User', 'Organization', 'Space'];
-
-const operatesAtItsMembersTenant: ActionRule = {
-  any: [
-    { all: [ownerModelIsOneOf(['OrganizationUser']), { rel: 'organization', action: 'operate' }] },
-    { all: [ownerModelIsOneOf(['SpaceUser']), { rel: 'space', action: 'operate' }] },
-  ],
+const accessOfRecordOwnedByAnyOwnerModel = (resource: string) => {
+  const owner = makeOwnerRules(resource);
+  return {
+    operate: { any: ['manage', owner.actorMayPerformActionOnOwner('operate', notMembers)] },
+    read: {
+      any: [
+        'operate',
+        owner.actorMayPerformActionOnOwner('read', notMembers),
+        owner.actorMayPerformActionOnOwner('own', members),
+      ],
+    },
+  } satisfies Record<string, ActionRule>;
 };
 
-export const integrationAdministering = {
-  create: {
-    any: [
-      actorOperatesOwnerUserOrManagesOwnerTenant,
-      {
-        all: [
-          ownerModelIsOneOf(members),
-          actorMayPerformActionOnOwner('operate', '', members),
-          operatesAtItsMembersTenant,
-        ],
-      },
-    ],
-  },
-  manage: {
-    any: [
-      actorMayPerformActionOnOwner('manage', '', ['User']),
-      actorMayPerformActionOnOwner('manage', '', organizationOrSpace),
-      actorMayPerformActionOnOwner('operate', '', members),
-    ],
-  },
-  delete: { any: ['manage', actorMayPerformActionOnOwner('own', '', members)] },
-  delegateFull: {
-    all: [
-      actorIsUser,
-      {
-        any: [
-          actorMayPerformActionOnOwner('manage', '', ['User']),
-          actorMayPerformActionOnOwner('own', '', organizationOrSpace),
-          actorMayPerformActionOnOwner('operate', '', members),
-        ],
-      },
-    ],
-  },
-} satisfies Record<string, ActionRule>;
+export const integrationAdministering = administeringOfRecordOwnedByAnyOwnerModel('db:Integration');
+export const integrationAccess = accessOfRecordOwnedByAnyOwnerModel('db:Integration');
 
-export const integrationAccess = {
-  operate: { any: ['manage', actorMayPerformActionOnOwner('operate', '', notMembers)] },
-  read: {
-    any: [
-      'operate',
-      actorMayPerformActionOnOwner('read', '', notMembers),
-      actorMayPerformActionOnOwner('own', '', members),
-    ],
-  },
-} satisfies Record<string, ActionRule>;
+export const actionsForRecordOwnedByAnyOwnerModel = (resource: string) =>
+  ({
+    ...omit(administeringOfRecordOwnedByAnyOwnerModel(resource), 'delegateFull'),
+    ...accessOfRecordOwnedByAnyOwnerModel(resource),
+  }) satisfies Record<string, ActionRule>;
 
-export const actionsForRecordOwnedByAnyOwnerModel = {
-  ...omit(integrationAdministering, 'delegateFull'),
-  ...integrationAccess,
-} satisfies Record<string, ActionRule>;
+const ownerOfIntegration = makeOwnerRules('db:Integration');
+const ownerOfToken = makeOwnerRules('db:Token');
+const ownerOfTokensIntegration = makeOwnerRules('db:Integration', 'integration.');
 
-// Read on an integration row, whose owner is never another integration.
 export const integrationRoleWrite: ActionRule = {
   any: [
-    actorMayPerformActionOnOwner('delegateFull', '', notIntegration),
-    { all: ['manage', roleHeldAtOwner('', notIntegration)] },
+    ownerOfIntegration.actorMayPerformActionOnOwner('delegateFull'),
+    { all: ['manage', ownerOfIntegration.roleHeldAtOwner()] },
   ],
 };
 
@@ -206,20 +196,24 @@ export const actorMayCreateTokenAtOwnerWithRole: ActionRule = {
   any: [
     {
       all: [
-        ownerModelIsOneOf(notIntegration),
-        ownedByYouOrOrganizationOrSpaceYouManage(),
-        { any: [ownerModelIsOneOf(['User', ...members]), roleHeldAtOwner('', notIntegration)] },
+        ownerOfToken.ownerModelIsOneOf(notIntegration),
+        ownerOfToken.ownedByYouOrOrganizationOrSpaceYouManage,
+        {
+          any: [
+            ownerOfToken.ownerModelIsOneOf(['User', ...members]),
+            ownerOfToken.roleHeldAtOwner(notIntegration),
+          ],
+        },
       ],
     },
     {
       all: [
-        ownerModelIsOneOf(['Integration']),
-        ownedByYouOrOrganizationOrSpaceYouManage('integration.'),
+        ownerOfToken.ownerModelIsOneOf(['Integration']),
+        ownerOfTokensIntegration.ownedByYouOrOrganizationOrSpaceYouManage,
         {
           any: [
-            ownerModelIsOneOf(['User', ...members], 'integration.'),
-            // An integration's owner is never another integration: no `integration.integration`.
-            roleHeldAtOwner('integration.', notIntegration),
+            ownerOfTokensIntegration.ownerModelIsOneOf(['User', ...members]),
+            ownerOfTokensIntegration.roleHeldAtOwner(),
           ],
         },
       ],
@@ -229,11 +223,13 @@ export const actorMayCreateTokenAtOwnerWithRole: ActionRule = {
 
 export const tokenAdministering: ActionRule = {
   any: [
-    actorMayPerformActionOnOwner('manage', '', ['User']),
-    actorMayPerformActionOnOwner('manage', '', organizationOrSpace),
-    actorMayPerformActionOnOwner('operate', '', members),
-    actorMayPerformActionOnOwner('own', '', members),
-    { all: [ownerModelIsOneOf(['Integration']), { rel: 'integration', action: 'delete' }] },
+    ownerOfToken.actorMayPerformActionOnOwner('manage', ['User']),
+    ownerOfToken.actorMayPerformActionOnOwner('manage', organizationOrSpace),
+    ownerOfToken.actorMayPerformActionOnOwner('operate', members),
+    ownerOfToken.actorMayPerformActionOnOwner('own', members),
+    kind.ruleForEachKind('db:Token', ownerAxis, {
+      Integration: { rel: 'integration', action: 'delete' },
+    }),
   ],
 };
 
