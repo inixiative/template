@@ -13,6 +13,7 @@ import {
   isStringArray,
   parseAttributeDate,
 } from '@template/shared/attributes';
+import { settingAppliesToIntegrationProvider } from '@template/shared/settings/registry';
 import type {
   SettingPermissionAction,
   SettingResourceModelName,
@@ -32,6 +33,7 @@ export type SettingCatalogDefinition = {
   readonly label: string;
   readonly description: string;
   readonly resourceModels: readonly string[];
+  readonly integrationProviders?: readonly string[];
   readonly valueType: AttributeValueType;
   readonly schema: Record<string, unknown>;
   readonly defaultValue?: unknown;
@@ -84,6 +86,7 @@ export type AssembledResourceSettings = {
 export type AssembleResourceSettingsOptions = {
   category?: string;
   keys?: readonly string[];
+  integrationProvider?: string;
 };
 
 export type SettingUpsertDraftItem = {
@@ -112,6 +115,8 @@ export const assembleResourceSettings = (
   const matching = Object.values(catalog.definitions)
     .filter((definition) => {
       if (!definition.resourceModels.includes(resourceModel)) return false;
+      if (!settingAppliesToIntegrationProvider(definition, options.integrationProvider))
+        return false;
       if (options.category && definition.category !== options.category) return false;
       if (keyFilter && !keyFilter.has(definition.key)) return false;
       return true;

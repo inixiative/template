@@ -109,7 +109,7 @@ export const settingPermissionForModel = (
 };
 
 export const settingAppliesToIntegrationProvider = (
-  definition: SettingDefinition,
+  definition: { readonly key: string; readonly integrationProviders?: readonly string[] },
   integrationProvider: string | undefined,
 ): boolean =>
   !definition.integrationProviders ||

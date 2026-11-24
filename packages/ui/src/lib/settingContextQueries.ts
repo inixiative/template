@@ -56,6 +56,7 @@ export type SettingExplicitTarget = {
   model: 'Project' | 'Integration' | 'ProjectIntegration';
   id: string;
   record?: HydratedRecord;
+  integrationProvider?: string;
 };
 
 const deleteSetting = mutation({

@@ -11,6 +11,7 @@ import {
   assembleResourceSettings,
   diffSettingDrafts,
   SETTING_DEFINITIONS,
+  settingAppliesToIntegrationProvider,
 } from '@template/shared/settings';
 import {
   Button,
@@ -78,9 +79,10 @@ export const ResourceSettingsSection = ({
     return Object.values(catalog.definitions).some(
       (def) =>
         def.resourceModels.includes(queries.resourceModel) &&
+        settingAppliesToIntegrationProvider(def, target?.integrationProvider) &&
         (!category || def.category === category),
     );
-  }, [catalog, queries.resourceModel, category]);
+  }, [catalog, queries.resourceModel, category, target?.integrationProvider]);
 
   const settingsQuery = useQuery({
     queryKey,
@@ -94,9 +96,15 @@ export const ResourceSettingsSection = ({
       catalog,
       settingsQuery.data?.data ?? [],
       queries.resourceModel,
-      { category },
+      { category, integrationProvider: target?.integrationProvider },
     );
-  }, [catalog, settingsQuery.data?.data, queries.resourceModel, category]);
+  }, [
+    catalog,
+    settingsQuery.data?.data,
+    queries.resourceModel,
+    category,
+    target?.integrationProvider,
+  ]);
 
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const [invalidKeys, setInvalidKeys] = useState<Record<string, boolean>>({});

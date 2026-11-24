@@ -11,7 +11,9 @@ import { castArray, pickBy } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
 type IntegrationRow = Partial<Integration>;
-type LinkRow = Partial<ProjectIntegration>;
+type ConnectInput = { connect?: { id?: string } };
+type LinkRow = Partial<ProjectIntegration> & { project?: ConnectInput; integration?: ConnectInput };
+type WriteArgs<T> = { data?: T | T[]; create?: T; where?: unknown };
 
 const ownerKey = (row: IntegrationRow) => ({
   provider: row.provider,
@@ -24,12 +26,11 @@ const ownerKey = (row: IntegrationRow) => ({
 const assertOwnerSingletonFree = async (row: IntegrationRow): Promise<void> => {
   if (!isIntegrationSingleton(row.provider, 'owner')) return;
   const key = ownerKey(row);
-  if (db.isInTxn())
-    await db.findForUpdate(
-      'Integration',
-      pickBy(key, (value) => value !== null),
-      { upserting: true },
-    );
+  await db.findForUpdate(
+    'Integration',
+    pickBy(key, (value) => value !== null),
+    { upserting: true },
+  );
   const existing = await db.integration.findFirst({
     where: { ...key, deletedAt: null, ...(row.id ? { id: { not: row.id } } : {}) },
     select: { id: true },
@@ -42,22 +43,19 @@ const assertOwnerSingletonFree = async (row: IntegrationRow): Promise<void> => {
 };
 
 const assertProjectSingletonFree = async (link: LinkRow): Promise<void> => {
-  if (!link.projectId || !link.integrationId) return;
+  const projectId = link.projectId ?? link.project?.connect?.id;
+  const integrationId = link.integrationId ?? link.integration?.connect?.id;
+  if (!projectId || !integrationId) return;
   const integration = await db.integration.findUnique({
-    where: { id: link.integrationId },
+    where: { id: integrationId },
     select: { provider: true },
   });
   if (!isIntegrationSingleton(integration?.provider, 'project')) return;
-  if (db.isInTxn())
-    await db.findForUpdate(
-      'ProjectIntegration',
-      { projectId: link.projectId },
-      { upserting: true },
-    );
+  await db.findForUpdate('ProjectIntegration', { projectId }, { upserting: true });
   const existing = await db.projectIntegration.findFirst({
     where: {
-      projectId: link.projectId,
-      integrationId: { not: link.integrationId },
+      projectId,
+      integrationId: { not: integrationId },
       deletedAt: null,
       integration: { provider: integration?.provider, deletedAt: null },
     },
@@ -70,34 +68,53 @@ const assertProjectSingletonFree = async (link: LinkRow): Promise<void> => {
     });
 };
 
-const revivedLinks = async (where: unknown): Promise<LinkRow[]> =>
-  db.withDeleted(() =>
+const createdRows = <T>(args: WriteArgs<T>): T[] =>
+  args.create ? [args.create] : args.data ? castArray(args.data) : [];
+
+const isRestore = <T extends { deletedAt?: Date | null }>(args: WriteArgs<T>) =>
+  !Array.isArray(args.data) && args.data?.deletedAt === null;
+
+const assertRestoredIntegrationsFree = async (where: unknown): Promise<void> => {
+  const restored = await db.withDeleted(() =>
+    db.integration.findMany({ where: where as never, include: { projectIntegrations: true } }),
+  );
+  for (const integration of restored) {
+    await assertOwnerSingletonFree(integration);
+    for (const link of integration.projectIntegrations.filter((row) => !row.deletedAt))
+      await assertProjectSingletonFree(link);
+  }
+};
+
+const assertRestoredLinksFree = async (where: unknown): Promise<void> => {
+  const restored = await db.withDeleted(() =>
     db.projectIntegration.findMany({
       where: where as never,
       select: { projectId: true, integrationId: true },
     }),
   );
+  for (const link of restored) await assertProjectSingletonFree(link);
+};
 
 export const registerIntegrationSingletonHook = () => {
   registerDbHook(
     'integrationSingleton:integrationCreate',
     'Integration',
     HookTiming.before,
-    [DbAction.create, DbAction.createManyAndReturn],
+    [DbAction.create, DbAction.createManyAndReturn, DbAction.upsert],
     async ({ args }) => {
-      for (const row of castArray((args as { data: IntegrationRow | IntegrationRow[] }).data))
+      for (const row of createdRows(args as WriteArgs<IntegrationRow>))
         await assertOwnerSingletonFree(row);
     },
   );
 
   registerDbHook(
-    'integrationSingleton:integrationUpsert',
+    'integrationSingleton:integrationRestore',
     'Integration',
     HookTiming.before,
-    [DbAction.upsert],
+    [DbAction.update, DbAction.updateManyAndReturn],
     async ({ args }) => {
-      const create = (args as { create?: IntegrationRow }).create;
-      if (create) await assertOwnerSingletonFree(create);
+      const write = args as WriteArgs<IntegrationRow>;
+      if (isRestore(write)) await assertRestoredIntegrationsFree(write.where);
     },
   );
 
@@ -105,33 +122,21 @@ export const registerIntegrationSingletonHook = () => {
     'integrationSingleton:linkCreate',
     'ProjectIntegration',
     HookTiming.before,
-    [DbAction.create, DbAction.createManyAndReturn],
+    [DbAction.create, DbAction.createManyAndReturn, DbAction.upsert],
     async ({ args }) => {
-      for (const row of castArray((args as { data: LinkRow | LinkRow[] }).data))
+      for (const row of createdRows(args as WriteArgs<LinkRow>))
         await assertProjectSingletonFree(row);
     },
   );
 
   registerDbHook(
-    'integrationSingleton:linkUpsert',
-    'ProjectIntegration',
-    HookTiming.before,
-    [DbAction.upsert],
-    async ({ args }) => {
-      const create = (args as { create?: LinkRow }).create;
-      if (create) await assertProjectSingletonFree(create);
-    },
-  );
-
-  registerDbHook(
-    'integrationSingleton:linkRevive',
+    'integrationSingleton:linkRestore',
     'ProjectIntegration',
     HookTiming.before,
     [DbAction.update, DbAction.updateManyAndReturn],
     async ({ args }) => {
-      const a = args as { where?: unknown; data?: LinkRow };
-      if (a.data?.deletedAt !== null) return;
-      for (const link of await revivedLinks(a.where)) await assertProjectSingletonFree(link);
+      const write = args as WriteArgs<LinkRow>;
+      if (isRestore(write)) await assertRestoredLinksFree(write.where);
     },
   );
 };

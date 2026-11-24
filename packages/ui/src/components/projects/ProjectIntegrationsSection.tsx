@@ -275,6 +275,7 @@ export const ProjectIntegrationsSection = ({
                             model: 'ProjectIntegration',
                             id: pi.id,
                             record: piRecordForPermissions,
+                            integrationProvider: integration?.provider ?? undefined,
                           }}
                           title={`${displayName} settings`}
                         />

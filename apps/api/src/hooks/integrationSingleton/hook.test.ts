@@ -91,4 +91,39 @@ describe('integrationSingleton hook', () => {
     ).rejects.toMatchObject({ status: 409 });
     expect(secondLink.integrationId).toBe(second.id);
   });
+
+  it('refuses a provider change, an integration restore and a connect-form link that would break a singleton', async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: project } = await createProject({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+    });
+    const { entity: slack } = await orgIntegration(organization.id, otherProvider);
+    const { entity: first } = await orgIntegration(organization.id, singletonProvider);
+
+    await expect(
+      db.integration.update({ where: { id: slack.id }, data: { provider: singletonProvider } }),
+    ).rejects.toMatchObject({ status: 422 });
+
+    await createProjectIntegration({}, { project, integration: first });
+    await db.integration.update({ where: { id: first.id }, data: { deletedAt: new Date() } });
+    const { entity: second } = await orgIntegration(organization.id, singletonProvider);
+    await expect(
+      db.withDeleted(() =>
+        db.integration.update({ where: { id: first.id }, data: { deletedAt: null } }),
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+
+    INTEGRATION_SINGLETONS[singletonProvider] = ['project'];
+    const { entity: third } = await orgIntegration(organization.id, singletonProvider);
+    await createProjectIntegration({}, { project, integration: second });
+    await expect(
+      db.projectIntegration.create({
+        data: {
+          project: { connect: { id: project.id } },
+          integration: { connect: { id: third.id } },
+        },
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+  });
 });
