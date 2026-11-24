@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { attributeTypedColumnIssues, encodeAttributeValue } from '@template/shared/attributes';
+import { encodeAttributeValue, validateAttributeTypedColumns } from '@template/shared/attributes';
 import {
   SETTING_CATEGORIES,
   SETTING_DEFINITIONS,
@@ -59,12 +59,13 @@ describe('SETTING_DEFINITIONS registry invariants', () => {
     for (const definition of Object.values(SETTING_DEFINITIONS)) {
       if (definition.defaultValue === null) continue;
       const encoded = encodeAttributeValue(definition.valueType, definition.defaultValue);
-      const checked = attributeTypedColumnIssues(
-        definition.valueType,
-        encoded,
-        definition.schema as z.ZodType,
-      );
-      expect(checked.ok).toBe(true);
+      expect(() =>
+        validateAttributeTypedColumns(
+          definition.valueType,
+          encoded,
+          definition.schema as z.ZodType,
+        ),
+      ).not.toThrow();
     }
   });
 

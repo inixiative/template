@@ -13,6 +13,7 @@ import {
   RuleReferenceError,
 } from '@template/db';
 import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
+import { AttributeValidationError } from '@template/shared/attributes';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Context } from 'hono';
@@ -83,6 +84,12 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
     return respondAppError(
       c,
       makeError({ status: 422, message: err.message, details: err.details }),
+    );
+
+  if (err instanceof AttributeValidationError)
+    return respondAppError(
+      c,
+      makeError({ status: 422, message: err.message, details: err.issues }),
     );
 
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
