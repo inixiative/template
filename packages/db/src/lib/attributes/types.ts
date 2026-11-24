@@ -48,14 +48,11 @@ export type PrismaAttributeColumnPayload = {
   valueJson: Prisma.InputJsonValue | typeof Prisma.DbNull;
 };
 
-export type AttributeWriteInspectionOk = {
-  ok: true;
+export type ValidatedAttributeWrite = {
   value: unknown;
   definition?: AttributeFieldDefinition;
   normalizedValueJson?: string[];
   normalizedValueDate?: Date;
 };
-
-export type AttributeWriteInspection = AttributeWriteInspectionOk | { ok: false; errors: string[] };
 
 export type AttributeModelInput = AccessorName | ModelName;

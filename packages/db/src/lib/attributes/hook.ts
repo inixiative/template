@@ -16,12 +16,13 @@ import {
   type AttributeModelName,
   attributeModelConfig,
 } from '@template/db/lib/attributes/registry';
-import { attributeWriteInspection } from '@template/db/lib/attributes/writing/attributeWriteInspection';
+import { validateAttributeWrite } from '@template/db/lib/attributes/writing/validateAttributeWrite';
 import { applyWriteDataOverPreviousRow } from '@template/db/utils/applyWriteDataOverPreviousRow';
 import { isTombstoneOnlyUpdate } from '@template/db/utils/isTombstoneOnlyUpdate';
 import { type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
 import {
   type AttributeFieldDefinition,
+  AttributeValidationError,
   deduplicateMultiSelect,
   isStringArray,
 } from '@template/shared/attributes';
@@ -46,8 +47,6 @@ const arraysEqual = (left: readonly string[], right: readonly string[]): boolean
   left.length === right.length && left.every((item, idx) => item === right[idx]);
 
 export type RegisterAttributeValidationHookOptions = {
-  /** Optional custom error factory (e.g. API `makeError({ status: 422, message })`). */
-  makeValidationError?: (message: string) => Error;
   /** Optional definition resolver override (used in unit/DB tests with synthetic definitions). */
   resolveDefinition?: (locator: string) => AttributeFieldDefinition | undefined;
 };
@@ -63,17 +62,13 @@ export const registerAttributeValidationHook = (
 ): void => {
   if (attributeModelNames.length === 0) return;
 
-  const toError = options.makeValidationError ?? ((message: string) => new Error(message));
-  const inspectionOptions = options.resolveDefinition
+  const validationOptions = options.resolveDefinition
     ? { resolveDefinition: options.resolveDefinition }
     : undefined;
 
   const validateAndNormalizeRow = (model: ModelName, mergedRow: Row, writableData?: Row): void => {
     const accessor = toAccessor(model) as AttributeModelName;
-    const result = attributeWriteInspection(accessor, mergedRow, inspectionOptions);
-    if (!result.ok) {
-      throw toError(result.errors.join('; '));
-    }
+    const result = validateAttributeWrite(accessor, mergedRow, validationOptions);
     if (writableData) {
       if (result.normalizedValueJson !== undefined && writableData.valueJson !== undefined) {
         writableData.valueJson = result.normalizedValueJson;
@@ -85,9 +80,13 @@ export const registerAttributeValidationHook = (
       const persisted = mergedRow.valueJson;
       if (!isStringArray(persisted) || !arraysEqual(persisted, result.normalizedValueJson)) {
         const config = attributeModelConfig(accessor);
-        throw toError(
-          `${model}: multiSelect valueJson must be deduplicated and canonically sorted (expected ${JSON.stringify(result.normalizedValueJson)}; scope where by '${config.locatorField ?? 'key'}' or pass deduplicateMultiSelect)`,
-        );
+        throw new AttributeValidationError([
+          {
+            code: 'unsorted_multiselect_value',
+            message: `${model}: multiSelect valueJson must be deduplicated and canonically sorted (expected ${JSON.stringify(result.normalizedValueJson)}; scope where by '${config.locatorField ?? 'key'}' or pass deduplicateMultiSelect)`,
+            path: ['valueJson'],
+          },
+        ]);
       }
     }
   };

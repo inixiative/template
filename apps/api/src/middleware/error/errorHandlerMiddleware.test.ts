@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { FindForUpdateLockTimeoutError, LockLostError, Prisma } from '@template/db';
+import { AttributeValidationError } from '@template/shared/attributes';
 import { HTTPException } from 'hono/http-exception';
 import { makeError } from '#/lib/errors';
 import { createTestApp } from '#tests/createTestApp';
@@ -43,6 +44,11 @@ const { fetch } = createTestApp({
       });
       app.get('/lock-lost', () => {
         throw new LockLostError('lock:cronJobs:schedulers');
+      });
+      app.get('/attribute-invalid', () => {
+        throw new AttributeValidationError([
+          { code: 'invalid_attribute_type', message: 'Expected finite number', path: ['value'] },
+        ]);
       });
       app.get('/raw', () => {
         throw new Error('boom');
@@ -134,6 +140,19 @@ describe('errorHandlerMiddleware', () => {
     await expectEnvelope(response, {
       error: 'CONFLICT',
       message: 'Lost the lock guarding this write; please retry',
+    });
+  });
+
+  it('answers an AttributeValidationError as 422 with structured issues', async () => {
+    const response = await fetch(get('/attribute-invalid'));
+
+    expect(response.status).toBe(422);
+    await expectEnvelope(response, {
+      error: 'VALIDATION_ERROR',
+      message: 'Expected finite number',
+      details: [
+        { code: 'invalid_attribute_type', message: 'Expected finite number', path: ['value'] },
+      ],
     });
   });
 

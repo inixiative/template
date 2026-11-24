@@ -16,7 +16,6 @@ export * from './validation/checkAttributeColumns';
 export * from './validation/checkAttributeGinIndex';
 export * from './validation/checkAttributeScalarIndexes';
 export * from './validation/validateAttributeModels';
-export * from './writing/attributeWriteInspection';
 export * from './writing/buildAttributeUpsertData';
 export * from './writing/encodeAttributeColumns';
 export * from './writing/packAttributeValue';
