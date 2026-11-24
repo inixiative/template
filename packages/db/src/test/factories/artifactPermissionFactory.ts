@@ -39,11 +39,6 @@ const artifactPermissionFactory = registerFactory('ArtifactPermission', {
       foreignKey: { id: 'granteeCustomerRelationshipId' },
       required: false,
     },
-    granteeIntegration: {
-      modelName: 'Integration',
-      foreignKey: { id: 'granteeIntegrationId' },
-      required: false,
-    },
   },
 });
 

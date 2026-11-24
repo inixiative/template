@@ -433,7 +433,6 @@ export const PolymorphismRegistry = {
           OrganizationUser: ['granteeOrganizationId', 'granteeUserId'],
           SpaceUser: ['granteeOrganizationId', 'granteeSpaceId', 'granteeUserId'],
           CustomerRelationship: ['granteeCustomerRelationshipId'],
-          Integration: ['granteeIntegrationId'],
         },
       },
     ],

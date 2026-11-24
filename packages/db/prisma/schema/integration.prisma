@@ -43,7 +43,6 @@ model Integration {
   integrationResources IntegrationResource[]
   projectIntegrations  ProjectIntegration[]
   settings             Setting[]
-  artifactGrants       ArtifactPermission[]  @relation("ArtifactPermissionGranteeIntegration")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

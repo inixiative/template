@@ -30,7 +30,7 @@ model Artifact {
   ancestors   ArtifactAncestor[] @relation("ArtifactAncestorDescendant")
   descendants ArtifactAncestor[] @relation("ArtifactAncestorAncestor")
 
-  /// @permissions(down: [permission.granteeUser, permission.granteeOrganization, permission.granteeSpace.organization, permission.granteeOrganizationUser.user, permission.granteeOrganizationUser.organization, permission.granteeSpaceUser.user, permission.granteeSpaceUser.space.organization, permission.granteeCustomerRelationship.customerUser, permission.granteeCustomerRelationship.customerOrganization, permission.granteeCustomerRelationship.customerSpace.organization, permission.granteeIntegration])
+  /// @permissions(down: [permission.granteeUser, permission.granteeOrganization, permission.granteeSpace.organization, permission.granteeOrganizationUser.user, permission.granteeOrganizationUser.organization, permission.granteeSpaceUser.user, permission.granteeSpaceUser.space.organization, permission.granteeCustomerRelationship.customerUser, permission.granteeCustomerRelationship.customerOrganization, permission.granteeCustomerRelationship.customerSpace.organization])
   effectivePermissions ArtifactEffectivePermission[]
 
   auditLogs          AuditLog[]
@@ -108,7 +108,6 @@ model ArtifactPermission {
   granteeOrganizationId         String?                        @db.VarChar(36)
   granteeSpaceId                String?                        @db.VarChar(36)
   granteeCustomerRelationshipId String?                        @db.VarChar(36)
-  granteeIntegrationId          String?                        @db.VarChar(36)
 
   granteeUser                 User?                 @relation("ArtifactPermissionGranteeUser", fields: [granteeUserId], references: [id], onDelete: Cascade)
   granteeOrganization         Organization?         @relation("ArtifactPermissionGranteeOrganization", fields: [granteeOrganizationId], references: [id], onDelete: Cascade)
@@ -116,7 +115,6 @@ model ArtifactPermission {
   granteeOrganizationUser     OrganizationUser?     @relation("ArtifactPermissionGranteeOrganizationUser", fields: [granteeOrganizationId, granteeUserId], references: [organizationId, userId], onDelete: Cascade)
   granteeSpaceUser            SpaceUser?            @relation("ArtifactPermissionGranteeSpaceUser", fields: [granteeOrganizationId, granteeSpaceId, granteeUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
   granteeCustomerRelationship CustomerRelationship? @relation("ArtifactPermissionGranteeCustomerRelationship", fields: [granteeCustomerRelationshipId], references: [id], onDelete: Cascade)
-  granteeIntegration          Integration?          @relation("ArtifactPermissionGranteeIntegration", fields: [granteeIntegrationId], references: [id], onDelete: Cascade)
 
   role             Role
   expiresAt        DateTime?
@@ -136,13 +134,11 @@ model ArtifactPermission {
   @@unique([artifactId, granteeOrganizationId, granteeUserId], where: raw("\"granteeModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_organization_user_key")
   @@unique([artifactId, granteeSpaceId, granteeUserId], where: raw("\"granteeModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_space_user_key")
   @@unique([artifactId, granteeCustomerRelationshipId], where: raw("\"granteeModel\" = 'CustomerRelationship' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_customer_relationship_key")
-  @@unique([artifactId, granteeIntegrationId], where: raw("\"granteeModel\" = 'Integration' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_integration_key")
   @@index([artifactId])
   @@index([granteeModel, granteeUserId])
   @@index([granteeModel, granteeOrganizationId])
   @@index([granteeModel, granteeSpaceId])
   @@index([granteeModel, granteeCustomerRelationshipId])
-  @@index([granteeModel, granteeIntegrationId])
 }
 
 enum ArtifactType {
@@ -171,5 +167,4 @@ enum ArtifactPermissionGranteeModel {
   OrganizationUser
   SpaceUser
   CustomerRelationship
-  Integration
 }

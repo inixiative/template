@@ -84,14 +84,12 @@ const writePlacement = async (
       where: { id: member.id },
       data: { access: artifactKindDef(member.kind)?.defaultAccess ?? 'private' },
     });
-  }
-  const placement = await db.artifactPlacement.create({
-    data: { artifactId: member.id, containerArtifactId: container.id },
-  });
-  if ((inherit ?? !placed) && member.access !== 'inherit') {
+  } else if ((inherit ?? !placed) && member.access !== 'inherit') {
     await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
   }
-  return placement;
+  return db.artifactPlacement.create({
+    data: { artifactId: member.id, containerArtifactId: container.id },
+  });
 };
 
 const removePlacement = async (artifactId: string, containerArtifactId: string) => {

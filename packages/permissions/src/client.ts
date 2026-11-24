@@ -61,21 +61,7 @@ export const InquiryAction = {
 } as const;
 export type InquiryAction = (typeof InquiryAction)[keyof typeof InquiryAction];
 
-export const IntegrationAction = {
-  ...StandardAction,
-  create: 'create',
-  delete: 'delete',
-  act: 'integration.act',
-} as const;
-export type IntegrationAction = (typeof IntegrationAction)[keyof typeof IntegrationAction];
-
-export type Action =
-  | UserAction
-  | OrganizationAction
-  | SpaceAction
-  | TokenAction
-  | InquiryAction
-  | IntegrationAction;
+export type Action = UserAction | OrganizationAction | SpaceAction | TokenAction | InquiryAction;
 
 export { ActorModel };
 

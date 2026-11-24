@@ -37,7 +37,7 @@ type Delegated = {
   spaceId: string | null;
   organizationUser?: OrganizationUser | null;
   spaceUser?: SpaceUser | null;
-  integration?: (Delegated & PermissionsRow & { id?: string }) | null;
+  integration?: (Delegated & PermissionsRow) | null;
 };
 
 const nobody: Permissions = [];
@@ -71,25 +71,10 @@ export const fetchPermissionsOfDelegateOwner = async (
       return spaceId ? spaceOwnerPermissions(spaceId) : nobody;
     case 'Integration':
       return integration
-        ? [
-            ...(integration.id
-              ? [
-                  {
-                    entries: [
-                      {
-                        resource: 'db:integration',
-                        id: integration.id,
-                        actions: { 'integration.act': true },
-                      },
-                    ],
-                  },
-                ]
-              : []),
-            ...narrowOwnerPermissionsToDelegate(
-              integration,
-              await fetchPermissionsOfDelegateOwner(integration),
-            ),
-          ]
+        ? narrowOwnerPermissionsToDelegate(
+            integration,
+            await fetchPermissionsOfDelegateOwner(integration),
+          )
         : nobody;
   }
 };

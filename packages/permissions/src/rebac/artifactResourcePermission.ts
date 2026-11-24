@@ -28,12 +28,8 @@ const rolesCovering: Record<StandardAction, readonly Role[]> = {
   read: roleHierarchy,
 };
 
-const actingAsNonUserToken: ActionRule = kind.ruleForEachKind('actor:Acting', 'model', {
-  Token: kind.ruleKindIsOneOf('actor:Token', 'ownerModel', [
-    'OrganizationUser',
-    'SpaceUser',
-    'Integration',
-  ]),
+const actingAsMemberToken: ActionRule = kind.ruleForEachKind('actor:Acting', 'model', {
+  Token: kind.ruleKindIsOneOf('actor:Token', 'ownerModel', ['OrganizationUser', 'SpaceUser']),
 });
 
 const memberOwns = (
@@ -42,7 +38,7 @@ const memberOwns = (
 ): ActionRule => ({
   any: [
     { rel: `${prefix}${rel}.user`, action: 'own' },
-    { all: [actingAsNonUserToken, { rel: `${prefix}${rel}`, action: 'operate' }] },
+    { all: [actingAsMemberToken, { rel: `${prefix}${rel}`, action: 'operate' }] },
   ],
 });
 
@@ -112,12 +108,6 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
                   { rel: 'permission.granteeCustomerRelationship.customerSpace', action },
                 ],
               },
-            ],
-          },
-          {
-            all: [
-              granteeIs('Integration'),
-              { rel: 'permission.granteeIntegration', action: 'integration.act' },
             ],
           },
         ],
