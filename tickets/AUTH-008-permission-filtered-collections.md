@@ -21,6 +21,6 @@ All list questions below are one class of problem — reason about them together
 - Inquiries' two sides (source, target): whether routes declare which side.
 - A bad body on a forbidden create answering 400 before 403.
 - Segments in general, including "conditions required" as a `RulesRegistry` rule.
-- Auth providers: owners see disabled ones — as a `read` rule on `db:authProvider`.
+- Auth providers: owners see disabled ones — as a `read` rule on `db:AuthProvider`.
 - Stored entitlements re-parsed on every request: keep or drop.
 - Token list `read`: `own` only for now; revisit.

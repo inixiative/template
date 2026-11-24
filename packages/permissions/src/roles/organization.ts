@@ -20,7 +20,7 @@ export const permissionEntryForOrganizationRole = (
 ): PermissionEntry => {
   const baseActions = organizationRoles[role].organization;
   return {
-    resource: 'db:organization',
+    resource: 'db:Organization',
     id: organizationId,
     actions: baseActions,
   };

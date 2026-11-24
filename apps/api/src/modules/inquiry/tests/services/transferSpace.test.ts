@@ -349,7 +349,7 @@ describe('handler: transferSpace', () => {
           }),
         );
         expect(rows.map(toEntitlementEntry)).toEqual([
-          memberSelfGrant('db:organizationUser', membership),
+          memberSelfGrant('db:OrganizationUser', membership),
         ]);
         expect(rows.map((row) => row.deletedAt)).toEqual([membership.deletedAt]);
       }

@@ -37,7 +37,7 @@ describe('every member row carries a self-grant to operate itself, and it cannot
   it('an organization member row is created with it, as a row', async () => {
     const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
     expect(await heldEntitlements(onMember(member))).toEqual([
-      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
+      toEntitlementInput(memberSelfGrant('db:OrganizationUser', member)),
     ]);
   });
 
@@ -45,7 +45,7 @@ describe('every member row carries a self-grant to operate itself, and it cannot
     const { entity: space } = await createSpace({}, { organization });
     const { entity: member } = await createSpaceUser({ role: 'member' }, { space, organization });
     expect(await heldEntitlements({ model: 'SpaceUser', id: member.id })).toEqual([
-      toEntitlementInput(memberSelfGrant('db:spaceUser', member)),
+      toEntitlementInput(memberSelfGrant('db:SpaceUser', member)),
     ]);
   });
 
@@ -63,7 +63,7 @@ describe('every member row carries a self-grant to operate itself, and it cannot
     const created = await upsert();
     await upsert();
     expect(await heldEntitlements(onMember(created))).toEqual([
-      toEntitlementInput(memberSelfGrant('db:organizationUser', created)),
+      toEntitlementInput(memberSelfGrant('db:OrganizationUser', created)),
     ]);
   });
 
@@ -98,7 +98,7 @@ describe('every member row carries a self-grant to operate itself, and it cannot
 
     await revive(db.organizationUser, { id: member.id });
     expect(await heldEntitlements(onMember(member))).toEqual([
-      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
+      toEntitlementInput(memberSelfGrant('db:OrganizationUser', member)),
     ]);
   });
 

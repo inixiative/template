@@ -60,7 +60,7 @@ writing. Superadmin passes as everywhere.
 by an integration, the same rule passes only when that Signet's owner integration is this
 resource's integration ("is this the integration, and is the integration the actor").
 
-### Integration resource status (`db:integrationResource`)
+### Integration resource status (`db:IntegrationResource`)
 
 | From → to | A person | The resource's own integration |
 |---|---|---|
@@ -91,7 +91,7 @@ Aron, 2026-11-22: "If you specifically change it back to tracked, then it revive
 Otherwise, it just doesn't. You have to track it to revive it." An integration re-registering
 its resources therefore never undoes a person's untrack.
 
-### Member role (`db:organizationUser`, `db:spaceUser`)
+### Member role (`db:OrganizationUser`, `db:SpaceUser`)
 
 One action whose `from.permission` and `to.permission` are both `memberRoleWrite(tenant)`
 (`packages/permissions/src/rebac/rebacSchemaRules.ts`), replacing the two `check` calls in

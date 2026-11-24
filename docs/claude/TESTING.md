@@ -313,7 +313,7 @@ foreignKey: 'webhookSubscriptionId'
 
 Every API test runs with every production hook ([Hooks in tests](#hooks-in-tests)), so a row a test writes passes the same hooks and rules (`apps/api/src/hooks/rules/registry.ts`) as a row production writes:
 
-- **Members:** every `OrganizationUser` and `SpaceUser` holds its self-grant as an `Entitlement` row, which the `memberSelfGrant` hook writes after create. Expect it among a member's rows: `toEntitlementInput(memberSelfGrant('db:organizationUser', member))` beside `heldEntitlements`.
+- **Members:** every `OrganizationUser` and `SpaceUser` holds its self-grant as an `Entitlement` row, which the `memberSelfGrant` hook writes after create. Expect it among a member's rows: `toEntitlementInput(memberSelfGrant('db:OrganizationUser', member))` beside `heldEntitlements`.
 - **Integrations and tokens:** a delegate that is not `full` may have no role and no entitlement rows; it is not refused and holds nothing. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements. A `full` delegate keeps no role, and writing `full` tombstones its rows (`fullDelegate`).
 - **Users:** every user gets an email contact, first in its email list (`userEmailContact`).
 - **Soft-delete models:** `delete` and `deleteMany` are refused (`preventHardDelete`). Remove a row the way production does, with `deletedAt`.

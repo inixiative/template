@@ -55,7 +55,7 @@
     "generate:routes": "bun --cwd apps/web generate:routes && bun --cwd apps/admin generate:routes && bun --cwd apps/superadmin generate:routes",
     "generate:sdk": "bun run with ${SDK_ENVIRONMENT:-local} api bash ./scripts/generate-sdk.sh",
     "deploy": "./scripts/deployment/deploy.sh",
-    "check:all": "bun run check:setup && bun run lint && bun run typecheck && bun run test && bun run test:fe && bash scripts/ci/run-ci-rules.sh",
+    "check:all": "bun run check:setup && bun run lint && bun run typecheck && bun run test && bun run test:fe && bun run build && bash scripts/ci/run-ci-rules.sh",
     "check": "inixiative-config bounded -- bun run check:all",
     "cleanup-scan:record": "./scripts/cleanup-scan/record.sh",
     "check:setup": "bun run generate:routes && bun run db:generate && bun run generate:sdk",
@@ -66,12 +66,12 @@
     "lint:fix": "biome check --write . && bun run lint:postBiome",
     "format": "biome format --write .",
     "docs:toc": "bun run scripts/docs/regenToc.ts",
-    "prepare": "if git rev-parse --git-dir >/dev/null 2>&1; then lefthook install; fi"
+    "prepare": "if git rev-parse --git-dir >/dev/null 2>&1; then root=\"$(dirname \"$(git rev-parse --path-format=absolute --git-common-dir)\")\"; if [ -x \"$root/node_modules/.bin/lefthook\" ]; then (cd \"$root\" && ./node_modules/.bin/lefthook install); fi; fi"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
     "@inixiative/atlas": "^0.5.1",
-    "@inixiative/config": "^0.5.237",
+    "@inixiative/config": "^0.5.251",
     "@lightpanda/browser": "^1.2.0",
     "@mendable/firecrawl-js": "^4.18.1",
     "@tanstack/react-router": "^1.166.2",
@@ -105,7 +105,7 @@
     "uuid": "14.0.0"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^4.6.0",
+    "@inixiative/json-rules": "^4.7.0",
     "@inixiative/vcr": "^0.1.0",
     "ink": "^6.8.0",
     "ink-select-input": "^6.2.0",

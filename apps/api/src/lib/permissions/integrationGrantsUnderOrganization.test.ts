@@ -85,8 +85,8 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
 
   const underOrganization = (where?: EntitlementInput['where']) => ({
     ...entitlementInputFor(
-      'db:integration',
-      ['db:organization', organization.id, 'organization'],
+      'db:Integration',
+      ['db:Organization', organization.id, 'organization'],
       ['delete'],
     ),
     ...(where ? { where } : {}),
@@ -118,8 +118,8 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
 
   it('an admin entitled to read every kind under the organization grants that onward', async () => {
     const owning = entitlementInputFor(
-      'db:integration',
-      ['db:organization', organization.id, 'organization'],
+      'db:Integration',
+      ['db:Organization', organization.id, 'organization'],
       ['read'],
     );
     expect(await grant('admin', owning)).toBe(403);
@@ -129,8 +129,8 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
   it("an admin entitled to read the organization's own integrations grants that, not every kind", async () => {
     const owning = (where?: EntitlementInput['where']) => ({
       ...entitlementInputFor(
-        'db:integration',
-        ['db:organization', organization.id, 'organization'],
+        'db:Integration',
+        ['db:Organization', organization.id, 'organization'],
         ['read'],
       ),
       ...(where ? { where } : {}),
@@ -193,8 +193,8 @@ describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one
   };
   const staticSegments = (where: EntitlementInput['where']) => ({
     ...entitlementInputFor(
-      'db:segment',
-      ['db:organization', organization.id, 'organization'],
+      'db:Segment',
+      ['db:Organization', organization.id, 'organization'],
       ['own'],
     ),
     where,
@@ -213,8 +213,8 @@ describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one
     expect(
       await grant(
         entitlementInputFor(
-          'db:segment',
-          ['db:organization', organization.id, 'organization'],
+          'db:Segment',
+          ['db:Organization', organization.id, 'organization'],
           ['own'],
         ),
         [held],

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { fieldOf, relationTarget } from '@inixiative/field-map';
 import { type Condition, Operator } from '@inixiative/json-rules';
-import type { HydratedRecord } from '@template/db';
+import { type HydratedRecord, resourceOfModel } from '@template/db';
 import { InquiryType, Role } from '@template/db/generated/client/enums';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import {
@@ -17,17 +17,16 @@ import {
 } from '@template/permissions/rebac/inquiryResourcePermission';
 import { INQUIRY_TYPES } from '@template/permissions/rebac/inquiryTypes';
 import { isNull, rowIsThereAnd } from '@template/permissions/rebac/rebacSchemaRules';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import { schemaMap } from '@template/permissions/rebac/schema';
 import type { ActionRule } from '@template/permissions/rebac/types';
 import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
-import { lowerFirst } from 'lodash-es';
 
 type Gated = { any: { all: [{ rule: { operator: string; value: string } }, unknown] }[] };
 const modelAt = (path: string): string | undefined =>
   relationTarget(prismaMap, 'Inquiry', path) ?? undefined;
 
 const actionsOf = (model: string) =>
-  Object.keys(rebacSchema.permissions[`db:${lowerFirst(model)}`]?.actions ?? {});
+  Object.keys(schemaMap.permissions[resourceOfModel(model)]?.actions ?? {});
 
 const leaves = (condition: Condition): Condition[] => {
   if (typeof condition !== 'object') return [];
@@ -147,8 +146,8 @@ describe('inquiryResourcePermissionFromParties', () => {
     });
   });
 
-  it('is what the rebac schema serves for db:inquiry', () => {
-    expect(rebacSchema.permissions['db:inquiry']).toEqual(
+  it('is what the rebac schema serves for db:Inquiry', () => {
+    expect(schemaMap.permissions['db:Inquiry']).toEqual(
       inquiryResourcePermissionFromParties(INQUIRY_TYPES),
     );
   });
@@ -189,7 +188,7 @@ describe('inquiryResourcePermissionFromParties through the real check, per inqui
   };
 
   const can = (permix: Permix, record: object, action: 'send' | 'resolve') =>
-    check(permix, rebacSchema, 'inquiry', record as HydratedRecord, action);
+    check(permix, 'inquiry', record as HydratedRecord, action);
 
   const invite = (role: Role) => ({
     type: 'inviteOrganizationUser',
@@ -279,7 +278,7 @@ describe('inquiryResourcePermissionFromParties through the real check, per inqui
 
   it("an organization reads what its token received after the token is deleted, and never a member's", async () => {
     const reads = async (seat: Seat, record: object) =>
-      check(await principal(seat), rebacSchema, 'inquiry', record as HydratedRecord, 'read');
+      check(await principal(seat), 'inquiry', record as HydratedRecord, 'read');
     const toToken = {
       id: 'i1',
       type: 'inviteOrganizationUser',

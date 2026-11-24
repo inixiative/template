@@ -44,7 +44,7 @@ const appOf = (user: User, member?: OrganizationUser) =>
   });
 
 const onOrganization = (actions: string[]): EntitlementInput =>
-  entitlementInputFor('db:organization', ['db:organization', organization.id], actions);
+  entitlementInputFor('db:Organization', ['db:Organization', organization.id], actions);
 
 const asked = async (add: EntitlementInput[], remove: string[] = []) =>
   (

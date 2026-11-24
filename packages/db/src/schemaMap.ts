@@ -9,7 +9,7 @@ import type { SchemaMap } from '@inixiative/permissions';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { sensitiveFieldsOf } from '@template/db/registries/sensitiveFields';
-import { difference, lowerFirst, pick } from 'lodash-es';
+import { difference, pick } from 'lodash-es';
 
 export const ActorModel = { User: 'User', Token: 'Token' } as const;
 export type ActorModel = (typeof ActorModel)[keyof typeof ActorModel];
@@ -30,11 +30,12 @@ const actorMap: FieldMap = {
   enums: { ...prismaMap.enums, ActorModel: Object.values(ActorModel) },
 };
 
-export const schemaMap: SchemaMap = {
-  resources: Object.fromEntries(
-    Object.keys(prismaMap.models).map((model) => [`db:${lowerFirst(model)}`, model]),
-  ),
-  fieldMap: prismaMap,
-  polymorphism: PolymorphismRegistry,
-  supplied: { maps: { actor: actorMap } },
+// why: who is acting is given with each check, so every model of `db` reaches each actor model over a bridge with no join
+export const schemaMapWithoutPermissions: Omit<SchemaMap, 'permissions'> = {
+  fieldMaps: { db: prismaMap, actor: actorMap },
+  polymorphismRegistries: { db: PolymorphismRegistry },
+  bridges: Object.keys(actorMap.models).map((model) => ({
+    endpoints: [{ fieldMap: 'db' }, { fieldMap: 'actor', model }],
+    cardinality: 'oneToOne',
+  })),
 };

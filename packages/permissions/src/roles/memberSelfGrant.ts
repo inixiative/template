@@ -7,7 +7,7 @@
 import type { EntitlementEntry } from '@template/permissions/client';
 import { isEqual, pick } from 'lodash-es';
 
-export type MemberResource = 'db:organizationUser' | 'db:spaceUser';
+export type MemberResource = 'db:OrganizationUser' | 'db:SpaceUser';
 
 export const memberSelfGrant = (
   resource: MemberResource,
