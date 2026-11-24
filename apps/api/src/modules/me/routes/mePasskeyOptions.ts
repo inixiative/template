@@ -6,8 +6,6 @@
  */
 import { UserAction } from '@template/permissions/client';
 import { actionRoute } from '#/lib/routeTemplates';
-import { forbidApiTokenMiddleware } from '#/middleware/auth/forbidApiTokenMiddleware';
-import { forbidSpoofingMiddleware } from '#/middleware/auth/forbidSpoofingMiddleware';
 import { requireRecentTwoFactorMiddleware } from '#/middleware/auth/requireRecentTwoFactorMiddleware';
 import { credentialChangeRateLimit } from '#/middleware/rateLimit/credentialChangeRateLimit';
 import { twoFactorRateLimit } from '#/middleware/rateLimit/twoFactorRateLimit';
@@ -23,11 +21,10 @@ export const mePasskeyOptionsRoute = actionRoute({
   model: Modules.me,
   action: 'twoFactor/passkey/options',
   skipId: true,
+  forbid: { tokens: true, spoof: true, batch: true },
   bodySchema: enrollmentStartBodySchema,
   responseSchema: webAuthnOptionsResponseSchema,
   middleware: [
-    forbidApiTokenMiddleware,
-    forbidSpoofingMiddleware,
     credentialChangeRateLimit,
     twoFactorRateLimit,
     validatePermission(UserAction.manageTwoFactor),
@@ -35,5 +32,4 @@ export const mePasskeyOptionsRoute = actionRoute({
   ],
   description: 'Generates WebAuthn registration options for adding a new passkey.',
   tags: [OpenApiTags.me, OpenApiTags.twoFactor],
-  'x-batch': false,
 });

@@ -789,6 +789,38 @@ describe('two-factor authentication', () => {
       expect(spoofBlocked.status).toBe(403);
     }
 
+    const spoofReadStatus = await app.request('/api/v1/me/twoFactor', {
+      headers: {
+        ...verifiedAdminJwt,
+        'x-spoof-user-email': victim.email,
+      },
+    });
+    expect(spoofReadStatus.status).toBe(200);
+    const { data: spoofStatusData } = (await spoofReadStatus.json()) as {
+      data: { enabled: boolean; methods: string[] };
+    };
+    expect(spoofStatusData.enabled).toBe(true);
+    expect(spoofStatusData.methods).toContain('totp');
+
+    const { authorization: adminApiAuth } = await createBearerToken(admin);
+    for (const [method, path, body] of [
+      ['GET', '/api/v1/me/twoFactor', undefined],
+      ['POST', '/api/v1/me/rotateJwts', undefined],
+      ['POST', '/api/v1/me/redact', undefined],
+      ['POST', '/api/v1/me/twoFactor/verify', JSON.stringify({ method: 'totp', code: '123456' })],
+    ] as const) {
+      const tokenSpoofBlocked = await app.request(path, {
+        method,
+        headers: {
+          authorization: adminApiAuth,
+          'x-spoof-user-email': victim.email,
+          ...(body ? { 'content-type': 'application/json' } : {}),
+        },
+        ...(body ? { body } : {}),
+      });
+      expect(tokenSpoofBlocked.status).toBe(403);
+    }
+
     const spoofVerify = await app.request('/api/v1/me/twoFactor/verify', {
       method: 'POST',
       headers: {
@@ -816,5 +848,33 @@ describe('two-factor authentication', () => {
         })
       ).status,
     ).toBe(404);
+
+    // Verified superadmin spoofing a non-2FA user can still execute batch sub-requests under REQUIRE_TWO_FACTOR=true
+    const spoofBatch = await app.request('/api/v1/batch/execute', {
+      method: 'POST',
+      headers: {
+        ...verifiedAdminJwt,
+        'x-spoof-user-email': victim.email,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        requests: [[{ method: 'GET', path: '/api/v1/me/organizations' }]],
+      }),
+    });
+    expect(spoofBatch.status).toBe(200);
+    const { data: spoofBatchData } = (await spoofBatch.json()) as {
+      data: { batch: Array<Array<{ status: number }>> };
+    };
+    expect(spoofBatchData.batch[0]?.[0]?.status).toBe(200);
+
+    // Superadmins can remove their own last 2FA factor even when REQUIRE_TWO_FACTOR=true
+    const adminDisableLast = await app.request('/api/v1/me/twoFactor/totp/disable', {
+      method: 'POST',
+      headers: { ...verifiedAdminJwt, 'content-type': 'application/json' },
+    });
+    expect(adminDisableLast.status).toBe(204);
+    const updatedAdmin = await db.user.findUniqueOrThrow({ where: { id: admin.id } });
+    expect(updatedAdmin.twoFactorEnabled).toBe(false);
+    expect(updatedAdmin.jwtVersion).toBe(admin.jwtVersion + 1);
   });
 });

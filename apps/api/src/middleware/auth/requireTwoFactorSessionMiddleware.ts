@@ -9,44 +9,41 @@ import {
   TWO_FACTOR_VERIFICATION_REQUIRED_CODE,
 } from '@template/shared/auth/twoFactor';
 import type { Context, Next } from 'hono';
-import { realUserActor } from '#/lib/context/realUserActor';
+import { isBatchSubRequest } from '#/lib/context/isBatchSubRequest';
 import { makeError } from '#/lib/errors';
+import { makeRouteMatcher } from '#/lib/http/routeMatcher';
 import { fetchUserTwoFactorMethods } from '#/lib/twoFactor/fetchUserTwoFactorMethods';
 import { isTwoFactorRequired } from '#/lib/twoFactor/isTwoFactorRequired';
 import { rpIdFromOrigin } from '#/lib/twoFactor/passkey/resolveWebAuthnOrigin';
 import type { AppEnv } from '#/types/appEnv';
 
-const isReadOnlyTwoFactorPath = (method: string, path: string): boolean =>
-  method === 'GET' && (path === '/api/v1/me' || path === '/api/v1/me/twoFactor');
+const isEnrollmentAllowedRoute = makeRouteMatcher([
+  'GET /api/v1/me',
+  'GET /api/v1/me/twoFactor',
+  'POST /api/v1/me/twoFactor/totp/start',
+  'POST /api/v1/me/twoFactor/totp/confirm',
+  'POST /api/v1/me/twoFactor/passkey/options',
+  'POST /api/v1/me/twoFactor/passkey/confirm',
+]);
 
-const isEnrollTwoFactorPath = (method: string, path: string): boolean =>
-  method === 'POST' &&
-  (path === '/api/v1/me/twoFactor/totp/start' ||
-    path === '/api/v1/me/twoFactor/totp/confirm' ||
-    path === '/api/v1/me/twoFactor/passkey/options' ||
-    path === '/api/v1/me/twoFactor/passkey/confirm');
-
-const isVerifyTwoFactorPath = (method: string, path: string): boolean =>
-  method === 'POST' &&
-  (path === '/api/v1/me/twoFactor/verify' ||
-    path === '/api/v1/me/twoFactor/verify/passkey/options');
+const isVerificationAllowedRoute = makeRouteMatcher([
+  'GET /api/v1/me',
+  'GET /api/v1/me/twoFactor',
+  'POST /api/v1/me/twoFactor/verify',
+  'POST /api/v1/me/twoFactor/verify/passkey/options',
+]);
 
 export const requireTwoFactorSessionMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  if (c.get('token')) return next();
+  // why: batch sub-requests inherit the parent request's already-gated session and post-spoof context
+  if (isBatchSubRequest(c) || c.get('token') || c.get('authCredentialKind') === 'token') {
+    return next();
+  }
 
-  const actor = realUserActor(c);
-  if (!actor) return next();
+  const user = c.get('user');
+  if (!user) return next();
 
-  const required = isTwoFactorRequired();
-  const isSpoofing = Boolean(c.get('spoofedBy'));
-
-  if (required && !actor.twoFactorEnabled) {
-    if (
-      !isSpoofing &&
-      (isReadOnlyTwoFactorPath(c.req.method, c.req.path) ||
-        isEnrollTwoFactorPath(c.req.method, c.req.path))
-    )
-      return next();
+  if (isTwoFactorRequired() && !user.twoFactorEnabled) {
+    if (isEnrollmentAllowedRoute(c.req.method, c.req.path)) return next();
 
     throw makeError({
       status: 403,
@@ -66,17 +63,10 @@ export const requireTwoFactorSessionMiddleware = async (c: Context<AppEnv>, next
     });
   }
 
-  if (c.get('jwtTwoFactorVerified')) return next();
-  if (!actor.twoFactorEnabled) return next();
+  if (c.get('jwtTwoFactorVerified') || !user.twoFactorEnabled) return next();
+  if (isVerificationAllowedRoute(c.req.method, c.req.path)) return next();
 
-  if (
-    !isSpoofing &&
-    (isReadOnlyTwoFactorPath(c.req.method, c.req.path) ||
-      isVerifyTwoFactorPath(c.req.method, c.req.path))
-  )
-    return next();
-
-  const methods = await fetchUserTwoFactorMethods(actor.id, rpIdFromOrigin(c.req.header('origin')));
+  const methods = await fetchUserTwoFactorMethods(user.id, rpIdFromOrigin(c.req.header('origin')));
   throw makeError({
     status: 403,
     message: 'Two-factor verification is required for this session',

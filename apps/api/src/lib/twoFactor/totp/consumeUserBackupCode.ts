@@ -7,7 +7,7 @@
 import { db } from '@template/db';
 import type { TwoFactor } from '@template/db/generated/client/client';
 import { makeError } from '#/lib/errors';
-import { consumeMatchingBackupCodeOrThrow } from '#/lib/twoFactor/totp/matchBackupCode';
+import { consumeMatchingBackupCode } from '#/lib/twoFactor/totp/matchBackupCode';
 
 export const consumeUserBackupCode = async (userId: string, code: string): Promise<void> => {
   await db.txn(async () => {
@@ -15,7 +15,7 @@ export const consumeUserBackupCode = async (userId: string, code: string): Promi
     if (!row || row.backupCodeHashes.length === 0)
       throw makeError({ status: 401, message: 'Invalid backup code' });
 
-    const remaining = await consumeMatchingBackupCodeOrThrow(code, row.backupCodeHashes);
+    const remaining = await consumeMatchingBackupCode(code, row.backupCodeHashes);
     await db.twoFactor.update({
       where: { id: row.id },
       data: { backupCodeHashes: remaining },

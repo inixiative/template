@@ -24,6 +24,7 @@ import {
 import { BackupCodesRevealModal } from '@template/ui/components/auth/BackupCodesRevealModal';
 import type { TotpSetupState } from '@template/ui/components/auth/TotpEnrollForm';
 import { Badge } from '@template/ui/components/primitives/Badge';
+import { Button } from '@template/ui/components/primitives/Button';
 import {
   Card,
   CardContent,
@@ -38,14 +39,14 @@ import { PasskeyListSection } from '@template/ui/components/settings/PasskeyList
 import { TotpSettingsSection } from '@template/ui/components/settings/TotpSettingsSection';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { TwoFactorVerifyCancelledError } from '@template/ui/lib/auth/twoFactor';
+import { isTwoFactorReverifyError } from '@template/ui/lib/auth/twoFactor';
 import { describeError } from '@template/ui/lib/describeError';
+import { navigateToTwoFactorReverify } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
 import { useState } from 'react';
 
 const isCancelled = (error: unknown) =>
-  error instanceof TwoFactorVerifyCancelledError ||
-  (error instanceof Error && (error.name === 'AbortError' || error.name === 'NotAllowedError'));
+  error instanceof Error && (error.name === 'AbortError' || error.name === 'NotAllowedError');
 
 export const TwoFactorSecurityCard = ({ onEnrolled }: { onEnrolled?: () => void } = {}) => {
   const queryClient = useQueryClient();
@@ -159,8 +160,18 @@ export const TwoFactorSecurityCard = ({ onEnrolled }: { onEnrolled?: () => void 
         </CardHeader>
         <CardContent className="space-y-4">
           {errorMessage && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {errorMessage}
+            <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              <span>{errorMessage}</span>
+              {isTwoFactorReverifyError(actionMutation.error) && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigateToTwoFactorReverify(useAppStore.getState)}
+                >
+                  Verify 2FA
+                </Button>
+              )}
             </div>
           )}
           {needsPassword && (

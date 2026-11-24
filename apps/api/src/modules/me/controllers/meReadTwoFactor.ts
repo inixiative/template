@@ -12,8 +12,11 @@ import { meReadTwoFactorRoute } from '#/modules/me/routes/meReadTwoFactor';
 export const meReadTwoFactorController = makeController(
   meReadTwoFactorRoute,
   async (c, respond) => {
-    const user = c.get('user')!;
-    const status = await fetchUserTwoFactorStatus(user.id, rpIdFromOrigin(c.req.header('origin')));
+    const sessionUser = c.get('spoofedBy') ?? c.get('user')!;
+    const status = await fetchUserTwoFactorStatus(
+      sessionUser.id,
+      rpIdFromOrigin(c.req.header('origin')),
+    );
     return respond.ok(status);
   },
 );

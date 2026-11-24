@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { generateTotpCode } from '#/lib/twoFactor/totp/generateTotpCode';
 import { generateTotpSetup } from '#/lib/twoFactor/totp/generateTotpSetup';
-import { verifyTotpCodeOrThrow } from '#/lib/twoFactor/totp/verifyTotpCode';
+import { verifyTotpCode } from '#/lib/twoFactor/totp/verifyTotpCode';
 
 describe('TOTP', () => {
   it('matches RFC 6238 SHA-1 test vectors', () => {
@@ -18,18 +18,18 @@ describe('TOTP', () => {
     expect(setup.otpauthUri).toContain(`secret=${setup.secret}`);
 
     const now = 1_700_000_000_000;
-    await verifyTotpCodeOrThrow({
+    await verifyTotpCode({
       secret: setup.secret,
       code: generateTotpCode(setup.secret, now),
       timestampMs: now,
     });
-    await verifyTotpCodeOrThrow({
+    await verifyTotpCode({
       secret: setup.secret,
       code: generateTotpCode(setup.secret, now - 30_000),
       timestampMs: now,
     });
     await expect(
-      verifyTotpCodeOrThrow({
+      verifyTotpCode({
         secret: setup.secret,
         code: generateTotpCode(setup.secret, now - 90_000),
         timestampMs: now,

@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
-import type { TwoFactorAction, TwoFactorMethod } from '@template/shared/auth/twoFactor';
+import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
 import {
   type ChangePasswordInput,
   changePassword as changePasswordFn,
@@ -14,7 +14,6 @@ import { signIn as signInFn } from '@template/ui/lib/auth/signIn';
 import { signUp as signUpFn } from '@template/ui/lib/auth/signUp';
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
 import { clearToken, fetchStoredTokenAndClearIfExpired } from '@template/ui/lib/auth/token';
-import { TwoFactorVerifyCancelledError } from '@template/ui/lib/auth/twoFactor';
 import type { AuthMethod } from '@template/ui/lib/auth/types';
 import type { AppStore } from '@template/ui/store/types';
 import type { AuthSlice } from '@template/ui/store/types/auth';
@@ -38,7 +37,6 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
   };
 
   const clearLocalAuth = () => {
-    get().auth.twoFactorVerifyRequest?.reject(new TwoFactorVerifyCancelledError());
     get().websocket.logout();
     clearToken();
     set((state: AppStore) => ({
@@ -51,7 +49,6 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         spaceUsers: null,
         spoofUserEmail: null,
         spoofingUserEmail: null,
-        twoFactorVerifyRequest: null,
         twoFactorAction: null,
         isAuthenticated: false,
       },
@@ -71,7 +68,6 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       strategy: { type: 'login' },
       spoofUserEmail: null,
       spoofingUserEmail: null,
-      twoFactorVerifyRequest: null,
       twoFactorAction: null,
       isAuthenticated: false,
       isEmbedded: false,
@@ -136,28 +132,6 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         if (get().auth.spoofUserEmail || !handoff.token) return;
         storeJwtHandoff(handoff);
         syncWsAuth();
-      },
-
-      requestTwoFactorVerify: (methods: TwoFactorMethod[]) => {
-        return new Promise<void>((resolve, reject) => {
-          const existing = get().auth.twoFactorVerifyRequest;
-          if (existing) existing.reject(new TwoFactorVerifyCancelledError());
-          set((state: AppStore) => ({
-            auth: { ...state.auth, twoFactorVerifyRequest: { methods, resolve, reject } },
-          }));
-        });
-      },
-
-      resolveTwoFactorVerify: () => {
-        const pending = get().auth.twoFactorVerifyRequest;
-        set((state: AppStore) => ({ auth: { ...state.auth, twoFactorVerifyRequest: null } }));
-        pending?.resolve();
-      },
-
-      cancelTwoFactorVerify: () => {
-        const pending = get().auth.twoFactorVerifyRequest;
-        set((state: AppStore) => ({ auth: { ...state.auth, twoFactorVerifyRequest: null } }));
-        pending?.reject(new TwoFactorVerifyCancelledError());
       },
 
       setStrategy: (strategy) =>

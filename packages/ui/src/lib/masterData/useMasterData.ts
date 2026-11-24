@@ -35,12 +35,11 @@ import { useEffect } from 'react';
 export const usePreloadMasterData = (enabled = true): void => {
   const queryClient = useQueryClient();
   const spoofUserEmail = useAppStore((state) => state.auth.spoofUserEmail);
-  const twoFactorAction = useAppStore((state) => state.auth.twoFactorAction);
 
   useEffect(() => {
-    if (!enabled || twoFactorAction) return;
+    if (!enabled) return;
     void preloadMasterData(queryClient, { spoofUserEmail });
-  }, [enabled, queryClient, spoofUserEmail, twoFactorAction]);
+  }, [enabled, queryClient, spoofUserEmail]);
 };
 
 /**

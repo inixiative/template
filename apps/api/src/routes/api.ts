@@ -60,13 +60,13 @@ apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 apiRouter.route('/unsubscribe', unsubscribeRouter);
 
 // A user presents a JWT, a program an API token; sessions never reach past /auth.
-// Spoof runs last so it applies whichever credential resolved the user.
+// 2FA session gating runs before spoofing so c.get('user') is still the real authenticated user.
 apiRouter.use('*', jwtAuthMiddleware);
 apiRouter.use('*', tokenAuthMiddleware);
+apiRouter.use('*', requireTwoFactorSessionMiddleware);
 apiRouter.use('*', spoofMiddleware);
 apiRouter.use('*', auditActorMiddleware);
 apiRouter.use('*', apiRateLimit);
-apiRouter.use('*', requireTwoFactorSessionMiddleware);
 
 // Admin Routes (superadmin only - see routes/admin.ts)
 apiRouter.route('/admin', adminRouter);

@@ -5,10 +5,7 @@
  * @uses infrastructure:prisma, primitive:errors
  */
 import type { Context } from 'hono';
-import {
-  fetchUserHasCredentialPassword,
-  verifyUserPasswordOrThrow,
-} from '#/lib/auth/verifyUserPassword';
+import { fetchUserHasCredentialPassword, verifyUserPassword } from '#/lib/auth/verifyUserPassword';
 import { makeError } from '#/lib/errors';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -28,5 +25,5 @@ export const assertEnrollmentAuthorization = async (
     });
   }
 
-  await verifyUserPasswordOrThrow(user.id, currentPassword);
+  await verifyUserPassword(user.id, currentPassword);
 };

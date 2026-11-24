@@ -6,8 +6,6 @@
  */
 import { UserAction } from '@template/permissions/client';
 import { actionRoute } from '#/lib/routeTemplates';
-import { forbidApiTokenMiddleware } from '#/middleware/auth/forbidApiTokenMiddleware';
-import { forbidSpoofingMiddleware } from '#/middleware/auth/forbidSpoofingMiddleware';
 import { requireRecentTwoFactorMiddleware } from '#/middleware/auth/requireRecentTwoFactorMiddleware';
 import { twoFactorRateLimit } from '#/middleware/rateLimit/twoFactorRateLimit';
 import { validatePermission } from '#/middleware/validations/validatePermission';
@@ -22,11 +20,10 @@ export const meConfirmTotpRoute = actionRoute({
   model: Modules.me,
   action: 'twoFactor/totp/confirm',
   skipId: true,
+  forbid: { tokens: true, spoof: true, batch: true },
   bodySchema: totpConfirmBodySchema,
   responseSchema: totpConfirmResponseSchema,
   middleware: [
-    forbidApiTokenMiddleware,
-    forbidSpoofingMiddleware,
     twoFactorRateLimit,
     validatePermission(UserAction.manageTwoFactor),
     requireRecentTwoFactorMiddleware(),
@@ -34,5 +31,4 @@ export const meConfirmTotpRoute = actionRoute({
   description:
     'Confirms a pending authenticator app (TOTP) setup with a 6-digit code and enables TOTP.',
   tags: [OpenApiTags.me, OpenApiTags.twoFactor],
-  'x-batch': false,
 });

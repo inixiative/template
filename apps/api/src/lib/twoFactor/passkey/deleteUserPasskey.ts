@@ -10,7 +10,11 @@ import { makeError } from '#/lib/errors';
 import { isTwoFactorRequired } from '#/lib/twoFactor/isTwoFactorRequired';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
-export const deleteUserPasskey = async (userId: string, passkeyId: string): Promise<void> => {
+export const deleteUserPasskey = async (
+  userId: string,
+  passkeyId: string,
+  options?: { allowRemovingLastFactor?: boolean },
+): Promise<void> => {
   await db.txn(async () => {
     const [row] = await db.findForUpdate<TwoFactor>('TwoFactor', { userId }, { upserting: true });
     const passkey = await db.passkey.findFirst({ where: { id: passkeyId, userId } });
@@ -18,7 +22,12 @@ export const deleteUserPasskey = async (userId: string, passkeyId: string): Prom
 
     const otherPasskeys = await db.passkey.count({ where: { userId, id: { not: passkeyId } } });
     const hasTotp = Boolean(row?.totpVerifiedAt);
-    if (isTwoFactorRequired() && otherPasskeys === 0 && !hasTotp) {
+    if (
+      !options?.allowRemovingLastFactor &&
+      isTwoFactorRequired() &&
+      otherPasskeys === 0 &&
+      !hasTotp
+    ) {
       throw makeError({
         status: 422,
         message:

@@ -31,9 +31,17 @@ const BUILDER_ONLY_MAP = {
   internal: true,
   filterLens: true,
   includeDeleted: true,
+  forbid: true,
 } satisfies Record<BuilderOnlyKey, true>;
 
 const BUILDER_ONLY_KEYS = Object.keys(BUILDER_ONLY_MAP) as readonly BuilderOnlyKey[];
 
-export const toOpenApi = <T extends RouteConfig>(route: T): Omit<T, BuilderOnlyKey> =>
-  omit(route, BUILDER_ONLY_KEYS) as Omit<T, BuilderOnlyKey>;
+export const toOpenApi = <T extends RouteConfig & Pick<RouteArgs, 'forbid'>>(
+  route: T,
+): Omit<T, BuilderOnlyKey> => {
+  const openApiRoute = omit(route, BUILDER_ONLY_KEYS) as Omit<T, BuilderOnlyKey>;
+  if (route.forbid?.batch) {
+    return { ...openApiRoute, 'x-batch': false };
+  }
+  return openApiRoute;
+};

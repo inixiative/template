@@ -13,10 +13,13 @@ import {
   withSpan,
 } from '@template/shared/telemetry';
 import type { MiddlewareHandler } from 'hono';
+import { makeRouteMatcher } from '#/lib/http/routeMatcher';
 import type { AppEnv } from '#/types/appEnv';
 
+const isTelemetryExcludedRoute = makeRouteMatcher(['/health*', '/api/telemetry/browser']);
+
 export const telemetryMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (c.req.path.startsWith('/health') || c.req.path === '/api/telemetry/browser') return next();
+  if (isTelemetryExcludedRoute(c.req.method, c.req.path)) return next();
   const method = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'].includes(c.req.method)
     ? c.req.method
     : '_OTHER';

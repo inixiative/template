@@ -47,7 +47,8 @@ export const prepareRequestMiddleware = async (c: Context<AppEnv>, next: Next) =
       c.set(key, value ? structuredClone(value) : null);
     }
 
-    c.set('jwtIsLocalIssuer', batchContext.baseContext.get('jwtIsLocalIssuer'));
+    c.set('authCredentialKind', batchContext.baseContext.get('authCredentialKind'));
+    c.set('jwtIsPlatformIssued', batchContext.baseContext.get('jwtIsPlatformIssued'));
     c.set('jwtTwoFactorVerified', batchContext.baseContext.get('jwtTwoFactorVerified'));
     c.set('jwtTwoFactorVerifiedAt', batchContext.baseContext.get('jwtTwoFactorVerifiedAt'));
     if (c.get('user') || c.get('token')) await installPermissionsFromRequestContext(c);
@@ -59,7 +60,8 @@ export const prepareRequestMiddleware = async (c: Context<AppEnv>, next: Next) =
     c.set('spaces', null);
     c.set('token', null);
     c.set('spoofedBy', null);
-    c.set('jwtIsLocalIssuer', false);
+    c.set('authCredentialKind', null);
+    c.set('jwtIsPlatformIssued', false);
     c.set('jwtTwoFactorVerified', false);
     c.set('jwtTwoFactorVerifiedAt', null);
   }

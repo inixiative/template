@@ -8,6 +8,7 @@ import type { RouteConfig } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { MiddlewareHandler } from 'hono';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
+import { makeForbidMiddleware } from '#/middleware/auth/forbidAuthMiddleware';
 import { includeDeletedMiddleware } from '#/middleware/resources/includeDeletedMiddleware';
 import { meResourceMiddleware } from '#/middleware/resources/meResourceMiddleware';
 import { resourceContextMiddleware } from '#/middleware/resources/resourceContextMiddleware';
@@ -33,16 +34,18 @@ const routeConfigSetter =
   };
 
 export const prepareMiddleware = (
-  { model, middleware, filterLens, includeDeleted = false }: RouteArgs,
+  { model, middleware, filterLens, includeDeleted = false, forbid }: RouteArgs,
   { skipId, route }: RouteMiddlewareSetup,
 ): MiddlewareHandler[] => {
   const middlewareArray = Array.isArray(middleware) ? middleware : middleware ? [middleware] : [];
+  const forbidMiddleware = forbid ? [makeForbidMiddleware(forbid)] : [];
   const resourceMiddleware = skipId ? [] : [resourceContextMiddleware()];
   const filterMiddleware = filterLens ? [filterLensSetter(filterLens)] : [];
   const deletedMiddleware = includeDeleted ? [includeDeletedMiddleware()] : [];
   return [
     ...(model === Modules.me ? [meResourceMiddleware] : []),
     routeConfigSetter(route),
+    ...forbidMiddleware,
     ...deletedMiddleware,
     ...resourceMiddleware,
     ...filterMiddleware,

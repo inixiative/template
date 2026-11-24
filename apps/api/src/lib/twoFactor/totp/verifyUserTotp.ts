@@ -7,7 +7,7 @@
 import { db } from '@template/db';
 import { decryptField } from '@template/db/lib/encryption/fieldEncryption';
 import { makeError } from '#/lib/errors';
-import { verifyTotpCodeOrThrow } from '#/lib/twoFactor/totp/verifyTotpCode';
+import { verifyTotpCode } from '#/lib/twoFactor/totp/verifyTotpCode';
 
 export const verifyUserTotp = async (userId: string, code: string): Promise<void> => {
   const row = await db.twoFactor.findFirst({ where: { userId } });
@@ -23,5 +23,5 @@ export const verifyUserTotp = async (userId: string, code: string): Promise<void
     encryptedTotpSecretKeyVersion: row.encryptedTotpSecretKeyVersion!,
   })) as string;
 
-  await verifyTotpCodeOrThrow({ userId, secret, code });
+  await verifyTotpCode({ userId, secret, code });
 };

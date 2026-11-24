@@ -17,10 +17,7 @@ export const fetchUserHasCredentialPassword = async (userId: string): Promise<bo
   return Boolean(account);
 };
 
-export const verifyUserPasswordOrThrow = async (
-  userId: string,
-  password: string,
-): Promise<void> => {
+export const verifyUserPassword = async (userId: string, password: string): Promise<void> => {
   const result = await withThrowawaySession(userId, (headers) =>
     auth.api.verifyPassword({ body: { password }, headers }),
   );

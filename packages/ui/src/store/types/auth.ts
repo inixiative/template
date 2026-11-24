@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import type { MeReadResponses } from '@template/sdk';
-import type { TwoFactorAction, TwoFactorMethod } from '@template/shared/auth/twoFactor';
+import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
 import type { ChangePasswordInput } from '@template/ui/lib/auth/changePassword';
 import type { AuthMethod, SignInResult, SignUpResult } from '@template/ui/lib/auth/types';
 import type { createAuthClient } from 'better-auth/client';
@@ -24,12 +24,6 @@ type SpaceUser = MeData['spaceUsers'][number];
 
 export type AuthStrategy = { type: 'login' } | { type: 'embed'; parentOrigin?: string };
 
-export type TwoFactorVerifyRequest = {
-  methods: TwoFactorMethod[];
-  resolve: () => void;
-  reject: (error: unknown) => void;
-};
-
 export type AuthSlice = {
   auth: {
     client: BetterAuthClient;
@@ -41,7 +35,6 @@ export type AuthSlice = {
     strategy: AuthStrategy;
     spoofUserEmail: string | null;
     spoofingUserEmail: string | null;
-    twoFactorVerifyRequest: TwoFactorVerifyRequest | null;
     twoFactorAction: TwoFactorAction | null;
     isAuthenticated: boolean;
     isEmbedded: boolean;
@@ -56,9 +49,6 @@ export type AuthSlice = {
     setTwoFactorAction: (action: TwoFactorAction | null) => void;
     signUp: (method: AuthMethod) => Promise<SignUpResult>;
     changePassword: (input: ChangePasswordInput) => Promise<void>;
-    requestTwoFactorVerify: (methods: TwoFactorMethod[]) => Promise<void>;
-    resolveTwoFactorVerify: () => void;
-    cancelTwoFactorVerify: () => void;
     setStrategy: (strategy: AuthStrategy) => void;
     setSpoof: (email: string | null) => Promise<void>;
     logout: () => Promise<void>;

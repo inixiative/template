@@ -6,8 +6,6 @@
  */
 import { UserAction } from '@template/permissions/client';
 import { actionRoute } from '#/lib/routeTemplates';
-import { forbidApiTokenMiddleware } from '#/middleware/auth/forbidApiTokenMiddleware';
-import { forbidSpoofingMiddleware } from '#/middleware/auth/forbidSpoofingMiddleware';
 import { requireRecentTwoFactorMiddleware } from '#/middleware/auth/requireRecentTwoFactorMiddleware';
 import { twoFactorRateLimit } from '#/middleware/rateLimit/twoFactorRateLimit';
 import { validatePermission } from '#/middleware/validations/validatePermission';
@@ -18,14 +16,12 @@ export const meDisableTotpRoute = actionRoute({
   model: Modules.me,
   action: 'twoFactor/totp/disable',
   skipId: true,
+  forbid: { tokens: true, spoof: true, batch: true },
   middleware: [
-    forbidApiTokenMiddleware,
-    forbidSpoofingMiddleware,
     twoFactorRateLimit,
     validatePermission(UserAction.manageTwoFactor),
     requireRecentTwoFactorMiddleware(),
   ],
   description: 'Disables authenticator app (TOTP) two-factor authentication.',
   tags: [OpenApiTags.me, OpenApiTags.twoFactor],
-  'x-batch': false,
 });

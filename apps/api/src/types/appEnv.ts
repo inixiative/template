@@ -29,7 +29,8 @@ export type AppVars = {
   spaces: Space[] | null;
   token: TokenWithRelations | null;
   spoofedBy: User | null;
-  jwtIsLocalIssuer: boolean;
+  authCredentialKind: 'jwt' | 'token' | null;
+  jwtIsPlatformIssued: boolean;
   jwtTwoFactorVerified: boolean;
   jwtTwoFactorVerifiedAt: number | null;
   permix: Permix;

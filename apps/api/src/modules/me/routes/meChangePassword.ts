@@ -6,7 +6,6 @@
  */
 import { UserAction } from '@template/permissions/client';
 import { actionRoute } from '#/lib/routeTemplates';
-import { forbidApiTokenMiddleware } from '#/middleware/auth/forbidApiTokenMiddleware';
 import { requireRecentTwoFactorMiddleware } from '#/middleware/auth/requireRecentTwoFactorMiddleware';
 import { authRateLimit } from '#/middleware/rateLimit/authRateLimit';
 import { credentialChangeRateLimit } from '#/middleware/rateLimit/credentialChangeRateLimit';
@@ -22,10 +21,10 @@ export const meChangePasswordRoute = actionRoute({
   model: Modules.me,
   action: 'changePassword',
   skipId: true,
+  forbid: { tokens: true, batch: true },
   bodySchema: changePasswordBodySchema,
   responseSchema: changePasswordResponseSchema,
   middleware: [
-    forbidApiTokenMiddleware,
     authRateLimit,
     validatePermission(UserAction.changePassword),
     credentialChangeRateLimit,
@@ -35,5 +34,4 @@ export const meChangePasswordRoute = actionRoute({
     'Changes your password after checking the current one. Every JWT signed for you before stops working; ' +
     'the response carries your new JWT, or nulls when a superadmin is spoofing you.',
   tags: [OpenApiTags.me, OpenApiTags.user],
-  'x-batch': false,
 });

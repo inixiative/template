@@ -10,7 +10,6 @@ import { isSuperadmin } from '@template/permissions';
 import { TWO_FACTOR_REVERIFY_REQUIRED_CODE } from '@template/shared/auth/twoFactor';
 import type { Context } from 'hono';
 import { TWO_FACTOR_REVERIFY_TTL_SECONDS } from '#/lib/auth/userJwt';
-import { realUserActor } from '#/lib/context/realUserActor';
 import { makeError } from '#/lib/errors';
 import { fetchUserTwoFactorMethods } from '#/lib/twoFactor/fetchUserTwoFactorMethods';
 import { rpIdFromOrigin } from '#/lib/twoFactor/passkey/resolveWebAuthnOrigin';
@@ -42,8 +41,9 @@ export const assertFirstFactorOrRecentVerify = async (
 
 export const assertRecentTwoFactor = async (c: Context<AppEnv>): Promise<void> => {
   const token = c.get('token');
-  if (token) {
-    if (token.user?.twoFactorEnabled && isSuperadmin(token.user)) {
+  if (token || c.get('authCredentialKind') === 'token') {
+    const tokenUser = token?.user ?? c.get('spoofedBy');
+    if (tokenUser?.twoFactorEnabled && isSuperadmin(tokenUser)) {
       throw makeError({
         status: 403,
         message: 'Two-factor verification required; use a signed-in user session',
@@ -52,11 +52,14 @@ export const assertRecentTwoFactor = async (c: Context<AppEnv>): Promise<void> =
     return;
   }
 
-  const actor = realUserActor(c);
-  if (!actor?.twoFactorEnabled) return;
+  const sessionUser = c.get('spoofedBy') ?? c.get('user');
+  if (!sessionUser?.twoFactorEnabled) return;
   if (isRecentTwoFactor(c)) return;
 
-  const methods = await fetchUserTwoFactorMethods(actor.id, rpIdFromOrigin(c.req.header('origin')));
+  const methods = await fetchUserTwoFactorMethods(
+    sessionUser.id,
+    rpIdFromOrigin(c.req.header('origin')),
+  );
 
   throw makeError({
     status: 403,

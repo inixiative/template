@@ -10,14 +10,17 @@ import { makeError } from '#/lib/errors';
 import { isTwoFactorRequired } from '#/lib/twoFactor/isTwoFactorRequired';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
-export const disableUserTotp = async (userId: string): Promise<void> => {
+export const disableUserTotp = async (
+  userId: string,
+  options?: { allowRemovingLastFactor?: boolean },
+): Promise<void> => {
   await db.txn(async () => {
     const [row] = await db.findForUpdate<TwoFactor>('TwoFactor', { userId });
     if (!row?.totpVerifiedAt)
       throw makeError({ status: 400, message: 'Authenticator app is not enabled' });
 
     const activePasskeys = await db.passkey.count({ where: { userId } });
-    if (isTwoFactorRequired() && activePasskeys === 0) {
+    if (!options?.allowRemovingLastFactor && isTwoFactorRequired() && activePasskeys === 0) {
       throw makeError({
         status: 422,
         message:

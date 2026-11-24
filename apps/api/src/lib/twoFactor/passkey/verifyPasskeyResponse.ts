@@ -12,7 +12,7 @@ import {
 } from '@simplewebauthn/server';
 import { makeError } from '#/lib/errors';
 
-export const verifyPasskeyRegistrationOrThrow = async (opts: VerifyRegistrationResponseOpts) => {
+export const verifyPasskeyRegistration = async (opts: VerifyRegistrationResponseOpts) => {
   const verification = await verifyRegistrationResponse(opts).catch(() => {
     throw makeError({ status: 400, message: 'Passkey registration verification failed' });
   });
@@ -22,9 +22,7 @@ export const verifyPasskeyRegistrationOrThrow = async (opts: VerifyRegistrationR
   return verification.registrationInfo;
 };
 
-export const verifyPasskeyAuthenticationOrThrow = async (
-  opts: VerifyAuthenticationResponseOpts,
-) => {
+export const verifyPasskeyAuthentication = async (opts: VerifyAuthenticationResponseOpts) => {
   const verification = await verifyAuthenticationResponse(opts).catch(() => {
     throw makeError({ status: 401, message: 'Passkey verification failed' });
   });

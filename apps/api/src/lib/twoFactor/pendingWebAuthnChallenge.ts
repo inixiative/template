@@ -30,7 +30,7 @@ export const storePendingWebAuthnChallenge = async (
   );
 };
 
-export const consumePendingWebAuthnChallengeOrThrow = async (
+export const consumePendingWebAuthnChallenge = async (
   kind: 'register' | 'authenticate',
   userId: string,
 ): Promise<PendingWebAuthnChallenge> => {

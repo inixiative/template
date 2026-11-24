@@ -8,8 +8,8 @@ import type { AuthenticationResponseJSON, AuthenticatorTransport } from '@simple
 import { db } from '@template/db';
 import type { Passkey } from '@template/db/generated/client/client';
 import { makeError } from '#/lib/errors';
-import { verifyPasskeyAuthenticationOrThrow } from '#/lib/twoFactor/passkey/verifyPasskeyResponseOrThrow';
-import { consumePendingWebAuthnChallengeOrThrow } from '#/lib/twoFactor/pendingWebAuthnChallenge';
+import { verifyPasskeyAuthentication } from '#/lib/twoFactor/passkey/verifyPasskeyResponse';
+import { consumePendingWebAuthnChallenge } from '#/lib/twoFactor/pendingWebAuthnChallenge';
 
 export const verifyUserPasskey = async ({
   userId,
@@ -18,7 +18,7 @@ export const verifyUserPasskey = async ({
   userId: string;
   response: AuthenticationResponseJSON;
 }): Promise<void> => {
-  const challenge = await consumePendingWebAuthnChallengeOrThrow('authenticate', userId);
+  const challenge = await consumePendingWebAuthnChallenge('authenticate', userId);
 
   await db.txn(async () => {
     const [passkey] = await db.findForUpdate<Passkey>('Passkey', {
@@ -30,7 +30,7 @@ export const verifyUserPasskey = async ({
       throw makeError({ status: 401, message: 'Passkey is not registered for this account' });
     }
 
-    const { newCounter } = await verifyPasskeyAuthenticationOrThrow({
+    const { newCounter } = await verifyPasskeyAuthentication({
       response,
       expectedChallenge: challenge.challenge,
       expectedOrigin: challenge.expectedOrigin,

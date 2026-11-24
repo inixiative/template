@@ -9,7 +9,7 @@ import { jwksStore } from '#/lib/auth/jwksStore';
 
 export const USER_JWT_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const PRE_TWO_FACTOR_JWT_TTL_SECONDS = 15 * 60;
-export const TWO_FACTOR_REVERIFY_TTL_SECONDS = 5 * 60;
+export const TWO_FACTOR_REVERIFY_TTL_SECONDS = 15 * 60;
 const SIGNING_KEY_LIFETIME_SECONDS = 90 * 24 * 60 * 60;
 
 export const userJwtIssuerUrlOrThrow = (): string => {

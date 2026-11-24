@@ -19,7 +19,7 @@ const normalizeBackupCode = (raw: string): string => {
   ].join('-');
 };
 
-export const consumeMatchingBackupCodeOrThrow = async (
+export const consumeMatchingBackupCode = async (
   rawCode: string,
   storedHashes: readonly string[],
 ): Promise<string[]> => {
