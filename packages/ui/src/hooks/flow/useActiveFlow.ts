@@ -12,9 +12,10 @@ import { useAppStore } from '@template/ui/store';
 export const useActiveFlow = (): Flow | null => {
   const flowId = useAppStore((state) => state.navigation.flowId);
   const isAuthenticated = useAppStore((state) => state.auth.isAuthenticated);
+  const twoFactorAction = useAppStore((state) => state.auth.twoFactorAction);
   const { data } = useQuery({
     ...flowReadQueryOptions(flowId ?? ''),
-    enabled: !!flowId && isAuthenticated,
+    enabled: !!flowId && isAuthenticated && !twoFactorAction,
   });
   return flowId && data?.id === flowId ? data : null;
 };

@@ -16,6 +16,13 @@ export type RequestRefinement = {
   bivarianceHack(value: unknown, ctx: z.RefinementCtx): void | Promise<void>;
 }['bivarianceHack'];
 
+export type RouteForbid = {
+  tokens?: boolean;
+  jwt?: boolean;
+  spoof?: boolean;
+  batch?: boolean;
+};
+
 export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'request'> & {
   model: Module;
   submodel?: Module;
@@ -36,4 +43,5 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   internal?: boolean;
   filterLens?: LensNarrowing;
   includeDeleted?: boolean;
+  forbid?: RouteForbid;
 };

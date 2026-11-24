@@ -10,6 +10,11 @@ import { z } from 'zod';
 
 const { fields: encryptionFields, applyRefinements: applyEncryptionRefinements } = encryptionEnv();
 
+const booleanEnvSchema = z.union([
+  z.boolean(),
+  z.enum(['true', 'false']).transform((value) => value === 'true'),
+]);
+
 const jobEnvFields = {
   JOBS_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
   JOBS_MAX_QUEUE_DEPTH: z.coerce.number().int().positive().default(100_000),
@@ -22,7 +27,11 @@ const jobEnvFields = {
   EMAIL_SLOW_LANE_MIN_RECIPIENTS: z.coerce.number().int().nonnegative().default(25),
 };
 
-const parseJobEnvOverride: EnvOverrideParser = (key, override, current) => {
+const parseEnvOverride: EnvOverrideParser = (key, override, current) => {
+  if (key === 'REQUIRE_TWO_FACTOR') {
+    const parsedOverride = booleanEnvSchema.safeParse(override);
+    return parsedOverride.success ? parsedOverride.data : current;
+  }
   if (!(key in jobEnvFields)) return override;
   const parsedOverride = jobEnvFields[key as keyof typeof jobEnvFields].safeParse(override);
   return parsedOverride.success ? parsedOverride.data : current;
@@ -65,6 +74,9 @@ const baseEnvSchema = z
     // Auth
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
+    REQUIRE_TWO_FACTOR: booleanEnvSchema.default(false),
+    WEBAUTHN_RP_ID: z.string().optional(),
+    WEBAUTHN_RP_NAME: z.string().optional(),
 
     // Webhooks (required)
     WEBHOOK_SIGNING_PRIVATE_KEY: z.string(),
@@ -115,5 +127,5 @@ const parsed = isTest
   : envSchema.parse(preprocessEnv(process.env));
 // In test the parsed env is wrapped so setEnvOverride/withEnv overrides win over reads.
 process.env = (isTest
-  ? wrapEnvWithOverrides(parsed, parseJobEnvOverride)
+  ? wrapEnvWithOverrides(parsed, parseEnvOverride)
   : parsed) as unknown as NodeJS.ProcessEnv;

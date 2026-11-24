@@ -236,7 +236,9 @@ Creating checks `create` on a pseudo record of the model being created (token cr
 
 ### Person-Only Actions
 
-Some actions are for a person, not a token: minting and updating a token (`create` on `db:Token`), deleting an organization, `user.redact`, `user.rotateJwts`, `user.changePassword`, and `delegateFull` on every model that has it. Their rules include `actorIsUser` (`actor:Acting.model equals User`). Creating an organization takes a user behind the actor: `actorIsUser` or `actorIsDelegateOfUser` (a token owned by a user). A token holding `own` still cannot take a person-only action, and because the grant check runs with no actor, a person-only action can never be granted as an entitlement.
+Some actions are for a person, not a token: minting and updating a token (`create` on `db:Token`), deleting an organization, `user.redact`, `user.rotateJwts`, `user.changePassword`, `user.manageTwoFactor`, and `delegateFull` on every model that has it. Their rules include `actorIsUser` (`actor:Acting.model equals User`). Creating an organization takes a user behind the actor: `actorIsUser` or `actorIsDelegateOfUser` (a token owned by a user). A token holding `own` still cannot take a person-only action, and because the grant check runs with no actor, a person-only action can never be granted as an entitlement.
+
+**Why `RouteArgs.forbid` stays outside the permission schema:** a superadmin passes every permission-schema check on any credential by design. Transport and credential-kind restrictions that must still apply to superadmins — forbidding API tokens, user JWTs, spoofing, or batching (`forbid: { tokens, jwt, spoof, batch }`) — therefore live on `RouteArgs` (enforced by `makeForbidMiddleware` in `prepareMiddleware`), not in `packages/permissions/src/rebac/schema.ts`. See [AUTH.md](./AUTH.md#two-factor-authentication-passkey--totp).
 
 ### The Actor
 

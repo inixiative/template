@@ -82,6 +82,7 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 | Jwks | - | - | - | - | - | yes | - | sensitive | - | - | - | - | - |
 | Organization | soft | yes | - | - | - | - | - | - | - | - | yes | - | yes |
 | OrganizationUser | soft | yes | - | - | - | - | - | - | - | - | yes | - | yes |
+| Passkey | soft, skip-revive | yes | - | User (userId) | - | - | - | noop, immutable-override | - | - | - | - | - |
 | Project | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | yes |
 | ProjectIntegration | soft | yes | - | Project (projectId) | - | - | - | immutable-override | - | - | - | - | yes |
 | ProjectIntegrationResource | soft | yes | - | - | - | - | - | - | - | - | - | - | yes |
@@ -96,6 +97,7 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 | TagAttachment | soft | - | resourceModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | TagCategory | soft | - | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | Token | soft, skip-revive | yes | ownerModel | - | - | - | - | sensitive, noop, immutable-override | yes | - | yes | - | yes |
+| TwoFactor | soft, skip-revive | yes | - | User (userId) | - | yes | - | sensitive | - | - | - | - | - |
 | User | soft | yes | - | - | - | - | - | internal, noop | - | - | yes | - | yes |
 | Verification | - | - | - | - | - | - | - | - | - | - | - | - | - |
 | WebhookEvent | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | - |

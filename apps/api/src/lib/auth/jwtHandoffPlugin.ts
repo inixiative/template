@@ -2,19 +2,20 @@
  * @atlas
  * @kind service
  * @partOf feature:auth
- * @uses none
+ * @uses infrastructure:prisma, infrastructure:redis
  */
+import type { User } from '@template/db/generated/client/client';
 import type { BetterAuthPlugin } from 'better-auth';
 import { createAuthMiddleware, isAPIError } from 'better-auth/api';
 import { deleteSessionCookie } from 'better-auth/cookies';
-import { signJWT } from 'better-auth/plugins';
 import { omit } from 'lodash-es';
-import { USER_JWT_TTL_SECONDS, userJwtOptions } from '#/lib/auth/userJwt';
+import { issueUserJwt, type UserJwtHandoff } from '#/lib/auth/issueUserJwt';
+import { PRE_TWO_FACTOR_JWT_TTL_SECONDS } from '#/lib/auth/userJwt';
+import { isTwoFactorRequired } from '#/lib/twoFactor/isTwoFactorRequired';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
-export type UserJwtHandoff = { token: string; expiresAt: string };
+export type { UserJwtHandoff };
 
-// The OAuth callback's session must outlive its redirect: the one-time token resolves to it.
 const isOAuthCallback = (path: string | undefined) => !!path?.startsWith('/callback/');
 
 const revokesEveryJwt = (path: string | undefined) => path === '/change-password';
@@ -31,27 +32,25 @@ export const jwtHandoffPlugin = (): BetterAuthPlugin => ({
           deleteSessionCookie(ctx);
           if (isOAuthCallback(ctx.path) || isAPIError(ctx.context.returned)) return;
 
+          const userId = newSession.user.id;
+          const twoFactorEnabled = Boolean(
+            (newSession.user as { twoFactorEnabled?: boolean }).twoFactorEnabled,
+          );
           try {
-            if (revokesEveryJwt(ctx.path)) await rotateUserJwts(newSession.user.id);
-            const iat = Math.floor(Date.now() / 1000);
-            const signedIn = (await ctx.context.internalAdapter.updateUser(newSession.user.id, {
-              lastLoginAt: new Date(iat * 1000),
-            })) as { jwtVersion?: number } | null;
-            if (typeof signedIn?.jwtVersion !== 'number')
-              throw new Error('Signed-in user has no jwtVersion to put on the JWT');
-            const token = await signJWT(ctx, {
-              options: userJwtOptions(),
-              payload: { sub: newSession.user.id, ver: signedIn.jwtVersion, iat },
-            });
+            const isPasswordChange = revokesEveryJwt(ctx.path);
+            if (isPasswordChange) await rotateUserJwts(userId);
 
-            const handoff: UserJwtHandoff & {
-              user: Omit<typeof newSession.user, 'jwtVersion'>;
-            } = {
-              token,
-              expiresAt: new Date((iat + USER_JWT_TTL_SECONDS) * 1000).toISOString(),
-              user: omit(newSession.user, 'jwtVersion'),
-            };
-            return ctx.json(handoff);
+            const signedIn = (await ctx.context.internalAdapter.updateUser(userId, {
+              lastLoginAt: new Date(),
+            })) as User;
+
+            const preTwoFactor = !isPasswordChange && (isTwoFactorRequired() || twoFactorEnabled);
+            const jwt = await issueUserJwt(signedIn, {
+              authCtx: ctx,
+              twoFactorVerified: isPasswordChange ? twoFactorEnabled : false,
+              ttlSeconds: preTwoFactor ? PRE_TWO_FACTOR_JWT_TTL_SECONDS : undefined,
+            });
+            return ctx.json({ ...jwt, user: omit(signedIn, 'jwtVersion') });
           } finally {
             await ctx.context.internalAdapter.deleteSession(newSession.session.token);
           }

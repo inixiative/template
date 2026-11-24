@@ -13,8 +13,10 @@ type Spec = {
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
-const expectedSchemes = (path: string): string[] => {
+const expectedSchemes = (path: string, security: Operation['security']): string[] => {
   if (path.startsWith('/api/internal')) return ['internalSecret'];
+  const actual = (security ?? []).flatMap((requirement) => Object.keys(requirement));
+  if (actual.length === 1 && (actual[0] === 'userJwt' || actual[0] === 'apiToken')) return actual;
   return ['userJwt', 'apiToken'];
 };
 
@@ -57,7 +59,7 @@ describe('OpenAPI security', () => {
 
     const wrong = all
       .map(({ path, method, op }) => {
-        const expectedSecurity = expectedSchemes(path).map((name) => ({
+        const expectedSecurity = expectedSchemes(path, op.security).map((name) => ({
           [name]: [],
         }));
         const ok =
@@ -70,6 +72,8 @@ describe('OpenAPI security', () => {
       .filter((entry): entry is string => entry !== null);
 
     expect(wrong).toEqual([]);
+    expect(spec.paths?.['/api/v1/me/twoFactor/verify']?.post?.security).toEqual([{ userJwt: [] }]);
+    expect(spec.paths?.['/api/v1/me/changePassword']?.post?.security).toEqual([{ userJwt: [] }]);
 
     const unregistered = all
       .flatMap(({ path, op }) =>

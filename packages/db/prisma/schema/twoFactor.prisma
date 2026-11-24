@@ -1,0 +1,30 @@
+// ============================================================================
+// TWO-FACTOR AUTHENTICATION (TOTP secret + one-way hashed backup codes)
+// ============================================================================
+
+model TwoFactor {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  userId String @unique @db.VarChar(36)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  encryptedTotpSecret           String?
+  encryptedTotpSecretMetadata   Json?
+  encryptedTotpSecretKeyVersion Int?
+  totpVerifiedAt                DateTime?
+
+  backupCodeHashes       String[]  @default([])
+  backupCodesGeneratedAt DateTime?
+
+  auditLogs AuditLog[]
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@index([encryptedTotpSecretKeyVersion])
+  @@index([deletedAt])
+}

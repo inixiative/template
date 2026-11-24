@@ -7,3 +7,4 @@ export * from './ProfileFormCard';
 export * from './ResourceSettingsSection';
 export * from './SettingField';
 export * from './SettingsLayout';
+export * from './TwoFactorSecurityCard';

@@ -7,6 +7,7 @@
 import { type HydratedRecord, hydrate, includeTargetEntitlements } from '@template/db';
 import { contextResource } from '#/lib/context/contextResource';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
+import { assertRecentTwoFactor } from '#/lib/twoFactor/assertRecentTwoFactor';
 import { makeController } from '#/lib/utils/makeController';
 import { tokenUpdateRoute } from '#/modules/token/routes/tokenUpdate';
 import { validateTokenWrite } from '#/modules/token/validations/validateTokenWrite';
@@ -18,6 +19,7 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
   const body = c.req.valid('json');
   await validateTokenWrite(permix, token);
   await validateTokenWrite(permix, { ...token, ...body });
+  if (body.role !== undefined || body.full !== undefined) await assertRecentTwoFactor(c);
   validateDelegateRole(await hydrate('token', { ...token, ...body } as HydratedRecord));
 
   await db.token.update({ where: { id: token.id }, data: body });

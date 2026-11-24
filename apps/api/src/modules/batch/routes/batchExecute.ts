@@ -46,7 +46,7 @@ export const batchExecuteRoute = actionRoute({
   model: Modules.batch,
   action: 'execute',
   skipId: true,
-  'x-batch': false,
+  forbid: { batch: true },
   middleware: [validateAuthenticatedMiddleware],
   bodySchema: batchExecuteBodySchema,
   bodyRefinement: ({ requests }: z.infer<typeof batchExecuteBodySchema>, ctx) => {

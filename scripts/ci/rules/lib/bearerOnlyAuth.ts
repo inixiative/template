@@ -160,6 +160,7 @@ const sessionCredentialBuild: Check = (node, sourceFile) => {
 
 const THROWAWAY_SESSION_CALLERS = new Set([
   'apps/api/src/modules/me/controllers/meChangePassword.ts',
+  'apps/api/src/lib/auth/verifyUserPassword.ts',
 ]);
 
 const isThrowawaySessionModule = (node: ts.Node | undefined): boolean =>

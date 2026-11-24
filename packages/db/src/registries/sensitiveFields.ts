@@ -10,6 +10,7 @@ import { type FieldRegistry, unionRegistries } from '@template/db/registries/fie
 const SENSITIVE_FIELDS_BASE: FieldRegistry = {
   Account: ['password'],
   Token: ['keyHash'],
+  TwoFactor: ['backupCodeHashes'],
 };
 
 // Value-sensitive columns: plaintext-sensitive plus every encrypted column (registering a model for

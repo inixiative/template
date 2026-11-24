@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { AuthProvider, Jwks } from '@template/db/generated/client/client';
+import type { AuthProvider, Jwks, TwoFactor } from '@template/db/generated/client/client';
 import type { EncryptedModelConfig } from '@template/db/lib/encryption/types';
 import { upperFirst } from 'lodash-es';
 
@@ -28,6 +28,15 @@ export const ENCRYPTED_MODELS = {
       },
     },
   } satisfies EncryptedModelConfig<'jwks'>,
+  twoFactor: {
+    model: 'twoFactor',
+    keys: {
+      totpSecret: {
+        envPrefix: 'TWO_FACTOR_SECRET',
+        buildAAD: (r: Pick<TwoFactor, 'id' | 'userId'>) => `twoFactor:${r.id}:${r.userId}`,
+      },
+    },
+  } satisfies EncryptedModelConfig<'twoFactor'>,
 } as const;
 
 // Helper to derive field names from key name

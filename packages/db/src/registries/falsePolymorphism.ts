@@ -367,6 +367,8 @@ export const PolymorphismRegistry = {
           ProjectIntegrationResource: ['subjectProjectIntegrationResourceId'],
           Setting: ['subjectSettingId'],
           ProjectIntegration: ['subjectProjectIntegrationId'],
+          TwoFactor: ['subjectTwoFactorId'],
+          Passkey: ['subjectPasskeyId'],
         },
       },
     ],

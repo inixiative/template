@@ -14,6 +14,7 @@ import { makeError } from '#/lib/errors';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
 import { validateFullGrant } from '#/lib/permissions/validateFullGrant';
+import { assertRecentTwoFactor } from '#/lib/twoFactor/assertRecentTwoFactor';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
@@ -42,6 +43,7 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   const pseudo = await hydrate('token', { id: '', ...row } as HydratedRecord);
   if (!check(permix, 'token', pseudo, TokenAction.create))
     throw makeError({ status: 403, message: 'Access denied' });
+  await assertRecentTwoFactor(c);
   validateDelegateRole(pseudo);
   if (row.full) validateFullGrant(permix, 'token', pseudo);
 

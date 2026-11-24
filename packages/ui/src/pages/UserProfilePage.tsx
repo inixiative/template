@@ -11,6 +11,7 @@ import {
   ChangePasswordCard,
   ProfileFormCard,
   ResourceSettingsSection,
+  TwoFactorSecurityCard,
 } from '@template/ui/components/settings';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
@@ -39,6 +40,7 @@ export const UserProfilePage = () => {
           />
           <ResourceSettingsSection context={personalContext} category="general" />
           <ChangePasswordCard />
+          <TwoFactorSecurityCard />
         </div>
       )}
     </Page>
