@@ -5,12 +5,8 @@
  * @uses none
  */
 import { validateActionRule } from '@inixiative/permissions';
-import {
-  type AccessorName,
-  accessorOfResource,
-  type BindableOwnerModel,
-  resourceOfModel,
-} from '@template/db';
+import type { AccessorName, BindableOwnerModel } from '@template/db';
+import { accessorOfResource, resourceOfModel } from '@template/db/utils/modelNames';
 import { schemaMap } from '@template/permissions/rebac/schema';
 import { reasonRuleIsOffItsOwnSide } from '@template/permissions/rebac/tenantPermissionRules';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';

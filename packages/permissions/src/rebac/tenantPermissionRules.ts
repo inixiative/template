@@ -5,13 +5,13 @@
  * @uses infrastructure:prisma
  */
 import { type ActionRule, type AdditionalRules, validateActionRule } from '@inixiative/permissions';
+import type { BindableOwnerModel } from '@template/db/registries/polymorphicAxisPointsAt';
+import { accessorOfResource, toModelName } from '@template/db/utils/modelNames';
 import {
-  accessorOfResource,
-  type BindableOwnerModel,
   relationsToTenantOnSides,
-  toModelName,
-} from '@template/db';
-import { tenantRowsAbove, tenantRowsOnSides } from '@template/db/utils/tenantRowsAbove';
+  tenantRowsAbove,
+  tenantRowsOnSides,
+} from '@template/db/utils/tenantRowsAbove';
 import { StandardAction } from '@template/permissions/client';
 import { schemaMap } from '@template/permissions/rebac/schema';
 import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
