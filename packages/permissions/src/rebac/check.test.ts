@@ -704,11 +704,11 @@ describe('rebac check', () => {
       },
     };
 
-    it('returns false for undefined model', () => {
+    it('throws for a name that is no model: a misspelt model never denies quietly', () => {
       const record = { id: 'unknown-1' };
-      expect(check(permix, schema, 'unknownModel' as unknown as AccessorName, record, 'own')).toBe(
-        false,
-      );
+      expect(() =>
+        check(permix, schema, 'unknownModel' as unknown as AccessorName, record, 'own'),
+      ).toThrow("Unknown model 'unknownModel'");
     });
 
     it('returns false for undefined action', async () => {
