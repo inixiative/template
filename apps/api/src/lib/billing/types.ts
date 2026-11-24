@@ -127,6 +127,7 @@ export type NormalizedBillingWebhookEvent =
       externalEventId: string;
       rawEventType: string;
       occurredAt: Date;
+      rawPayload: Record<string, unknown>;
       kind: 'accountStateChanged';
       accountId: string | null;
       externalCustomerId: string;
@@ -136,6 +137,7 @@ export type NormalizedBillingWebhookEvent =
       externalEventId: string;
       rawEventType: string;
       occurredAt: Date;
+      rawPayload: Record<string, unknown>;
       kind: 'paymentSucceeded';
       accountId: string | null;
       externalCustomerId: string;
@@ -148,6 +150,7 @@ export type NormalizedBillingWebhookEvent =
       externalEventId: string;
       rawEventType: string;
       occurredAt: Date;
+      rawPayload: Record<string, unknown>;
       kind: 'paymentFailed';
       accountId: string | null;
       externalCustomerId: string;
@@ -158,6 +161,7 @@ export type NormalizedBillingWebhookEvent =
       externalEventId: string;
       rawEventType: string;
       occurredAt: Date;
+      rawPayload: Record<string, unknown>;
       kind: 'ignored';
     };
 

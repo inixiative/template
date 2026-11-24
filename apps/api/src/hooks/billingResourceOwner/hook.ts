@@ -12,7 +12,7 @@ import {
 } from '@template/db/generated/client/enums';
 import { castArray, chunk } from 'lodash-es';
 import { makeError } from '#/lib/errors';
-import { isBillingOwnerAllowed } from '#/modules/billingAccount/services/billingGovernance';
+import { assertBillingOwnerAllowed } from '#/modules/billingAccount/services/billingGovernance';
 
 const VALIDATION_CHUNK_SIZE = 2_000;
 
@@ -74,66 +74,39 @@ const fetchAccountsMap = async (ids: string[]): Promise<Map<string, AccountBound
 const resolveTargetBoundary = async (row: LinkRow): Promise<OwnerBoundary> => {
   switch (row.resourceModel) {
     case BillingResourceTargetModel.Space: {
-      if (!row.resourceOrganizationId || !row.resourceSpaceId) {
-        throw makeError({
-          status: 422,
-          message: 'Space target requires organizationId and spaceId',
-        });
-      }
-      const space = await db.space.findFirst({
+      const space = await db.space.findFirstOrThrow({
         where: {
-          id: row.resourceSpaceId,
-          organizationId: row.resourceOrganizationId,
+          id: row.resourceSpaceId ?? '',
+          organizationId: row.resourceOrganizationId ?? '',
           deletedAt: null,
         },
         select: { id: true, organizationId: true },
       });
-      if (!space) {
-        throw makeError({ status: 422, message: `Space ${row.resourceSpaceId} not found` });
-      }
       return { organizationId: space.organizationId, spaceId: space.id, userId: null };
     }
 
     case BillingResourceTargetModel.OrganizationUser: {
-      if (!row.resourceOrganizationId || !row.resourceUserId) {
-        throw makeError({
-          status: 422,
-          message: 'OrganizationUser target requires organizationId and userId',
-        });
-      }
-      const member = await db.organizationUser.findFirst({
+      const member = await db.organizationUser.findFirstOrThrow({
         where: {
-          organizationId: row.resourceOrganizationId,
-          userId: row.resourceUserId,
+          organizationId: row.resourceOrganizationId ?? '',
+          userId: row.resourceUserId ?? '',
           deletedAt: null,
         },
         select: { organizationId: true, userId: true },
       });
-      if (!member) {
-        throw makeError({ status: 422, message: 'OrganizationUser target not found' });
-      }
       return { organizationId: member.organizationId, spaceId: null, userId: member.userId };
     }
 
     case BillingResourceTargetModel.SpaceUser: {
-      if (!row.resourceOrganizationId || !row.resourceSpaceId || !row.resourceUserId) {
-        throw makeError({
-          status: 422,
-          message: 'SpaceUser target requires organizationId, spaceId, and userId',
-        });
-      }
-      const member = await db.spaceUser.findFirst({
+      const member = await db.spaceUser.findFirstOrThrow({
         where: {
-          organizationId: row.resourceOrganizationId,
-          spaceId: row.resourceSpaceId,
-          userId: row.resourceUserId,
+          organizationId: row.resourceOrganizationId ?? '',
+          spaceId: row.resourceSpaceId ?? '',
+          userId: row.resourceUserId ?? '',
           deletedAt: null,
         },
         select: { organizationId: true, spaceId: true, userId: true },
       });
-      if (!member) {
-        throw makeError({ status: 422, message: 'SpaceUser target not found' });
-      }
       return {
         organizationId: member.organizationId,
         spaceId: member.spaceId,
@@ -141,42 +114,26 @@ const resolveTargetBoundary = async (row: LinkRow): Promise<OwnerBoundary> => {
       };
     }
 
-    case BillingResourceTargetModel.Project: {
-      if (!row.resourceProjectId) {
-        throw makeError({ status: 422, message: 'Project target requires resourceProjectId' });
-      }
-      const project = await db.project.findFirst({
-        where: { id: row.resourceProjectId, deletedAt: null },
+    case BillingResourceTargetModel.Project:
+      return db.project.findFirstOrThrow({
+        where: { id: row.resourceProjectId ?? '', deletedAt: null },
         select: { organizationId: true, spaceId: true, userId: true },
       });
-      if (!project) {
-        throw makeError({ status: 422, message: `Project ${row.resourceProjectId} not found` });
-      }
-      return project;
-    }
 
     case BillingResourceTargetModel.ProjectIntegration: {
-      if (!row.resourceProjectIntegrationId) {
-        throw makeError({
-          status: 422,
-          message: 'ProjectIntegration target requires resourceProjectIntegrationId',
-        });
-      }
-      const pi = await db.projectIntegration.findFirst({
-        where: { id: row.resourceProjectIntegrationId, deletedAt: null },
+      const pi = await db.projectIntegration.findFirstOrThrow({
+        where: {
+          id: row.resourceProjectIntegrationId ?? '',
+          deletedAt: null,
+          project: { deletedAt: null },
+          integration: { deletedAt: null },
+        },
         select: {
           project: {
-            select: { organizationId: true, spaceId: true, userId: true, deletedAt: true },
+            select: { organizationId: true, spaceId: true, userId: true },
           },
-          integration: { select: { deletedAt: true } },
         },
       });
-      if (!pi || pi.project.deletedAt || pi.integration.deletedAt) {
-        throw makeError({
-          status: 422,
-          message: `ProjectIntegration ${row.resourceProjectIntegrationId} not found`,
-        });
-      }
       return {
         organizationId: pi.project.organizationId,
         spaceId: pi.project.spaceId,
@@ -238,14 +195,7 @@ const validateCreateRows = async (rows: LinkRow[]): Promise<void> => {
     }
     const target = await resolveTargetBoundary(row);
     assertContainment(account, target);
-
-    const allowed = await isBillingOwnerAllowed(account);
-    if (!allowed) {
-      throw makeError({
-        status: 403,
-        message: `${account.ownerModel} billing is not enabled by parent settings`,
-      });
-    }
+    await assertBillingOwnerAllowed(account);
   }
 };
 

@@ -10,6 +10,7 @@ import {
   BillingAccountSharing,
   SettingResourceModel,
 } from '@template/db/generated/client/enums';
+import { makeError } from '#/lib/errors';
 
 export type BillingOwnerRef = {
   ownerModel: BillingAccountOwnerModel;
@@ -88,6 +89,15 @@ export const isBillingOwnerAllowed = async (owner: BillingOwnerRef): Promise<boo
       ]);
       return (orgAllowsSpace || orgAllowsOrgUser) && spaceAllows && orgUserAllows;
     }
+  }
+};
+
+export const assertBillingOwnerAllowed = async (owner: BillingOwnerRef): Promise<void> => {
+  if (!(await isBillingOwnerAllowed(owner))) {
+    throw makeError({
+      status: 403,
+      message: `${owner.ownerModel} billing is not enabled by parent settings`,
+    });
   }
 };
 

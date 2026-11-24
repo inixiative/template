@@ -13,11 +13,10 @@ import {
 } from '@template/db/generated/client/enums';
 import { polymorphicAxis } from '@template/db/registries/falsePolymorphism';
 import { defaultBillingClient } from '#/lib/billing';
-import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import {
+  assertBillingOwnerAllowed,
   type BillingOwnerRef,
-  isBillingOwnerAllowed,
   ownerLockKeyForBillingAccount,
 } from '#/modules/billingAccount/services/billingGovernance';
 
@@ -55,13 +54,7 @@ export const ownerWhereForBillingAccount = (
 export const createBillingAccountRecord = async (
   input: CreateBillingAccountInput,
 ): Promise<BillingAccount> => {
-  const allowed = await isBillingOwnerAllowed(input.owner);
-  if (!allowed) {
-    throw makeError({
-      status: 403,
-      message: `${input.owner.ownerModel} billing is not enabled by parent settings`,
-    });
-  }
+  await assertBillingOwnerAllowed(input.owner);
 
   const lockKey = ownerLockKeyForBillingAccount(input.owner);
   const ownerWhere = ownerWhereForBillingAccount(input.owner);

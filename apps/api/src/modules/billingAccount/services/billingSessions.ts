@@ -16,7 +16,7 @@ import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { applyBillingAccountState } from '#/modules/billingAccount/services/applyBillingAccountState';
 import {
-  isBillingOwnerAllowed,
+  assertBillingOwnerAllowed,
   ownerLockKeyForBillingAccount,
 } from '#/modules/billingAccount/services/billingGovernance';
 
@@ -24,12 +24,9 @@ const ensureExternalCustomerId = async (account: BillingAccount): Promise<string
   if (account.externalCustomerId) return account.externalCustomerId;
 
   return withOwnerLock(ownerLockKeyForBillingAccount(account), 'billing', async () => {
-    const current = await db.billingAccount.findFirst({
+    const current = await db.billingAccount.findFirstOrThrow({
       where: { id: account.id, deletedAt: null },
     });
-    if (!current) {
-      throw makeError({ status: 404, message: 'Billing account not found' });
-    }
     if (current.externalCustomerId) return current.externalCustomerId;
 
     const client = billingClientForProviderOrThrow(current.provider);
@@ -64,13 +61,7 @@ export const createBillingSetupSession = async (
     planKey?: string;
   },
 ): Promise<CreateSetupSessionResult> => {
-  const allowed = await isBillingOwnerAllowed(account);
-  if (!allowed) {
-    throw makeError({
-      status: 403,
-      message: `${account.ownerModel} billing is not enabled by parent settings`,
-    });
-  }
+  await assertBillingOwnerAllowed(account);
 
   const externalCustomerId = await ensureExternalCustomerId(account);
   const client = billingClientForProviderOrThrow(account.provider);

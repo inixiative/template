@@ -21,6 +21,15 @@ export type UpdateBillingAccountInput = {
   sharing?: BillingAccountSharing;
 };
 
+const assertCanUpdateDefault = (current: BillingAccount, isDefault?: boolean) => {
+  if (isDefault === false && current.isDefault) {
+    throw makeError({
+      status: 422,
+      message: 'Cannot unset the default billing account directly; promote another account first',
+    });
+  }
+};
+
 export const updateBillingAccountRecord = async (
   input: UpdateBillingAccountInput,
 ): Promise<BillingAccount> => {
@@ -31,18 +40,10 @@ export const updateBillingAccountRecord = async (
   const ownerWhere = ownerWhereForBillingAccount(account);
 
   return withOwnerLock(lockKey, 'billing', async () => {
-    const preRead = await db.billingAccount.findFirst({
+    const preRead = await db.billingAccount.findFirstOrThrow({
       where: { id: account.id, deletedAt: null },
     });
-    if (!preRead) {
-      throw makeError({ status: 404, message: 'Billing account not found' });
-    }
-    if (input.isDefault === false && preRead.isDefault) {
-      throw makeError({
-        status: 422,
-        message: 'Cannot unset the default billing account directly; promote another account first',
-      });
-    }
+    assertCanUpdateDefault(preRead, input.isDefault);
 
     if (preRead.externalCustomerId && (input.name !== undefined || normalizedEmail !== undefined)) {
       const client = billingClientForProviderOrThrow(preRead.provider);
@@ -55,19 +56,10 @@ export const updateBillingAccountRecord = async (
     }
 
     return db.txn(async () => {
-      const current = await db.billingAccount.findFirst({
+      const current = await db.billingAccount.findFirstOrThrow({
         where: { id: account.id, deletedAt: null },
       });
-      if (!current) {
-        throw makeError({ status: 404, message: 'Billing account not found' });
-      }
-      if (input.isDefault === false && current.isDefault) {
-        throw makeError({
-          status: 422,
-          message:
-            'Cannot unset the default billing account directly; promote another account first',
-        });
-      }
+      assertCanUpdateDefault(current, input.isDefault);
 
       if (input.isDefault === true && !current.isDefault) {
         await db.billingAccount.updateManyAndReturn({

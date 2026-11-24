@@ -68,28 +68,23 @@ export const createBillingResourceRecord = async (
         throw makeError({ status: 404, message: 'Billing account not found' });
       }
 
-      const existing = await db.billingResource.findFirst({
-        where: { ...targetWhere, deletedAt: null },
-      });
-
-      if (existing) {
-        if (input.replaceExisting === false) {
-          throw makeError({
-            status: 409,
-            message: 'Target already has an active billing resource binding',
+      if (input.replaceExisting !== false) {
+        const existing = await db.billingResource.findFirst({
+          where: { ...targetWhere, deletedAt: null },
+        });
+        if (existing) {
+          const hydratedExisting = await hydrate(
+            'billingResource',
+            existing as unknown as HydratedRecord,
+          );
+          if (!check(permix, rebacSchema, 'billingResource', hydratedExisting, 'delete')) {
+            throw makeError({ status: 403, message: 'Access denied' });
+          }
+          await db.billingResource.update({
+            where: { id: existing.id },
+            data: { deletedAt: new Date() },
           });
         }
-        const hydratedExisting = await hydrate(
-          'billingResource',
-          existing as unknown as HydratedRecord,
-        );
-        if (!check(permix, rebacSchema, 'billingResource', hydratedExisting, 'delete')) {
-          throw makeError({ status: 403, message: 'Access denied' });
-        }
-        await db.billingResource.update({
-          where: { id: existing.id },
-          data: { deletedAt: new Date() },
-        });
       }
 
       return db.billingResource.create({

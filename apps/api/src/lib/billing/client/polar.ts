@@ -227,14 +227,8 @@ export const createPolarBillingClient = (config: PolarBillingConfig): BillingCli
     });
 
     const text = await response.text();
-    let parsed: unknown = null;
-    if (text.length > 0) {
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        parsed = text;
-      }
-    }
+    const isJson = response.headers.get('content-type')?.includes('json') ?? false;
+    const parsed = text.length === 0 ? null : isJson ? JSON.parse(text) : text;
 
     return { status: response.status, data: parsed as T };
   };
@@ -507,25 +501,30 @@ export const createPolarBillingClient = (config: PolarBillingConfig): BillingCli
         input.rawBody,
       );
 
-      let parsed: { type?: string; data?: Record<string, unknown> };
-      try {
-        parsed = JSON.parse(input.rawBody) as { type?: string; data?: Record<string, unknown> };
-      } catch {
-        throw makeError({ status: 400, message: 'Invalid JSON webhook body' });
-      }
-
+      const parsed = JSON.parse(input.rawBody) as {
+        type?: string;
+        data?: Record<string, unknown>;
+      };
+      const rawPayload = parsed as Record<string, unknown>;
       const rawEventType = parsed.type ?? 'unknown';
       const data = parsed.data ?? {};
 
       if (rawEventType === 'customer.state_changed') {
         const statePayload = data as unknown as PolarCustomerStatePayload;
         if (!statePayload.id) {
-          return { externalEventId: webhookId, rawEventType, occurredAt, kind: 'ignored' };
+          return {
+            externalEventId: webhookId,
+            rawEventType,
+            occurredAt,
+            rawPayload,
+            kind: 'ignored',
+          };
         }
         return {
           externalEventId: webhookId,
           rawEventType,
           occurredAt,
+          rawPayload,
           kind: 'accountStateChanged',
           accountId: statePayload.external_id ?? null,
           externalCustomerId: statePayload.id,
@@ -540,12 +539,19 @@ export const createPolarBillingClient = (config: PolarBillingConfig): BillingCli
         const sub = data as unknown as PolarSubscriptionPayload;
         const externalCustomerId = sub.customer_id ?? sub.customer?.id;
         if (!externalCustomerId || !sub.id) {
-          return { externalEventId: webhookId, rawEventType, occurredAt, kind: 'ignored' };
+          return {
+            externalEventId: webhookId,
+            rawEventType,
+            occurredAt,
+            rawPayload,
+            kind: 'ignored',
+          };
         }
         return {
           externalEventId: webhookId,
           rawEventType,
           occurredAt,
+          rawPayload,
           kind: 'accountStateChanged',
           accountId: sub.customer?.external_id ?? null,
           externalCustomerId,
@@ -560,12 +566,19 @@ export const createPolarBillingClient = (config: PolarBillingConfig): BillingCli
           undefined;
         const externalInvoiceId = data.id as string | undefined;
         if (!externalCustomerId || !externalInvoiceId) {
-          return { externalEventId: webhookId, rawEventType, occurredAt, kind: 'ignored' };
+          return {
+            externalEventId: webhookId,
+            rawEventType,
+            occurredAt,
+            rawPayload,
+            kind: 'ignored',
+          };
         }
         return {
           externalEventId: webhookId,
           rawEventType,
           occurredAt,
+          rawPayload,
           kind: 'paymentSucceeded',
           accountId:
             (data.customer as { external_id?: string | null } | undefined)?.external_id ?? null,
@@ -581,6 +594,7 @@ export const createPolarBillingClient = (config: PolarBillingConfig): BillingCli
         externalEventId: webhookId,
         rawEventType,
         occurredAt,
+        rawPayload,
         kind: 'ignored',
       };
     },

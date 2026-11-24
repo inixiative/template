@@ -110,18 +110,11 @@ billingWebhooksRouter.post('/:provider', async (c) => {
     headers: c.req.raw.headers,
   });
 
-  let rawPayload: Prisma.InputJsonValue = {};
-  try {
-    rawPayload = JSON.parse(rawBody) as Prisma.InputJsonValue;
-  } catch {
-    rawPayload = { rawBody };
-  }
-
   const claim = await claimWebhookEvent(
     provider,
     normalized.externalEventId,
     normalized.rawEventType,
-    rawPayload,
+    normalized.rawPayload as Prisma.InputJsonValue,
   );
   if (claim.action === 'alreadyHandled') return c.json({ status: 'ok' }, 200);
   if (claim.action === 'inFlight') return c.json({ status: 'retry' }, 503);

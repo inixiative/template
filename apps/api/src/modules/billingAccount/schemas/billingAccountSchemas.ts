@@ -58,17 +58,7 @@ export const billingAccountUpdateBodySchema = z.object({
   sharing: z.enum(BillingAccountSharing).optional(),
 });
 
-const httpUrlSchema = z.url().refine(
-  (value) => {
-    try {
-      const protocol = new URL(value).protocol;
-      return protocol === 'https:' || protocol === 'http:';
-    } catch {
-      return false;
-    }
-  },
-  { message: 'URL must use http or https protocol' },
-);
+const httpUrlSchema = z.url({ protocol: /^https?$/ });
 
 export const billingAccountSetupSessionBodySchema = z.object({
   successUrl: httpUrlSchema,
