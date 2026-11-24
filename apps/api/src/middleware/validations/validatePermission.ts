@@ -1,5 +1,5 @@
 import { hydrate } from '@template/db';
-import { type ActionRule, check, schemaMap } from '@template/permissions/rebac';
+import { type ActionRule, check } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 

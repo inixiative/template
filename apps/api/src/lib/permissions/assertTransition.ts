@@ -7,7 +7,7 @@
 import { checkTransition, describe, type Reason } from '@inixiative/transitions';
 import { type AccessorName, type HydratedRecord, hydrate, resourceOfModel } from '@template/db';
 import type { Permix } from '@template/permissions/client';
-import { check, schemaMap } from '@template/permissions/rebac';
+import { check } from '@template/permissions/rebac';
 import { transitions } from '@template/permissions/transitions';
 import { makeError } from '#/lib/errors';
 

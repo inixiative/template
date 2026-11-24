@@ -26,16 +26,14 @@ export type EntitlementFields = {
   sourcePath?: string | null;
 };
 
-const resourceOf = resourceOfModel;
-
 const modelOf = (resource: string): EntitlementResourceModel =>
   toModelName(accessorOfResource(resource)) as EntitlementResourceModel;
 
 /** A row as the library reads it: no path or where when the row has none, actions as a map. */
 export const toEntitlementEntry = (row: EntitlementFields): EntitlementEntry => ({
-  resource: resourceOf(row.resource),
+  resource: resourceOfModel(row.resource),
   anchor: {
-    resource: resourceOf(row.sourceModel),
+    resource: resourceOfModel(row.sourceModel),
     id: row.sourceId,
     ...(row.sourcePath ? { path: row.sourcePath } : {}),
   },

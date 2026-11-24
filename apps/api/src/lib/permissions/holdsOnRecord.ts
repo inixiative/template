@@ -6,7 +6,7 @@
  */
 import { type AccessorName, type HydratedRecord, hydrate } from '@template/db';
 import type { Permix } from '@template/permissions/client';
-import { type ActionRule, check, schemaMap } from '@template/permissions/rebac';
+import { type ActionRule, check } from '@template/permissions/rebac';
 
 export const holdsOnRecord = async (
   permix: Permix,

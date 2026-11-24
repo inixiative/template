@@ -13,7 +13,7 @@ import {
 } from '@template/db';
 import type { Setting } from '@template/db/generated/client/client';
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
-import { check, schemaMap } from '@template/permissions/rebac';
+import { check } from '@template/permissions/rebac';
 import { settingDefinitionsForResourceModel } from '@template/shared/settings';
 import type { Context } from 'hono';
 import type { SettingListQuery } from '#/modules/setting/schemas/settingSchemas';

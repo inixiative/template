@@ -73,9 +73,16 @@ export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) =>
     .record(z.string(), z.record(z.string(), z.unknown()))
     .superRefine((byResource, ctx) => {
       for (const [resource, rules] of Object.entries(byResource)) {
-        const hidden = Object.keys(rules).filter(
-          (action) => !actionsTenantMayExtend(tenantModel, resource).includes(action),
-        );
+        const extendable = actionsTenantMayExtend(tenantModel, resource);
+        if (!extendable.length) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [resource],
+            message: `not something a ${tenantModel} may extend`,
+          });
+          continue;
+        }
+        const hidden = Object.keys(rules).filter((action) => !extendable.includes(action));
         for (const action of hidden)
           ctx.addIssue({
             code: 'custom',
