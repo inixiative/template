@@ -6,12 +6,12 @@
  */
 import type { ArtifactPlacement } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions/client';
-import { withLockedArtifacts } from '#/modules/artifact/lib/artifactOwner';
+import { withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
 import {
   assertEdgeAuthority,
   fetchArtifact,
   writePlacement,
-} from '#/modules/artifact/lib/artifactPlacementHelpers';
+} from '#/modules/artifact/services/artifactPlacementHelpers';
 
 export type PlaceArtifactInput = {
   artifactId: string;

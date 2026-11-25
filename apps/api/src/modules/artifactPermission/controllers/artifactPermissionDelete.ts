@@ -9,8 +9,8 @@ import { check } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
-import { withLockedArtifactPermission } from '#/modules/artifactPermission/lib/withLockedArtifactPermission';
 import { artifactPermissionDeleteRoute } from '#/modules/artifactPermission/routes/artifactPermissionDelete';
+import { withLockedArtifactPermission } from '#/modules/artifactPermission/services/withLockedArtifactPermission';
 
 export const artifactPermissionDeleteController = makeController(
   artifactPermissionDeleteRoute,

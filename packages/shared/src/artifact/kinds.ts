@@ -7,45 +7,23 @@
 export const ARTIFACT_MAX_DEPTH = 50;
 export const ARTIFACT_MAX_CHILDREN = 500;
 
-export type ArtifactKindDef = {
-  contains: readonly string[];
-  defaultAccess: 'public' | 'tenant' | 'private';
-  contentModel?: 'File';
-  lazyCopy?: true;
-};
-
-export const ArtifactKinds = {
-  file: {
-    contains: [],
-    defaultAccess: 'private',
-    contentModel: 'File',
-    lazyCopy: true,
-  },
-  folder: {
-    contains: ['file', 'folder'],
-    defaultAccess: 'private',
-  },
+export const containerChildren = {
+  folder: ['file', 'folder'],
   // ==========================================================================
-  // TEMPLATE ABOVE — Add app-specific kinds below
+  // TEMPLATE ABOVE — Add app-specific container kinds below
   // ==========================================================================
-} satisfies Record<string, ArtifactKindDef>;
+} as const;
 
-export type ArtifactKind = keyof typeof ArtifactKinds;
+export type ArtifactKind = 'file' | 'folder';
 
-const kindDefs: Record<string, ArtifactKindDef> = ArtifactKinds;
+export const containerArtifactKinds: ArtifactKind[] = Object.keys(
+  containerChildren,
+) as ArtifactKind[];
 
-export const artifactKindDef = (kind: string): ArtifactKindDef | null => kindDefs[kind] ?? null;
+export const plainArtifactKinds: ArtifactKind[] = ['folder'];
 
-export const isContainerKind = (kind: string): boolean =>
-  (artifactKindDef(kind)?.contains.length ?? 0) > 0;
-
-export const containerArtifactKinds = (Object.keys(kindDefs) as ArtifactKind[]).filter(
-  isContainerKind,
-);
-
-export const plainArtifactKinds = (Object.keys(kindDefs) as ArtifactKind[]).filter(
-  (kind) => !kindDefs[kind]!.contentModel,
-);
+export const isContainerKind = (kind: string): boolean => kind in containerChildren;
 
 export const canContain = (containerKind: string, childKind: string): boolean =>
-  artifactKindDef(containerKind)?.contains.includes(childKind) ?? false;
+  (containerChildren as Record<string, readonly string[]>)[containerKind]?.includes(childKind) ??
+  false;

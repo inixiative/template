@@ -12,7 +12,7 @@ import {
   filterReadableArtifactPlacements,
   includeArtifactPlacementList,
   ownerArtifactPlacementsWhere,
-} from '#/modules/artifactPlacement/lib/ownerArtifactPlacementsQuery';
+} from '#/modules/artifactPlacement/queries/ownerArtifactPlacementsQuery';
 import { meReadManyArtifactPlacementsRoute } from '#/modules/me/routes/meReadManyArtifactPlacements';
 
 export const meReadManyArtifactPlacementsController = makeController(

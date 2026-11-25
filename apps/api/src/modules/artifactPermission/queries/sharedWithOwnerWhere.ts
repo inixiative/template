@@ -9,7 +9,7 @@ import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import type { OwnerRef } from '#/modules/artifact/lib/artifactOwner';
+import type { OwnerRef } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
 const granteeRecordForOwner = (owner: OwnerRef): Record<string, unknown> => ({

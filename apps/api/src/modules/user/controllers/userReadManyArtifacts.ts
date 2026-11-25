@@ -12,7 +12,7 @@ import {
   includeArtifactList,
   ownerArtifactsWhere,
   shapeReadableArtifacts,
-} from '#/modules/artifact/lib/ownerArtifactsQuery';
+} from '#/modules/artifact/queries/ownerArtifactsQuery';
 import { userReadManyArtifactsRoute } from '#/modules/user/routes/userReadManyArtifacts';
 
 export const userReadManyArtifactsController = makeController(

@@ -7,18 +7,17 @@
 import { db } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions/client';
-import { artifactKindDef } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
 import {
   type OwnedArtifact,
   ownerColumns,
   withLockedArtifacts,
-} from '#/modules/artifact/lib/artifactOwner';
-import { insertArtifact } from '#/modules/artifact/lib/artifactPlacementHelpers';
+} from '#/modules/artifact/services/artifactOwner';
+import { insertArtifact } from '#/modules/artifact/services/artifactPlacementHelpers';
 import {
   assertArtifactPermission,
   canActOnArtifact,
-} from '#/modules/artifact/lib/checkArtifactPermission';
+} from '#/modules/artifact/services/checkArtifactPermission';
 
 export type CopyArtifactInput = {
   artifactId: string;
@@ -38,7 +37,7 @@ export const copyArtifactInto = async (
     access: containerArtifactId ? 'inherit' : 'private',
     containerArtifactId,
   });
-  if (artifactKindDef(source.kind)?.contentModel === 'File') {
+  if (source.kind === 'file') {
     const file = await db.file.findUnique({
       where: { artifactId: source.id },
       include: { versions: { where: { status: 'active' } } },

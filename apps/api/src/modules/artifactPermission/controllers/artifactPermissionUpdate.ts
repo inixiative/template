@@ -8,8 +8,8 @@ import { check } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
-import { withLockedArtifactPermission } from '#/modules/artifactPermission/lib/withLockedArtifactPermission';
 import { artifactPermissionUpdateRoute } from '#/modules/artifactPermission/routes/artifactPermissionUpdate';
+import { withLockedArtifactPermission } from '#/modules/artifactPermission/services/withLockedArtifactPermission';
 
 export const artifactPermissionUpdateController = makeController(
   artifactPermissionUpdateRoute,

@@ -21,7 +21,7 @@ import {
   ownerColumns,
   sameArtifactOwner,
   withArtifactOwnersLock,
-} from '#/modules/artifact/lib/artifactOwner';
+} from '#/modules/artifact/services/artifactOwner';
 import { copyArtifactInto } from '#/modules/artifact/services/copyArtifact';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
 import { openInquiryWhere } from '#/modules/inquiry/validations/validateInquiryStatus';

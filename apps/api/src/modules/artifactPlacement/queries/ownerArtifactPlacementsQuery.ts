@@ -12,11 +12,11 @@ import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import { type OwnerRef, ownerColumns } from '#/modules/artifact/lib/artifactOwner';
 import {
   readableAnyArtifactWhere,
   readableArtifactWhereForOwner,
-} from '#/modules/artifact/lib/readableArtifactWhere';
+} from '#/modules/artifact/queries/readableArtifactWhere';
+import { type OwnerRef, ownerColumns } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
 export type PlacementWithArtifacts = ArtifactPlacement & {

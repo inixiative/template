@@ -11,12 +11,12 @@ import {
   type OwnedArtifact,
   ownerColumns,
   withArtifactOwnersLock,
-} from '#/modules/artifact/lib/artifactOwner';
+} from '#/modules/artifact/services/artifactOwner';
 import {
   type CreateArtifactInput,
   insertArtifact,
-} from '#/modules/artifact/lib/artifactPlacementHelpers';
-import { assertArtifactPermission } from '#/modules/artifact/lib/checkArtifactPermission';
+} from '#/modules/artifact/services/artifactPlacementHelpers';
+import { assertArtifactPermission } from '#/modules/artifact/services/checkArtifactPermission';
 
 export type { CreateArtifactInput };
 

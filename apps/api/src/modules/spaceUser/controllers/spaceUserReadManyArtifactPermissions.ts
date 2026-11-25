@@ -11,7 +11,7 @@ import {
   assertCanReadSharedArtifactPermissions,
   defaultSharedPermissionOrderBy,
   sharedWithOwnerWhere,
-} from '#/modules/artifactPermission/lib/sharedWithOwnerWhere';
+} from '#/modules/artifactPermission/queries/sharedWithOwnerWhere';
 import { spaceUserReadManyArtifactPermissionsRoute } from '#/modules/spaceUser/routes/spaceUserReadManyArtifactPermissions';
 
 export const spaceUserReadManyArtifactPermissionsController = makeController(

@@ -1,0 +1,37 @@
+model ArtifactPlacement {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  ownerModel     ArtifactOwnerModel
+  userId         String?            @db.VarChar(36)
+  organizationId String?            @db.VarChar(36)
+  spaceId        String?            @db.VarChar(36)
+
+  user             User?             @relation("ArtifactPlacementOwnerUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization?     @relation("ArtifactPlacementOwnerOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationUser OrganizationUser? @relation("ArtifactPlacementOwnerOrganizationUser", fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  space            Space?            @relation("ArtifactPlacementOwnerSpace", fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
+  spaceUser        SpaceUser?        @relation("ArtifactPlacementOwnerSpaceUser", fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+
+  containerArtifactId String?   @db.VarChar(36)
+  artifactId          String    @db.VarChar(36)
+  containerArtifact   Artifact? @relation("ArtifactPlacementContainer", fields: [containerArtifactId], references: [id], onDelete: Cascade)
+  artifact            Artifact  @relation("ArtifactPlacementArtifact", fields: [artifactId], references: [id], onDelete: Cascade)
+
+  auditLogs AuditLog[]
+
+  @@unique([containerArtifactId, artifactId], where: raw("\"deletedAt\" IS NULL"), map: "ArtifactPlacement_edge_key")
+  @@unique([artifactId, userId], where: raw("\"containerArtifactId\" IS NULL AND \"ownerModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "ArtifactPlacement_root_user_key")
+  @@unique([artifactId, organizationId], where: raw("\"containerArtifactId\" IS NULL AND \"ownerModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "ArtifactPlacement_root_organization_key")
+  @@unique([artifactId, spaceId], where: raw("\"containerArtifactId\" IS NULL AND \"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "ArtifactPlacement_root_space_key")
+  @@unique([artifactId, organizationId, userId], where: raw("\"containerArtifactId\" IS NULL AND \"ownerModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPlacement_root_organization_user_key")
+  @@unique([artifactId, spaceId, userId], where: raw("\"containerArtifactId\" IS NULL AND \"ownerModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPlacement_root_space_user_key")
+  @@index([ownerModel])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([containerArtifactId])
+  @@index([artifactId])
+}

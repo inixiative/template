@@ -14,8 +14,8 @@ import {
   ownerColumns,
   sameArtifactOwner,
   withArtifactOwnersLock,
-} from '#/modules/artifact/lib/artifactOwner';
-import { fetchArtifact } from '#/modules/artifact/lib/artifactPlacementHelpers';
+} from '#/modules/artifact/services/artifactOwner';
+import { fetchArtifact } from '#/modules/artifact/services/artifactPlacementHelpers';
 
 const assertRootPlacementCreate = async (
   permix: Permix,

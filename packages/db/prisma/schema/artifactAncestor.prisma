@@ -1,0 +1,15 @@
+model ArtifactAncestor {
+  id                 String  @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  artifactId         String  @db.VarChar(36)
+  ancestorArtifactId String  @db.VarChar(36)
+  inherits           Boolean
+  inheritsAccess     Boolean
+  depth              Int
+
+  artifact         Artifact @relation("ArtifactAncestorDescendant", fields: [artifactId], references: [id], onDelete: Cascade)
+  ancestorArtifact Artifact @relation("ArtifactAncestorAncestor", fields: [ancestorArtifactId], references: [id], onDelete: Cascade)
+
+  @@unique([artifactId, ancestorArtifactId], map: "ArtifactAncestor_pair_key")
+  @@index([ancestorArtifactId, inherits])
+  @@index([ancestorArtifactId, inheritsAccess])
+}

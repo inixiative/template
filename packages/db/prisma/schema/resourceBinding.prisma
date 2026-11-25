@@ -1,0 +1,45 @@
+model ResourceBinding {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  sourceModel      ResourceBindingSourceModel
+  sourceArtifactId String?                    @db.VarChar(36)
+  sourceArtifact   Artifact?                  @relation(fields: [sourceArtifactId], references: [id])
+  url              String?
+
+  resourceModel                  ResourceBindingResourceModel
+  resourceOrganizationId         String?                      @db.VarChar(36)
+  resourceSpaceId                String?                      @db.VarChar(36)
+  resourceUserId                 String?                      @db.VarChar(36)
+  resourceCustomerRelationshipId String?                      @db.VarChar(36)
+
+  resourceOrganization         Organization?         @relation("ResourceBindingOrganization", fields: [resourceOrganizationId], references: [id], onDelete: Cascade)
+  resourceSpace                Space?                @relation("ResourceBindingSpace", fields: [resourceSpaceId], references: [id], onDelete: Cascade)
+  resourceUser                 User?                 @relation("ResourceBindingUser", fields: [resourceUserId], references: [id], onDelete: Cascade)
+  resourceCustomerRelationship CustomerRelationship? @relation("ResourceBindingCustomerRelationship", fields: [resourceCustomerRelationshipId], references: [id], onDelete: Cascade)
+
+  bindingType String
+  order       Int    @default(0)
+  media       Json?
+  conditions  Json?
+
+  @@index([resourceModel, resourceOrganizationId, bindingType])
+  @@index([resourceModel, resourceSpaceId, bindingType])
+  @@index([resourceModel, resourceUserId, bindingType])
+  @@index([resourceModel, resourceCustomerRelationshipId, bindingType])
+  @@index([sourceArtifactId])
+}
+
+enum ResourceBindingSourceModel {
+  Artifact
+  url
+}
+
+enum ResourceBindingResourceModel {
+  Organization
+  Space
+  User
+  CustomerRelationship
+}

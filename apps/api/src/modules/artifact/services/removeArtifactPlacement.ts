@@ -9,11 +9,14 @@ import type { ArtifactPlacement } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
-import { withArtifactOwnersLock, withLockedArtifacts } from '#/modules/artifact/lib/artifactOwner';
+import {
+  withArtifactOwnersLock,
+  withLockedArtifacts,
+} from '#/modules/artifact/services/artifactOwner';
 import {
   assertEdgeAuthority,
   fetchArtifact,
-} from '#/modules/artifact/lib/artifactPlacementHelpers';
+} from '#/modules/artifact/services/artifactPlacementHelpers';
 
 export const removeArtifactPlacement = async (
   permix: Permix,

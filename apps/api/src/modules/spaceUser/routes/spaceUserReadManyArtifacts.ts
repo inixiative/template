@@ -5,7 +5,6 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { readRoute } from '#/lib/routeTemplates';
-import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import {
   artifactListFilterLens,
   artifactWithPermissionsSchema,
@@ -18,8 +17,7 @@ export const spaceUserReadManyArtifactsRoute = readRoute({
   many: true,
   paginate: true,
   filterLens: artifactListFilterLens,
-  middleware: [validateSubmodelPermission('read')],
   description:
-    "Lists a member's artifacts inside a space (defaults to root artifacts when no search/filter is passed).",
+    "Lists a member's artifacts inside a space (defaults to root artifacts when no search/filter is passed) that the caller can read (public, tenant, granted, or all for the member/space owner).",
   responseSchema: artifactWithPermissionsSchema,
 });

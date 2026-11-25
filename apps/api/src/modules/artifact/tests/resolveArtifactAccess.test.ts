@@ -23,7 +23,7 @@ import {
   effectiveArtifactAccess,
   hydrateArtifact,
   isArtifactPublic,
-} from '#/modules/artifact/lib/checkArtifactPermission';
+} from '#/modules/artifact/services/checkArtifactPermission';
 
 const folderOf = async (
   organization: Organization,

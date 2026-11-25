@@ -15,13 +15,13 @@ import {
 } from '@template/db';
 import { keyBy } from 'lodash-es';
 import {
-  invalidateInheritingDescendants,
-  syncArtifactPermissionEffective,
-  syncArtifactSubgraph,
-} from '#/hooks/artifactTree/syncArtifactTree';
+  clearDescendantCaches,
+  syncArtifactAncestors,
+} from '#/hooks/artifactTree/syncArtifactAncestors';
+import { syncPermissionDescendants } from '#/hooks/artifactTree/syncPermissionDescendants';
 import { ALL_MUTATION_ACTIONS, isManyAction } from '#/hooks/shared/hookRows';
 import { makeError } from '#/lib/errors';
-import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
+import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 
 type Row = Record<string, unknown> & { id?: string };
 
@@ -100,7 +100,7 @@ export const registerArtifactTreeHook = () => {
         if (typeof previous?.artifactId === 'string') ids.push(previous.artifactId);
         return ids;
       });
-      await syncArtifactSubgraph(artifactIds);
+      await syncArtifactAncestors(artifactIds);
     },
   );
 
@@ -114,7 +114,7 @@ export const registerArtifactTreeHook = () => {
         const id = result?.id ?? previous?.id;
         return typeof id === 'string' ? [id] : [];
       });
-      await syncArtifactPermissionEffective(permissionIds);
+      await syncPermissionDescendants(permissionIds);
     },
   );
 
@@ -125,14 +125,14 @@ export const registerArtifactTreeHook = () => {
     [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
     async (options: HookOptions) => {
       const pairs = changedPairs(options);
-      const subgraphIds: string[] = [];
+      const ancestorSyncIds: string[] = [];
       const visibilityChangedIds: string[] = [];
       for (const { result, previous } of pairs) {
         if (!result || typeof result.id !== 'string') continue;
         const { id } = result;
         const accessChanged = Boolean(previous && result.access !== previous.access);
         const revived = previous?.deletedAt != null && result.deletedAt == null;
-        if (accessChanged || revived) subgraphIds.push(id);
+        if (accessChanged || revived) ancestorSyncIds.push(id);
         const visibilityChanged =
           accessChanged &&
           (result.access === 'public' ||
@@ -141,8 +141,8 @@ export const registerArtifactTreeHook = () => {
             previous?.access === 'tenant');
         if (visibilityChanged) visibilityChangedIds.push(id);
       }
-      await syncArtifactSubgraph(subgraphIds);
-      await invalidateInheritingDescendants(visibilityChangedIds);
+      await syncArtifactAncestors(ancestorSyncIds);
+      await clearDescendantCaches(visibilityChangedIds);
     },
   );
 };

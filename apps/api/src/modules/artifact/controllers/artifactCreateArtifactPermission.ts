@@ -9,9 +9,9 @@ import { check } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
-import { withLockedArtifacts } from '#/modules/artifact/lib/artifactOwner';
-import { hydrateArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactCreateArtifactPermissionRoute } from '#/modules/artifact/routes/artifactCreateArtifactPermission';
+import { withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
+import { hydrateArtifact } from '#/modules/artifact/services/checkArtifactPermission';
 
 export const artifactCreateArtifactPermissionController = makeController(
   artifactCreateArtifactPermissionRoute,

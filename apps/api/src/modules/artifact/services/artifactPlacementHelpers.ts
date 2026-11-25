@@ -11,7 +11,6 @@ import type { Permix } from '@template/permissions/client';
 import {
   ARTIFACT_MAX_CHILDREN,
   ARTIFACT_MAX_DEPTH,
-  artifactKindDef,
   canContain,
   containerArtifactKinds,
   isContainerKind,
@@ -21,8 +20,8 @@ import {
   lockArtifactsInTxn,
   ownerColumns,
   sameArtifactOwner,
-} from '#/modules/artifact/lib/artifactOwner';
-import { canActOnArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
+} from '#/modules/artifact/services/artifactOwner';
+import { canActOnArtifact } from '#/modules/artifact/services/checkArtifactPermission';
 
 export type CreateArtifactInput = Omit<Prisma.ArtifactUncheckedCreateInput, 'access'> & {
   access?: ArtifactAccess;
@@ -122,7 +121,7 @@ export const writePlacement = async (
     if (inherit === false && member.access === 'inherit' && !placed) {
       await db.artifact.update({
         where: { id: member.id },
-        data: { access: artifactKindDef(member.kind)?.defaultAccess ?? 'private' },
+        data: { access: 'private' },
       });
     } else if ((inherit ?? !placed) && member.access !== 'inherit') {
       await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
@@ -155,9 +154,6 @@ export const insertArtifact = async (
   permix?: Permix,
   prelockedContainer?: Artifact,
 ): Promise<Artifact> => {
-  const kind = artifactKindDef(data.kind);
-  if (!kind) throw makeError({ status: 422, message: `Unknown artifact kind: ${data.kind}` });
-
   const candidateOwner = ownerColumns(data);
   let container: Artifact | null = null;
   if (containerArtifactId) {
@@ -176,7 +172,7 @@ export const insertArtifact = async (
   }
 
   const sameOwner = container ? sameArtifactOwner(container, candidateOwner) : false;
-  const resolvedAccess = access ?? (sameOwner ? 'inherit' : kind.defaultAccess);
+  const resolvedAccess = access ?? (sameOwner ? 'inherit' : 'private');
   const artifact = await db.artifact.create({
     data: { ...data, access: resolvedAccess },
   });

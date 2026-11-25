@@ -10,9 +10,9 @@ import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
-import { type OwnerRef, ownerColumns } from '#/modules/artifact/lib/artifactOwner';
-import { hydrateArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
-import { readableArtifactWhereForOwner } from '#/modules/artifact/lib/readableArtifactWhere';
+import { readableArtifactWhereForOwner } from '#/modules/artifact/queries/readableArtifactWhere';
+import { type OwnerRef, ownerColumns } from '#/modules/artifact/services/artifactOwner';
+import { hydrateArtifact } from '#/modules/artifact/services/checkArtifactPermission';
 import type { AppEnv } from '#/types/appEnv';
 
 export type ArtifactWithPermissions = Artifact & { permissions: ArtifactPermission[] };

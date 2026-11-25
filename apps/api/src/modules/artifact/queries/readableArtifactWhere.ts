@@ -8,7 +8,7 @@ import type { Prisma } from '@template/db';
 import type { Action, Permix } from '@template/permissions/client';
 import type { Context } from 'hono';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import { type OwnerRef, ownerColumns } from '#/modules/artifact/lib/artifactOwner';
+import { type OwnerRef, ownerColumns } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
 const visibilityWhere = (access: 'public' | 'tenant'): Prisma.ArtifactWhereInput[] => [

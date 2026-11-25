@@ -7,9 +7,9 @@
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
-import { withLockedArtifacts } from '#/modules/artifact/lib/artifactOwner';
-import { canActOnArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactUpdateRoute } from '#/modules/artifact/routes/artifactUpdate';
+import { withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
+import { canActOnArtifact } from '#/modules/artifact/services/checkArtifactPermission';
 
 export const artifactUpdateController = makeController(artifactUpdateRoute, async (c, respond) => {
   const db = c.get('db');

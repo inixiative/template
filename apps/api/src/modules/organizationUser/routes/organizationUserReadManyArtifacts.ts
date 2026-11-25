@@ -5,7 +5,6 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { readRoute } from '#/lib/routeTemplates';
-import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import {
   artifactListFilterLens,
   artifactWithPermissionsSchema,
@@ -18,8 +17,7 @@ export const organizationUserReadManyArtifactsRoute = readRoute({
   many: true,
   paginate: true,
   filterLens: artifactListFilterLens,
-  middleware: [validateSubmodelPermission('read')],
   description:
-    "Lists a member's artifacts inside an organization (defaults to root artifacts when no search/filter is passed).",
+    "Lists a member's artifacts inside an organization (defaults to root artifacts when no search/filter is passed) that the caller can read (public, tenant, granted, or all for the member/org owner).",
   responseSchema: artifactWithPermissionsSchema,
 });

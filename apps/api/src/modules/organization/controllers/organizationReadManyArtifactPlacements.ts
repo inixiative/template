@@ -12,7 +12,7 @@ import {
   filterReadableArtifactPlacements,
   includeArtifactPlacementList,
   ownerArtifactPlacementsWhere,
-} from '#/modules/artifactPlacement/lib/ownerArtifactPlacementsQuery';
+} from '#/modules/artifactPlacement/queries/ownerArtifactPlacementsQuery';
 import { organizationReadManyArtifactPlacementsRoute } from '#/modules/organization/routes/organizationReadManyArtifactPlacements';
 
 export const organizationReadManyArtifactPlacementsController = makeController(

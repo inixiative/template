@@ -127,9 +127,10 @@ describe('artifact lifecycle', () => {
       expect(
         (await ownerFetch(patch(`/api/v1/artifact/${note.id}`, { name: 'nope' }))).status,
       ).toBe(403);
-      expect(
-        (await adminFetch(get(`/api/v1/organizationUser/${memberSeat.id}/artifacts`))).status,
-      ).toBe(403);
+      const adminListPrivate = await parseSuccessBody<Artifact[]>(
+        await adminFetch(get(`/api/v1/organizationUser/${memberSeat.id}/artifacts`)),
+      );
+      expect(adminListPrivate.data.map((artifact) => artifact.id)).not.toContain(note.id);
       const memberRoots = await parseSuccessBody<Artifact[]>(
         await memberFetch(get(`/api/v1/organizationUser/${memberSeat.id}/artifacts`)),
       );
@@ -139,6 +140,16 @@ describe('artifact lifecycle', () => {
       );
       expect(orgRoots.data.map((artifact) => artifact.id)).not.toContain(note.id);
       expect((await ownerFetch(del(`/api/v1/artifact/${note.id}`))).status).toBe(204);
+    });
+
+    it('flipping a member artifact to tenant makes it visible to coworkers on GET /organizationUser/:id/artifacts', async () => {
+      expect(
+        (await memberFetch(patch(`/api/v1/artifact/${note.id}`, { access: 'tenant' }))).status,
+      ).toBe(200);
+      const adminListTenant = await parseSuccessBody<Artifact[]>(
+        await adminFetch(get(`/api/v1/organizationUser/${memberSeat.id}/artifacts`)),
+      );
+      expect(adminListTenant.data.map((artifact) => artifact.id)).toContain(note.id);
     });
 
     it('an explicit grant opens it to an admin', async () => {

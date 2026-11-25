@@ -8,14 +8,14 @@ import { db } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions/client';
 import { makeError } from '#/lib/errors';
-import { sameArtifactOwner, withLockedArtifacts } from '#/modules/artifact/lib/artifactOwner';
+import { sameArtifactOwner, withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
 import {
   assertEdgeAuthority,
   fetchArtifact,
   removePlacement,
   writePlacement,
-} from '#/modules/artifact/lib/artifactPlacementHelpers';
-import { canActOnArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
+} from '#/modules/artifact/services/artifactPlacementHelpers';
+import { canActOnArtifact } from '#/modules/artifact/services/checkArtifactPermission';
 
 export type MoveArtifactInput = {
   artifactId: string;

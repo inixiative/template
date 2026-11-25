@@ -11,7 +11,7 @@ import {
   assertCanReadSharedArtifactPermissions,
   defaultSharedPermissionOrderBy,
   sharedWithOwnerWhere,
-} from '#/modules/artifactPermission/lib/sharedWithOwnerWhere';
+} from '#/modules/artifactPermission/queries/sharedWithOwnerWhere';
 import { organizationUserReadManyArtifactPermissionsRoute } from '#/modules/organizationUser/routes/organizationUserReadManyArtifactPermissions';
 
 export const organizationUserReadManyArtifactPermissionsController = makeController(
