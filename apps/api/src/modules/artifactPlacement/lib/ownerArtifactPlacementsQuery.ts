@@ -1,42 +1,43 @@
 /**
  * @atlas
- * @kind service
+ * @kind query
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
 import type { Prisma } from '@template/db';
-import { db, hydrate } from '@template/db';
+import { hydrate } from '@template/db';
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
 import { check } from '@template/permissions/rebac';
+import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import { paginate } from '#/lib/prisma/paginate';
-import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 import { type OwnerRef, ownerColumns } from '#/modules/artifact/lib/artifactOwner';
 import {
   readableAnyArtifactWhere,
   readableArtifactWhereForOwner,
 } from '#/modules/artifact/lib/readableArtifactWhere';
+import type { AppEnv } from '#/types/appEnv';
 
-type PlacementWithArtifacts = ArtifactPlacement & {
+export type PlacementWithArtifacts = ArtifactPlacement & {
   artifact: Artifact;
   containerArtifact: Artifact | null;
 };
 
-export const paginateOwnerArtifactPlacements = async (
-  c: ValidatedContext<
-    'query',
-    {
-      page?: number;
-      pageSize?: number;
-      search?: string;
-      searchFields?: BracketQueryRecord;
-      orderBy?: string[];
-    }
-  >,
+export const includeArtifactPlacementList = {
+  artifact: true,
+  containerArtifact: true,
+} satisfies Prisma.ArtifactPlacementInclude;
+
+export const defaultArtifactPlacementOrderBy = (
+  c: ValidatedContext<'query', { orderBy?: string[] }>,
+): Prisma.ArtifactPlacementOrderByWithRelationInput | undefined =>
+  validatedQuery(c).orderBy?.length ? undefined : { createdAt: 'desc' };
+
+export const ownerArtifactPlacementsWhere = async (
+  c: Context<AppEnv>,
   owner: OwnerRef,
-) => {
+): Promise<Prisma.ArtifactPlacementWhereInput> => {
   const permix = c.get('permix');
   const ownerFields = ownerColumns(owner);
 
@@ -59,11 +60,7 @@ export const paginateOwnerArtifactPlacements = async (
     token.role === null &&
     permix.entitlements('db:ArtifactPlacement', 'read').length === 0
   ) {
-    const { page = 1, pageSize = 20 } = validatedQuery(c);
-    return {
-      data: [] as PlacementWithArtifacts[],
-      pagination: { page, pageSize, total: 0, totalPages: 0 },
-    };
+    return { id: { in: [] } };
   }
 
   const [anyArtifactWhere, ownerContainerWhere] = await Promise.all([
@@ -78,31 +75,25 @@ export const paginateOwnerArtifactPlacements = async (
     ? { AND: [{ deletedAt: null }, ownerContainerWhere] }
     : { deletedAt: null };
 
-  const where: Prisma.ArtifactPlacementWhereInput = {
+  return {
     AND: [
       { deletedAt: null, ...ownerFields },
       { artifact: artifactWhere },
       { OR: [{ containerArtifactId: null }, { containerArtifact: containerWhere }] },
     ],
   };
+};
 
-  const hasOrderBy = Boolean(validatedQuery(c).orderBy?.length);
-  const result = await paginate(c, db.artifactPlacement, {
-    where,
-    include: { artifact: true, containerArtifact: true },
-    ...(hasOrderBy ? {} : { orderBy: { createdAt: 'desc' } }),
-  });
-
-  const rows = result.data as PlacementWithArtifacts[];
+export const filterReadableArtifactPlacements = async (
+  c: Context<AppEnv>,
+  rows: PlacementWithArtifacts[],
+): Promise<PlacementWithArtifacts[]> => {
+  const permix = c.get('permix');
   const checked = await Promise.all(
     rows.map(async (row) => {
       const hydrated = await hydrate('artifactPlacement', row);
       return check(permix, 'artifactPlacement', hydrated, 'read');
     }),
   );
-
-  return {
-    data: rows.filter((_, index) => checked[index]),
-    pagination: result.pagination,
-  };
+  return rows.filter((_, index) => checked[index]);
 };

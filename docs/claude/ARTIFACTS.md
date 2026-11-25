@@ -160,7 +160,7 @@ No frontend is built yet (`tickets/FEAT-032-file-browser-ui.md`).
 | ReBAC rules | `packages/permissions/src/rebac/artifactResourcePermission.ts`, `apps/api/src/modules/artifact/lib/checkArtifactPermission.ts` |
 | Materialized tree | `apps/api/src/hooks/artifactTree/hook.ts`, `syncArtifactTree.ts` |
 | Placements & creation | `apps/api/src/modules/artifact/services/{createArtifact,placeArtifact,placeArtifactAtRoot,moveArtifact,copyArtifact,removeArtifactPlacement}.ts`, `lib/artifactPlacementHelpers.ts` |
-| Navigation & shared | `apps/api/src/modules/artifact/queries/artifactIncludes.ts`, `controllers/artifactRead.ts`, `lib/readableArtifactWhere.ts`, `services/paginateOwnerArtifacts.ts`, `apps/api/src/modules/artifactPermission/lib/sharedWithOwnerWhere.ts`, `apps/api/src/modules/artifactPlacement/lib/paginateOwnerArtifactPlacements.ts` |
+| Navigation & shared | `apps/api/src/modules/artifact/queries/artifactIncludes.ts`, `controllers/artifactRead.ts`, `lib/readableArtifactWhere.ts`, `lib/ownerArtifactsQuery.ts`, `apps/api/src/modules/artifactPermission/lib/sharedWithOwnerWhere.ts`, `apps/api/src/modules/artifactPlacement/lib/ownerArtifactPlacementsQuery.ts` |
 | Ownership | `apps/api/src/modules/inquiry/services/transferArtifact/` |
 | Deleting | `apps/api/src/modules/artifact/controllers/artifactDelete.ts` |
 | Routes | `apps/api/src/modules/{artifact,artifactPlacement,artifactPermission}/`, `{me,organization,space,organizationUser,spaceUser}{Create,ReadMany}Artifact`, `userReadManyArtifacts`, `{me,organization,space,organizationUser,spaceUser}ReadManyArtifactPermissions`, `{me,organization,space,organizationUser,spaceUser}{Create,ReadMany}ArtifactPlacement` |

@@ -1,17 +1,16 @@
 /**
  * @atlas
- * @kind utils
+ * @kind query
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
 import type { Prisma } from '@template/db';
-import { db } from '@template/db';
+import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import { paginate } from '#/lib/prisma/paginate';
-import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 import type { OwnerRef } from '#/modules/artifact/lib/artifactOwner';
+import type { AppEnv } from '#/types/appEnv';
 
 const granteeRecordForOwner = (owner: OwnerRef): Record<string, unknown> => ({
   id: '',
@@ -21,6 +20,24 @@ const granteeRecordForOwner = (owner: OwnerRef): Record<string, unknown> => ({
   granteeSpaceId: owner.spaceId ?? null,
   granteeCustomerRelationshipId: null,
 });
+
+export const defaultSharedPermissionOrderBy = (
+  c: ValidatedContext<'query', { orderBy?: string[] }>,
+): Prisma.ArtifactPermissionOrderByWithRelationInput | undefined =>
+  validatedQuery(c).orderBy?.length ? undefined : { createdAt: 'desc' };
+
+export const assertCanReadSharedArtifactPermissions = async (
+  c: Context<AppEnv>,
+  owner: OwnerRef,
+): Promise<void> => {
+  const allowed = await holdsOnRecord(
+    c.get('permix'),
+    'artifactPermission',
+    granteeRecordForOwner(owner),
+    'read',
+  );
+  if (!allowed) throw makeError({ status: 403, message: 'Forbidden' });
+};
 
 export const sharedWithOwnerWhere = (owner: OwnerRef): Prisma.ArtifactPermissionWhereInput => {
   const now = new Date();
@@ -82,35 +99,4 @@ export const sharedWithOwnerWhere = (owner: OwnerRef): Prisma.ArtifactPermission
       { artifact: { deletedAt: null } },
     ],
   };
-};
-
-export const paginateSharedArtifactPermissions = async (
-  c: ValidatedContext<
-    'query',
-    {
-      page?: number;
-      pageSize?: number;
-      search?: string;
-      searchFields?: BracketQueryRecord;
-      orderBy?: string[];
-    }
-  >,
-  owner: OwnerRef,
-) => {
-  if (
-    !(await holdsOnRecord(
-      c.get('permix'),
-      'artifactPermission',
-      granteeRecordForOwner(owner),
-      'read',
-    ))
-  ) {
-    throw makeError({ status: 403, message: 'Forbidden' });
-  }
-  const hasOrderBy = Boolean(validatedQuery(c).orderBy?.length);
-  return paginate(c, db.artifactPermission, {
-    where: sharedWithOwnerWhere(owner),
-    include: { artifact: true },
-    ...(hasOrderBy ? {} : { orderBy: { createdAt: 'desc' } }),
-  });
 };

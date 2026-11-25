@@ -20,9 +20,11 @@ import type {
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac';
+import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
 import { pick } from 'lodash-es';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
+import { sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
 import {
   artifactEffectiveRole,
   effectiveArtifactAccess,
@@ -82,8 +84,19 @@ const accessForNeighbor = async (permix: Permix, neighbor: Artifact) => {
   };
 };
 
+const ARTIFACT_READ_IMPLYING_ACTIONS = ['read', 'operate', 'manage', 'own'] as const;
+
+const hasCustomArtifactRules = (permix: Permix, hydrated: HydratedRecord): boolean =>
+  tenantPermissionRulesAbove('db:Artifact', hydrated).some(
+    (rules) => Boolean(rules) && Object.keys(rules!).length > 0,
+  ) ||
+  ARTIFACT_READ_IMPLYING_ACTIONS.some(
+    (action) => permix.entitlements('db:Artifact', action).length > 0,
+  );
+
 export const artifactReadController = makeController(artifactReadRoute, async (c, respond) => {
   const permix = c.get('permix');
+  const isAnonymous = !c.get('user') && !c.get('token');
   const {
     placements: rawPlacements,
     contents: rawContents,
@@ -100,18 +113,48 @@ export const artifactReadController = makeController(artifactReadRoute, async (c
     } => placement.containerArtifact !== null,
   );
 
-  const [hydrated, parentAccess, childAccess, bindingFlags] = await Promise.all([
-    hydrateArtifact(scalarArtifact),
+  const hydrated = await hydrateArtifact(scalarArtifact);
+  const canManage = check(permix, 'artifact', hydrated, 'manage');
+  const parentRole = artifactEffectiveRole(permix, hydrated);
+  const parentEffectiveAccess = effectiveArtifactAccess(hydrated);
+  const canShortCircuit = !hasCustomArtifactRules(permix, hydrated);
+
+  // why: same-owner non-private children inherit this container's permissions monotonically,
+  // avoiding N individual hydrateArtifact calls when the parent already decides the child.
+  const accessForChild = async (child: (typeof rawContents)[number]['artifact']) => {
+    if (child.deletedAt !== null) return { canRead: false, canManage: false };
+    if (canShortCircuit && sameArtifactOwner(child, scalarArtifact)) {
+      if (isAnonymous) {
+        if (child.access === 'public') return { canRead: true, canManage: false };
+        if (child.access === 'inherit' && parentEffectiveAccess === 'public') {
+          return { canRead: true, canManage: false };
+        }
+        if (child.access !== 'inherit' || child.placements.length === 1) {
+          return { canRead: false, canManage: false };
+        }
+      } else if (child.access !== 'private') {
+        if (canManage) return { canRead: true, canManage: true };
+        if (
+          parentRole !== null &&
+          child.permissions.length === 0 &&
+          child.placements.length === 1
+        ) {
+          return { canRead: true, canManage: false };
+        }
+      }
+    }
+    return accessForNeighbor(permix, child);
+  };
+
+  const [parentAccess, childAccess, bindingFlags] = await Promise.all([
     Promise.all(
       containerPlacements.map(({ containerArtifact }) =>
         accessForNeighbor(permix, containerArtifact),
       ),
     ),
-    Promise.all(rawContents.map(({ artifact }) => accessForNeighbor(permix, artifact))),
+    Promise.all(rawContents.map(({ artifact }) => accessForChild(artifact))),
     Promise.all(rawBindings.map((binding) => visibleBindingToCaller(permix, binding))),
   ]);
-
-  const canManage = check(permix, 'artifact', hydrated, 'manage');
 
   const placements = containerPlacements.flatMap(
     ({ containerArtifact: _container, ...placement }, index) =>
@@ -157,8 +200,8 @@ export const artifactReadController = makeController(artifactReadRoute, async (c
   return respond.ok({
     ...scalarArtifact,
     effectiveAccess: {
-      role: artifactEffectiveRole(permix, hydrated),
-      access: effectiveArtifactAccess(hydrated),
+      role: parentRole,
+      access: parentEffectiveAccess,
     },
     parents,
     children,

@@ -5,17 +5,26 @@
  * @uses primitive:routeTemplates
  */
 import { actingUser } from '#/lib/context/actingUser';
+import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { paginateOwnerArtifactPlacements } from '#/modules/artifactPlacement/lib/paginateOwnerArtifactPlacements';
+import {
+  defaultArtifactPlacementOrderBy,
+  filterReadableArtifactPlacements,
+  includeArtifactPlacementList,
+  ownerArtifactPlacementsWhere,
+} from '#/modules/artifactPlacement/lib/ownerArtifactPlacementsQuery';
 import { meReadManyArtifactPlacementsRoute } from '#/modules/me/routes/meReadManyArtifactPlacements';
 
 export const meReadManyArtifactPlacementsController = makeController(
   meReadManyArtifactPlacementsRoute,
   async (c, respond) => {
-    const { data, pagination } = await paginateOwnerArtifactPlacements(c, {
-      ownerModel: 'User',
-      userId: actingUser(c)!.id,
+    const db = c.get('db');
+    const owner = { ownerModel: 'User' as const, userId: actingUser(c)!.id };
+    const { data, pagination } = await paginate(c, db.artifactPlacement, {
+      where: await ownerArtifactPlacementsWhere(c, owner),
+      include: includeArtifactPlacementList,
+      orderBy: defaultArtifactPlacementOrderBy(c),
     });
-    return respond.ok(data, { pagination });
+    return respond.ok(await filterReadableArtifactPlacements(c, data), { pagination });
   },
 );

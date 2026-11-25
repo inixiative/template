@@ -5,18 +5,27 @@
  * @uses primitive:routeTemplates
  */
 import { contextResource } from '#/lib/context/contextResource';
+import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { paginateOwnerArtifactPlacements } from '#/modules/artifactPlacement/lib/paginateOwnerArtifactPlacements';
+import {
+  defaultArtifactPlacementOrderBy,
+  filterReadableArtifactPlacements,
+  includeArtifactPlacementList,
+  ownerArtifactPlacementsWhere,
+} from '#/modules/artifactPlacement/lib/ownerArtifactPlacementsQuery';
 import { organizationReadManyArtifactPlacementsRoute } from '#/modules/organization/routes/organizationReadManyArtifactPlacements';
 
 export const organizationReadManyArtifactPlacementsController = makeController(
   organizationReadManyArtifactPlacementsRoute,
   async (c, respond) => {
+    const db = c.get('db');
     const organization = contextResource<'organization'>(c);
-    const { data, pagination } = await paginateOwnerArtifactPlacements(c, {
-      ownerModel: 'Organization',
-      organizationId: organization.id,
+    const owner = { ownerModel: 'Organization' as const, organizationId: organization.id };
+    const { data, pagination } = await paginate(c, db.artifactPlacement, {
+      where: await ownerArtifactPlacementsWhere(c, owner),
+      include: includeArtifactPlacementList,
+      orderBy: defaultArtifactPlacementOrderBy(c),
     });
-    return respond.ok(data, { pagination });
+    return respond.ok(await filterReadableArtifactPlacements(c, data), { pagination });
   },
 );
