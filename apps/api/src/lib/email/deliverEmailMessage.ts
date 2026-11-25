@@ -144,10 +144,11 @@ export const deliverEmailMessage = async (
     emailTemplateAuditLogId: renderedTemplate.emailTemplateAuditLogId,
   };
 
+  const isContactRemoved = entry.recipientContactId != null && entry.recipientContact == null;
   const deliverable = entry.recipientContact
     ? canDeliver(renderedTemplate.kind, entry.recipientContact)
     : renderedTemplate.kind === 'system';
-  if (!deliverable) {
+  if (isContactRemoved || !deliverable) {
     await recordCommunicationOutcome(open, { status: 'suppressed', address, ...resolved });
     return;
   }

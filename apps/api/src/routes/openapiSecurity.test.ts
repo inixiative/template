@@ -4,6 +4,10 @@ import { app } from '#/app';
 type Operation = {
   operationId?: string;
   security?: Array<Record<string, unknown>>;
+  'x-forbid-tokens'?: boolean;
+  'x-forbid-jwt'?: boolean;
+  'x-forbid-spoof'?: boolean;
+  'x-forbid-batch'?: boolean;
 };
 
 type Spec = {
@@ -13,11 +17,12 @@ type Spec = {
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
-const expectedSchemes = (path: string, security: Operation['security']): string[] => {
+const expectedSchemes = (path: string, op: Operation): string[] => {
   if (path.startsWith('/api/internal')) return ['internalSecret'];
-  const actual = (security ?? []).flatMap((requirement) => Object.keys(requirement));
-  if (actual.length === 1 && (actual[0] === 'userJwt' || actual[0] === 'apiToken')) return actual;
-  return ['userJwt', 'apiToken'];
+  const schemes: string[] = [];
+  if (!op['x-forbid-jwt']) schemes.push('userJwt');
+  if (!op['x-forbid-tokens']) schemes.push('apiToken');
+  return schemes;
 };
 
 const fetchSpec = async (): Promise<Spec> => {
@@ -50,7 +55,7 @@ describe('OpenAPI security', () => {
     });
   });
 
-  it('declares security on every operation, matching the middleware it mounts', async () => {
+  it('declares security on every operation, matching its middleware and x-forbid-* extensions', async () => {
     const spec = await fetchSpec();
     const registered = Object.keys(spec.components?.securitySchemes ?? {});
     const all = operations(spec);
@@ -59,7 +64,7 @@ describe('OpenAPI security', () => {
 
     const wrong = all
       .map(({ path, method, op }) => {
-        const expectedSecurity = expectedSchemes(path, op.security).map((name) => ({
+        const expectedSecurity = expectedSchemes(path, op).map((name) => ({
           [name]: [],
         }));
         const ok =
@@ -72,8 +77,17 @@ describe('OpenAPI security', () => {
       .filter((entry): entry is string => entry !== null);
 
     expect(wrong).toEqual([]);
-    expect(spec.paths?.['/api/v1/me/twoFactor/verify']?.post?.security).toEqual([{ userJwt: [] }]);
-    expect(spec.paths?.['/api/v1/me/changePassword']?.post?.security).toEqual([{ userJwt: [] }]);
+    expect(spec.paths?.['/api/v1/me/twoFactor/verify']?.post).toMatchObject({
+      security: [{ userJwt: [] }],
+      'x-forbid-tokens': true,
+      'x-forbid-batch': true,
+    });
+    expect(spec.paths?.['/api/v1/me/twoFactor/totp/start']?.post).toMatchObject({
+      security: [{ userJwt: [] }],
+      'x-forbid-tokens': true,
+      'x-forbid-spoof': true,
+      'x-forbid-batch': true,
+    });
 
     const unregistered = all
       .flatMap(({ path, op }) =>

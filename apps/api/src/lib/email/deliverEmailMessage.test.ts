@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { db } from '@template/db';
-import { CommunicationReasonCode, CommunicationStatus } from '@template/db/generated/client/enums';
+import {
+  CommunicationReasonCode,
+  CommunicationStatus,
+  ContactOwnerModel,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createCommunicationLog,
+  createContact,
   createInquiry,
   createOrganization,
   createOrganizationUser,
@@ -167,6 +172,27 @@ describe('deliverEmailMessage — claim policy', () => {
 
     expect(attempts).toHaveLength(0);
     expect((await rowOf(log.id)).status).toBe(status);
+  });
+
+  it('suppresses a send whose contact was removed since it was queued, without asking the verifier', async () => {
+    const { entity: user } = await createUser();
+    const { entity: contact } = await createContact(
+      { ownerModel: ContactOwnerModel.User },
+      { user },
+    );
+    const log = await createLog({ recipientContactId: contact.id });
+    await db.contact.update({ where: { id: contact.id }, data: { deletedAt: new Date() } });
+    const verify = spyOn(emailVerifier, 'verify');
+
+    try {
+      await deliverEmailMessage(payloadFor(log.id), { sleep });
+
+      expect(verify).not.toHaveBeenCalled();
+      expect(attempts).toHaveLength(0);
+      expect((await rowOf(log.id)).status).toBe(CommunicationStatus.suppressed);
+    } finally {
+      verify.mockRestore();
+    }
   });
 
   it('closes a render failure as render_failed without sending', async () => {

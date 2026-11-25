@@ -8,7 +8,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { completeOAuthSignIn } from '@template/ui/lib/auth/signIn';
 import { describeError } from '@template/ui/lib/describeError';
 import { log } from '@template/ui/lib/logger';
-import { safeInternalRedirect } from '@template/ui/lib/routeRedirect';
+import { redirectAfterLogin } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
 import { useEffect, useRef } from 'react';
 
@@ -34,10 +34,11 @@ export const AuthCallbackPage = () => {
 
         const storedRedirect = localStorage.getItem('authRedirectTo') || undefined;
         localStorage.removeItem('authRedirectTo');
-        const redirectTo = safeInternalRedirect(storedRedirect);
-        useAppStore
-          .getState()
-          .navigation.navigateKeepingSearchParams(redirectTo, storedRedirect ? 'spoof' : 'context');
+        redirectAfterLogin(
+          useAppStore.getState,
+          storedRedirect,
+          storedRedirect ? 'spoof' : 'context',
+        );
       } catch (error) {
         log.error('OAuth callback failed:', error);
         navigate({

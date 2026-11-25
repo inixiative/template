@@ -81,4 +81,26 @@ describe('makeForbidMiddleware', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it('accumulates all violated forbid rules into one response', async () => {
+    const { app } = await makeTestApp({ tokens: true, spoof: true, batch: true }, (c) => {
+      c.set('user', { id: 'usr_target' });
+      c.set('spoofedBy', { id: 'usr_admin', platformRole: 'superadmin' });
+      c.set('authCredentialKind', 'token');
+      c.set('txn', {});
+    });
+    const res = await app.request('/test', {
+      method: 'POST',
+      headers: { 'x-batch-id': 'batch_1' },
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as {
+      message: string;
+      details: Array<{ code: string; rule: string; message: string }>;
+    };
+    expect(body.details.map((entry) => entry.rule)).toEqual(['batch', 'tokens', 'spoof']);
+    expect(body.message).toContain('batch');
+    expect(body.message).toContain('API tokens');
+    expect(body.message).toContain('spoofing');
+  });
 });
