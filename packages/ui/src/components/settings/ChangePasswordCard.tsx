@@ -16,6 +16,7 @@ import {
   Input,
   Label,
 } from '@template/ui/components';
+import { changePassword } from '@template/ui/lib/auth/changePassword';
 import { describeError } from '@template/ui/lib/describeError';
 import { formatFieldErrors } from '@template/ui/lib/formatFieldErrors';
 import { useAppStore } from '@template/ui/store';
@@ -29,7 +30,8 @@ const errorMessage = (error: unknown): string => {
 };
 
 export const ChangePasswordCard = () => {
-  const changePassword = useAppStore((state) => state.auth.changePassword);
+  const spoofUserEmail = useAppStore((state) => state.auth.spoofUserEmail);
+  const applyUpgradedJwt = useAppStore((state) => state.auth.applyUpgradedJwt);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -46,7 +48,8 @@ export const ChangePasswordCard = () => {
     setIsSubmitting(true);
     setStatus({ kind: 'idle' });
     try {
-      await changePassword({ currentPassword, newPassword });
+      const handoff = await changePassword({ currentPassword, newPassword });
+      if (!spoofUserEmail && handoff.token) applyUpgradedJwt(handoff, false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
