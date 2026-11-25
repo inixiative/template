@@ -13,14 +13,17 @@ import { assertTransition } from '#/lib/permissions/assertTransition';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationCreateIntegrationResourceRoute } from '#/modules/integration/routes/integrationCreateIntegrationResource';
+import { validateIntegrationResource } from '#/modules/integration/validations/validateIntegrationResource';
 
 export const integrationCreateIntegrationResourceController = makeController(
   integrationCreateIntegrationResourceRoute,
   async (c, respond) => {
     const db = c.get('db');
     const permix = c.get('permix');
-    const { id: integrationId } = contextResource<'integration'>(c);
+    const integration = contextResource<'integration'>(c);
+    const integrationId = integration.id;
     const { projectId, metadata, status, ...body } = c.req.valid('json');
+    validateIntegrationResource(integration, { ...body, metadata });
     const key = { integrationId, kind: body.kind, externalId: body.externalId };
     const fields = { ...body, metadata: metadata as Prisma.InputJsonValue };
     const resource = await db.txn(async () => {
