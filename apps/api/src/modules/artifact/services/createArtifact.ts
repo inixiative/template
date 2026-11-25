@@ -1,0 +1,33 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:files
+ * @uses infrastructure:prisma, mutex, primitive:authz
+ */
+import { db } from '@template/db';
+import type { Artifact } from '@template/db/generated/client/client';
+import type { Permix } from '@template/permissions/client';
+import {
+  type OwnedArtifact,
+  ownerColumns,
+  withArtifactOwnersLock,
+} from '#/modules/artifact/lib/artifactOwner';
+import {
+  type CreateArtifactInput,
+  insertArtifact,
+} from '#/modules/artifact/lib/artifactPlacementHelpers';
+import { assertArtifactPermission } from '#/modules/artifact/lib/checkArtifactPermission';
+
+export type { CreateArtifactInput };
+
+export const createArtifact = async (
+  permix: Permix,
+  input: CreateArtifactInput,
+): Promise<Artifact> => {
+  const lockTargets: OwnedArtifact[] = [ownerColumns(input)];
+  if (input.containerArtifactId) {
+    const container = await assertArtifactPermission(permix, input.containerArtifactId, 'operate');
+    lockTargets.push(container);
+  }
+  return withArtifactOwnersLock(lockTargets, () => db.txn(() => insertArtifact(input, permix)));
+};

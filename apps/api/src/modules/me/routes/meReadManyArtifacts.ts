@@ -6,8 +6,10 @@
  */
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
-
-import { artifactReadResponseSchema } from '#/modules/artifact/schemas/artifactSchemas';
+import {
+  artifactListFilterLens,
+  artifactWithPermissionsSchema,
+} from '#/modules/artifact/schemas/artifactSchemas';
 import { Modules } from '#/modules/modules';
 import { OpenApiTags } from '#/modules/openApiTags';
 
@@ -16,9 +18,11 @@ export const meReadManyArtifactsRoute = readRoute({
   submodel: Modules.artifact,
   many: true,
   skipId: true,
+  paginate: true,
+  filterLens: artifactListFilterLens,
   middleware: [validatePermission('read')],
   description:
-    "Lists the owner's root artifacts (those in no container) that the caller can read: the top of the browser.",
-  responseSchema: artifactReadResponseSchema,
+    "Lists the user's artifacts (defaults to root artifacts when no search/filter is passed) with their permissions.",
+  responseSchema: artifactWithPermissionsSchema,
   tags: [OpenApiTags.me, OpenApiTags.artifact],
 });

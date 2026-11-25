@@ -4,8 +4,7 @@ model Artifact {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  kind   String
-  type   ArtifactType
+  kind   ArtifactKind
   name   String
   access ArtifactAccess @default(private)
 
@@ -44,7 +43,6 @@ model Artifact {
   @@index([organizationId])
   @@index([spaceId])
   @@index([kind])
-  @@index([type])
 }
 
 model ArtifactAncestor {
@@ -138,9 +136,13 @@ model ArtifactPermission {
   @@index([granteeModel, granteeCustomerRelationshipId])
 }
 
-enum ArtifactType {
-  container
-  object
+enum ArtifactKind {
+  file
+  folder
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific kinds below
+  // ==========================================================================
 }
 
 enum ArtifactAccess {

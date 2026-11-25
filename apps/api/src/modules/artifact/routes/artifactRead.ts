@@ -12,7 +12,7 @@ import { Modules } from '#/modules/modules';
 export const artifactReadRoute = readRoute({
   model: Modules.artifact,
   description:
-    'Reads an artifact along with its effective access, readable parents and ancestors, visible placements and bindings, and (for managers) direct and effective permissions.',
+    'Reads an artifact with its effective access, direct readable parents and children (1-step includes, with their permissions for managers), visible placements and bindings, and (for managers) direct and effective permissions.',
   responseSchema: artifactDetailResponseSchema,
   middleware: [validatePermission('read')],
 });

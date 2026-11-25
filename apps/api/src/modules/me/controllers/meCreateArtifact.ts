@@ -6,7 +6,7 @@
  */
 import { actingUser } from '#/lib/context/actingUser';
 import { makeController } from '#/lib/utils/makeController';
-import { createArtifact } from '#/modules/artifact/services/artifactPlacements';
+import { createArtifact } from '#/modules/artifact/services/createArtifact';
 import { meCreateArtifactRoute } from '#/modules/me/routes/meCreateArtifact';
 
 export const meCreateArtifactController = makeController(

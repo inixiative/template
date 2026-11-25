@@ -7,6 +7,7 @@
 import { db, polymorphicKeyColumnOrThrow, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
+import { isContainerKind } from '@template/shared/artifact';
 import {
   type TransferArtifactContent,
   type TransferArtifactResolutionInput,
@@ -21,7 +22,7 @@ import {
   sameArtifactOwner,
   withArtifactOwnersLock,
 } from '#/modules/artifact/lib/artifactOwner';
-import { copyArtifactInto } from '#/modules/artifact/services/artifactPlacements';
+import { copyArtifactInto } from '#/modules/artifact/services/copyArtifact';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
 import { openInquiryWhere } from '#/modules/inquiry/validations/validateInquiryStatus';
 
@@ -62,7 +63,7 @@ const fetchOwnedObject = async (artifactId: string, source: Party): Promise<Arti
   if (!artifact || !sameArtifactOwner(artifact, expectedOwner)) {
     throw makeError({ status: 404, message: 'Artifact not found' });
   }
-  if (artifact.type !== 'object') {
+  if (isContainerKind(artifact.kind)) {
     throw makeError({
       status: 422,
       message: 'Containers are not transferable yet; transfer what is inside them',
@@ -165,7 +166,7 @@ export const transferArtifactService: InquiryService<
       if (!artifact || artifact.deletedAt || !sameArtifactOwner(artifact, sourceOwner)) {
         throw makeError({ status: 404, message: 'Artifact not found' });
       }
-      if (artifact.type !== 'object') {
+      if (isContainerKind(artifact.kind)) {
         throw makeError({
           status: 422,
           message: 'Containers are not transferable yet; transfer what is inside them',

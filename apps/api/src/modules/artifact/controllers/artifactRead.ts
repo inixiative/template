@@ -29,7 +29,6 @@ import {
   isArtifactPublic,
 } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactReadRoute } from '#/modules/artifact/routes/artifactRead';
-import { listableArtifacts } from '#/modules/artifact/services/listableArtifacts';
 
 type BindingAccessor = Extract<AccessorName, 'user' | 'organization' | 'space'>;
 
@@ -57,10 +56,8 @@ const visibleBindingToCaller = async (
   return check(permix, accessor, hydrated, 'read');
 };
 
-type HydratedAncestorItem = { ancestorArtifact?: Artifact | null };
 type EffectivePermItem = { permission?: ArtifactPermission | null };
 
-const artifactColumns = columnsOf(prismaMap, 'Artifact');
 const artifactPermissionColumns = columnsOf(prismaMap, 'ArtifactPermission');
 
 const activeEffectivePermissions = (items: EffectivePermItem[]): ArtifactPermission[] => {
@@ -76,85 +73,78 @@ const activeEffectivePermissions = (items: EffectivePermItem[]): ArtifactPermiss
   return active;
 };
 
+const accessForNeighbor = async (permix: Permix, neighbor: Artifact) => {
+  const hydrated = await hydrateArtifact(neighbor);
+  return {
+    canRead: check(permix, 'artifact', hydrated, 'read'),
+    canManage: check(permix, 'artifact', hydrated, 'manage'),
+  };
+};
+
 export const artifactReadController = makeController(artifactReadRoute, async (c, respond) => {
   const permix = c.get('permix');
-  const artifact = contextResource<'artifact'>(c);
-  const hydrated = await hydrateArtifact(artifact);
-  const canManage = check(permix, 'artifact', hydrated, 'manage');
+  const {
+    placements: rawPlacements,
+    contents: rawContents,
+    permissions: rawPermissions,
+    bindings: rawBindings,
+    ...scalarArtifact
+  } = contextResource<'artifact'>(c);
 
-  const candidateAncestors = ((hydrated.ancestors ?? []) as HydratedAncestorItem[])
-    .map((item) => item.ancestorArtifact)
-    .filter((row): row is Artifact => Boolean(row) && row!.deletedAt === null)
-    .map((row) => pick(row, artifactColumns) as Artifact);
-  const readableAncestors = await listableArtifacts(permix, candidateAncestors);
-  const readableById = new Map(readableAncestors.map((row) => [row.id, row]));
-
-  const [allPlacements, permissions, rawBindings] = await Promise.all([
-    readableById.size > 0
-      ? db.artifactPlacement.findMany({
-          where: {
-            artifactId: { in: [artifact.id, ...readableById.keys()] },
-            containerArtifactId: { in: [...readableById.keys()] },
-          },
-          orderBy: { createdAt: 'asc' },
-        })
-      : Promise.resolve([]),
-    canManage
-      ? db.artifactPermission.findMany({
-          where: { artifactId: artifact.id },
-          orderBy: { createdAt: 'asc' },
-        })
-      : Promise.resolve([]),
-    db.resourceBinding.findMany({
-      where: { sourceArtifactId: artifact.id },
-      orderBy: { createdAt: 'asc' },
-    }),
+  const [hydrated, parentAccess, childAccess, bindingFlags] = await Promise.all([
+    hydrateArtifact(scalarArtifact),
+    Promise.all(
+      rawPlacements.map(({ containerArtifact }) => accessForNeighbor(permix, containerArtifact)),
+    ),
+    Promise.all(rawContents.map(({ artifact }) => accessForNeighbor(permix, artifact))),
+    Promise.all(rawBindings.map((binding) => visibleBindingToCaller(permix, binding))),
   ]);
 
-  const placements = allPlacements.filter((placement) => placement.artifactId === artifact.id);
-  const parents = [...new Set(placements.map((placement) => placement.containerArtifactId))]
-    .map((id) => readableById.get(id)!)
+  const canManage = check(permix, 'artifact', hydrated, 'manage');
+
+  const placements = rawPlacements
+    .filter((_, index) => parentAccess[index]!.canRead)
+    .map(({ containerArtifact: _container, ...placement }) => placement);
+
+  const parents = rawPlacements
+    .filter((_, index) => parentAccess[index]!.canRead)
+    .map(({ containerArtifact }, index) => ({
+      ...containerArtifact,
+      permissions: parentAccess[index]!.canManage ? containerArtifact.permissions : [],
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  const parentsByNode = new Map<string, string[]>();
-  for (const placement of allPlacements) {
-    const list = parentsByNode.get(placement.artifactId) ?? [];
-    list.push(placement.containerArtifactId);
-    parentsByNode.set(placement.artifactId, list);
-  }
-  const reached = new Set<string>();
-  const edges: { artifactId: string; containerArtifactId: string }[] = [];
-  const visit = (nodeId: string) => {
-    for (const containerArtifactId of parentsByNode.get(nodeId) ?? []) {
-      edges.push({ artifactId: nodeId, containerArtifactId });
-      if (reached.has(containerArtifactId)) continue;
-      reached.add(containerArtifactId);
-      visit(containerArtifactId);
-    }
-  };
-  visit(artifact.id);
-  const ancestors = { artifacts: [...reached].map((id) => readableById.get(id)!), edges };
+  const children = rawContents
+    .filter((_, index) => childAccess[index]!.canRead)
+    .map(({ artifact }, index) => {
+      const {
+        placements: childPlacements,
+        permissions: childPermissions,
+        ...childScalar
+      } = artifact;
+      return {
+        ...childScalar,
+        permissions: childAccess[index]!.canManage ? childPermissions : [],
+        exclusive: childPlacements.length === 1,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const effectivePermissions = canManage
     ? activeEffectivePermissions((hydrated.effectivePermissions ?? []) as EffectivePermItem[])
     : [];
 
-  const bindingFlags = await Promise.all(
-    rawBindings.map((binding) => visibleBindingToCaller(permix, binding)),
-  );
-  const bindings = rawBindings.filter((_, index) => bindingFlags[index]);
-
   return respond.ok({
-    ...artifact,
+    ...scalarArtifact,
     effectiveAccess: {
       role: artifactEffectiveRole(permix, hydrated),
       public: isArtifactPublic(hydrated),
     },
     parents,
-    ancestors,
+    children,
     placements,
-    permissions,
+    permissions: canManage ? rawPermissions : [],
     effectivePermissions,
-    bindings,
+    bindings: rawBindings.filter((_, index) => bindingFlags[index]),
   });
 });

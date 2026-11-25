@@ -47,7 +47,6 @@ const baseImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOve
         (field) => field !== 'ownerModel',
       ),
       'kind',
-      'type',
     ],
     exclude: ['userId', 'organizationId', 'spaceId'],
   },

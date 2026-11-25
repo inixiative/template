@@ -5,13 +5,12 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { ArtifactType } from '@template/db/generated/client/enums';
+import { ArtifactKind } from '@template/db/generated/client/enums';
 import { registerFactory } from '@template/db/test/factory';
 
 const artifactFactory = registerFactory('Artifact', {
   defaults: () => ({
-    kind: 'file',
-    type: ArtifactType.object,
+    kind: ArtifactKind.file,
     name: faker.word.noun(),
   }),
 });

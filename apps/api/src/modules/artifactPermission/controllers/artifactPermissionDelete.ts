@@ -4,6 +4,7 @@
  * @partOf feature:files
  * @uses primitive:routeTemplates, primitive:authz
  */
+import { hydrate } from '@template/db';
 import { check } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
@@ -17,8 +18,12 @@ export const artifactPermissionDeleteController = makeController(
     const db = c.get('db');
     const permission = contextResource<'artifactPermission'>(c);
     const permix = c.get('permix');
-    await withLockedArtifactPermission(permission, async (current, hydrated) => {
-      if (!check(permix, 'artifactPermission', { ...current, artifact: hydrated }, 'delete')) {
+    await withLockedArtifactPermission(permission, async (current, hydratedArtifact) => {
+      const hydratedPermission = {
+        ...(await hydrate('artifactPermission', current)),
+        artifact: hydratedArtifact,
+      };
+      if (!check(permix, 'artifactPermission', hydratedPermission, 'delete')) {
         throw makeError({ status: 403, message: 'Forbidden' });
       }
       await db.artifactPermission.update({

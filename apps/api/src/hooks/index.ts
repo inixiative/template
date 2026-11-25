@@ -1,5 +1,4 @@
 import { registerAttributeValidationHook } from '@template/db';
-import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
 import { registerArtifactTreeHook } from '#/hooks/artifactTree/hook';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
@@ -35,7 +34,6 @@ export const registerHooks = () => {
   registerEntitlementChangeRequestsHook();
   registerMemberSelfGrantHook();
   registerRulesHook();
-  registerArtifactAccessHook();
   registerAttributeValidationHook();
   registerAuditLogHook();
   registerEmailVersioningHook();

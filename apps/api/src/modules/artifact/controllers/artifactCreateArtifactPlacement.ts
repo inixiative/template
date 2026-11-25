@@ -7,7 +7,7 @@
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactCreateArtifactPlacementRoute } from '#/modules/artifact/routes/artifactCreateArtifactPlacement';
-import { placeArtifact } from '#/modules/artifact/services/artifactPlacements';
+import { placeArtifact } from '#/modules/artifact/services/placeArtifact';
 
 export const artifactCreateArtifactPlacementController = makeController(
   artifactCreateArtifactPlacementRoute,

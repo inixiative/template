@@ -26,14 +26,17 @@ import { memoize } from 'lodash-es';
 
 const DEFAULT_TTL = 60 * 60; // 1 hour
 
+// why: findResourceMiddleware and makeHydrator share the same Redis key, so cached rows must include @permissions(down) lists.
 const downIncludeOfAccessor = memoize((accessor: AccessorName): PrismaIncludeOfDown | undefined => {
   const fields = prismaMap.models[toModelName(accessor)]?.fields;
   if (!fields) return undefined;
+
   const down: Down = {};
   for (const [fieldName, field] of Object.entries(fields)) {
     const paths = (field as { annotations?: { permissions?: { down?: readonly string[] } } })
       .annotations?.permissions?.down;
     if (!paths) continue;
+
     const tree: DownPaths = {};
     for (const path of paths) {
       let node = tree;
@@ -43,6 +46,7 @@ const downIncludeOfAccessor = memoize((accessor: AccessorName): PrismaIncludeOfD
     }
     down[fieldName] = tree;
   }
+
   return prismaIncludeOfDown(down);
 });
 

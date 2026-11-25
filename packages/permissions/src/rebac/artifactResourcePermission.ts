@@ -10,6 +10,7 @@ import type { Role } from '@template/db/generated/client/enums';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import {
   actorMayPerformActionOnOwner,
+  actorOperatesOwnerUserOrManagesOwnerTenant,
   isNull,
   operatesAtItsMembersTenant,
   ownerModelIsOneOf,
@@ -44,8 +45,8 @@ const memberOwns = (
   ],
 });
 
-const granteeIs = (granteeModel: string): ActionRule => ({
-  rule: { field: 'permission.granteeModel', operator: Operator.equals, value: granteeModel },
+const granteeIs = (granteeModel: string, prefix = 'permission.'): ActionRule => ({
+  rule: { field: `${prefix}granteeModel`, operator: Operator.equals, value: granteeModel },
 });
 
 const grantNotExpired: ActionRule = {
@@ -184,7 +185,7 @@ export const artifactResourcePermission: ResourcePermission = {
     },
     create: {
       any: [
-        actorMayPerformActionOnOwner('operate', '', ['User', 'Organization', 'Space']),
+        actorOperatesOwnerUserOrManagesOwnerTenant,
         {
           all: [
             ownerModelIsOneOf(['OrganizationUser', 'SpaceUser']),
@@ -204,12 +205,40 @@ const artifactPermissionRoleWrite: ActionRule = {
   ],
 };
 
+const artifactPermissionGranteeLeave: ActionRule = {
+  any: [
+    { all: [granteeIs('User', ''), { rel: 'granteeUser', action: 'operate' }] },
+    { all: [granteeIs('Organization', ''), { rel: 'granteeOrganization', action: 'manage' }] },
+    { all: [granteeIs('Space', ''), { rel: 'granteeSpace', action: 'manage' }] },
+    {
+      all: [
+        granteeIs('OrganizationUser', ''),
+        { rel: 'granteeOrganizationUser', action: 'operate' },
+      ],
+    },
+    { all: [granteeIs('SpaceUser', ''), { rel: 'granteeSpaceUser', action: 'operate' }] },
+    {
+      all: [
+        granteeIs('CustomerRelationship', ''),
+        {
+          any: [
+            { rel: 'granteeCustomerRelationship.customerUser', action: 'operate' },
+            { rel: 'granteeCustomerRelationship.customerOrganization', action: 'manage' },
+            { rel: 'granteeCustomerRelationship.customerSpace', action: 'manage' },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 export const artifactPermissionResourcePermission: ResourcePermission = {
   actions: {
     manage: artifactPermissionRoleWrite,
-    read: { any: ['manage', { rel: 'artifact', action: 'manage' }] },
+    read: { any: ['manage', 'leave', { rel: 'artifact', action: 'manage' }] },
     create: artifactPermissionRoleWrite,
-    delete: artifactPermissionRoleWrite,
+    leave: artifactPermissionGranteeLeave,
+    delete: { any: ['leave', artifactPermissionRoleWrite] },
   },
 };
 

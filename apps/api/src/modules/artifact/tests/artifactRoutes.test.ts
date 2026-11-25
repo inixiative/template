@@ -99,21 +99,43 @@ describe('artifact routes', () => {
       }),
     );
     expect(grant.status).toBe(201);
-    drafts = await createFolder(memberFetch, `/api/v1/organization/${organization.id}/artifacts`);
+    drafts = await createFolder(adminFetch, `/api/v1/organization/${organization.id}/artifacts`);
+    expect(
+      (
+        await adminFetch(
+          post(`/api/v1/artifact/${drafts.id}/artifactPermissions`, {
+            granteeModel: 'OrganizationUser',
+            granteeOrganizationId: organization.id,
+            granteeUserId: member.id,
+            role: 'admin',
+          }),
+        )
+      ).status,
+    ).toBe(201);
   });
 
-  it('creates at the kind default and gives the creating member an owner grant', async () => {
+  it('organization root creation requires manage; member workspaces stay open to the member', async () => {
+    expect(
+      (
+        await memberFetch(
+          post(`/api/v1/organization/${organization.id}/artifacts`, {
+            kind: 'folder',
+            name: 'denied',
+          }),
+        )
+      ).status,
+    ).toBe(403);
     const created = await createFolder(
-      memberFetch,
+      adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
     );
     expect(created.ownerModel).toBe('Organization');
     expect(created.access).toBe('private');
-    const detail = await memberFetch(get(`/api/v1/artifact/${created.id}`));
+    const detail = await adminFetch(get(`/api/v1/artifact/${created.id}`));
     expect(
       (await parseSuccessBody<{ effectiveAccess: { role: string } }>(detail)).data.effectiveAccess
         .role,
-    ).toBe('owner');
+    ).toBe('admin');
   });
 
   it('creating inside a container inherits by default', async () => {
@@ -163,11 +185,7 @@ describe('artifact routes', () => {
         .role,
     ).toBe('viewer');
     expect((await place(tokenFetch, personalOwned, shared)).status).toBe(403);
-    const orgMemberOwned = await createFolder(
-      memberFetch,
-      `/api/v1/organization/${organization.id}/artifacts`,
-    );
-    expect((await tokenFetch(get(`/api/v1/artifact/${orgMemberOwned.id}`))).status).toBe(403);
+    expect((await tokenFetch(get(`/api/v1/artifact/${drafts.id}`))).status).toBe(403);
   });
 
   it('placing an artifact that already sits somewhere keeps its explicit access', async () => {
@@ -297,11 +315,7 @@ describe('artifact routes', () => {
       },
       mount,
     }).fetch;
-    const memberOwned = await createFolder(
-      memberFetch,
-      `/api/v1/organization/${organization.id}/artifacts`,
-    );
-    expect((await entOnlyFetch(get(`/api/v1/artifact/${memberOwned.id}`))).status).toBe(403);
+    expect((await entOnlyFetch(get(`/api/v1/artifact/${drafts.id}`))).status).toBe(403);
 
     const { entity: memberToken } = await createToken({
       ownerModel: 'OrganizationUser',
@@ -330,16 +344,12 @@ describe('artifact routes', () => {
       },
       mount,
     }).fetch;
-    const tokenCreated = await createFolder(
-      memberTokenFetch,
-      `/api/v1/organization/${organization.id}/artifacts`,
-    );
-    const tokenDetail = await memberTokenFetch(get(`/api/v1/artifact/${tokenCreated.id}`));
+    const tokenDetail = await memberTokenFetch(get(`/api/v1/artifact/${drafts.id}`));
     expect(tokenDetail.status).toBe(200);
     expect(
       (await parseSuccessBody<{ effectiveAccess: { role: string } }>(tokenDetail)).data
         .effectiveAccess.role,
-    ).toBe('owner');
+    ).toBe('admin');
   });
 
   it('refuses a placement whose longest path (despite shortcut edges) exceeds ARTIFACT_MAX_DEPTH', async () => {
@@ -500,7 +510,7 @@ describe('artifact routes', () => {
     const asAdmin = await parseSuccessBody<{
       effectiveAccess: { role: string | null; public: boolean };
     }>(await adminFetch(get(`/api/v1/artifact/${pub.id}`)));
-    expect(asAdmin.data.effectiveAccess).toEqual({ role: 'owner', public: true });
+    expect(asAdmin.data.effectiveAccess).toEqual({ role: 'admin', public: true });
   });
 
   it('PATCH /artifact/:id lets operate rename, requires manage to change access', async () => {
@@ -516,7 +526,7 @@ describe('artifact routes', () => {
     ).toBe(200);
   });
 
-  it('lists only the members the caller can read', async () => {
+  it('lists only the children the caller can read on GET /artifact/:id', async () => {
     await placeDraftsInShared();
     const hidden = await createFolder(
       adminFetch,
@@ -525,18 +535,25 @@ describe('artifact routes', () => {
     await place(adminFetch, hidden, shared);
     await db.artifact.update({ where: { id: hidden.id }, data: { access: 'private' } });
 
-    const asAdmin = await parseSuccessBody<Artifact[]>(
-      await adminFetch(get(`/api/v1/artifact/${shared.id}/artifacts`)),
+    const asAdmin = await parseSuccessBody<{ children: Artifact[] }>(
+      await adminFetch(get(`/api/v1/artifact/${shared.id}`)),
     );
-    expect(asAdmin.data.map((artifact) => artifact.id)).toContain(hidden.id);
-    const asMember = await parseSuccessBody<Artifact[]>(
-      await memberFetch(get(`/api/v1/artifact/${shared.id}/artifacts`)),
+    expect(asAdmin.data.children.map((artifact) => artifact.id)).toContain(hidden.id);
+    const asMember = await parseSuccessBody<{ children: Artifact[] }>(
+      await memberFetch(get(`/api/v1/artifact/${shared.id}`)),
     );
-    expect(asMember.data.map((artifact) => artifact.id)).toContain(drafts.id);
-    expect(asMember.data.map((artifact) => artifact.id)).not.toContain(hidden.id);
+    expect(asMember.data.children.map((artifact) => artifact.id)).toContain(drafts.id);
+    expect(asMember.data.children.map((artifact) => artifact.id)).not.toContain(hidden.id);
   });
 
   it('a grant cannot exceed the granter own role', async () => {
+    const ownerSeat = await createOrganizationUser({ role: 'owner' }, { organization });
+    const ownerFetch = createTestApp({
+      mockUser: ownerSeat.context.user,
+      mockOrganizationUsers: [ownerSeat.entity],
+      mount,
+    }).fetch;
+
     const grantOutsider = await adminFetch(
       post(`/api/v1/artifact/${shared.id}/artifactPermissions`, {
         granteeModel: 'User',
@@ -555,9 +572,17 @@ describe('artifact routes', () => {
     );
     expect(tooHigh.status).toBe(403);
 
-    const ownerGrant = await db.artifactPermission.findFirstOrThrow({
-      where: { artifactId: shared.id, role: 'owner', granteeModel: 'OrganizationUser' },
-    });
+    const ownerGrant = (
+      await parseSuccessBody<{ id: string }>(
+        await ownerFetch(
+          post(`/api/v1/artifact/${shared.id}/artifactPermissions`, {
+            granteeModel: 'User',
+            granteeUserId: admin.id,
+            role: 'owner',
+          }),
+        ),
+      )
+    ).data;
     const demote = await outsiderFetch(
       patch(`/api/v1/artifactPermission/${ownerGrant.id}`, { role: 'viewer' }),
     );

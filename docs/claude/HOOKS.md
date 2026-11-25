@@ -119,7 +119,6 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 
 | Hook | Purpose |
 |------|---------|
-| `artifactAccess` | Sets an Artifact's `type` from its kind and refuses a kind the catalog does not know ([ARTIFACTS.md](ARTIFACTS.md)) |
 | `artifactTree` | Keeps `ArtifactAncestor` and `ArtifactEffectivePermission` materialized tree tables in sync across `ArtifactPlacement`, `ArtifactPermission`, and `Artifact` (`access`/revive) mutations using O(1) boundary-parent lookups, forces `inherits = false` across owners, and evicts affected `Artifact` cache keys ([ARTIFACTS.md](ARTIFACTS.md)) |
 | `attributes` | Enforces the 5-column Attribute write invariant, definition schema, and canonical sorted `multiSelect` deduplication on every model in `ATTRIBUTE_MODELS` (`registerAttributeValidationHook`, `packages/db/src/lib/attributes/hook.ts`; skips tombstone-only `{ deletedAt }` updates; see [SETTINGS.md](SETTINGS.md)) |
 | `auditLog` | Immutable audit trail of all mutations on enabled models |

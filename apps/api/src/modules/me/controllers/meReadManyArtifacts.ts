@@ -6,16 +6,17 @@
  */
 import { actingUser } from '#/lib/context/actingUser';
 import { makeController } from '#/lib/utils/makeController';
-import { fetchRootArtifacts } from '#/modules/artifact/services/fetchRootArtifacts';
+import { paginateOwnerArtifacts } from '#/modules/artifact/services/paginateOwnerArtifacts';
 import { meReadManyArtifactsRoute } from '#/modules/me/routes/meReadManyArtifacts';
 
 export const meReadManyArtifactsController = makeController(
   meReadManyArtifactsRoute,
   async (c, respond) => {
-    const roots = await fetchRootArtifacts(c.get('permix'), {
-      ownerModel: 'User',
-      userId: actingUser(c)!.id,
-    });
-    return respond.ok(roots);
+    const { data, pagination } = await paginateOwnerArtifacts(
+      c,
+      { ownerModel: 'User', userId: actingUser(c)!.id },
+      { allReadable: true },
+    );
+    return respond.ok(data, { pagination });
   },
 );

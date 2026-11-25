@@ -24,17 +24,19 @@ import {
 } from '@template/db/test';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { artifactRouter } from '#/modules/artifact';
+import { artifactPermissionRouter } from '#/modules/artifactPermission';
 import { artifactPlacementRouter } from '#/modules/artifactPlacement';
 import { inquiryRouter } from '#/modules/inquiry';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get, parseSuccessBody, patch, post } from '#tests/utils/request';
+import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [
   (app) => {
     app.use('*', auditActorMiddleware);
     app.route('/api/v1/artifact', artifactRouter);
+    app.route('/api/v1/artifactPermission', artifactPermissionRouter);
     app.route('/api/v1/artifactPlacement', artifactPlacementRouter);
     app.route('/api/v1/inquiry', inquiryRouter);
     app.route('/api/v1/me', meRouter);
@@ -90,13 +92,13 @@ describe('artifact actions', () => {
     strangerFetch = createTestApp({ mockUser: stranger, mount }).fetch;
   });
 
-  it('every artifact is a container or an object, set from its kind and fixed', async () => {
+  it('kind is an enum and stays fixed after create', async () => {
     const folder = await orgFolder();
     const file = await userFile(member);
-    expect(folder.type).toBe('container');
-    expect(file.type).toBe('object');
-    const after = await db.artifact.update({ where: { id: file.id }, data: { type: 'container' } });
-    expect(after.type).toBe('object');
+    expect(folder.kind).toBe('folder');
+    expect(file.kind).toBe('file');
+    const after = await db.artifact.update({ where: { id: file.id }, data: { kind: 'folder' } });
+    expect(after.kind).toBe('file');
   });
 
   it('at root means no live placement: a removed placement puts the item back at root', async () => {
@@ -119,24 +121,38 @@ describe('artifact actions', () => {
     expect(await atRoot()).toEqual([{ id: item.id }]);
   });
 
-  it("an item in a container the caller can't see shows at the caller's root", async () => {
+  it('owner list defaults to root, searches nested items when filtered, and reflective artifactPermissions lists shares + allows leaving', async () => {
     const hidden = await orgFolder();
-    const report = await orgFolder({ name: 'report' });
+    const report = await orgFolder({ name: 'quarterly-report' });
     await createArtifactPlacement({ artifactId: report.id, containerArtifactId: hidden.id });
-    await createArtifactPermission({
+    const { entity: grant } = await createArtifactPermission({
       artifactId: report.id,
       granteeModel: 'User',
       granteeUserId: member.id,
       role: 'viewer',
     });
-    const asMember = await parseSuccessBody<Artifact[]>(
+    const rootAsMember = await parseSuccessBody<Artifact[]>(
       await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
     );
-    expect(ids(asMember.data)).toContain(report.id);
-    const asAdmin = await parseSuccessBody<Artifact[]>(
-      await adminFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+    expect(ids(rootAsMember.data)).not.toContain(report.id);
+
+    const searchAsMember = await parseSuccessBody<Artifact[]>(
+      await memberFetch(
+        get(`/api/v1/organization/${organization.id}/artifacts?search=quarterly-report`),
+      ),
     );
-    expect(ids(asAdmin.data)).not.toContain(report.id);
+    expect(ids(searchAsMember.data)).toContain(report.id);
+
+    const sharedWithMe = await parseSuccessBody<{ id: string; artifact: Artifact }[]>(
+      await memberFetch(get('/api/v1/me/artifactPermissions')),
+    );
+    expect(sharedWithMe.data.map((row) => [row.id, row.artifact.id])).toEqual([
+      [grant.id, report.id],
+    ]);
+
+    // Grantee can leave a share via DELETE /artifactPermission/:id
+    expect((await memberFetch(del(`/api/v1/artifactPermission/${grant.id}`))).status).toBe(204);
+    expect((await memberFetch(get(`/api/v1/artifact/${report.id}`))).status).toBe(403);
   });
 
   it('move replaces a placement, from and to the root too', async () => {

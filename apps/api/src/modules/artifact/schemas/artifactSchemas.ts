@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
+import type { LensNarrowing } from '@inixiative/json-rules';
 import {
   ArtifactPermissionScalarSchema,
   ArtifactPlacementScalarSchema,
@@ -13,6 +14,7 @@ import {
   ResourceBindingScalarSchema,
 } from '@template/db';
 import { ArtifactAccess, Role } from '@template/db/generated/client/enums';
+import { lensFor } from '@template/db/lens';
 import { type ArtifactKind, plainArtifactKinds } from '@template/shared/artifact';
 
 export const ARTIFACT_CREATE_IMMUTABLE_FIELDS = [
@@ -35,6 +37,14 @@ export const artifactUpdateBodySchema = ArtifactScalarInputSchema.pick({
 
 export const artifactReadResponseSchema = ArtifactScalarSchema;
 
+export const artifactWithPermissionsSchema = ArtifactScalarSchema.extend({
+  permissions: z.array(ArtifactPermissionScalarSchema),
+});
+
+export const artifactChildSchema = artifactWithPermissionsSchema.extend({
+  exclusive: z.boolean(),
+});
+
 export const artifactAccessResponseSchema = z.object({
   role: z.enum(Role).nullable(),
   public: z.boolean(),
@@ -42,16 +52,26 @@ export const artifactAccessResponseSchema = z.object({
 
 export const artifactDetailResponseSchema = ArtifactScalarSchema.extend({
   effectiveAccess: artifactAccessResponseSchema,
-  parents: z.array(ArtifactScalarSchema),
-  ancestors: z.object({
-    artifacts: z.array(ArtifactScalarSchema),
-    edges: z.array(z.object({ artifactId: z.string(), containerArtifactId: z.string() })),
-  }),
+  parents: z.array(artifactWithPermissionsSchema),
+  children: z.array(artifactChildSchema),
   placements: z.array(ArtifactPlacementScalarSchema),
   permissions: z.array(ArtifactPermissionScalarSchema),
   effectivePermissions: z.array(ArtifactPermissionScalarSchema),
   bindings: z.array(ResourceBindingScalarSchema),
 });
+
+export const artifactListFilterLens: LensNarrowing = {
+  parent: lensFor('Artifact'),
+  root: {
+    relations: {
+      placements: {
+        relations: {
+          containerArtifact: {},
+        },
+      },
+    },
+  },
+};
 
 export const artifactMoveBodySchema = z.object({
   fromContainerArtifactId: z.string().optional(),

@@ -6,7 +6,7 @@
  */
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { createArtifact } from '#/modules/artifact/services/artifactPlacements';
+import { createArtifact } from '#/modules/artifact/services/createArtifact';
 import { organizationUserCreateArtifactRoute } from '#/modules/organizationUser/routes/organizationUserCreateArtifact';
 
 export const organizationUserCreateArtifactController = makeController(

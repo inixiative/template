@@ -6,19 +6,23 @@
  */
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
-import { fetchRootArtifacts } from '#/modules/artifact/services/fetchRootArtifacts';
+import { paginateOwnerArtifacts } from '#/modules/artifact/services/paginateOwnerArtifacts';
 import { spaceUserReadManyArtifactsRoute } from '#/modules/spaceUser/routes/spaceUserReadManyArtifacts';
 
 export const spaceUserReadManyArtifactsController = makeController(
   spaceUserReadManyArtifactsRoute,
   async (c, respond) => {
     const member = contextResource<'spaceUser'>(c);
-    const roots = await fetchRootArtifacts(c.get('permix'), {
-      ownerModel: 'SpaceUser',
-      organizationId: member.organizationId,
-      spaceId: member.spaceId,
-      userId: member.userId,
-    });
-    return respond.ok(roots);
+    const { data, pagination } = await paginateOwnerArtifacts(
+      c,
+      {
+        ownerModel: 'SpaceUser',
+        organizationId: member.organizationId,
+        spaceId: member.spaceId,
+        userId: member.userId,
+      },
+      { allReadable: true },
+    );
+    return respond.ok(data, { pagination });
   },
 );
