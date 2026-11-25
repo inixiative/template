@@ -9,23 +9,16 @@ import type { Integration, ProjectIntegration } from '@template/db/generated/cli
 import { isIntegrationSingleton } from '@template/shared/integrations/integrationSingletons';
 import { castArray, pickBy } from 'lodash-es';
 import { makeError } from '#/lib/errors';
+import { integrationOwnerKey } from '#/modules/integration/services/integrationOwnerKey';
 
 type IntegrationRow = Partial<Integration>;
 type ConnectInput = { connect?: { id?: string } };
 type LinkRow = Partial<ProjectIntegration> & { project?: ConnectInput; integration?: ConnectInput };
 type WriteArgs<T> = { data?: T | T[]; create?: T; where?: unknown };
 
-const ownerKey = (row: IntegrationRow) => ({
-  provider: row.provider,
-  ownerModel: row.ownerModel,
-  organizationId: row.organizationId ?? null,
-  spaceId: row.spaceId ?? null,
-  userId: row.userId ?? null,
-});
-
 const assertOwnerSingletonFree = async (row: IntegrationRow): Promise<void> => {
   if (!isIntegrationSingleton(row.provider, 'owner')) return;
-  const key = ownerKey(row);
+  const key = integrationOwnerKey(row);
   await db.findForUpdate(
     'Integration',
     pickBy(key, (value) => value !== null),

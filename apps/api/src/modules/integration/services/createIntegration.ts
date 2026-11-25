@@ -6,21 +6,31 @@
  */
 import { db, type EntitlementInput, type Prisma } from '@template/db';
 import type { Permix } from '@template/permissions';
+import { omit } from 'lodash-es';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
+import { fetchRemovedOwnerSingleton } from '#/modules/integration/services/fetchRemovedOwnerSingleton';
+import { integrationOwnerKey } from '#/modules/integration/services/integrationOwnerKey';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
 
 type IntegrationCreate = Prisma.IntegrationUncheckedCreateInput & {
   entitlements?: EntitlementInput[];
 };
 
-/** The integration and the entitlements it is created with, in one transaction. */
 export const createIntegration = (
   writer: Permix,
   { entitlements = [], ...row }: IntegrationCreate,
 ) =>
   db.txn(async () => {
     await validateIntegrationRole(writer, row);
-    const integration = await db.integration.create({ data: row });
+    const removed = await fetchRemovedOwnerSingleton(row);
+    const integration = removed
+      ? await db.withDeleted(() =>
+          db.integration.update({
+            where: { id: removed.id },
+            data: { ...omit(row, Object.keys(integrationOwnerKey(row))), deletedAt: null },
+          }),
+        )
+      : await db.integration.create({ data: row });
     const targetEntitlements = await changeEntitlements(
       writer,
       { model: 'Integration', id: integration.id },

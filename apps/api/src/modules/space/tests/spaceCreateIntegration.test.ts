@@ -11,11 +11,14 @@ import {
   cleanupTouchedTables,
   createOrganization,
   createOrganizationUser,
+  createProject,
+  createProjectIntegration,
   createSpace,
   createSpaceUser,
   createUser,
   nextFactorySequenceNumber,
 } from '@template/db/test';
+import { INTEGRATION_SINGLETONS } from '@template/shared/integrations/integrationSingletons';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { parseSuccessBody, post } from '#tests/utils/request';
@@ -70,5 +73,36 @@ describe('POST /api/v1/space/:id/integrations', () => {
     expect(data.ownerModel).toBe('Space');
     expect(data.spaceId).toBe(space.id);
     expect(data.organizationId).toBe(org.id);
+  });
+
+  it('connecting an owner-singleton provider again revives the removed integration, with what was removed with it', async () => {
+    INTEGRATION_SINGLETONS.linear = ['owner'];
+    const connect = () =>
+      fetch(
+        post(`/api/v1/space/${space.id}/integrations`, {
+          name: 'Linear',
+          role: 'viewer',
+          provider: 'linear',
+        }),
+      );
+    try {
+      const { data: first } = await parseSuccessBody<Integration>(await connect());
+      const { entity: project } = await createProject({
+        ownerModel: 'Space',
+        organizationId: org.id,
+        spaceId: space.id,
+      });
+      await createProjectIntegration({}, { project, integration: first });
+      await db.integration.update({ where: { id: first.id }, data: { deletedAt: new Date() } });
+
+      const again = await connect();
+      const { data: revived } = await parseSuccessBody<Integration>(again);
+      expect(again.status).toBe(201);
+      expect(revived).toMatchObject({ id: first.id, deletedAt: null });
+      expect(await db.projectIntegration.count({ where: { integrationId: first.id } })).toBe(1);
+      expect((await connect()).status).toBe(409);
+    } finally {
+      delete INTEGRATION_SINGLETONS.linear;
+    }
   });
 });
