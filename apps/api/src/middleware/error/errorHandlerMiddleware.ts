@@ -12,6 +12,8 @@ import {
   Prisma,
   RuleReferenceError,
 } from '@template/db';
+import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
+import { AttributeValidationError } from '@template/shared/attributes';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Context } from 'hono';
@@ -66,10 +68,28 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
       makeError({ status: 409, message: 'Lost the lock guarding this write; please retry' }),
     );
 
+  if (err instanceof StoredPermissionRuleRefusedError) {
+    log.error('A stored permission rule is refused:', err.message);
+    return respondAppError(
+      c,
+      makeError({
+        status: 409,
+        message:
+          'A permission rule stored on this record, or on its user, organization or space, is no longer valid. An owner sets the rules again (setTenantPermissionRules): saving says what is wrong, null clears them.',
+      }),
+    );
+  }
+
   if (err instanceof RuleReferenceError)
     return respondAppError(
       c,
       makeError({ status: 422, message: err.message, details: err.details }),
+    );
+
+  if (err instanceof AttributeValidationError)
+    return respondAppError(
+      c,
+      makeError({ status: 422, message: err.message, details: err.issues }),
     );
 
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {

@@ -64,7 +64,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
     expect(data.status).toBe(InquiryStatus.approved);
   });
 
-  it('approving an invite for someone already a live member leaves their role alone', async () => {
+  it('approving an invite for someone already a not-deleted member leaves their role alone', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,

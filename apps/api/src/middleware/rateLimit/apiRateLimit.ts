@@ -6,7 +6,6 @@
  */
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { isBatchSubRequest } from '#/lib/context/isBatchSubRequest';
-import { isSystemProbe } from '#/lib/utils/authProbe';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { enforceRateLimit, type RateLimitRule, rateLimit } from '#/middleware/rateLimit/rateLimit';
 import {
@@ -45,9 +44,8 @@ const apiRateLimitRules: RateLimitRule[] = [
 const limiter = rateLimit(apiRateLimitRules);
 const rateLimitedRequests = new WeakSet<Request>();
 
-// Server-initiated re-authorization probes spend no caller budget; client-driven probes and reads still do.
 export const apiRateLimit: MiddlewareHandler<AppEnv> = (c: Context<AppEnv>, next: Next) => {
-  if (isBatchSubRequest(c) || isSystemProbe(c)) return next();
+  if (isBatchSubRequest(c)) return next();
   rateLimitedRequests.add(c.req.raw);
   return limiter(c, next);
 };

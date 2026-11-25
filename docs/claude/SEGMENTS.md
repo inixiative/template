@@ -37,7 +37,7 @@ static rule over customer-relationship IDs. There is no direct member add/remove
   those customers' relationships in one query, and reconciles them a provider at a time: one
   `fetchLens` hydrate per page of relationships, `check()` per dynamic segment in dependency order,
   and one membership diff per segment for the whole page. It is a plain job, not superseding: two runs
-  over the same customer read live rows, so the second only repeats work. Enqueue it through
+  over the same customer read not-deleted rows, so the second only repeats work. Enqueue it through
   `enqueueSegmentReconcileForCustomers` (`modules/segment/lib/enqueueSegmentReconcileForCustomers.ts`),
   which drops duplicates and sends every customer it is given in one job: an event that carries many
   rows (`tag.deleted`) makes one job, not one per row.
@@ -51,9 +51,9 @@ membership; changing static to dynamic schedules a fresh reconciliation.
 ## Rule health and references
 
 The save gate validates the lens vocabulary and refuses self-reference, cycles, unsupported
-path-to-path comparisons, and references outside the owner's live segments. `RuleReference`
+path-to-path comparisons, and references outside the owner's not-deleted segments. `RuleReference`
 edges record named segments. Health is derived from those edges and their dependency closure;
-a live segment can be degraded because a segment it depends on is degraded.
+a not-deleted segment can be degraded because a segment it depends on is degraded.
 
 Owner reads include `ruleIssues`. Customer-facing membership reads expose segment identity,
 name, owner, type and creation date, without the rule or its issues. Degraded segments retain

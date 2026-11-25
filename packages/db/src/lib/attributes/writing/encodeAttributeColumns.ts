@@ -10,9 +10,9 @@ import {
   resolveAttributeTarget,
 } from '@template/db/lib/attributes/resolveAttributeTarget';
 import type { PrismaAttributeColumnPayload } from '@template/db/lib/attributes/types';
-import { toPrismaAttributeColumns } from '@template/db/lib/attributes/writing/packAttributeValue';
+import { packAttributeValue } from '@template/db/lib/attributes/writing/packAttributeValue';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { attributeTypedColumnIssues } from '@template/shared/attributes';
+import { validateAttributeValue } from '@template/shared/attributes';
 
 /**
  * Validates `value` against the model's registered definition (or explicit `valueType`/`definition`),
@@ -24,12 +24,9 @@ export const encodeAttributeColumns = (
   value: unknown,
   options?: ResolveAttributeTargetOptions,
 ): PrismaAttributeColumnPayload => {
-  const { config, definition, valueType, column } = resolveAttributeTarget(model, locator, options);
-  const checked = attributeTypedColumnIssues(valueType, { [column]: value }, definition?.schema);
-  if (!checked.ok) {
-    throw new Error(
-      `Invalid value for ${config.model}.${locator}: ${checked.issues.map((issue) => issue.message).join('; ')}`,
-    );
-  }
-  return toPrismaAttributeColumns(checked.columns);
+  const { config, definition, valueType } = resolveAttributeTarget(model, locator, options);
+  const validated = validateAttributeValue(valueType, value, definition?.schema, {
+    context: `Invalid value for ${config.model}.${locator}`,
+  });
+  return packAttributeValue(valueType, validated);
 };

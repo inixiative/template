@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { liveIncludes, liveWhere } from '@template/db/extensions/softDeleteScope';
+import { notDeletedIncludes, notDeletedWhere } from '@template/db/extensions/softDeleteScope';
 import { Prisma } from '@template/db/generated/client/client';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 
@@ -26,11 +26,11 @@ const SCOPED_OPS = new Set([
 
 const scopeArgs = (model: string, args: unknown): Record<string, unknown> => {
   const next = { ...((args ?? {}) as Record<string, unknown>) };
-  next.where = liveWhere(model, (next.where as Record<string, unknown>) ?? {});
+  next.where = notDeletedWhere(model, (next.where as Record<string, unknown>) ?? {});
   for (const key of ['include', 'select'] as const) {
     const tree = next[key];
     if (tree && typeof tree === 'object')
-      next[key] = liveIncludes(model, tree as Record<string, unknown>);
+      next[key] = notDeletedIncludes(model, tree as Record<string, unknown>);
   }
   return next;
 };

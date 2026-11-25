@@ -370,6 +370,8 @@ export const PolymorphismRegistry = {
           Artifact: ['subjectArtifactId'],
           ArtifactPlacement: ['subjectArtifactPlacementId'],
           ArtifactPermission: ['subjectArtifactPermissionId'],
+          TwoFactor: ['subjectTwoFactorId'],
+          Passkey: ['subjectPasskeyId'],
         },
       },
     ],

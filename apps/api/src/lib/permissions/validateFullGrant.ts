@@ -6,7 +6,7 @@
  */
 import { type AccessorName, type HydratedRecord, toAccessor } from '@template/db';
 import type { Permix } from '@template/permissions';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 
 export const validateFullGrant = (
@@ -15,7 +15,7 @@ export const validateFullGrant = (
   delegate: HydratedRecord,
 ): void => {
   if (
-    !check(writer, rebacSchema, model, delegate, {
+    !check(writer, model, delegate, {
       rel: toAccessor(delegate.ownerModel as string),
       action: 'delegateFull',
     })

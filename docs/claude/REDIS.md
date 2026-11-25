@@ -143,7 +143,9 @@ secondaryStorage: {
 
 Fixed windows, one atomic Lua `INCR` + first-hit `PEXPIRE` per rule (`incrementFixedWindows`).
 A `rateLimit(rules)` middleware ANDs its rules — every bucket must be under its max — and 429s
-with `Retry-After`. Redis down = fail open (warn + report, request allowed).
+with `Retry-After`. Redis down = fail open (warn + report, request allowed). A system probe (the
+server's own re-check of a request already admitted, `isSystemProbe`) is never limited: a limited
+re-check would be a check that never ran.
 
 ```typescript
 // `${redisNamespace.limit}:${scope}:${windowMs}:${identity}`
@@ -269,7 +271,7 @@ const user = await fetchThroughCache(
 ```
 
 Behavior:
-- A cached value is always the live view: `fn` runs inside `db.withoutDeleted`, so a caller inside
+- A cached value is always the not-deleted view: `fn` runs inside `db.withoutDeleted`, so a caller inside
   `db.withDeleted` (every superadmin route, any `?includeDeleted=true` request) reads and writes the
   shared key like any other caller, and nothing tombstone-inclusive is cached under it. A read that
   needs deleted rows goes to `db` directly, not through `fetchThroughCache()`. Rolling caches are read normally

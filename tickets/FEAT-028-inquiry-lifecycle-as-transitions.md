@@ -44,7 +44,7 @@ other things to do."
 
 ## Open Questions
 
-- Whether per-type actions live in one resource (`db:inquiry`) keyed by type, or a resource per type.
+- Whether per-type actions live in one resource (`db:Inquiry`) keyed by type, or a resource per type.
 - Whether `approve` with the approver's adjusted copy (R-2026-11-15) is a `to` predicate or stays in the handler.
 
 ---

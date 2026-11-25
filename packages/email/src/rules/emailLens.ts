@@ -34,7 +34,7 @@ import {
 } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { lensFor, live, omitForeignKeys } from '@template/db/lens';
+import { lensFor, omitForeignKeys } from '@template/db/lens';
 import { omitSensitiveFieldsFromLens } from '@template/db/lens/omitSensitiveFieldsFromLens';
 import {
   RESERVED_SCOPE_ROOTS,
@@ -47,6 +47,7 @@ import type { EmailLensOwner } from '@template/email/rules/scopeEmailLens';
 import { walkConditionTree } from '@template/email/rules/walkConditionTree';
 import { type LensPathWalk, walkLensPath } from '@template/email/rules/walkLensPath';
 import type { RuleLens, RuleReference, RuleVocabulary } from '@template/shared/rules';
+import { notDeleted } from '@template/shared/rules';
 import { startCase } from 'lodash-es';
 
 export const OPAQUE_SLOT = 'opaque';
@@ -81,7 +82,7 @@ const referenced: ModelNarrowing = {
 export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
   picks: ['id', 'name', 'email'],
   relations: {
-    tagAttachments: { picks: [], where: live, relations: { tag: referenced } },
+    tagAttachments: { picks: [], where: notDeleted, relations: { tag: referenced } },
     spaceUsers: { picks: ['role'], relations: { space: referenced } },
     organizationUsers: { picks: ['role'], relations: { organization: referenced } },
     customerRelationshipsAsCustomer: {

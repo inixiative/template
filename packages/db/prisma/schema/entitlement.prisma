@@ -89,10 +89,10 @@ model Entitlement {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  // why: full, not live-only: the audit history read joins a target's tombstoned rows too.
+  // why: full, not not-deleted-only: the audit history read joins a target's tombstoned rows too.
   @@index([targetModel, targetId])
-  @@index([sourceModel, sourceId], where: raw("\"deletedAt\" IS NULL"), map: "Entitlement_live_source_idx")
-  @@index([resource], where: raw("\"deletedAt\" IS NULL"), map: "Entitlement_live_resource_idx")
+  @@index([sourceModel, sourceId], where: raw("\"deletedAt\" IS NULL"), map: "Entitlement_not_deleted_source_idx")
+  @@index([resource], where: raw("\"deletedAt\" IS NULL"), map: "Entitlement_not_deleted_resource_idx")
   @@index([actions(ops: ArrayOps)], type: Gin)
   @@index([sourceUserId])
   @@index([sourceOrganizationId])

@@ -129,7 +129,7 @@ describe('fetchCachedRecordWithTargetEntitlements', () => {
     expect(result).toBeNull();
   });
 
-  it('a withDeleted read through fetchCachedRecordWithTargetEntitlements gets the live view and caches it', async () => {
+  it('a withDeleted read through fetchCachedRecordWithTargetEntitlements gets the not-deleted view and caches it', async () => {
     const { entity: user } = await createUser();
     await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
     expect(
@@ -143,7 +143,7 @@ describe('fetchCachedRecordWithTargetEntitlements', () => {
     expect(await fetchCachedRecordWithTargetEntitlements('user', user.id)).toBeNull();
   });
 
-  it('hydrates live relations only, even inside a withDeleted block', async () => {
+  it('hydrates not-deleted relations only, even inside a withDeleted block', async () => {
     const { entity: token } = await createToken({
       organizationUser: {},
       ownerModel: TokenOwnerModel.OrganizationUser,

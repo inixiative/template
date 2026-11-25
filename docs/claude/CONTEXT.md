@@ -345,7 +345,7 @@ type TokenWithRelations = WithTargetEntitlements<Token> & {
 };
 ```
 
-Every holder carries `targetEntitlements: Entitlement[]`, its live rows as stored (`includeTargetEntitlements(model)`, `packages/db/src/entitlements`, which names the holder's model because a member arm keys on the owner chain and an `OrganizationUser`'s relation also reaches its `SpaceUser` rows). `fetchTokenContext` reads the token with them, and `hydrate` loads the member and integration through `fetchCachedRecordWithTargetEntitlements`, which includes them for every holder. The rows become library entries only where a holder is handed to the permissions library (`entitlementEntriesOfHolder`, `@template/permissions`). The resource context loads the plain row; the read controllers include its rows.
+Every holder carries `targetEntitlements: Entitlement[]`, its not-deleted rows as stored (`includeTargetEntitlements(model)`, `packages/db/src/entitlements`, which names the holder's model because a member arm keys on the owner chain and an `OrganizationUser`'s relation also reaches its `SpaceUser` rows). `fetchTokenContext` reads the token with them, and `hydrate` loads the member and integration through `fetchCachedRecordWithTargetEntitlements`, which includes them for every holder. The rows become library entries only where a holder is handed to the permissions library (`entitlementEntriesOfHolder`, `@template/permissions`). The resource context loads the plain row; the read controllers include its rows.
 
 Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 

@@ -49,7 +49,7 @@ const role = (operator: Operator, value: string[]): ActionRule => ({
 });
 
 // Who may stand on each side of each inquiry type, and the level each needs to send (source) or
-// resolve (target). `db:inquiry` is built from this, and the API validates parties against it.
+// resolve (target). `db:Inquiry` is built from this, and the API validates parties against it.
 export const INQUIRY_TYPES = {
   inviteOrganizationUser: {
     sources: [

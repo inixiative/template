@@ -54,7 +54,7 @@ describe('softDeleteScope extension', () => {
     expect(await db.user.findUnique({ where: { id: user.id } })).toBeNull();
   });
 
-  it('withoutDeleted restores the live-row scope inside withDeleted', async () => {
+  it('withoutDeleted restores the not-deleted scope inside withDeleted', async () => {
     const { entity: user } = await createUser();
     await tombstone('user', user.id);
 
@@ -83,51 +83,51 @@ describe('softDeleteScope extension', () => {
 
   it('scopes bare include trees automatically', async () => {
     const { entity: user } = await createUser();
-    const { entity: liveContact } = await createContact(
+    const { entity: notDeletedContact } = await createContact(
       { ownerModel: ContactOwnerModel.User },
       { user },
     );
-    const { entity: deadContact } = await createContact(
+    const { entity: deletedContact } = await createContact(
       { ownerModel: ContactOwnerModel.User },
       { user },
     );
-    await tombstone('contact', deadContact.id);
+    await tombstone('contact', deletedContact.id);
 
     const loaded = await db.user.findUnique({
       where: { id: user.id },
       include: { contacts: true },
     });
     const ids = loaded?.contacts.map((c) => c.id) ?? [];
-    expect(ids).toContain(liveContact.id);
-    expect(ids).not.toContain(deadContact.id);
+    expect(ids).toContain(notDeletedContact.id);
+    expect(ids).not.toContain(deletedContact.id);
   });
 
-  const userWithOneLiveOneDeadContact = async () => {
+  const userWithOneNotDeletedOneDeletedContact = async () => {
     const { entity: user } = await createUser();
-    const { entity: liveContact } = await createContact(
+    const { entity: notDeletedContact } = await createContact(
       { ownerModel: ContactOwnerModel.User },
       { user },
     );
-    const { entity: deadContact } = await createContact(
+    const { entity: deletedContact } = await createContact(
       { ownerModel: ContactOwnerModel.User },
       { user },
     );
-    await tombstone('contact', deadContact.id);
-    return { user, liveContact, deadContact };
+    await tombstone('contact', deletedContact.id);
+    return { user, notDeletedContact, deletedContact };
   };
 
   it('scopes nested select trees', async () => {
-    const { user, liveContact } = await userWithOneLiveOneDeadContact();
+    const { user, notDeletedContact } = await userWithOneNotDeletedOneDeletedContact();
 
     const loaded = await db.user.findUnique({
       where: { id: user.id },
       select: { id: true, contacts: { select: { id: true } } },
     });
-    expect(loaded?.contacts.map((c) => c.id)).toEqual([liveContact.id]);
+    expect(loaded?.contacts.map((c) => c.id)).toEqual([notDeletedContact.id]);
   });
 
-  it('counts only live rows in a _count select', async () => {
-    const { user } = await userWithOneLiveOneDeadContact();
+  it('counts only not-deleted rows in a _count select', async () => {
+    const { user } = await userWithOneNotDeletedOneDeletedContact();
 
     const loaded = await db.user.findUnique({
       where: { id: user.id },
@@ -137,22 +137,22 @@ describe('softDeleteScope extension', () => {
   });
 
   it('scopes relation filters — a tombstoned child does not satisfy `some`', async () => {
-    const { entity: onlyDead } = await createUser();
-    const { entity: deadContact } = await createContact(
+    const { entity: onlyDeleted } = await createUser();
+    const { entity: deletedContact } = await createContact(
       { ownerModel: ContactOwnerModel.User },
-      { user: onlyDead },
+      { user: onlyDeleted },
     );
-    await tombstone('contact', deadContact.id);
-    const { user: hasLive } = await userWithOneLiveOneDeadContact();
+    await tombstone('contact', deletedContact.id);
+    const { user: hasNotDeleted } = await userWithOneNotDeletedOneDeletedContact();
 
     const rows = await db.user.findMany({
-      where: { id: { in: [onlyDead.id, hasLive.id] }, contacts: { some: {} } },
+      where: { id: { in: [onlyDeleted.id, hasNotDeleted.id] }, contacts: { some: {} } },
     });
-    expect(rows.map((r) => r.id)).toEqual([hasLive.id]);
+    expect(rows.map((r) => r.id)).toEqual([hasNotDeleted.id]);
   });
 
   it('scopes count and groupBy (the lens count-plan position)', async () => {
-    const { user } = await userWithOneLiveOneDeadContact();
+    const { user } = await userWithOneNotDeletedOneDeletedContact();
 
     expect(await db.contact.count({ where: { userId: user.id } })).toBe(1);
 
@@ -165,18 +165,18 @@ describe('softDeleteScope extension', () => {
   });
 
   it('an explicit deletedAt in a where opts that level out — root and include', async () => {
-    const { user, deadContact } = await userWithOneLiveOneDeadContact();
+    const { user, deletedContact } = await userWithOneNotDeletedOneDeletedContact();
 
-    const dead = await db.contact.findMany({
+    const deleted = await db.contact.findMany({
       where: { userId: user.id, deletedAt: { not: null } },
     });
-    expect(dead.map((c) => c.id)).toEqual([deadContact.id]);
+    expect(deleted.map((c) => c.id)).toEqual([deletedContact.id]);
 
     const loaded = await db.user.findUnique({
       where: { id: user.id },
       include: { contacts: { where: { deletedAt: { not: null } } } },
     });
-    expect(loaded?.contacts.map((c) => c.id)).toEqual([deadContact.id]);
+    expect(loaded?.contacts.map((c) => c.id)).toEqual([deletedContact.id]);
   });
 
   it('leaves a model without a deletedAt column untouched', async () => {

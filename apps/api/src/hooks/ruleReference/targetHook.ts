@@ -33,7 +33,7 @@ const namedModels = (edge: NamingEdge): string[] =>
       {},
   );
 
-const isLive = (row: HookRow): boolean => row.deletedAt == null;
+const isNotDeleted = (row: HookRow): boolean => row.deletedAt == null;
 
 const deletedAtStamp = (row: HookRow): number => (row.deletedAt as Date | null)?.getTime() ?? 0;
 
@@ -74,7 +74,7 @@ export const registerRuleReferenceTargetHook = () => {
       const flipped = castArray((result ?? []) as HookRow[]).filter((row) => {
         if (typeof row.id !== 'string') return false;
         const prior = previousById[row.id];
-        return prior !== undefined && isLive(prior) !== isLive(row);
+        return prior !== undefined && isNotDeleted(prior) !== isNotDeleted(row);
       });
       if (!flipped.length) return;
       for (const edge of NAMING_EDGES) await stampEdges(edge, model, flipped);

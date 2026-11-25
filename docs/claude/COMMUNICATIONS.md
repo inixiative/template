@@ -405,7 +405,7 @@ paginated response; its `where` clauses can remove rows from the page.
 
 - **Template variants and liveness** — `variant`, `live`, tombstone revival and flag-selected
   variants remain the proposal in [COMM-014](../../tickets/COMM-014-template-variants-and-untombstone.md).
-  The current schema has neither column and `saveScopedRow` only finds live rows before
+  The current schema has neither column and `saveScopedRow` only finds not-deleted rows before
   update-or-create; it does not revive a deleted natural key.
 
 - **Subtenancy brand lock** — an `Organization`-level `spaceEmailPolicy:

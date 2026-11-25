@@ -19,7 +19,7 @@ import type {
 } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { Permix } from '@template/permissions/client';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check } from '@template/permissions/rebac';
 import { pick } from 'lodash-es';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
@@ -54,7 +54,7 @@ const visibleBindingToCaller = async (
   const record = await db.delegate(accessor).findUnique({ where: { id: ref.id } });
   if (!record) return false;
   const hydrated = await hydrate(accessor, record as HydratedRecord);
-  return check(permix, rebacSchema, accessor, hydrated, 'read');
+  return check(permix, accessor, hydrated, 'read');
 };
 
 type HydratedAncestorItem = { ancestorArtifact?: Artifact | null };
@@ -80,7 +80,7 @@ export const artifactReadController = makeController(artifactReadRoute, async (c
   const permix = c.get('permix');
   const artifact = contextResource<'artifact'>(c);
   const hydrated = await hydrateArtifact(artifact);
-  const canManage = check(permix, rebacSchema, 'artifact', hydrated, 'manage');
+  const canManage = check(permix, 'artifact', hydrated, 'manage');
 
   const candidateAncestors = ((hydrated.ancestors ?? []) as HydratedAncestorItem[])
     .map((item) => item.ancestorArtifact)

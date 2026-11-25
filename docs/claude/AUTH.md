@@ -18,6 +18,7 @@
 - [Account changes through BetterAuth (withThrowawaySession)](#account-changes-through-betterauth-withthrowawaysession)
   - [Change password](#change-password)
   - [The same pattern for the next account changes](#the-same-pattern-for-the-next-account-changes)
+- [Two-Factor Authentication (Passkey + TOTP)](#two-factor-authentication-passkey--totp)
 - [OAuth + One-Time Token](#oauth--one-time-token)
   - [OAuth Flow](#oauth-flow)
   - [One-Time Token Handoff](#one-time-token-handoff)
@@ -213,7 +214,7 @@ Why not let the browser hold a short-lived session for one call (the first desig
 `POST /api/v1/me/changePassword` (`modules/me/routes/meChangePassword.ts`), body `{ currentPassword, newPassword }`, response `{ token, expiresAt }`:
 
 - **Who:** a user. `validatePermission(UserAction.changePassword)` on the user, `actorIsUser` in the schema: an API token cannot change its user's password, whatever it holds. A superadmin passes on any credential. A superadmin spoofing a user can change that user's password like any other action (no spoof guard: a superadmin passes every check, on any credential); the response is then `{ token: null, expiresAt: null }`, so the spoofed user's new JWT never leaves the API, and the UI keeps its own JWT while spoofing or when the answer has no JWT. A superadmin cannot be spoofed ([Spoof Middleware](#spoof-middleware)), so a superadmin never changes their own password through a spoof.
-- **Not in a batch:** the route is `'x-batch': false`; a batch that reaches it is refused before anything runs ([BATCH.md](./BATCH.md#routes-that-cannot-batch)).
+- **Not in a batch:** the route sets `forbid: { tokens: true, batch: true }`, which emits `'x-batch': false` in OpenAPI; a batch that reaches it is refused before anything runs ([BATCH.md](./BATCH.md#routes-that-cannot-batch)).
 - **Limits:** `newPassword` length comes from `passwordLength` (`packages/shared/src/auth/passwordLength.ts`, also used by the web form), the same constants `auth.ts` gives BetterAuth as `minPasswordLength`/`maxPasswordLength`; outside them is a 422 before BetterAuth runs. Rate limits: the `/api/auth` IP bucket (`authRateLimit`, 60 a minute) first, and a per-user bucket (`credentialChangeRateLimit`, 5 a minute) after the permission checks, so a stolen JWT can't guess the current password from rotating IPs and a refused token can't use up its person's attempts.
 - **What runs:** `withThrowawaySession(user.id, (headers) => auth.api.changePassword({ body: { currentPassword, newPassword, revokeOtherSessions: true }, headers }))`. BetterAuth verifies the current password and hashes the new one; a wrong current password is its 400 `Invalid password`, and nothing changes. `revokeOtherSessions` deletes every BetterAuth session of the user and creates a new one; `jwtHandoffPlugin` sees `/change-password`, calls `rotateUserJwts` before signing (every older JWT is a 401 from now on), signs the new JWT through the same path sign-in uses, stamps `lastLoginAt` (the person just proved the password) and deletes that session.
 - **Response check:** the controller checks BetterAuth's answer is a JWT handoff (`safeParse`); if the hook ever did not run, BetterAuth's own body (which carries a session token) fails that check and the request is a plain 500, never a leak.
@@ -221,6 +222,68 @@ Why not let the browser hold a short-lived session for one call (the first desig
 - An account with no password (Google only) gets BetterAuth's 400 `Credential account not found`.
 
 ### The same pattern for the next account changes
+
+The same `withThrowawaySession` pattern is reused by `apps/api/src/lib/auth/verifyUserPassword.ts` to verify a user's current password before first-time 2FA enrollment on email/password accounts.
+
+---
+
+## Two-Factor Authentication (Passkey + TOTP)
+
+Strict second-factor authentication using WebAuthn passkeys (`@simplewebauthn/server` + `@simplewebauthn/browser`) and RFC 6238 TOTP authenticator apps (`otpauth` + Redis single-use replay guard; no SMS/phone/email OTP), controlled by `REQUIRE_TWO_FACTOR` (`false` in `template`, `true` in `kingdom`).
+
+### Auth Middleware & 2FA Flow
+
+```mermaid
+flowchart LR
+  Req["Incoming /api Request"] --> Jwt["jwtAuthMiddleware\n(verifies ES256 JWT;\nsets jwtIsPlatformIssued,\njwtTwoFactorVerified,\njwtTwoFactorVerifiedAt)"]
+  Jwt --> Tok["tokenAuthMiddleware\n(resolves API token)"]
+  Tok --> Gate["requireTwoFactorSessionMiddleware\n(gates interactive JWT users\nvia routeMatcher BEFORE spoofing)"]
+  Gate --> Spoof["spoofMiddleware\n(refuses spoofing on pre-2FA JWT;\nsets spoofedBy + target user)"]
+  Spoof --> Audit["auditActorMiddleware -> apiRateLimit"]
+  Audit --> Forbid["RouteArgs.forbid\n(makeForbidMiddleware:\ntokens / jwt / spoof / batch)"]
+  Forbid --> Route["Route Middleware & Controller"]
+```
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant BA as /api/auth/* (jwtHandoffPlugin)
+  participant API as /api/v1/me/twoFactor/*
+  participant DB as Postgres + Redis
+
+  C->>BA: Sign in (email or OAuth OTT)
+  BA->>DB: Stamp lastLoginAt + delete BetterAuth session
+  alt 2FA disabled & not required
+    BA-->>C: 30d User JWT
+  else 2FA enabled or REQUIRE_TWO_FACTOR=true
+    BA-->>C: 15m pre-2FA User JWT (no twoFactor claim)
+    C->>API: GET /api/v1/me
+    API-->>C: User + empty rosters + twoFactorAction ('enroll' | 'verify')
+    alt First-time enrollment
+      C->>API: POST totp/start or passkey/options (assertEnrollmentAuthorization)
+      API->>DB: Store encrypted pending secret / WebAuthn challenge in Redis
+      C->>API: POST totp/confirm or passkey/confirm
+      API->>DB: Verify factor -> ensureTwoFactorRow -> enableUserTotp / registerUserPasskey
+      API-->>C: Backup codes (once) + 30d User JWT (twoFactor: true, twoFactorVerifiedAt: iat)
+    else Existing 2FA verification (or 15m re-verify)
+      C->>API: POST twoFactor/verify (totp | passkey | backupCode)
+      API->>DB: verifyUserFactor (replay-guarded TOTP / WebAuthn counter / scrypt backup code)
+      API-->>C: 30d User JWT (twoFactor: true, twoFactorVerifiedAt: iat)
+    end
+  end
+```
+
+- **Models:** `TwoFactor` (1:1 per user: AES-256-GCM encrypted `totpSecret` via `ENCRYPTED_MODELS`, `totpVerifiedAt`, scrypt-hashed 80-bit `backupCodeHashes`) and `Passkey` (1:N WebAuthn credentials scoped by `rpId`, `Float` `counter`). Both are audit-logged, never revived on user revive (`skipRevive`), and scrubbed/soft-deleted by `redactUser`.
+- **Pre-2FA sign-in handoff (`jwtHandoffPlugin`):** Both email/password (`/sign-in/email`) and Google OAuth (`/one-time-token/verify`) always exchange the BetterAuth handshake session for a User JWT and delete the session immediately. When `REQUIRE_TWO_FACTOR` is true or `user.twoFactorEnabled` is true, `jwtHandoffPlugin` issues a short-lived **15-minute** pre-2FA JWT (`PRE_TWO_FACTOR_JWT_TTL_SECONDS`, without `twoFactor: true`). There are no unauthenticated 2FA challenge routes.
+- **Platform-issued JWTs (`jwtIsPlatformIssued`):** `jwtAuthMiddleware` distinguishes JWTs signed by this API (`claims.iss === userJwtIssuerUrlOrThrow()`) from optional external OIDC/JWKS issuers (`AUTH_ISSUER` / `AUTH_JWKS_URL`). Only platform-issued JWTs are checked against `user.jwtVersion`, trusted for `twoFactor` / `twoFactorVerifiedAt` claims, and refreshed on 2FA enrollment/verification.
+- **JWT claim & API enforcement (`requireTwoFactorSessionMiddleware`):** Runs **before** `spoofMiddleware` in `apps/api/src/routes/api.ts`, so `c.get('user')` is always the real authenticated caller (`spoofMiddleware` independently rejects spoofing from pre-2FA JWT sessions). Uses the shared `makeRouteMatcher` (`apps/api/src/lib/http/routeMatcher.ts`) to allowlist pre-2FA paths:
+  - Read-only `GET /api/v1/me` (returning `twoFactorAction: 'enroll' | 'verify' | null` with tenant rosters redacted while `twoFactorAction` is set) and `GET /api/v1/me/twoFactor`.
+  - If `!user.twoFactorEnabled` and `REQUIRE_TWO_FACTOR=true`, only the 4 enrollment endpoints (`POST /api/v1/me/twoFactor/totp/{start,confirm}`, `POST /api/v1/me/twoFactor/passkey/{options,confirm}`) are allowed; everything else returns `403 TWO_FACTOR_ENROLLMENT_REQUIRED`.
+  - Once `user.twoFactorEnabled` is true, only `POST /api/v1/me/twoFactor/verify` and `POST /api/v1/me/twoFactor/verify/*` are allowed; everything else returns `403 TWO_FACTOR_VERIFICATION_REQUIRED`. Completing enrollment or verification trades the 15-minute pre-2FA JWT for a 30-day `twoFactor: true` JWT with `twoFactorVerifiedAt: iat`.
+- **Declarative `RouteArgs.forbid` (`forbidAuthMiddleware`):** Routes declare `forbid: { tokens?: boolean; jwt?: boolean; spoof?: boolean; batch?: boolean }` on `RouteArgs` instead of manually wiring middleware or `'x-batch': false`. `prepareMiddleware` enforces `tokens`, `jwt`, `spoof`, and `batch`; `toOpenApi` emits `'x-batch': false` when `forbid.batch` is set; `securityForRoute` omits forbidden schemes from OpenAPI `security`. **Why `forbid` lives on routes instead of the ReBAC permission schema:** superadmins always pass permission-schema checks by design, whereas credential/transport boundaries (blocking API tokens, JWTs, spoofing, or batching on sensitive auth endpoints) must still enforce on superadmins too.
+- **Self-service management:** `GET /api/v1/me/twoFactor` and `POST /api/v1/me/twoFactor/*` (including `passkey/rename` and `passkey/delete`), guarded by `forbid: { tokens: true, spoof: true, batch: true }`, `twoFactorRateLimit`, and `UserAction.manageTwoFactor`. Pending TOTP secrets are encrypted in Redis via `encryptField`. When `REQUIRE_TWO_FACTOR` is enabled, removing the last remaining factor returns `422` for regular users; superadmins are exempt so they can reset their own last factor cleanly (which clears backup codes, sets `twoFactorEnabled = false`, and rotates JWTs).
+- **Recent 2FA re-verification (`requireRecentTwoFactorMiddleware` / `assertRecentTwoFactor`):** Sensitive mutations (`meChangePassword`, `meRedact`, `adminUserResetTwoFactor`, token creation/escalation via `createToken`/`tokenUpdate`/`tokenCreateManyEntitlements`, and 2FA/passkey mutations once 2FA is active) require a fresh `twoFactorVerifiedAt` claim (within **15 minutes**, `TWO_FACTOR_REVERIFY_TTL_SECONDS`) on the User JWT obtained via `POST /api/v1/me/twoFactor/verify` (`method: 'totp' | 'backupCode' | 'passkey'`). Missing/expired verification returns `403` with `details: [{ code: 'TWO_FACTOR_REVERIFY_REQUIRED', methods, actions }]`. Superadmin API tokens cannot bypass verification on 2FA-enabled accounts.
+- **Emergency superadmin reset:** `POST /api/admin/user/:id/resetTwoFactor` (`forbid: { tokens: true, batch: true }`, signed-in superadmin JWT + recent 2FA verification) scrubs `TwoFactor` in-place, soft-deletes all user `Passkey` rows, clears pending Redis setups/challenges, sets `User.twoFactorEnabled = false`, and revokes every active JWT via `rotateUserJwts`.
 
 Not built; each is a JWT route plus one `withThrowawaySession` call, keeping BetterAuth's endpoint in `disabledPaths`:
 
@@ -522,7 +585,7 @@ Spoof runs last so a superadmin can spoof through either credential.
 |---|---|---|---|
 | Put a fixed username and password in front of an operator tool (the job dashboard): "password-protect this admin page" | **basicAuthMiddleware** · primitive `apps/api/src/middleware/auth/basicAuthMiddleware.ts#basicAuthMiddleware` — one static credential per mount, answers 401 with `WWW-Authenticate`; not for users or API keys | this section · code `apps/api/src/routes/bullBoard.ts` | splitting the `Authorization` header and `atob`-decoding `Basic` credentials by hand |
 | Ask "would this caller be allowed this route?" without running it: "check the socket may read this channel" | **isAuthProbe** · primitive `apps/api/src/lib/utils/authProbe.ts#isAuthProbe` — the request carries the per-boot `x-auth-probe` secret; `makeController` answers 204 after the whole middleware chain and validation pass, without running the handler | [WEBSOCKETS.md](./WEBSOCKETS.md) (subscribe authorization, `apps/api/src/ws/probe.ts`) | a second permission check written for the socket path; calling the controller's service directly to test access |
-| Let the server's own stream probes skip the API rate limit | **isSystemProbe** · primitive `apps/api/src/lib/utils/authProbe.ts#isSystemProbe` — true only for the system probe secret (`apps/api/src/ws/streamProbe.ts`); `apiRateLimit` skips it | [REDIS.md § Rate Limiting](./REDIS.md#rate-limiting-limit) | a header or flag of your own to exempt internal calls from limits |
+| Let the server's own stream probes skip rate limits | **isSystemProbe** · primitive `apps/api/src/lib/utils/authProbe.ts#isSystemProbe` — true only for the system probe secret (`apps/api/src/ws/streamProbe.ts`); `enforceRateLimit` skips it, so no limit counts it | [REDIS.md § Rate Limiting](./REDIS.md#rate-limiting-limit) | a header or flag of your own to exempt internal calls from limits |
 
 ### Flow
 

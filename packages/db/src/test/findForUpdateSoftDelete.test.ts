@@ -22,15 +22,15 @@ describe('db.findForUpdate on a soft-delete model', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('locks and returns live rows only', async () => {
-    const { entity: live } = await createResource();
+  it('locks and returns not-deleted rows only', async () => {
+    const { entity: notDeleted } = await createResource();
     const { entity: removed } = await createResource();
     await db.integrationResource.update({
       where: { id: removed.id },
       data: { deletedAt: new Date() },
     });
 
-    expect((await lockResource(live.id)).map((row) => row.id)).toEqual([live.id]);
+    expect((await lockResource(notDeleted.id)).map((row) => row.id)).toEqual([notDeleted.id]);
     expect(await lockResource(removed.id)).toEqual([]);
   });
 
@@ -101,11 +101,11 @@ describe('db.findForUpdate on a soft-delete model', () => {
   });
 
   it('reads a deletedAt: null predicate as IS NULL', async () => {
-    const { entity: live } = await createResource();
+    const { entity: notDeleted } = await createResource();
     expect(
       await db.txn(() =>
         db.findForUpdate<IntegrationResource>('IntegrationResource', {
-          id: live.id,
+          id: notDeleted.id,
           deletedAt: null,
         }),
       ),

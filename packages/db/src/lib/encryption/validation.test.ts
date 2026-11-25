@@ -14,6 +14,9 @@ describe('validateEncryptionVersions', () => {
     setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '1');
     setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT', testKey1Base64);
     setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', undefined);
+    setEnvOverride('TWO_FACTOR_SECRET_ENCRYPTION_VERSION', '1');
+    setEnvOverride('TWO_FACTOR_SECRET_ENCRYPTION_KEY_CURRENT', testKey1Base64);
+    setEnvOverride('TWO_FACTOR_SECRET_ENCRYPTION_KEY_PREVIOUS', undefined);
   });
 
   afterEach(async () => {

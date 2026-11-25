@@ -190,7 +190,7 @@ Every plan, ticket and PR names, for each concern it touches (auth, permissions,
 
 "Why none fits" shows the bridge: what would make the existing primitive fit (extend it, add a parameter, compose two), what was tried, and why that bridge is wrong if it is. "It doesn't match exactly" is not a reason. Adversarially review the bridge analysis before building.
 
-Every adversarial review checks the diff for parallel machinery first.
+Every adversarial review checks the diff for parallel machinery first. Before coding (on the 10-line prose/diagram plan) and again before merge, run an **Architectural Subtractor** pass (`.claude/skills/cleanup-scan/SKILL.md` §3.5) with an explicit deletion mandate: assume the design has 30–50% too much surface area and try to fold new routes, stores, middlewares, flags, and turn-by-turn accretion into existing primitives. See `docs/claude/GREAT_PROGRAMMER.md`.
 
 Why: parallel machinery multiplies the cost of every later fix.
 
@@ -261,6 +261,7 @@ Read docs based on task type:
 - Init script work: read `docs/claude/INIT_SCRIPT_PATTERNS.md` first
 - Scripts/tooling/env: `docs/claude/SCRIPTS.md`, `docs/claude/ENVIRONMENTS.md`, `docs/claude/DEVELOPER.md`
 - Architecture/monorepo: `docs/claude/ARCHITECTURE.md`, `docs/claude/MONOREPO.md`
+- Craft principles & code style: `docs/claude/GREAT_PROGRAMMER.md`, `docs/claude/STYLE.md`
 
 ## 11.5 Atlas: the code map
 
@@ -278,5 +279,5 @@ This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP
 3. Keep imports aligned with alias rules.
 4. Remove stale/duplicate logic/exports.
 5. Run targeted validation.
-6. Before pushing, run the cleanup scan (`.claude/skills/cleanup-scan/SKILL.md`): duplicates and parallel machinery, naming, an adversarial review, the reviews Aron asks for most, in-flight branches and PRs, doctrine drift, template parity, leftovers. The `cleanupScanGate` hook refuses `git push` until the commit being pushed has been scanned.
+6. Before pushing, run the cleanup scan (`.claude/skills/cleanup-scan/SKILL.md`): duplicates and parallel machinery, naming, an adversarial review, an architectural subtraction pass, the reviews Aron asks for most, in-flight branches and PRs, doctrine drift, template parity, leftovers. The `cleanupScanGate` hook refuses `git push` until the commit being pushed has been scanned.
 7. Summarize exactly what changed and why.

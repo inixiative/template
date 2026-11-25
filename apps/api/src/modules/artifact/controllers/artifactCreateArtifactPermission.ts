@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import type { Prisma } from '@template/db';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -26,7 +26,6 @@ export const artifactCreateArtifactPermissionController = makeController(
       if (
         !check(
           permix,
-          rebacSchema,
           'artifactPermission',
           { id: '', artifactId: target.id, role: body.role, artifact: hydrated },
           'create',

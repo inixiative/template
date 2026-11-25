@@ -1,5 +1,6 @@
 import { describe, expect, it, spyOn } from 'bun:test';
 import { redisClient } from '@template/db';
+import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET, SYSTEM_PROBE_SECRET } from '#/lib/utils/authProbe';
 import { type RateLimitRule, rateLimit } from '#/middleware/rateLimit/rateLimit';
 import { globalRateLimitKey, ipRateLimitKey } from '#/middleware/rateLimit/rateLimitKeys';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
@@ -62,6 +63,17 @@ describe('rateLimit', () => {
     const limited = await hit(fetch, '9.9.9.9');
     expect(limited.status).toBe(302);
     expect(limited.headers.get('location')).toMatch(/^http:\/\/t\/limited\?after=[1-9]\d*$/);
+  });
+
+  it('never limits a system probe, and still limits an auth probe', async () => {
+    const { fetch } = createTestApp({ mount: [mount([ipRule({ max: 1 })])] });
+
+    expect((await hit(fetch, '4.4.4.4')).status).toBe(200);
+    expect((await hit(fetch, '4.4.4.4')).status).toBe(429);
+    const authProbe = await hit(fetch, '4.4.4.4', { [AUTH_PROBE_HEADER]: AUTH_PROBE_SECRET });
+    expect(authProbe.status).toBe(429);
+    const systemProbe = await hit(fetch, '4.4.4.4', { [AUTH_PROBE_HEADER]: SYSTEM_PROBE_SECRET });
+    expect(systemProbe.status).toBe(200);
   });
 
   it('limits each client independently', async () => {

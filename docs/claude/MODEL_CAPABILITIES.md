@@ -47,7 +47,7 @@ Every cross-cutting behavior in `template` (soft delete, auditing, polymorphism,
 | Cascade-exempt FK relations | [cascadeExempt.ts](../../apps/api/src/hooks/softDeleteCascade/cascadeExempt.ts) | `CASCADE_EXEMPT` | `ModelName` (PascalCase) | [softDeleteCascade/childRelations.ts](../../apps/api/src/hooks/softDeleteCascade/childRelations.ts) |
 | Write-time json-rules validation | [rules/registry.ts](../../apps/api/src/hooks/rules/registry.ts) | `RulesRegistry`, `ruleForModel` | `ModelName` (PascalCase) | [rules/hook.ts](../../apps/api/src/hooks/rules/hook.ts), [fullDelegateRules.ts](../../apps/api/src/hooks/rules/fullDelegateRules.ts) |
 | RuleReference source surfaces | [ruleReference/surfaces.ts](../../apps/api/src/hooks/ruleReference/surfaces.ts) | `RULE_REFERENCE_SURFACES`, `isRuleReferenceSourceModel` | `RuleReferenceSourceModel` (PascalCase) | [ruleReference/hook.ts](../../apps/api/src/hooks/ruleReference/hook.ts), [ruleReference/targetHook.ts](../../apps/api/src/hooks/ruleReference/targetHook.ts) |
-| ReBAC authorization schema | [schema.ts](../../packages/permissions/src/rebac/schema.ts) | `rebacSchema` | `db:<accessor>` (ReBAC namespace) | [validatePermission.ts](../../apps/api/src/middleware/validations/validatePermission.ts), [validateSubmodelPermission.ts](../../apps/api/src/middleware/validations/validateSubmodelPermission.ts) |
+| ReBAC authorization schema | [schema.ts](../../packages/permissions/src/rebac/schema.ts) | `schemaMap` | `db:<accessor>` (ReBAC namespace) | [validatePermission.ts](../../apps/api/src/middleware/validations/validatePermission.ts), [validateSubmodelPermission.ts](../../apps/api/src/middleware/validations/validateSubmodelPermission.ts) |
 | Inquiry party declarations | [inquiryTypes.ts](../../packages/permissions/src/rebac/inquiryTypes.ts) | `INQUIRY_TYPES`, `INQUIRY_READ_LEVELS` | `InquiryType` enum | [inquiryResourcePermission.ts](../../packages/permissions/src/rebac/inquiryResourcePermission.ts) |
 | Setting definitions & catalog | [settings/registry.ts](../../packages/shared/src/settings/registry.ts) | `SETTING_CATEGORIES`, `SETTING_DEFINITIONS` | Dotted setting key | [settingResourcePermission.ts](../../packages/permissions/src/rebac/settingResourcePermission.ts), [settingInfo.ts](../../apps/api/src/modules/setting/controllers/settingInfo.ts) |
 
@@ -89,6 +89,7 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 | Jwks | - | - | - | - | - | yes | - | sensitive | - | - | - | - | - |
 | Organization | soft | yes | - | - | - | - | - | - | - | - | yes | - | yes |
 | OrganizationUser | soft | yes | - | - | - | - | - | - | - | - | yes | - | yes |
+| Passkey | soft, skip-revive | yes | - | User (userId) | - | - | - | noop, immutable-override | - | - | - | - | - |
 | Project | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | yes |
 | ProjectIntegration | soft | yes | - | Project (projectId) | - | - | - | immutable-override | - | - | - | - | yes |
 | ProjectIntegrationResource | soft | yes | - | - | - | - | - | - | - | - | - | - | yes |
@@ -104,6 +105,7 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 | TagAttachment | soft | - | resourceModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | TagCategory | soft | - | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | Token | soft, skip-revive | yes | ownerModel | - | - | - | - | sensitive, noop, immutable-override | yes | - | yes | - | yes |
+| TwoFactor | soft, skip-revive | yes | - | User (userId) | - | yes | - | sensitive | - | - | - | - | - |
 | User | soft | yes | - | - | - | - | - | internal, noop | - | - | yes | - | yes |
 | Verification | - | - | - | - | - | - | - | - | - | - | - | - | - |
 | WebhookEvent | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | - |

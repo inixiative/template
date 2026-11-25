@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses primitive:routeTemplates, primitive:authz
  */
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -20,13 +20,7 @@ export const artifactPermissionUpdateController = makeController(
     const permix = c.get('permix');
     const updated = await withLockedArtifactPermission(permission, async (current, hydrated) => {
       const canWrite = (role: typeof current.role) =>
-        check(
-          permix,
-          rebacSchema,
-          'artifactPermission',
-          { ...current, role, artifact: hydrated },
-          'manage',
-        );
+        check(permix, 'artifactPermission', { ...current, role, artifact: hydrated }, 'manage');
       if (!canWrite(current.role) || (body.role && !canWrite(body.role))) {
         throw makeError({ status: 403, message: 'Forbidden' });
       }

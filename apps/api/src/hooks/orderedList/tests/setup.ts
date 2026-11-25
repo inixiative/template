@@ -25,7 +25,10 @@ export const createEmailContact = async (userId: string) =>
     })
   ).entity;
 
-export const fetchLiveContactPositions = (userId: string, type: ContactType = ContactType.phone) =>
+export const fetchNotDeletedContactPositions = (
+  userId: string,
+  type: ContactType = ContactType.phone,
+) =>
   db.contact.findMany({
     where: { userId, type, deletedAt: null },
     orderBy: { position: 'asc' },

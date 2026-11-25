@@ -4,7 +4,7 @@
 // A channel, a repository, a model: the provider's own resource, named by `kind` and the provider's
 // `externalId`. Soft-deleted with its integration and revived with it, so the entitlements anchored
 // at it and the rules naming it are degraded (sourceDeletedAt, targetDeletedAt), never left
-// pointing at a live row under a dead integration. Registering a removed resource again revives it
+// pointing at a not-deleted row under a deleted integration. Registering a removed resource again revives it
 // (the unique holds tombstones too, so `upsert` finds it), and the cascade revives what died with
 // it. `status` says whether we listen to it: `tracked`, `missing` (the
 // provider does not show it, now or yet) or `untracked` (the owner stopped caring: kept with its

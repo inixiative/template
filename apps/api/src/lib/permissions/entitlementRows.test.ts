@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { cacheKey, checkCache, db, type EntitlementInput, revive, toAccessor } from '@template/db';
+import {
+  cacheKey,
+  checkCache,
+  db,
+  type EntitlementInput,
+  resourceOfModel,
+  revive,
+} from '@template/db';
 import type {
   Entitlement,
   Organization,
@@ -17,7 +24,7 @@ import {
   createToken,
 } from '@template/db/test';
 import { memberSelfGrant, type Permix, toEntitlementInput } from '@template/permissions';
-import { rebacSchema } from '@template/permissions/rebac';
+import { schemaMap } from '@template/permissions/rebac';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { fetchPermixForUser } from '#/lib/permissions/userPermissions';
 import { integrationRouter } from '#/modules/integration';
@@ -38,9 +45,9 @@ let organization: Organization;
 let owner: { user: User; member: OrganizationUser; permix: Permix };
 
 const organizationReadEntitlement = (): EntitlementInput =>
-  entitlementInputFor('db:organization', ['db:organization', organization.id], ['read']);
+  entitlementInputFor('db:Organization', ['db:Organization', organization.id], ['read']);
 const spaceReadEntitlement = (spaceId: string): EntitlementInput =>
-  entitlementInputFor('db:space', ['db:space', spaceId], ['read']);
+  entitlementInputFor('db:Space', ['db:Space', spaceId], ['read']);
 
 const rowsOf = (model: 'Token' | 'Integration' | 'OrganizationUser', id: string) =>
   db.withDeleted(() =>
@@ -65,19 +72,15 @@ afterEach(async () => {
 
 // why: Artifact models use ArtifactPermission for sharing and are intentionally outside EntitlementResourceModel for now.
 const RESOURCES_OUTSIDE_ENTITLEMENTS = new Set([
-  'db:artifact',
-  'db:artifactPermission',
-  'db:artifactPlacement',
+  'db:Artifact',
+  'db:ArtifactPermission',
+  'db:ArtifactPlacement',
 ]);
 
 describe('the entitlement table: the source names the anchor, the target holds it (Aron, 2026-11-02)', () => {
   it('the source and resource models are the rebac resources, one for one', () => {
-    expect(
-      Object.values(EntitlementResourceModel)
-        .map((model) => `db:${toAccessor(model)}`)
-        .sort(),
-    ).toEqual(
-      Object.keys(rebacSchema.permissions)
+    expect(Object.values(EntitlementResourceModel).map(resourceOfModel).sort()).toEqual(
+      Object.keys(schemaMap.permissions)
         .filter((resource) => !RESOURCES_OUTSIDE_ENTITLEMENTS.has(resource))
         .sort(),
     );
@@ -157,7 +160,7 @@ describe('rows live and die with their target', () => {
     expect(await db.token.findUnique({ where: { id: token.id } })).toBeNull();
     expect((await rowsOf('Token', token.id)).map((row) => row.deletedAt != null)).toEqual([true]);
     expect(await heldEntitlements({ model: 'OrganizationUser', id: member.id })).toEqual([
-      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
+      toEntitlementInput(memberSelfGrant('db:OrganizationUser', member)),
     ]);
   });
 });
@@ -187,7 +190,7 @@ describe('a gone anchor is stamped on the row, like a rule reference target', ()
       {
         ownerModel: 'OrganizationUser',
         role: 'viewer',
-        entitlements: [entitlementInputFor('db:flow', ['db:flow', flow.id], ['read'])],
+        entitlements: [entitlementInputFor('db:Flow', ['db:Flow', flow.id], ['read'])],
       },
       { organizationUser: owner.member },
     );
@@ -249,11 +252,11 @@ describe('the writer keeps its invariants under a lock on the target', () => {
     });
     const target = { model: 'OrganizationUser' as const, id: member.id };
     const [selfGrant] = await entitlementIds(target, [
-      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
+      toEntitlementInput(memberSelfGrant('db:OrganizationUser', member)),
     ]);
     expect((await revokeEntitlements(app, target, [selfGrant!])).status).toBe(422);
     expect(await heldEntitlements(target)).toEqual([
-      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
+      toEntitlementInput(memberSelfGrant('db:OrganizationUser', member)),
     ]);
   });
 });
@@ -383,8 +386,8 @@ describe("an entitlement's where names rows as rule-reference edges", () => {
     const { entity: space } = await createSpace({}, { organization });
     const pinned = {
       ...entitlementInputFor(
-        'db:space',
-        ['db:organization', organization.id, 'organization'],
+        'db:Space',
+        ['db:Organization', organization.id, 'organization'],
         ['read'],
       ),
       where: { field: 'id', operator: 'equals', value: space.id },

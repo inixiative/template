@@ -21,6 +21,7 @@ export * from './SpaceProfilePage';
 export * from './SpaceTransferInquiryPage';
 export * from './SpaceUpdateInquiryPage';
 export * from './TokensPage';
+export * from './TwoFactorPage';
 export * from './UserProfilePage';
 export * from './UserReceivedInvitationsPage';
 export * from './WebhooksPage';

@@ -32,7 +32,7 @@ export const segmentInfoResponseSchema = infoResponseSchema(
             sourced: z
               .boolean()
               .describe(
-                'Takes the id of a row its owner may name: its own live segments, its own or platform tags.',
+                'Takes the id of a row its owner may name: its own not-deleted segments, its own or platform tags.',
               ),
           }),
         )

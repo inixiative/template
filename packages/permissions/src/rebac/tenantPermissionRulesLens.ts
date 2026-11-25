@@ -7,9 +7,9 @@
 import type { FieldMap } from '@inixiative/field-map';
 import { createLens, type LensNarrowing, lensVisit } from '@inixiative/json-rules';
 import type { BindableOwnerModel } from '@template/db/registries/polymorphicAxisPointsAt';
-import { type ModelName, toAccessor } from '@template/db/utils/modelNames';
+import { type ModelName, resourceOfModel } from '@template/db/utils/modelNames';
 import { modelsHeldUnderTenant } from '@template/db/utils/tenantRowsAbove';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import { schemaMap } from '@template/permissions/rebac/schema';
 import { mapValues, memoize } from 'lodash-es';
 
 const root = 'TenantPermissionRules';
@@ -18,12 +18,12 @@ const root = 'TenantPermissionRules';
 const rebacSchemaAsFieldMap: FieldMap = {
   models: {
     [root]: {
-      fields: mapValues(rebacSchema.permissions, (_, resource) => ({
+      fields: mapValues(schemaMap.permissions, (_, resource) => ({
         kind: 'object' as const,
         type: resource,
       })),
     },
-    ...mapValues(rebacSchema.permissions, (permission) => ({
+    ...mapValues(schemaMap.permissions, (permission) => ({
       fields: mapValues(permission?.actions, () => ({ kind: 'scalar' as const, type: 'Boolean' })),
     })),
   },
@@ -38,9 +38,9 @@ const everyResourceAndAction = createLens({
 
 /**
  * The resources a tenant may extend, each with its narrowing: product records, never `own`, and
- * reading or operating a space. Never the rest of the permission system's own (a member row, a
- * token, an integration, an inquiry, a sign-in provider): an action there is a gate on handing
- * authority on, and a rule on it would open that gate.
+ * reading or operating a space, and reading an inquiry. Never the rest of the permission system's
+ * own (a member row, a token, an integration, a sign-in provider), nor sending or resolving an
+ * inquiry: an action there is a gate on handing authority on, and a rule on it would open that gate.
  */
 const resourcesATenantMayExtend: Partial<
   Record<ModelName, { picks?: string[]; omits?: string[] }>
@@ -51,6 +51,7 @@ const resourcesATenantMayExtend: Partial<
   // why: an organization opens its spaces to read or operate; `manage` is what minting a space's
   // tokens, writing its members' roles and creating its integrations ask
   Space: { picks: ['read', 'operate'] },
+  Inquiry: { picks: ['read'] },
 
   // ========================================================================
   // TEMPLATE ABOVE — Add app-specific product resources below
@@ -64,7 +65,7 @@ export const tenantPermissionRulesLens = (tenantModel: BindableOwnerModel): Lens
     relations: Object.fromEntries(
       modelsHeldUnderTenant(tenantModel).flatMap((model) => {
         const narrowing = resourcesATenantMayExtend[model];
-        return narrowing ? [[`db:${toAccessor(model)}`, narrowing]] : [];
+        return narrowing ? [[resourceOfModel(model), narrowing]] : [];
       }),
     ),
   },

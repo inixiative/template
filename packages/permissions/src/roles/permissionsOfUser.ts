@@ -73,11 +73,11 @@ export const permissionsOfUser = (
   ...members.flatMap((member) =>
     memberPermissions(
       member,
-      'db:organizationUser',
+      'db:OrganizationUser',
       organizationOwnerPermissions(member.organizationId),
     ),
   ),
   ...spaceMembers.flatMap((member) =>
-    memberPermissions(member, 'db:spaceUser', spaceOwnerPermissions(member.spaceId)),
+    memberPermissions(member, 'db:SpaceUser', spaceOwnerPermissions(member.spaceId)),
   ),
 ];

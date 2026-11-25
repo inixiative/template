@@ -5,14 +5,18 @@
  * @uses primitive:sdk
  */
 import type { MeReadResponses } from '@template/sdk';
+import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
 import type { ChangePasswordInput } from '@template/ui/lib/auth/changePassword';
-import type { AuthMethod, SignUpResult } from '@template/ui/lib/auth/types';
+import type { AuthMethod, SignInResult, SignUpResult } from '@template/ui/lib/auth/types';
 import type { createAuthClient } from 'better-auth/client';
 
 type BetterAuthClient = ReturnType<typeof createAuthClient>;
 
 type MeData = MeReadResponses[200]['data'];
-type User = Omit<MeData, 'organizations' | 'spaces' | 'organizationUsers' | 'spaceUsers'>;
+type User = Omit<
+  MeData,
+  'organizations' | 'spaces' | 'organizationUsers' | 'spaceUsers' | 'twoFactorAction'
+>;
 type Organization = MeData['organizations'][number];
 type Space = MeData['spaces'][number];
 type OrganizationUser = MeData['organizationUsers'][number];
@@ -31,12 +35,18 @@ export type AuthSlice = {
     strategy: AuthStrategy;
     spoofUserEmail: string | null;
     spoofingUserEmail: string | null;
+    twoFactorAction: TwoFactorAction | null;
     isAuthenticated: boolean;
     isEmbedded: boolean;
     isInitialized: boolean;
     initialize: () => Promise<void>;
     refreshMe: () => Promise<void>;
-    signIn: (method: AuthMethod) => Promise<void>;
+    signIn: (method: AuthMethod) => Promise<SignInResult>;
+    applyUpgradedJwt: (
+      jwt: { token: string; expiresAt: string } | null | undefined,
+      clearTwoFactorAction?: boolean,
+    ) => void;
+    setTwoFactorAction: (action: TwoFactorAction | null) => void;
     signUp: (method: AuthMethod) => Promise<SignUpResult>;
     changePassword: (input: ChangePasswordInput) => Promise<void>;
     setStrategy: (strategy: AuthStrategy) => void;

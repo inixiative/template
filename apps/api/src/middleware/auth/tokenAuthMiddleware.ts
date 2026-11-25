@@ -31,6 +31,7 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
       data: { lastUsedAt: new Date() },
     });
   await setTokenContext(c, signIn.context);
+  c.set('authCredentialKind', 'token');
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {

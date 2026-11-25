@@ -7,7 +7,7 @@
 import { DateOperator, Operator } from '@inixiative/json-rules';
 import { makeKindRules } from '@inixiative/permissions';
 import type { Role } from '@template/db/generated/client/enums';
-import { schemaMap } from '@template/db/schemaMap';
+import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import {
   actorMayPerformActionOnOwner,
   isNull,
@@ -19,7 +19,7 @@ import {
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 import { roleHierarchy } from '@template/permissions/roles/shared';
 
-const kind = makeKindRules(schemaMap);
+const kind = makeKindRules(schemaMapWithoutPermissions);
 
 type StandardAction = 'own' | 'manage' | 'operate' | 'read';
 

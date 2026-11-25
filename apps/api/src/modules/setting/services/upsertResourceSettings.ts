@@ -12,7 +12,7 @@ import {
 } from '@template/db';
 import type { Setting } from '@template/db/generated/client/client';
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
 import type { SettingUpsertItem } from '#/modules/setting/schemas/settingSchemas';
@@ -21,10 +21,10 @@ import type { AppEnv } from '#/types/appEnv';
 /**
  * Shared atomic batch writer for all 8 parent-scoped `PATCH /.../settings` routes:
  * 1. Rejects empty arrays (`[]`) and duplicate keys within the batch (422) before auth/locking.
- * 2. Authorizes EVERY item upfront (`db:setting:manage`) — all-or-nothing (403 writes nothing).
+ * 2. Authorizes EVERY item upfront (`db:Setting:manage`) — all-or-nothing (403 writes nothing).
  * 3. Sorts keys lexicographically to avoid lock-ordering deadlocks under concurrent writes.
  * 4. Inside one `db.txn`, locks each `(resourceModel, ...targetFks, key)` via
- *    `db.findForUpdate(..., { upserting: true })`, updates live row or creates new row,
+ *    `db.findForUpdate(..., { upserting: true })`, updates the not-deleted row or creates a new row,
  *    and returns raw `Setting[]`.
  */
 export const upsertResourceSettings = async (
@@ -60,7 +60,6 @@ export const upsertResourceSettings = async (
   for (const item of items) {
     const allowed = check(
       permix,
-      rebacSchema,
       'setting',
       { ...hydratedBase, key: item.key } as HydratedRecord,
       'manage',
@@ -82,16 +81,16 @@ export const upsertResourceSettings = async (
       };
 
       const locked = await db.findForUpdate<Setting>('Setting', whereKey, { upserting: true });
-      const live = locked.find((row) => row.deletedAt === null);
+      const notDeleted = locked.find((row) => row.deletedAt === null);
 
-      const resolvedDisabled = item.disabled ?? (live?.disabled ? false : undefined);
+      const resolvedDisabled = item.disabled ?? (notDeleted?.disabled ? false : undefined);
       const payload = buildAttributeUpsertData('setting', item.key, item.value, {
         resourceModel,
         disabled: resolvedDisabled,
       });
 
-      if (live) {
-        saved.push(await db.setting.update({ where: { id: live.id }, data: payload }));
+      if (notDeleted) {
+        saved.push(await db.setting.update({ where: { id: notDeleted.id }, data: payload }));
       } else {
         saved.push(
           await db.setting.create({

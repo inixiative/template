@@ -58,8 +58,14 @@ describe('integration resource status transitions', () => {
 
   beforeEach(async () => {
     owner = (await createUser()).entity;
-    integration = (await createIntegration({ ownerModel: 'User', userId: owner.id, full: true }))
-      .entity;
+    integration = (
+      await createIntegration({
+        ownerModel: 'User',
+        userId: owner.id,
+        full: true,
+        provider: 'slack',
+      })
+    ).entity;
     person = await asPerson(owner);
     itsIntegration = await asIntegration(integration);
   });
@@ -133,7 +139,7 @@ describe('integration resource status transitions', () => {
     );
   });
 
-  it('registering a live untracked resource keeps it untracked unless a person tracks it', async () => {
+  it('registering a not-deleted untracked resource keeps it untracked unless a person tracks it', async () => {
     const row = await resource('untracked');
     expect((await register(itsIntegration, integration.id, {})).status).toBe(201);
     expect(await statusOf(row.id)).toBe('untracked');

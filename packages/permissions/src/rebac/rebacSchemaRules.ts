@@ -6,14 +6,14 @@
  */
 import { type Condition, Operator } from '@inixiative/json-rules';
 import { makeKindRules, ruleFieldEqualsPath } from '@inixiative/permissions';
-import { schemaMap } from '@template/db/schemaMap';
+import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
 import { omit } from 'lodash-es';
 
 export const privilegedRoles = ['owner', 'admin'];
 export const unprivilegedRoles = roleHierarchy.filter((role) => !privilegedRoles.includes(role));
-const kind = makeKindRules(schemaMap);
+const kind = makeKindRules(schemaMapWithoutPermissions);
 
 export const isNull = (field: string): Condition => ({
   field,

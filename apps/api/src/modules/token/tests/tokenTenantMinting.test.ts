@@ -154,7 +154,7 @@ describe('minting a token owned by a tenant or by its integration takes manage o
         spaceId: otherSpace.id,
       })
     ).entity;
-    const entry = entitlementInputFor('db:project', ['db:project', project.id], ['manage']);
+    const entry = entitlementInputFor('db:Project', ['db:Project', project.id], ['manage']);
     const owner = await jwt(people.owner.user);
     const rowPath = `/organizationUser/${people.viewer.row.id}`;
     expect((await send(owner, 'POST', `${rowPath}/entitlements`, [entry])).status).toBe(201);
@@ -202,7 +202,7 @@ describe('minting a token owned by a tenant or by its integration takes manage o
         spaceId: otherSpace.id,
       })
     ).entity;
-    const entry = entitlementInputFor('db:project', ['db:project', project.id], ['manage']);
+    const entry = entitlementInputFor('db:Project', ['db:Project', project.id], ['manage']);
     const owner = await jwt(people.owner.user);
     const admin = await jwt(people.admin.user);
     const rowPath = `/organizationUser/${people.admin.row.id}`;

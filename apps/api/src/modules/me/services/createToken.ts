@@ -8,12 +8,13 @@ import { createHash, randomBytes } from 'node:crypto';
 import { type HydratedRecord, hydrate } from '@template/db';
 import type { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { type DelegatePermissions, TokenAction } from '@template/permissions';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
 import { validateFullGrant } from '#/lib/permissions/validateFullGrant';
+import { assertRecentTwoFactor } from '#/lib/twoFactor/assertRecentTwoFactor';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
@@ -40,8 +41,9 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   const { name: _name, expiresAt: _expiresAt, ...row } = params;
   const permix = c.get('permix');
   const pseudo = await hydrate('token', { id: '', ...row } as HydratedRecord);
-  if (!check(permix, rebacSchema, 'token', pseudo, TokenAction.create))
+  if (!check(permix, 'token', pseudo, TokenAction.create))
     throw makeError({ status: 403, message: 'Access denied' });
+  await assertRecentTwoFactor(c);
   validateDelegateRole(pseudo);
   if (row.full) validateFullGrant(permix, 'token', pseudo);
 

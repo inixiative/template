@@ -8,12 +8,12 @@ import type { Condition } from '@inixiative/json-rules';
 import type { EntitlementInput } from '@template/db/entitlements/entitlementRow';
 import type { Prisma } from '@template/db/generated/client/client';
 import type { EntitlementResourceModel } from '@template/db/generated/client/enums';
+import { accessorOfResource, resourceOfModel, toModelName } from '@template/db/utils/modelNames';
 import {
   coversEntitlement,
   type EntitlementEntry,
   wellFormedEntitlements,
 } from '@template/permissions/client';
-import { lowerFirst, upperFirst } from 'lodash-es';
 
 /** A row as stored, written, or serialized to a client: what the transformer reads. */
 export type EntitlementFields = {
@@ -26,16 +26,14 @@ export type EntitlementFields = {
   sourcePath?: string | null;
 };
 
-const resourceOf = (model: string): string => `db:${lowerFirst(model)}`;
-
 const modelOf = (resource: string): EntitlementResourceModel =>
-  upperFirst(resource.slice('db:'.length)) as EntitlementResourceModel;
+  toModelName(accessorOfResource(resource)) as EntitlementResourceModel;
 
 /** A row as the library reads it: no path or where when the row has none, actions as a map. */
 export const toEntitlementEntry = (row: EntitlementFields): EntitlementEntry => ({
-  resource: resourceOf(row.resource),
+  resource: resourceOfModel(row.resource),
   anchor: {
-    resource: resourceOf(row.sourceModel),
+    resource: resourceOfModel(row.sourceModel),
     id: row.sourceId,
     ...(row.sourcePath ? { path: row.sourcePath } : {}),
   },
@@ -63,7 +61,7 @@ export const toEntitlementInput = (entry: EntitlementEntry): EntitlementInput =>
 
 const grantsBelow = (row: EntitlementFields): boolean => row.where == null && row.lens == null;
 
-/** The well-formed entries a holder's live rows grant, for the library's checks; a row nothing narrows grants below its record. */
+/** The well-formed entries a holder's not-deleted rows grant, for the library's checks; a row nothing narrows grants below its record. */
 export const entitlementEntriesOfHolder = (holder: {
   targetEntitlements?: EntitlementFields[] | null;
 }): EntitlementEntry[] =>

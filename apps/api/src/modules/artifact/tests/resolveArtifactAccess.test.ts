@@ -15,7 +15,7 @@ import {
 } from '@template/db/test';
 import { delegate, permissionsOfUser } from '@template/permissions';
 import { createPermissions, installPermissions } from '@template/permissions/client';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, schemaMap } from '@template/permissions/rebac';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { ARTIFACT_MAX_DEPTH } from '@template/shared/artifact';
 import {
@@ -216,11 +216,11 @@ describe('artifact ReBAC & closure inheritance', () => {
 
     for (const artifact of [orgMemberArtifact, spaceMemberArtifact]) {
       const hydrated = await hydrateArtifact(artifact);
-      expect(check(selfPermix, rebacSchema, 'artifact', hydrated, 'own')).toBe(true);
-      expect(check(orgOwnerPermix, rebacSchema, 'artifact', hydrated, 'read')).toBe(true);
-      expect(check(orgOwnerPermix, rebacSchema, 'artifact', hydrated, 'delete')).toBe(true);
-      expect(check(orgOwnerPermix, rebacSchema, 'artifact', hydrated, 'manage')).toBe(false);
-      expect(check(orgAdminPermix, rebacSchema, 'artifact', hydrated, 'read')).toBe(false);
+      expect(check(selfPermix, 'artifact', hydrated, 'own')).toBe(true);
+      expect(check(orgOwnerPermix, 'artifact', hydrated, 'read')).toBe(true);
+      expect(check(orgOwnerPermix, 'artifact', hydrated, 'delete')).toBe(true);
+      expect(check(orgOwnerPermix, 'artifact', hydrated, 'manage')).toBe(false);
+      expect(check(orgAdminPermix, 'artifact', hydrated, 'read')).toBe(false);
     }
   });
 
@@ -239,32 +239,22 @@ describe('artifact ReBAC & closure inheritance', () => {
       })
     ).entity;
     const memberPermix = permixForUser(reader, [{ id: organization.id, role: 'member' }]);
-    expect(
-      check(memberPermix, rebacSchema, 'artifact', await hydrateArtifact(folder), 'read'),
-    ).toBe(false);
+    expect(check(memberPermix, 'artifact', await hydrateArtifact(folder), 'read')).toBe(false);
 
     await db.organization.update({
       where: { id: organization.id },
       data: {
         tenantPermissionRules: {
-          'db:artifact': { read: { rel: 'organization', action: 'read' } },
+          'db:Artifact': { read: { rel: 'organization', action: 'read' } },
         },
       },
     });
+    expect(check(memberPermix, 'artifact', await hydrateArtifact(folder), 'read')).toBe(true);
     expect(
-      check(memberPermix, rebacSchema, 'artifact', await hydrateArtifact(folder), 'read'),
-    ).toBe(true);
-    expect(
-      check(
-        memberPermix,
-        rebacSchema,
-        'artifact',
-        await hydrateArtifact(privateMemberArtifact),
-        'read',
-      ),
+      check(memberPermix, 'artifact', await hydrateArtifact(privateMemberArtifact), 'read'),
     ).toBe(false);
-    expect(actionsTenantMayExtend('Organization', 'db:artifact')).not.toContain('own');
-    expect(actionsTenantMayExtend('Organization', 'db:artifact')).not.toContain('delete');
+    expect(actionsTenantMayExtend('Organization', 'db:Artifact')).not.toContain('own');
+    expect(actionsTenantMayExtend('Organization', 'db:Artifact')).not.toContain('delete');
   });
 
   it('admin-capped User token gets manage but not own or delete on member-owned and member-granted artifacts', async () => {
@@ -302,13 +292,13 @@ describe('artifact ReBAC & closure inheritance', () => {
       [{ organizationId: organization.id, role: 'member' }],
       [],
     );
-    await installPermissions(permix, delegate(rebacSchema, base, { ceiling: 'manage' }));
+    await installPermissions(permix, delegate(schemaMap, base, { ceiling: 'manage' }));
 
     for (const artifact of [memberOwned, orgFolder]) {
       const hydrated = await hydrateArtifact(artifact);
-      expect(check(permix, rebacSchema, 'artifact', hydrated, 'manage')).toBe(true);
-      expect(check(permix, rebacSchema, 'artifact', hydrated, 'own')).toBe(false);
-      expect(check(permix, rebacSchema, 'artifact', hydrated, 'delete')).toBe(false);
+      expect(check(permix, 'artifact', hydrated, 'manage')).toBe(true);
+      expect(check(permix, 'artifact', hydrated, 'own')).toBe(false);
+      expect(check(permix, 'artifact', hydrated, 'delete')).toBe(false);
     }
   });
 

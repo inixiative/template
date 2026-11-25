@@ -9,14 +9,14 @@ import {
 } from '@template/permissions/entitlementRows';
 
 const selfAnchored: EntitlementEntry = {
-  resource: 'db:space',
-  anchor: { resource: 'db:space', id: 's' },
+  resource: 'db:Space',
+  anchor: { resource: 'db:Space', id: 's' },
   actions: { manage: true },
 };
 
 const pathAndWhere: EntitlementEntry = {
-  resource: 'db:integration',
-  anchor: { resource: 'db:organization', id: 'o', path: 'organization' },
+  resource: 'db:Integration',
+  anchor: { resource: 'db:Organization', id: 'o', path: 'organization' },
   where: { field: 'ownerModel', operator: Operator.equals, value: 'Organization' },
   actions: { read: true, operate: true },
 };
@@ -30,8 +30,8 @@ describe('a row is the entry it stores, exactly (Aron, 2026-11-10)', () => {
   it('an entry is written with its held actions only, as model names', () => {
     expect(
       toEntitlementInput({
-        resource: 'db:organizationUser',
-        anchor: { resource: 'db:organization', id: 'o' },
+        resource: 'db:OrganizationUser',
+        anchor: { resource: 'db:Organization', id: 'o' },
         actions: { read: true, manage: false },
       }),
     ).toEqual({

@@ -109,7 +109,7 @@ describe('an integration resource dies and revives with its integration (Aron, 2
     expect(await resourceStamp(removedEarlier.id)).toEqual(removedAt);
   });
 
-  it('a project’s delete tombstones its links and leaves the resource live', async () => {
+  it('a project’s delete tombstones its links and leaves the resource not-deleted', async () => {
     const { resource, project, link } = await createIntegrationWithLinkedResource();
 
     const { deletedAt } = await db.project.update({

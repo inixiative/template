@@ -8,7 +8,7 @@ import { db, type HydratedRecord, hydrate } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 import type { Role } from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check } from '@template/permissions/rebac';
 import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
 import { makeError } from '#/lib/errors';
 
@@ -25,7 +25,7 @@ export const canActOnArtifact = async (
   action: ArtifactAction,
 ): Promise<boolean> => {
   const hydrated = await hydrateArtifact(artifact);
-  return check(permix, rebacSchema, 'artifact', hydrated, action);
+  return check(permix, 'artifact', hydrated, action);
 };
 
 export const assertArtifactPermission = async (
@@ -36,7 +36,7 @@ export const assertArtifactPermission = async (
   const artifact = await db.artifact.findUnique({ where: { id: artifactId } });
   if (!artifact) throw makeError({ status: 404, message: 'Artifact not found' });
   const hydrated = (await hydrateArtifact(artifact)) as Artifact & HydratedRecord;
-  if (!check(permix, rebacSchema, 'artifact', hydrated, action)) {
+  if (!check(permix, 'artifact', hydrated, action)) {
     throw makeError({ status: 403, message: 'Forbidden' });
   }
   return hydrated;
@@ -46,7 +46,7 @@ export const artifactEffectiveRole = (permix: Permix, hydrated: HydratedRecord):
   // why: public access is reported separately in `effectiveAccess.public`, not synthesized as a viewer role.
   const withoutPublic = { ...hydrated, access: 'private' };
   for (const role of [...roleHierarchy].reverse()) {
-    if (check(permix, rebacSchema, 'artifact', withoutPublic, roleToStandardAction(role))) {
+    if (check(permix, 'artifact', withoutPublic, roleToStandardAction(role))) {
       return role;
     }
   }

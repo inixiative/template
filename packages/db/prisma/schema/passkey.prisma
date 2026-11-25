@@ -1,0 +1,33 @@
+// ============================================================================
+// PASSKEY (WebAuthn 2FA credentials)
+// ============================================================================
+
+model Passkey {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  userId String @db.VarChar(36)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  credentialId String    @unique
+  publicKey    String
+  rpId         String
+  counter      Float     @default(0)
+  deviceType   String
+  backedUp     Boolean   @default(false)
+  transports   String[]  @default([])
+  name         String
+  lastUsedAt   DateTime?
+
+  auditLogs AuditLog[]
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@index([userId])
+  @@index([userId, rpId])
+  @@index([deletedAt])
+}

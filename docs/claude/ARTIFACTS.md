@@ -36,7 +36,7 @@ Why one table: a grant, a placement, and an audit entry each have a single kind 
 | What a kind may contain and its access default: "can a folder hold a folder", "files start private" | **`ArtifactKinds`** · registry `packages/shared/src/artifact/kinds.ts` — `type`, `contains`, `defaultAccess`, `contentModel`, `lazyCopy` | § Kinds | `if (artifact.kind === 'folder')` checks spread through services; `kind in [...]` lists instead of `type` |
 | Put something in a folder, file it in two places, move it, copy it, list what is inside: "nest folders", "add to a collection" | **`ArtifactPlacement`** · model — written only through **`placeArtifact`**, **`moveArtifact`**, **`copyArtifact`**, **`createArtifact`**, **`removeArtifactPlacement`** · services `apps/api/src/modules/artifact/services/` | § Placements | a `parentId` or materialized `path` column; `db.artifactPlacement.create` from a controller |
 | Share with a person, an org, a space, a member or a customer; time-limited share: "give Bob edit access", "share this folder with the design space" | **`ArtifactPermission`** · model — a role on an artifact, materialized onto inheriting descendants via **`ArtifactEffectivePermission`** | § Access | a per-feature share table; a shared-with JSON column |
-| Can this caller read / edit / manage / delete this artifact: "who can see this file", "is it public" | **`validatePermission(action)`** · middleware + **`assertArtifactPermission`** / **`canActOnArtifact`** (`db:artifact` in `rebacSchema` with `ArtifactAncestor` and `ArtifactEffectivePermission` `down` lists) | § Access | a custom permission walk outside `rebacSchema`; reading `artifact.access` alone to decide public |
+| Can this caller read / edit / manage / delete this artifact: "who can see this file", "is it public" | **`validatePermission(action)`** · middleware + **`assertArtifactPermission`** / **`canActOnArtifact`** (`db:Artifact` in `schemaMap` with `ArtifactAncestor` and `ArtifactEffectivePermission` `down` lists) | § Access | a custom permission walk outside `schemaMap`; reading `artifact.access` alone to decide public |
 | Give an artifact to another user, org or space: "hand this file over", "move it to the client's workspace" | **`transferArtifact`** · Inquiry service `apps/api/src/modules/inquiry/services/transferArtifact/` | § Ownership | rewriting `organizationId` on the row; copying the file and deleting the original |
 | Read an artifact with its effective access, parents, ancestors, placements, bindings, and (for managers) grants | **`GET /artifact/:id`** (`artifactRead`) | § Navigating | joining placements, grants, and bindings by hand without the caller's view |
 | Delete a folder, or delete a folder and what is in it: "empty this folder", "remove the folder but keep the files" | **`DELETE /artifact/:id`** (`artifactDelete`), **`GET /artifact/:id/artifacts?exclusive=true`**, **`/v1/batch`** | § Deleting | a delete that walks a container's members and removes them; a bespoke delete-many endpoint |
@@ -82,7 +82,7 @@ Placements are soft-deleted and audit-enabled.
 
 ## Access
 
-Artifact authorization lives in `rebacSchema` (`packages/permissions/src/rebac/artifactResourcePermission.ts`) using `@inixiative/permissions` `down` lists (`ancestors` and `effectivePermissions`) plus `tenantPermissionRules`.
+Artifact authorization lives in `schemaMap` (`packages/permissions/src/rebac/artifactResourcePermission.ts`) using `@inixiative/permissions` `down` lists (`ancestors` and `effectivePermissions`) plus `tenantPermissionRules`.
 
 `Artifact.access` defaults to `private` and is `inherit`, `public` or `private`:
 
@@ -105,7 +105,7 @@ Artifact authorization lives in `rebacSchema` (`packages/permissions/src/rebac/a
 - `Organization` / `Space`: org/space owners hold `own` (`delete`), admins hold `manage`; members create (receiving a creator `owner` `ArtifactPermission`), and read/operate other org/space artifacts via `ArtifactPermission`, `public`, or `tenantPermissionRules`.
 - `OrganizationUser` / `SpaceUser`: private member-owned workspace inside a tenant. The member owns it; the org/space owner has break-glass `read` and `delete` (no `manage`); admins and peers get `403`. `tenantPermissionRules` skip private member-owned artifacts.
 
-**Explicit grants (`ArtifactPermission`):** materialized onto inheriting descendants via `ArtifactEffectivePermission` (1 `down` jump from `Artifact`; see `tickets/AUTH-014-nested-down-list-walks.md`), with `expiresAt` evaluated live against `actor:Clock.now`. Denied access returns `403` (`404` only when the row does not exist). `db:artifactPermission` uses `roleHeldVia` so a grant can't be created, changed or revoked by someone whose access is below it.
+**Explicit grants (`ArtifactPermission`):** materialized onto inheriting descendants via `ArtifactEffectivePermission` (1 `down` jump from `Artifact`; see `tickets/AUTH-014-nested-down-list-walks.md`), with `expiresAt` evaluated live against `actor:Clock.now`. Denied access returns `403` (`404` only when the row does not exist). `db:ArtifactPermission` uses `roleHeldVia` so a grant can't be created, changed or revoked by someone whose access is below it.
 
 **Creation.** `Artifact.access` defaults to `private`. `createArtifact` creates with `access: 'inherit'` when placed into a same-owner container (unless overridden) and `kind.defaultAccess` at root or cross-owner, in one locked `db.txn`.
 
@@ -142,7 +142,7 @@ There is no "primary parent": with several parents, `GET /artifact/:id` returns 
 | Artifact detail (access, parents, ancestors, placements, permissions, bindings) | `GET /artifact/:id` |
 | Below: direct children (pass `?exclusive=true` for items only in this container) | `GET /artifact/:id/artifacts` |
 
-**A placement in a container the caller can't see (or in another owner's container) doesn't hide an artifact from its owner's root.** `GET /artifact/:id` only returns placements in containers the caller can read and bindings on resources the caller can read via ReBAC (`db:user`, `db:organization`, `db:space`).
+**A placement in a container the caller can't see (or in another owner's container) doesn't hide an artifact from its owner's root.** `GET /artifact/:id` only returns placements in containers the caller can read and bindings on resources the caller can read via ReBAC (`db:User`, `db:Organization`, `db:Space`).
 
 No frontend is built yet.
 

@@ -36,13 +36,13 @@ afterEach(async () => {
 });
 
 const broken = () =>
-  entitlementInputFor('db:integration', ['db:organization', organization.id], ['read']);
+  entitlementInputFor('db:Integration', ['db:Organization', organization.id], ['read']);
 const organizationReadEntitlement = () =>
-  entitlementInputFor('db:organization', ['db:organization', organization.id], ['read']);
+  entitlementInputFor('db:Organization', ['db:Organization', organization.id], ['read']);
 const manageItsIntegrations = (): EntitlementInput => ({
   ...entitlementInputFor(
-    'db:integration',
-    ['db:organization', organization.id, 'organization'],
+    'db:Integration',
+    ['db:Organization', organization.id, 'organization'],
     ['manage'],
   ),
   where: { field: 'ownerModel', operator: 'equals', value: 'Organization' },

@@ -41,7 +41,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
 
   const slack = { field: 'provider', operator: 'equals', value: 'slack' };
   const integrations = (path: string, actions: string[], where?: Record<string, unknown>) => ({
-    ...entitlementInputFor('db:integration', ['db:organization', organization.id, path], actions),
+    ...entitlementInputFor('db:Integration', ['db:Organization', organization.id, path], actions),
     ...(where ? { where } : {}),
   });
 
@@ -125,15 +125,15 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     );
     expect(response.status).toBe(403);
     expect(((await response.json()) as { message: string }).message).toBe(
-      `A delegate holds your permissions or less: you cannot give manage on db:integration at db:organization ${organization.id} by space.organization`,
+      `A delegate holds your permissions or less: you cannot give manage on db:Integration at db:Organization ${organization.id} by space.organization`,
     );
   });
 
   it('a path that does not end at the anchor is a malformed grant', async () => {
     const { entity: space } = await createSpace({}, { organization });
     const wrongModel = entitlementInputFor(
-      'db:integration',
-      ['db:space', space.id, 'organization'],
+      'db:Integration',
+      ['db:Space', space.id, 'organization'],
       ['read'],
     );
     expect((await grant('owner', wrongModel)).status).toBe(422);
@@ -145,7 +145,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       (
         await grant(
           'owner',
-          entitlementInputFor('db:integration', ['db:space', space.id], ['read']),
+          entitlementInputFor('db:Integration', ['db:Space', space.id], ['read']),
         )
       ).status,
     ).toBe(422);
@@ -153,7 +153,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       (
         await grant(
           'owner',
-          entitlementInputFor('db:space', ['db:space', space.id, 'organization'], ['read']),
+          entitlementInputFor('db:Space', ['db:Space', space.id, 'organization'], ['read']),
         )
       ).status,
     ).toBe(422);
@@ -175,8 +175,8 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
     });
     const sendAtOther = entitlementInputFor(
-      'db:inquiry',
-      ['db:organization', other.id, 'targetOrganization'],
+      'db:Inquiry',
+      ['db:Organization', other.id, 'targetOrganization'],
       ['send'],
     );
     const response = await app.fetch(
@@ -189,8 +189,8 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     const { entity: target } = await createOrganizationUser({ role: 'member' }, { organization });
     const { entity: space } = await createSpace({}, { organization });
     const offTree = entitlementInputFor(
-      'db:organization',
-      ['db:space', space.id, 'spaces'],
+      'db:Organization',
+      ['db:Space', space.id, 'spaces'],
       ['read'],
     );
     const response = await (await writer('owner')).fetch(
@@ -204,8 +204,8 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       const { entity: target } = await createOrganizationUser({ role: 'member' }, { organization });
       const mint = {
         ...entitlementInputFor(
-          'db:token',
-          ['db:organization', organization.id, 'organization'],
+          'db:Token',
+          ['db:Organization', organization.id, 'organization'],
           ['create'],
         ),
         ...(where ? { where } : {}),

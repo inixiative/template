@@ -7,6 +7,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
+import { requireTwoFactorSessionMiddleware } from '#/middleware/auth/requireTwoFactorSessionMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
@@ -62,9 +63,10 @@ apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 apiRouter.route('/unsubscribe', unsubscribeRouter);
 
 // A user presents a JWT, a program an API token; sessions never reach past /auth.
-// Spoof runs last so it applies whichever credential resolved the user.
+// 2FA session gating runs before spoofing so c.get('user') is still the real authenticated user.
 apiRouter.use('*', jwtAuthMiddleware);
 apiRouter.use('*', tokenAuthMiddleware);
+apiRouter.use('*', requireTwoFactorSessionMiddleware);
 apiRouter.use('*', spoofMiddleware);
 apiRouter.use('*', auditActorMiddleware);
 apiRouter.use('*', apiRateLimit);

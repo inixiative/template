@@ -30,7 +30,8 @@ export const fetchAndHydrateMe = async (
   const spoofingEmail = response.headers.get('x-spoofing-user-email');
   const spoofedEmail = response.headers.get('x-spoofed-user-email');
 
-  const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userData;
+  const { organizationUsers, organizations, spaceUsers, spaces, twoFactorAction, ...user } =
+    userData;
   const organizationsDict = keyBy(organizations || [], 'id');
   const organizationUsersDict = keyBy(organizationUsers || [], 'organizationId');
   const spacesDict = keyBy(spaces || [], 'id');
@@ -45,6 +46,7 @@ export const fetchAndHydrateMe = async (
       spaces: spacesDict,
       spaceUsers: spaceUsersDict,
       spoofingUserEmail: spoofingEmail && spoofedEmail ? spoofingEmail : null,
+      twoFactorAction: twoFactorAction ?? null,
       isAuthenticated: true,
       isInitialized: true,
     },

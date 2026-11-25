@@ -35,7 +35,7 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     await cleanupTouchedTables(db);
   });
 
-  it('a holder read through fetchCachedRecordWithTargetEntitlements carries its live rows, in the order granted', async () => {
+  it('a holder read through fetchCachedRecordWithTargetEntitlements carries its not-deleted rows, in the order granted', async () => {
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
     const inputs: EntitlementInput[] = [

@@ -11,7 +11,7 @@ model User {
   deletedAt            DateTime?
 
   // The tenant's own additions to the permission schema for the records under it.
-  // Shape: Record<Resource, Record<Action, ActionRule>> ('db:contact' → read → rule). check() ORs each
+  // Shape: Record<Resource, Record<Action, ActionRule>> ('db:Contact' → read → rule). check() ORs each
   // rule with the schema's for that resource and action. Null = schema-only.
   tenantPermissionRules Json?
 
@@ -26,6 +26,8 @@ model User {
   lastLoginAt DateTime?
   // Every person JWT carries it as `ver`; incrementing it signs the user out everywhere.
   jwtVersion  Int       @default(0)
+  // Kept in sync inside transactions whenever TOTP or Passkeys change.
+  twoFactorEnabled Boolean @default(false)
 
   // Platform-level role (for superadmin access)
   platformRole PlatformRole @default(user)
@@ -33,6 +35,8 @@ model User {
   // Relations
   accounts                        Account[]
   sessions                        Session[]
+  twoFactor                       TwoFactor?
+  passkeys                        Passkey[]
   organizationUsers               OrganizationUser[]
   spaceUsers                      SpaceUser[]
   tokens                          Token[]

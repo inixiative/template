@@ -37,8 +37,8 @@ describe("an entitlement's anchor is read when the row is written, even past the
   it('an anchor that does not exist is refused with a 422, not a 500', async () => {
     const response = await grantEntitlements(app, onHolder(), [
       entitlementInputFor(
-        'db:organizationUser',
-        ['db:organizationUser', 'no-such-member'],
+        'db:OrganizationUser',
+        ['db:OrganizationUser', 'no-such-member'],
         ['read'],
       ),
     ]);
@@ -53,7 +53,7 @@ describe("an entitlement's anchor is read when the row is written, even past the
     await db.organizationUser.update({ where: { id: anchor.id }, data: { deletedAt: new Date() } });
 
     const response = await grantEntitlements(app, onHolder(), [
-      entitlementInputFor('db:organizationUser', ['db:organizationUser', anchor.id], ['read']),
+      entitlementInputFor('db:OrganizationUser', ['db:OrganizationUser', anchor.id], ['read']),
     ]);
     expect(response.status).toBe(422);
   });

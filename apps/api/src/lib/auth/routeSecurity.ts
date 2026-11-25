@@ -5,14 +5,18 @@
  * @uses none
  */
 import type { RouteConfig } from '@hono/zod-openapi';
-import { securityRequirements } from '#/lib/auth/securitySchemes';
+import { type SecuritySchemeName, securityRequirements } from '#/lib/auth/securitySchemes';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 
 export const securityForRoute = ({
   internal,
   security,
-}: Pick<RouteArgs, 'internal' | 'security'>): NonNullable<RouteConfig['security']> => {
+  forbid,
+}: Pick<RouteArgs, 'internal' | 'security' | 'forbid'>): NonNullable<RouteConfig['security']> => {
   if (security) return security;
   if (internal) return securityRequirements('internalSecret');
-  return securityRequirements('userJwt', 'apiToken');
+  const schemes: SecuritySchemeName[] = [];
+  if (!forbid?.jwt) schemes.push('userJwt');
+  if (!forbid?.tokens) schemes.push('apiToken');
+  return securityRequirements(...schemes);
 };

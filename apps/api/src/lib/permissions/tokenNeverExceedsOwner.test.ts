@@ -26,8 +26,8 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
     actions
       ? [
           toEntitlementInput({
-            resource: 'db:organization',
-            anchor: { resource: 'db:organization', id: organization.id },
+            resource: 'db:Organization',
+            anchor: { resource: 'db:Organization', id: organization.id },
             actions,
           }),
         ]

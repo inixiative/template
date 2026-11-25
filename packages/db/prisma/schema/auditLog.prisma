@@ -94,6 +94,10 @@ model AuditLog {
   subjectArtifactPlacement            ArtifactPlacement?          @relation(fields: [subjectArtifactPlacementId], references: [id], onDelete: SetNull)
   subjectArtifactPermissionId         String?                     @db.VarChar(36)
   subjectArtifactPermission           ArtifactPermission?         @relation(fields: [subjectArtifactPermissionId], references: [id], onDelete: SetNull)
+  subjectTwoFactorId                  String?                     @db.VarChar(36)
+  subjectTwoFactor                    TwoFactor?                  @relation(fields: [subjectTwoFactorId], references: [id], onDelete: SetNull)
+  subjectPasskeyId                    String?                     @db.VarChar(36)
+  subjectPasskey                      Passkey?                    @relation(fields: [subjectPasskeyId], references: [id], onDelete: SetNull)
   // Composite FKs
   subjectOrganizationUser       OrganizationUser?     @relation("AuditLogSubjectOrganizationUser", fields: [subjectOrganizationId, subjectUserId], references: [organizationId, userId], onDelete: SetNull)
   subjectSpaceUser              SpaceUser?            @relation("AuditLogSubjectSpaceUser", fields: [subjectOrganizationId, subjectSpaceId, subjectUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
@@ -142,6 +146,8 @@ model AuditLog {
   @@index([subjectArtifactId])
   @@index([subjectArtifactPlacementId])
   @@index([subjectArtifactPermissionId])
+  @@index([subjectTwoFactorId])
+  @@index([subjectPasskeyId])
 }
 
 enum AuditAction {
@@ -177,4 +183,6 @@ enum AuditSubjectModel {
   Artifact
   ArtifactPlacement
   ArtifactPermission
+  TwoFactor
+  Passkey
 }

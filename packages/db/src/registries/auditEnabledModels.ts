@@ -29,6 +29,8 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
   AuditSubjectModel.Artifact,
   AuditSubjectModel.ArtifactPlacement,
   AuditSubjectModel.ArtifactPermission,
+  AuditSubjectModel.TwoFactor,
+  AuditSubjectModel.Passkey,
   // Account, Session excluded — ephemeral auth state, hard-deleted on redact.
 ];
 

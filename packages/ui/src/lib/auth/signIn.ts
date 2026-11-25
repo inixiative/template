@@ -10,6 +10,7 @@ import type {
   EmailAuthMethod,
   OAuthAuthMethod,
   SamlAuthMethod,
+  SignInResult,
 } from '@template/ui/lib/auth/types';
 import { createAuthClient } from 'better-auth/client';
 import { oneTimeTokenClient } from 'better-auth/client/plugins';
@@ -19,7 +20,7 @@ const betterAuthClient = () => {
   return createAuthClient({ baseURL, plugins: [oneTimeTokenClient()] });
 };
 
-const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
+const signInWithEmail = async (method: EmailAuthMethod): Promise<SignInResult> => {
   const client = betterAuthClient();
 
   const { data, error } = await client.signIn.email({
@@ -32,9 +33,10 @@ const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
   }
 
   storeJwtHandoff(data);
+  return { status: 'authenticated' };
 };
 
-const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
+const signInWithOAuth = async (method: OAuthAuthMethod): Promise<SignInResult> => {
   const client = betterAuthClient();
 
   const callbackURL = method.callbackURL || `${window.location.origin}/auth/callback`;
@@ -44,6 +46,7 @@ const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
     callbackURL,
     errorCallbackURL: `${window.location.origin}/login`,
   });
+  return { status: 'redirecting' };
 };
 
 export const completeOAuthSignIn = async (oneTimeToken: string): Promise<void> => {
@@ -58,11 +61,11 @@ export const completeOAuthSignIn = async (oneTimeToken: string): Promise<void> =
   storeJwtHandoff(data);
 };
 
-const signInWithSaml = async (_method: SamlAuthMethod): Promise<void> => {
+const signInWithSaml = async (_method: SamlAuthMethod): Promise<SignInResult> => {
   throw new Error('SAML authentication not yet implemented');
 };
 
-export const signIn = async (method: AuthMethod): Promise<void> => {
+export const signIn = async (method: AuthMethod): Promise<SignInResult> => {
   switch (method.type) {
     case 'email':
       return signInWithEmail(method);

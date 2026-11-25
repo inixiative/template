@@ -341,9 +341,9 @@ describe('Contact CRUD', () => {
     });
   });
 
-  describe('adding a contact that is already live', () => {
-    it('answers 409 and leaves the live contact as it was', async () => {
-      const address = `live${nextFactorySequenceNumber()}@example.com`;
+  describe('adding a contact that is already not-deleted', () => {
+    it('answers 409 and leaves the not-deleted contact as it was', async () => {
+      const address = `existing${nextFactorySequenceNumber()}@example.com`;
       const first = await parseSuccessBody<Contact>(
         await fetch(
           post('/api/v1/me/contacts', { type: 'email', value: { address }, label: 'Kept' }),

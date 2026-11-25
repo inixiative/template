@@ -153,7 +153,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
     it('an admin cannot name an entitlement action it does not hold', async () => {
       const integration = await orgIntegration('member');
       const ownOrganization = [
-        entitlementInputFor('db:organization', ['db:organization', organization.id], ['own']),
+        entitlementInputFor('db:Organization', ['db:Organization', organization.id], ['own']),
       ];
       expect(
         (await mint(admin, `integration/${integration.id}`, { entitlements: ownOrganization }))
@@ -163,7 +163,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
 
     it('a role token on an integration with no role is an error: the role narrows nothing (R114)', async () => {
       const integration = await orgIntegration(null, [
-        entitlementInputFor('db:space', ['db:space', space.id], ['read', 'operate']),
+        entitlementInputFor('db:Space', ['db:Space', space.id], ['read', 'operate']),
       ]);
       const minted = await mint(admin, `integration/${integration.id}`, { role: 'member' });
       expect(minted.status).toBe(422);
@@ -174,14 +174,14 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
         200,
       );
       const entitled = await orgIntegration('viewer', [
-        entitlementInputFor('db:space', ['db:space', space.id], ['read']),
+        entitlementInputFor('db:Space', ['db:Space', space.id], ['read']),
       ]);
       expect((await update(owner, entitled, { role: null })).status).toBe(200);
     });
 
     it('a token left with a role over a role-less integration is judged as it will be: it can be repaired (R114)', async () => {
       const integration = await orgIntegration('admin', [
-        entitlementInputFor('db:space', ['db:space', space.id], ['read']),
+        entitlementInputFor('db:Space', ['db:Space', space.id], ['read']),
       ]);
       expect((await mint(owner, `integration/${integration.id}`, { role: 'member' })).status).toBe(
         201,
@@ -294,7 +294,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
 
     it('an admin cannot name an entitlement action it does not hold on an integration', async () => {
       const ownOrganization = [
-        entitlementInputFor('db:organization', ['db:organization', organization.id], ['own']),
+        entitlementInputFor('db:Organization', ['db:Organization', organization.id], ['own']),
       ];
       expect((await createOrgIntegration(admin, { entitlements: ownOrganization })).status).toBe(
         403,

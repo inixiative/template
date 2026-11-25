@@ -1,10 +1,10 @@
 # FEAT-027: Status and Role Changes as Transitions
 
-**Status**: 🆕 Not Started
+**Status**: ✅ Done (#327 `8337dc53`; Kingdom port kingdom#325 `6cc893d7`)
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-11-22
-**Updated**: 2026-11-22
+**Updated**: 2026-11-23
 **Related**: [FEAT-018](./FEAT-018-transitions.md) (the transitions primitive), [AUTH-004](./AUTH-004-rebac-bridges-schema-layering.md) § Transitions (adoption deferred until a second lifecycle; this is it), [FEAT-028](./FEAT-028-inquiry-lifecycle-as-transitions.md) (Inquiry, later), template #313 (integration resource soft delete and revive)
 
 ---
@@ -60,7 +60,7 @@ writing. Superadmin passes as everywhere.
 by an integration, the same rule passes only when that Signet's owner integration is this
 resource's integration ("is this the integration, and is the integration the actor").
 
-### Integration resource status (`db:integrationResource`)
+### Integration resource status (`db:IntegrationResource`)
 
 | From → to | A person | The resource's own integration |
 |---|---|---|
@@ -91,7 +91,7 @@ Aron, 2026-11-22: "If you specifically change it back to tracked, then it revive
 Otherwise, it just doesn't. You have to track it to revive it." An integration re-registering
 its resources therefore never undoes a person's untrack.
 
-### Member role (`db:organizationUser`, `db:spaceUser`)
+### Member role (`db:OrganizationUser`, `db:SpaceUser`)
 
 One action whose `from.permission` and `to.permission` are both `memberRoleWrite(tenant)`
 (`packages/permissions/src/rebac/rebacSchemaRules.ts`), replacing the two `check` calls in
