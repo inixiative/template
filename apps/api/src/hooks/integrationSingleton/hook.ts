@@ -100,10 +100,25 @@ export const registerIntegrationSingletonHook = () => {
     'integrationSingleton:integrationCreate',
     'Integration',
     HookTiming.before,
-    [DbAction.create, DbAction.createManyAndReturn, DbAction.upsert],
+    [DbAction.create, DbAction.createManyAndReturn],
     async ({ args }) => {
       for (const row of createdRows(args as WriteArgs<IntegrationRow>))
         await assertOwnerSingletonFree(row);
+    },
+  );
+
+  registerDbHook(
+    'integrationSingleton:integrationUpsert',
+    'Integration',
+    HookTiming.before,
+    [DbAction.upsert],
+    async ({ args }) => {
+      const write = args as WriteArgs<IntegrationRow>;
+      const target = await db.withDeleted(() =>
+        db.integration.findFirst({ where: write.where as never }),
+      );
+      if (!target) return assertOwnerSingletonFree(write.create ?? {});
+      if (target.deletedAt) await assertOwnerSingletonFree(target);
     },
   );
 

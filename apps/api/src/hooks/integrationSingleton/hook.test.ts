@@ -126,4 +126,24 @@ describe('integrationSingleton hook', () => {
       }),
     ).rejects.toMatchObject({ status: 409 });
   });
+
+  it('an upsert refreshes the live singleton itself, and reviving a removed one onto a live one is refused', async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: removed } = await orgIntegration(organization.id, singletonProvider);
+    await db.integration.update({ where: { id: removed.id }, data: { deletedAt: new Date() } });
+    const { entity: live } = await orgIntegration(organization.id, singletonProvider);
+    const create = {
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+      provider: singletonProvider,
+      name: 'Linear',
+    } as never;
+
+    await db.integration.upsert({ where: { id: live.id }, create, update: { name: 'renamed' } });
+    await expect(
+      db.withDeleted(() =>
+        db.integration.upsert({ where: { id: removed.id }, create, update: { deletedAt: null } }),
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+  });
 });
