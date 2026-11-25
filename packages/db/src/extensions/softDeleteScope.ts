@@ -94,7 +94,7 @@ export const notDeletedIncludes = (
     for (const key of ['include', 'select'] as const) {
       if (isPlainObject(entry[key])) entry[key] = notDeletedIncludes(field.type, entry[key]);
     }
-    if (field.isList) {
+    if (field.isList || !field.isRequired) {
       if (isPlainObject(entry.where)) {
         entry.where = notDeletedWhere(field.type, entry.where);
       } else {
