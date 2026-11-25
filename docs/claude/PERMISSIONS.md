@@ -236,7 +236,9 @@ Creating checks `create` on a pseudo record of the model being created (token cr
 
 ### Person-Only Actions
 
-Some actions are for a person, not a token: minting and updating a token (`create` on `db:Token`), deleting an organization, `user.redact`, `user.rotateJwts`, `user.changePassword`, and `delegateFull` on every model that has it. Their rules include `actorIsUser` (`actor:Acting.model equals User`). Creating an organization takes a user behind the actor: `actorIsUser` or `actorIsDelegateOfUser` (a token owned by a user). A token holding `own` still cannot take a person-only action, and because the grant check runs with no actor, a person-only action can never be granted as an entitlement.
+Some actions are for a person, not a token: minting and updating a token (`create` on `db:Token`), deleting an organization, `user.redact`, `user.rotateJwts`, `user.changePassword`, `user.manageTwoFactor`, and `delegateFull` on every model that has it. Their rules include `actorIsUser` (`actor:Acting.model equals User`). Creating an organization takes a user behind the actor: `actorIsUser` or `actorIsDelegateOfUser` (a token owned by a user). A token holding `own` still cannot take a person-only action, and because the grant check runs with no actor, a person-only action can never be granted as an entitlement.
+
+**Why `RouteArgs.forbid` stays outside the permission schema:** a superadmin passes every permission-schema check on any credential by design. Transport and credential-kind restrictions that must still apply to superadmins — forbidding API tokens, user JWTs, spoofing, or batching (`forbid: { tokens, jwt, spoof, batch }`) — therefore live on `RouteArgs` (enforced by `makeForbidMiddleware` in `prepareMiddleware`), not in `packages/permissions/src/rebac/schema.ts`. See [AUTH.md](./AUTH.md#two-factor-authentication-passkey--totp).
 
 ### The Actor
 
@@ -264,7 +266,7 @@ Integration resource status (`changeStatus`; `PATCH /integrationResource/:id`). 
 
 Aron, 2026-11-22: "integration resources should be able to move missing to tracked, but should not be able to touch untracked." A token of a different integration fails even when granted `manage` on this one.
 
-Registering (`register`; `POST /integration/:id/integrationResources`) is a new key created tracked (`create`) plus the same paths as `changeStatus`: a not-deleted row may make any move above, and a removed row any move except staying untracked (that path's `from` holds `notDeleted`). So a removed untracked resource comes back only when a person registers it with `status: 'tracked'`; otherwise the answer is 409 (Aron, 2026-11-22: "You have to track it to revive it"), and an integration re-registering its resources never undoes a person's untrack.
+Registering (`register`; `POST /integration/:id/integrationResources`) takes only (`validateIntegrationResource`, 422 otherwise) a kind, identifier and metadata the integration's provider declares in the `@inixiative/integrations` catalog (an integration with no provider takes none), and is a new key created tracked (`create`) plus the same paths as `changeStatus`: a not-deleted row may make any move above, and a removed row any move except staying untracked (that path's `from` holds `notDeleted`). So a removed untracked resource comes back only when a person registers it with `status: 'tracked'`; otherwise the answer is 409 (Aron, 2026-11-22: "You have to track it to revive it"), and an integration re-registering its resources never undoes a person's untrack.
 
 ## Member Rows
 

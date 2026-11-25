@@ -8,7 +8,7 @@ import type { AttributeModelName } from '@template/db/lib/attributes/registry';
 import { resolveAttributeTarget } from '@template/db/lib/attributes/resolveAttributeTarget';
 import type { AttributeOperatorOptions } from '@template/db/lib/attributes/types';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { parseAttributeValueOrThrow } from '@template/shared/attributes';
+import { parseAttributeValue } from '@template/shared/attributes';
 
 /** Prisma `where` matching an attribute whose scalar value (`boolean`, `text`, `number`, `date`) is in `values`. */
 export const attributeWhereIn = (
@@ -26,7 +26,7 @@ export const attributeWhereIn = (
   }
 
   const parsed = values.map((item) =>
-    parseAttributeValueOrThrow(valueType, item, `attributeWhereIn(${model}, '${locator}')`),
+    parseAttributeValue(valueType, item, `attributeWhereIn(${model}, '${locator}')`),
   );
   return { ...locatorFilter, [column]: { in: parsed } };
 };

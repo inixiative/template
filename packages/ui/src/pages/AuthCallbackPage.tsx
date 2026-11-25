@@ -5,10 +5,10 @@
  * @uses none
  */
 import { useNavigate } from '@tanstack/react-router';
-import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { completeOAuthSignIn } from '@template/ui/lib/auth/signIn';
 import { describeError } from '@template/ui/lib/describeError';
 import { log } from '@template/ui/lib/logger';
+import { safeInternalRedirect } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
 import { useEffect, useRef } from 'react';
 
@@ -30,13 +30,14 @@ export const AuthCallbackPage = () => {
         if (!oneTimeToken) throw new Error('No authentication token received');
 
         await completeOAuthSignIn(oneTimeToken);
+        await useAppStore.getState().auth.refreshMe();
 
-        await fetchAndHydrateMe(useAppStore.setState, useAppStore.getState);
-
-        const redirectTo = localStorage.getItem('authRedirectTo') || '/dashboard';
+        const storedRedirect = localStorage.getItem('authRedirectTo') || undefined;
         localStorage.removeItem('authRedirectTo');
-
-        navigate({ to: redirectTo });
+        const redirectTo = safeInternalRedirect(storedRedirect);
+        useAppStore
+          .getState()
+          .navigation.navigateKeepingSearchParams(redirectTo, storedRedirect ? 'spoof' : 'context');
       } catch (error) {
         log.error('OAuth callback failed:', error);
         navigate({

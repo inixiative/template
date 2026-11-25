@@ -5,10 +5,7 @@
  * @uses infrastructure:prisma, primitive:routeTemplates
  */
 import { z } from '@hono/zod-openapi';
-import {
-  attributeColumnForValueType,
-  attributeTypedColumnIssues,
-} from '@template/shared/attributes';
+import { AttributeValidationError, validateAttributeValue } from '@template/shared/attributes';
 import {
   SettingCategoryKeySchema,
   SettingKeySchema,
@@ -67,17 +64,17 @@ export const makeSettingUpsertItemRefinement =
       return;
     }
 
-    const targetColumn = attributeColumnForValueType(definition.valueType);
-    const checked = attributeTypedColumnIssues(
-      definition.valueType,
-      { [targetColumn]: item.value },
-      definition.schema,
-    );
-    if (!checked.ok) {
-      for (const issue of checked.issues) {
+    // why: Zod superRefine accumulates fieldErrors per array item via ctx.addIssue; letting a throw escape aborts safeParseAsync.
+    try {
+      validateAttributeValue(definition.valueType, item.value, definition.schema, {
+        pathPrefix: ['value'],
+      });
+    } catch (err) {
+      if (!(err instanceof AttributeValidationError)) throw err;
+      for (const issue of err.issues) {
         ctx.addIssue({
           code: 'custom',
-          path: ['value', ...(issue.path?.slice(1) ?? [])],
+          path: issue.path ?? ['value'],
           message: issue.message,
         });
       }

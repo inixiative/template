@@ -4,23 +4,34 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates
  */
-
+import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
+import type { Context } from 'hono';
 import { actingUser } from '#/lib/context/actingUser';
+import { isTwoFactorRequired } from '#/lib/twoFactor/isTwoFactorRequired';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadRoute } from '#/modules/me/routes/meRead';
+import type { AppEnv } from '#/types/appEnv';
+
+const twoFactorActionFor = (
+  c: Context<AppEnv>,
+  twoFactorEnabled: boolean,
+): TwoFactorAction | null => {
+  if (c.get('token') || c.get('spoofedBy')) return null;
+  if (isTwoFactorRequired() && !twoFactorEnabled) return 'enroll';
+  if (c.get('jwtTwoFactorVerified')) return null;
+  return twoFactorEnabled ? 'verify' : null;
+};
 
 export const meReadController = makeController(meReadRoute, async (c, respond) => {
   const user = actingUser(c)!;
-  const organizationUsers = c.get('organizationUsers');
-  const organizations = c.get('organizations');
-  const spaceUsers = c.get('spaceUsers');
-  const spaces = c.get('spaces');
+  const twoFactorAction = twoFactorActionFor(c, user.twoFactorEnabled);
 
   return respond.ok({
     ...user,
-    organizationUsers: organizationUsers || [],
-    organizations: organizations || [],
-    spaceUsers: spaceUsers || [],
-    spaces: spaces || [],
+    organizationUsers: twoFactorAction ? [] : (c.get('organizationUsers') ?? []),
+    organizations: twoFactorAction ? [] : (c.get('organizations') ?? []),
+    spaceUsers: twoFactorAction ? [] : (c.get('spaceUsers') ?? []),
+    spaces: twoFactorAction ? [] : (c.get('spaces') ?? []),
+    twoFactorAction,
   });
 });

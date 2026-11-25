@@ -10,6 +10,6 @@ export * from './typing/columns';
 export * from './typing/definition';
 export * from './typing/permission';
 export * from './typing/valueTypes';
-export * from './writing/attributeTypedColumnIssues';
 export * from './writing/encodeAttributeValue';
 export * from './writing/validateAttributeTypedColumns';
+export * from './writing/validateAttributeValue';

@@ -71,7 +71,17 @@ export const tombstoneChildren = async (model: string, rows: Row[], deletedAt: u
   }
 };
 
+const resetRevivedUsersTwoFactorFlag = async (rows: Row[]) => {
+  const userIds = rows.map((row) => row.id).filter((id): id is string => typeof id === 'string');
+  if (!userIds.length) return;
+  await db.user.updateManyAndReturn({
+    where: { id: { in: userIds }, twoFactorEnabled: true },
+    data: { twoFactorEnabled: false, jwtVersion: { increment: 1 } },
+  });
+};
+
 export const reviveChildren = async (model: string, rows: Row[], priorDeletedAt: unknown) => {
+  if (model === 'User') await resetRevivedUsersTwoFactorFlag(rows);
   for (const child of childRelations(model)) {
     if (isHardDeletedOnTombstone(child.model)) {
       await REGENERATE_ON_REVIVE[child.model]?.(model, rows);

@@ -7,5 +7,8 @@
 import { createAuthGuards } from '@template/ui/guards/authGuard';
 import { useAppStore } from '@template/ui/store';
 
-export const { redirectToLoginUnlessAuthenticated, redirectAuthenticatedUserAwayFromPublicPage } =
-  createAuthGuards(() => useAppStore.getState());
+export const {
+  redirectToLoginUnlessAuthenticated,
+  redirectUnlessTwoFactorRequired,
+  redirectAuthenticatedUserAwayFromPublicPage,
+} = createAuthGuards(() => useAppStore.getState());

@@ -58,8 +58,14 @@ describe('integration resource status transitions', () => {
 
   beforeEach(async () => {
     owner = (await createUser()).entity;
-    integration = (await createIntegration({ ownerModel: 'User', userId: owner.id, full: true }))
-      .entity;
+    integration = (
+      await createIntegration({
+        ownerModel: 'User',
+        userId: owner.id,
+        full: true,
+        provider: 'slack',
+      })
+    ).entity;
     person = await asPerson(owner);
     itsIntegration = await asIntegration(integration);
   });

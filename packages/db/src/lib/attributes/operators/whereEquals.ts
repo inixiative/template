@@ -9,7 +9,7 @@ import type { AttributeModelName } from '@template/db/lib/attributes/registry';
 import { resolveAttributeTarget } from '@template/db/lib/attributes/resolveAttributeTarget';
 import type { AttributeOperatorOptions } from '@template/db/lib/attributes/types';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { parseAttributeValueOrThrow } from '@template/shared/attributes';
+import { parseAttributeValue } from '@template/shared/attributes';
 
 /**
  * Prisma `where` matching an exact attribute locator + typed column value (supports all 6 valueTypes).
@@ -30,7 +30,7 @@ export const attributeWhereEquals = (
     );
   }
 
-  const parsed = parseAttributeValueOrThrow(
+  const parsed = parseAttributeValue(
     valueType,
     value,
     `attributeWhereEquals(${model}, '${locator}')`,

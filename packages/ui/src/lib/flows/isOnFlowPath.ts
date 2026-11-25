@@ -6,8 +6,9 @@
  */
 import type { Flow } from '@template/sdk';
 import { pathnameOf } from '@template/ui/lib/flows/pathnameOf';
+import { TWO_FACTOR_PATH } from '@template/ui/lib/routeRedirect';
 
-const ALWAYS_ON_PATH = ['/login', '/auth/callback', '/dashboard'];
+const ALWAYS_ON_PATH = ['/login', '/auth/callback', TWO_FACTOR_PATH, '/dashboard'];
 
 export const isOnFlowPath = (pathname: string, flow: Flow): boolean =>
   [

@@ -338,14 +338,29 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
           .status,
       ).toBe(422);
 
-      // Invalid timezone
-      expect(
-        (
-          await ownerApp.fetch(
-            patch('/api/v1/me/settings', [{ key: 'general.defaultTimezone', value: 'Not/A_Zone' }]),
-          )
-        ).status,
-      ).toBe(422);
+      // Invalid timezone returns standard 422 fieldErrors envelope
+      const invalidTzRes = await ownerApp.fetch(
+        patch('/api/v1/me/settings', [{ key: 'general.defaultTimezone', value: 'Not/A_Zone' }]),
+      );
+      expect(invalidTzRes.status).toBe(422);
+      const invalidTzBody = (await invalidTzRes.json()) as {
+        fieldErrors?: Record<string, string[]>;
+      };
+      expect(invalidTzBody.fieldErrors?.['0.value']?.length).toBeGreaterThan(0);
+
+      // Multi-error batch collects fieldErrors across all failing items with array-indexed paths
+      const multiErrRes = await ownerApp.fetch(
+        patch(`/api/v1/project/${orgProject.id}/settings`, [
+          { key: 'general.displayLocale', value: 'en' },
+          { key: 'general.defaultTimezone', value: 'Not/A_Zone' },
+        ]),
+      );
+      expect(multiErrRes.status).toBe(422);
+      const multiErrBody = (await multiErrRes.json()) as {
+        fieldErrors?: Record<string, string[]>;
+      };
+      expect(multiErrBody.fieldErrors?.['0.key']?.length).toBeGreaterThan(0);
+      expect(multiErrBody.fieldErrors?.['1.value']?.length).toBeGreaterThan(0);
 
       // Disallowed resourceModel (displayLocale is not on Project)
       expect(

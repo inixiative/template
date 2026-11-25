@@ -5,8 +5,9 @@
  * @uses primitive:shared
  */
 import type { ApiErrorBody } from '@template/shared/errors';
+import { isTwoFactorReverifyError } from '@template/ui/lib/auth/twoFactor';
 import { formatFieldErrors } from '@template/ui/lib/formatFieldErrors';
-import { navigateToLogin } from '@template/ui/lib/routeRedirect';
+import { navigateToLogin, navigateToTwoFactorReverify } from '@template/ui/lib/routeRedirect';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
 
@@ -16,6 +17,16 @@ export const doesQueryMetaSkipErrorToast = (meta: unknown) => {
 };
 
 export const showApiErrorToast = (error: unknown) => {
+  if (isTwoFactorReverifyError(error)) {
+    toast.error('Two-factor verification required.', {
+      action: {
+        label: 'Verify 2FA',
+        onClick: () => navigateToTwoFactorReverify(useAppStore.getState),
+      },
+    });
+    return;
+  }
+
   let message = 'An error occurred';
   let guidance: ApiErrorBody['guidance'] | undefined;
 

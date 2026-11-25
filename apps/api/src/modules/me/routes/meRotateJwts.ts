@@ -4,7 +4,6 @@
  * @partOf feature:users, feature:auth
  * @uses primitive:routeTemplates
  */
-
 import { UserAction } from '@template/permissions/client';
 import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
@@ -15,10 +14,10 @@ export const meRotateJwtsRoute = actionRoute({
   model: Modules.me,
   action: 'rotateJwts',
   skipId: true,
+  forbid: { tokens: true, batch: true },
   middleware: [validatePermission(UserAction.rotateUserJwts)],
   description:
     'Rotates your JWT version: every JWT this API has signed for you, on every device, stops working. ' +
     'Sign in again afterwards. Signing out of one browser needs no call; that browser drops its JWT.',
   tags: [OpenApiTags.me, OpenApiTags.user],
-  'x-batch': false,
 });

@@ -4,6 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
+import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
 import {
   type ChangePasswordInput,
   changePassword as changePasswordFn,
@@ -23,11 +24,16 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   const client = createAuthClient({ baseURL });
 
-  // After any auth change, sync the websocket identity. The server re-validates
-  // the token; the socket queues the send if it isn't open yet.
   const syncWsAuth = () => {
+    if (get().auth.twoFactorAction) return;
     const token = fetchStoredTokenAndClearIfExpired();
-    if (token) get().websocket.authenticate(token);
+    if (!token) return;
+    const spoofUserEmail = get().auth.spoofUserEmail;
+    if (spoofUserEmail) {
+      get().websocket.spoof(token, spoofUserEmail);
+    } else {
+      get().websocket.authenticate(token);
+    }
   };
 
   const clearLocalAuth = () => {
@@ -43,6 +49,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         spaceUsers: null,
         spoofUserEmail: null,
         spoofingUserEmail: null,
+        twoFactorAction: null,
         isAuthenticated: false,
       },
     }));
@@ -61,6 +68,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       strategy: { type: 'login' },
       spoofUserEmail: null,
       spoofingUserEmail: null,
+      twoFactorAction: null,
       isAuthenticated: false,
       isEmbedded: false,
       isInitialized: false,
@@ -87,11 +95,26 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       },
 
       signIn: async (method: AuthMethod) => {
-        await signInFn(method);
-        if (method.type !== 'oauth') {
+        const result = await signInFn(method);
+        if (result.status === 'authenticated') {
           await fetchAndHydrateMe(set, get);
           syncWsAuth();
         }
+        return result;
+      },
+
+      applyUpgradedJwt: (jwt, clearTwoFactorAction = true) => {
+        if (!jwt) return;
+        storeJwtHandoff(jwt);
+        if (clearTwoFactorAction) {
+          set((state: AppStore) => ({ auth: { ...state.auth, twoFactorAction: null } }));
+        }
+        syncWsAuth();
+      },
+
+      setTwoFactorAction: (action: TwoFactorAction | null) => {
+        set((state: AppStore) => ({ auth: { ...state.auth, twoFactorAction: action } }));
+        if (action === null) syncWsAuth();
       },
 
       signUp: async (method: AuthMethod) => {

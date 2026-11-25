@@ -4,11 +4,13 @@
  * @partOf feature:users
  * @uses infrastructure:prisma, primitive:shared, feature:contact
  */
-import type { Prisma } from '@template/db';
+import { Prisma } from '@template/db';
 import type { ContactType } from '@template/db/generated/client/enums';
 import { ContactRegistry } from '@template/shared/contact';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
+import { clearPendingTotpSetup } from '#/lib/twoFactor/pendingTotpSetup';
+import { clearPendingWebAuthnChallenges } from '#/lib/twoFactor/pendingWebAuthnChallenge';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -48,6 +50,30 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
     data: { deletedAt: now },
   });
 
+  const twoFactor = await db.twoFactor.findFirst({
+    where: { userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (twoFactor) {
+    await db.twoFactor.update({
+      where: { id: twoFactor.id },
+      data: {
+        encryptedTotpSecret: null,
+        encryptedTotpSecretMetadata: Prisma.DbNull,
+        encryptedTotpSecretKeyVersion: null,
+        totpVerifiedAt: null,
+        backupCodeHashes: [],
+        backupCodesGeneratedAt: null,
+        deletedAt: now,
+      },
+    });
+  }
+  await db.passkey.updateManyAndReturn({
+    where: { userId, deletedAt: null },
+    data: { name: '[DELETED]', deletedAt: now },
+  });
+  await Promise.all([clearPendingTotpSetup(userId), clearPendingWebAuthnChallenges(userId)]);
+
   // Ephemeral auth state — hard delete.
   await db.account.deleteMany({ where: { userId } });
   await db.webhookSubscription.deleteMany({ where: { userId, ownerModel: 'User' } });
@@ -86,6 +112,7 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
     data: {
       email: `deleted-${userId}@deleted.null`,
       emailVerified: false,
+      twoFactorEnabled: false,
       name: '[DELETED]',
       displayName: '[DELETED]',
       image: null,

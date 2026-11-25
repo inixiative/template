@@ -65,14 +65,19 @@ type AuthMethod =
   | { type: 'oauth'; provider: string; callbackURL?: string }
   | { type: 'saml'; provider: string; email?: string };
 
-signIn(method: AuthMethod): Promise<void>
+signIn(method: AuthMethod): Promise<SignInResult>
 signUp(method: AuthMethod): Promise<SignUpResult>
+
+type SignInResult = { status: 'authenticated' } | { status: 'redirecting' };
 
 type SignUpResult =
   | { status: 'authenticated' }
   | { status: 'verification-pending'; email: string }
   | { status: 'redirecting' };
 ```
+
+- **Two-factor sign-in & enrollment:** Email and OAuth sign-in always return a User JWT (15-minute pre-2FA JWT when 2FA enrollment or verification is required). `fetchAndHydrateMe` stores `twoFactorAction: 'enroll' | 'verify' | null` from `GET /api/v1/me`, and `redirectToLoginUnlessAuthenticated` in `authGuard.ts` immediately redirects pre-2FA sessions to the standalone `/two-factor` page (`/_public/two-factor.tsx` → `TwoFactorPage`) with the same `redirectTo` and `['org', 'space', 'spoof', 'flow']` preservation as `/login` (`/two-factor` is also in `isOnFlowPath`'s `ALWAYS_ON_PATH` so active flows stay alive). `TwoFactorPage` renders `TwoFactorVerifyForm` (`verify`) or `TwoFactorSecurityCard` (`enroll`), trades the pre-2FA JWT for the upgraded 30-day JWT via `auth.applyUpgradedJwt`, and returns via `navigateKeepingSearchParams(safeInternalRedirect(search.redirectTo), 'context')`.
+- **Profile security & 15-minute re-verification:** `UserProfilePage` mounts `TwoFactorSecurityCard` below `ChangePasswordCard` for passkeys (`@simplewebauthn/browser`), TOTP setup/rotation, and backup code regeneration. When a sensitive mutation returns `403 TWO_FACTOR_REVERIFY_REQUIRED`, `showApiErrorToast` (and `TwoFactorSecurityCard`'s inline error banner) offers a **Verify 2FA** action button (same pattern as `reauthenticate`'s Login button) that navigates to `/two-factor` and returns once verified — keeping `apiMutation` and `createAppQueryClient` completely free of 2FA retry/intercept machinery.
 
 - `signIn` / `signUp` live in `packages/ui/src/lib/auth/{signIn,signUp}.ts`; the store wraps them (`auth.signIn`, `auth.signUp`).
 - `signUp` with email requires `name`. The API requires email verification, so a new account usually returns `verification-pending` and stays logged out.
@@ -138,7 +143,7 @@ const { providers, isLoading, error } = useAuthProviders();
 
 1. Read `ott` from the URL fragment, then strip the fragment with `history.replaceState`.
 2. `completeOAuthSignIn(ott)` → `client.oneTimeToken.verify` → `storeJwtHandoff(data)` (the API has already deleted the handshake session).
-3. `fetchAndHydrateMe(useAppStore.setState, useAppStore.getState)`.
+3. `useAppStore.getState().auth.refreshMe()` (hydrates `/me` and syncs the websocket once 2FA is satisfied).
 4. Navigate to `localStorage.authRedirectTo` (then remove it) or `/dashboard`.
 5. On failure: log, then navigate to `/login?error=<message>`.
 

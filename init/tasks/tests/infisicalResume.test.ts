@@ -100,10 +100,9 @@ describe('Infisical Resume Scenario', () => {
     infisicalApi.vcr.queue('setSecret', 'envProd');
     infisicalApi.vcr.queue('setSecret', 'envStaging');
     // Encryption-keys step always iterates (no isComplete guard) so we can
-    // detect newly-added ENCRYPTED_MODELS prefixes. Template has 1 prefix
-    // (AUTH_PROVIDER_SECRETS) × 2 envs × 2 keys (VERSION, KEY_CURRENT) = 4
-    // fetchSecret probes; existing values short-circuit the writes.
-    for (let i = 0; i < 4; i++) infisicalApi.vcr.queue('fetchSecret', 'prodApiUrl');
+    // detect newly-added ENCRYPTED_MODELS prefixes (AUTH_PROVIDER_SECRETS,
+    // JWKS_PRIVATE_KEY, TWO_FACTOR_SECRET) × 2 envs × 2 keys (VERSION, KEY_CURRENT).
+    for (let i = 0; i < 12; i++) infisicalApi.vcr.queue('fetchSecret', 'prodApiUrl');
   });
 
   afterEach(() => {

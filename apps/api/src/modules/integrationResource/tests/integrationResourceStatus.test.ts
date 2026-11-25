@@ -31,7 +31,9 @@ describe('integration resource status and removal', () => {
 
   beforeEach(async () => {
     user = (await createUser()).entity;
-    integration = (await createIntegration({ ownerModel: 'User', userId: user.id })).entity;
+    integration = (
+      await createIntegration({ ownerModel: 'User', userId: user.id, provider: 'slack' })
+    ).entity;
     ({ fetch, db } = harnessFor(user));
   });
 
@@ -68,7 +70,11 @@ describe('integration resource status and removal', () => {
       { status: 'missing' },
       { integration },
     );
-    const { entity: other } = await createIntegration({ ownerModel: 'User', userId: user.id });
+    const { entity: other } = await createIntegration({
+      ownerModel: 'User',
+      userId: user.id,
+      provider: 'slack',
+    });
     await createIntegrationResource({ status: 'untracked' }, { integration: other });
 
     expect((await listed()).sort()).toEqual([tracked.id, missing.id].sort());

@@ -37,9 +37,18 @@ export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 
   const user = await findUserWithRelations(claims.sub);
   if (!user) throw unauthorized();
-  if (claims.iss === userJwtIssuerUrlOrThrow() && claims.ver !== user.jwtVersion)
-    throw unauthorized();
+  const isPlatformIssued = claims.iss === userJwtIssuerUrlOrThrow();
+  if (isPlatformIssued && claims.ver !== user.jwtVersion) throw unauthorized();
 
+  c.set('authCredentialKind', 'jwt');
+  c.set('jwtIsPlatformIssued', isPlatformIssued);
+  c.set('jwtTwoFactorVerified', isPlatformIssued && claims.twoFactor === true);
+  c.set(
+    'jwtTwoFactorVerifiedAt',
+    isPlatformIssued && claims.twoFactor === true && typeof claims.twoFactorVerifiedAt === 'number'
+      ? claims.twoFactorVerifiedAt
+      : null,
+  );
   await setUserContext(c, user);
   await next();
 };

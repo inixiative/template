@@ -20,6 +20,8 @@ export const ParentEdgeRegistry = {
   Entitlement: { axis: 'targetModel' },
   ProjectIntegration: { parent: 'Project', foreignKey: 'projectId' },
   Setting: { axis: 'resourceModel' },
+  TwoFactor: { parent: 'User', foreignKey: 'userId' },
+  Passkey: { parent: 'User', foreignKey: 'userId' },
 } as const satisfies Partial<Record<ModelName, ParentEdge>>;
 
 const parentEdges: Partial<Record<ModelName, ParentEdge>> = ParentEdgeRegistry;
