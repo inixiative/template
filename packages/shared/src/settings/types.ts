@@ -4,6 +4,8 @@
  * @partOf primitive:shared
  * @uses none
  */
+
+import type { Provider } from '@template/db/generated/client/enums';
 import type { AttributeFieldDefinition, AttributeValueType } from '@template/shared/attributes';
 import type {
   SettingPermissionSpec,
@@ -29,7 +31,7 @@ export type SettingDefinition<
   readonly key: TKey;
   readonly category: TCategory;
   readonly resourceModels: readonly SettingResourceModelName[];
-  readonly integrationProviders?: readonly string[];
+  readonly integrationProviders?: readonly Provider[];
   readonly valueType: AttributeValueType;
   readonly schema: z.ZodType<TValue>;
   readonly defaultValue: TValue | null;

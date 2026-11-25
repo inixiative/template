@@ -14,7 +14,7 @@ import { integrationOwnerKey } from '#/modules/integration/services/integrationO
 type IntegrationRow = Partial<Integration>;
 type ConnectInput = { connect?: { id?: string } };
 type LinkRow = Partial<ProjectIntegration> & { project?: ConnectInput; integration?: ConnectInput };
-type WriteArgs<T, W> = { data?: T | T[]; create?: T; where?: W };
+type WriteArgs<T, W> = { data?: T | T[]; create?: T; update?: T; where?: W };
 type IntegrationWrite = WriteArgs<IntegrationRow, Prisma.IntegrationWhereInput>;
 type LinkWrite = WriteArgs<LinkRow, Prisma.ProjectIntegrationWhereInput>;
 
@@ -114,7 +114,8 @@ export const registerIntegrationSingletonHook = () => {
       const write = args as IntegrationWrite;
       const target = await db.withDeleted(() => db.integration.findFirst({ where: write.where }));
       if (!target) return assertOwnerSingletonFree(write.create ?? {});
-      if (target.deletedAt) await assertOwnerSingletonFree(target);
+      if (target.deletedAt && write.update?.deletedAt === null)
+        await assertOwnerSingletonFree(target);
     },
   );
 

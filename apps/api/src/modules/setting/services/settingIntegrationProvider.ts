@@ -7,7 +7,6 @@
 import { db } from '@template/db';
 import type { Provider, SettingResourceModel } from '@template/db/generated/client/enums';
 
-/** The provider that decides which settings apply to an Integration or ProjectIntegration. */
 export const settingIntegrationProvider = async (
   resourceModel: SettingResourceModel,
   resource: Record<string, unknown>,

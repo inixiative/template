@@ -30,9 +30,7 @@ export const settingInfoController = makeController(settingInfoRoute, async (_c,
         label: definition.label,
         description: definition.description,
         resourceModels: [...definition.resourceModels] as SettingResourceModel[],
-        integrationProviders: (definition as SettingDefinition).integrationProviders as
-          | Provider[]
-          | undefined,
+        integrationProviders: (definition as SettingDefinition).integrationProviders?.slice(),
         valueType: definition.valueType,
         schema: toJsonSchema(definition.schema, 'input'),
         defaultValue: definition.defaultValue,

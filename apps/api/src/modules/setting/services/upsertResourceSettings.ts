@@ -66,7 +66,7 @@ export const upsertResourceSettings = async (
     )
       throw makeError({
         status: 422,
-        message: `Setting '${item.key}' does not apply to a ${integrationProvider} integration`,
+        message: `Setting '${item.key}' does not apply to ${integrationProvider ? `a ${integrationProvider}` : 'this'} integration`,
       });
   }
 

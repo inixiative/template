@@ -119,11 +119,15 @@ describe('integrationSingleton hook', () => {
     const { entity: third } = await orgIntegration(organization.id, singletonProvider);
     await createProjectIntegration({}, { project, integration: second });
     await expect(
-      db.projectIntegration.create({
-        data: {
+      db.projectIntegration.upsert({
+        where: {
+          projectId_integrationId: { projectId: project.id, integrationId: third.id },
+        },
+        create: {
           project: { connect: { id: project.id } },
           integration: { connect: { id: third.id } },
         },
+        update: {},
       }),
     ).rejects.toMatchObject({ status: 409 });
   });

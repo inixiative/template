@@ -4,7 +4,11 @@
  * @partOf feature:integrations
  * @uses none
  */
+import { emptySideKeyColumns, polymorphicAxis, polymorphicKeyColumns } from '@template/db';
 import type { Integration } from '@template/db/generated/client/client';
+import { pick } from 'lodash-es';
+
+const ownerAxis = polymorphicAxis('Integration', 'ownerModel');
 
 export const integrationOwnerKey = (
   row: Partial<
@@ -13,7 +17,8 @@ export const integrationOwnerKey = (
 ) => ({
   provider: row.provider,
   ownerModel: row.ownerModel,
-  organizationId: row.organizationId ?? null,
-  spaceId: row.spaceId ?? null,
-  userId: row.userId ?? null,
+  ...emptySideKeyColumns(ownerAxis),
+  ...(row.ownerModel
+    ? pick(row, polymorphicKeyColumns('Integration', 'ownerModel', row.ownerModel))
+    : {}),
 });

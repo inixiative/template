@@ -13,6 +13,7 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
+import { settingAppliesToIntegrationProvider } from '@template/shared/settings';
 import {
   Badge,
   Button,
@@ -239,6 +240,7 @@ const IntegrationProviderSection = ({
                         model: 'Integration',
                         id: integration.id,
                         record: integration as unknown as HydratedRecord,
+                        integrationProvider: integration.provider ?? undefined,
                       }}
                       title={`${integration.name} settings`}
                     />
@@ -280,12 +282,15 @@ const IntegrationOwnerSection = ({
   const queryClient = useQueryClient();
   const permissions = useAppStore((state) => state.permissions);
   const { catalog } = useSettingCatalog();
-  const hasIntegrationSettings = Boolean(
-    catalog &&
-      Object.values(catalog.definitions).some((definition) =>
-        definition.resourceModels.includes('Integration'),
-      ),
-  );
+  const hasIntegrationSettings = (provider: IntegrationProvider | null) =>
+    Boolean(
+      catalog &&
+        Object.values(catalog.definitions).some(
+          (definition) =>
+            definition.resourceModels.includes('Integration') &&
+            settingAppliesToIntegrationProvider(definition, provider ?? undefined),
+        ),
+    );
   const integrationQueries = integrationContextQueries(context, ownership);
   const canManage =
     ownership?.ownedByMyMembership ||
@@ -365,7 +370,7 @@ const IntegrationOwnerSection = ({
               canConnect={canConnectProvider(provider)}
               showStatus
               canManage={canManage}
-              hasIntegrationSettings={hasIntegrationSettings}
+              hasIntegrationSettings={hasIntegrationSettings(provider)}
               sectionId={`${sectionIdPrefix}connect-${provider}`}
               renderConnect={renderConnect(provider)}
               onDelete={handleDelete}
@@ -383,7 +388,7 @@ const IntegrationOwnerSection = ({
         canConnect={canManage}
         showStatus={false}
         canManage={canManage}
-        hasIntegrationSettings={hasIntegrationSettings}
+        hasIntegrationSettings={hasIntegrationSettings(null)}
         sectionId={`${sectionIdPrefix}add-custom`}
         renderConnect={renderConnect(null)}
         onDelete={handleDelete}
