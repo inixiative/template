@@ -6,6 +6,7 @@
  */
 import {
   DbAction,
+  db,
   type HookOptions,
   HookTiming,
   type ManyAction,
@@ -19,6 +20,8 @@ import {
   syncArtifactSubgraph,
 } from '#/hooks/artifactTree/syncArtifactTree';
 import { ALL_MUTATION_ACTIONS, isManyAction } from '#/hooks/shared/hookRows';
+import { makeError } from '#/lib/errors';
+import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
 
 type Row = Record<string, unknown> & { id?: string };
 
@@ -42,12 +45,56 @@ const changedPairs = (options: HookOptions): { result?: Row; previous?: Row }[] 
 
 export const registerArtifactTreeHook = () => {
   registerDbHook(
+    'artifactTree:placementOwner',
+    'ArtifactPlacement',
+    HookTiming.before,
+    [DbAction.create, DbAction.createManyAndReturn],
+    async (options: HookOptions) => {
+      const rawData = (options.args as { data?: Row | Row[] } | undefined)?.data;
+      const rows = Array.isArray(rawData) ? rawData : rawData ? [rawData] : [];
+      const containerIds = [
+        ...new Set(
+          rows.flatMap((row) =>
+            typeof row.containerArtifactId === 'string' ? [row.containerArtifactId] : [],
+          ),
+        ),
+      ];
+      if (containerIds.length === 0) return;
+      const containers = await db.withoutDeleted(() =>
+        db.artifact.findMany({
+          where: { id: { in: containerIds } },
+          select: { id: true, ownerModel: true, userId: true, organizationId: true, spaceId: true },
+        }),
+      );
+      const containerById = new Map(containers.map((container) => [container.id, container]));
+      for (const row of rows) {
+        if (typeof row.containerArtifactId !== 'string') continue;
+        const container = containerById.get(row.containerArtifactId);
+        if (!container) continue;
+        const candidate = {
+          ownerModel: row.ownerModel,
+          userId: row.userId ?? null,
+          organizationId: row.organizationId ?? null,
+          spaceId: row.spaceId ?? null,
+        } as OwnedArtifact;
+        if (!sameArtifactOwner(candidate, container)) {
+          throw makeError({
+            status: 422,
+            message: 'ArtifactPlacement owner must match its containerArtifact owner',
+          });
+        }
+      }
+    },
+  );
+
+  registerDbHook(
     'artifactTree:placement',
     'ArtifactPlacement',
     HookTiming.after,
     ALL_MUTATION_ACTIONS,
     async (options: HookOptions) => {
       const artifactIds = changedPairs(options).flatMap(({ result, previous }) => {
+        if (!result?.containerArtifactId && !previous?.containerArtifactId) return [];
         const ids: string[] = [];
         if (typeof result?.artifactId === 'string') ids.push(result.artifactId);
         if (typeof previous?.artifactId === 'string') ids.push(previous.artifactId);
@@ -79,21 +126,23 @@ export const registerArtifactTreeHook = () => {
     async (options: HookOptions) => {
       const pairs = changedPairs(options);
       const subgraphIds: string[] = [];
-      const publicChangedIds: string[] = [];
+      const visibilityChangedIds: string[] = [];
       for (const { result, previous } of pairs) {
         if (!result || typeof result.id !== 'string') continue;
         const { id } = result;
-        const accessChanged = previous && result.access !== previous.access;
-        const inheritChanged =
-          accessChanged && (result.access === 'private') !== (previous.access === 'private');
+        const accessChanged = Boolean(previous && result.access !== previous.access);
         const revived = previous?.deletedAt != null && result.deletedAt == null;
-        if (inheritChanged || revived) subgraphIds.push(id);
-        if (accessChanged && (result.access === 'public' || previous.access === 'public')) {
-          publicChangedIds.push(id);
-        }
+        if (accessChanged || revived) subgraphIds.push(id);
+        const visibilityChanged =
+          accessChanged &&
+          (result.access === 'public' ||
+            previous?.access === 'public' ||
+            result.access === 'tenant' ||
+            previous?.access === 'tenant');
+        if (visibilityChanged) visibilityChangedIds.push(id);
       }
       await syncArtifactSubgraph(subgraphIds);
-      await invalidateInheritingDescendants(publicChangedIds);
+      await invalidateInheritingDescendants(visibilityChangedIds);
     },
   );
 };

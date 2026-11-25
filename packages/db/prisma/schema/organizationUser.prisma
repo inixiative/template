@@ -30,6 +30,7 @@ model OrganizationUser {
   emailComponents    EmailComponent[]
   auditLogsAsSubject AuditLog[]           @relation("AuditLogSubjectOrganizationUser")
   ownedArtifacts     Artifact[]           @relation("ArtifactOwnerOrganizationUser")
+  artifactPlacements ArtifactPlacement[]  @relation("ArtifactPlacementOwnerOrganizationUser")
   artifactGrants     ArtifactPermission[] @relation("ArtifactPermissionGranteeOrganizationUser")
 
   // ==========================================================================

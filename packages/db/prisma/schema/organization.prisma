@@ -43,6 +43,7 @@ model Organization {
   segments                        Segment[]
   settings                        Setting[]
   ownedArtifacts                  Artifact[]             @relation("ArtifactOwnerOrganization")
+  artifactPlacements              ArtifactPlacement[]    @relation("ArtifactPlacementOwnerOrganization")
   artifactGrants                  ArtifactPermission[]   @relation("ArtifactPermissionGranteeOrganization")
   resourceBindings                ResourceBinding[]      @relation("ResourceBindingOrganization")
 

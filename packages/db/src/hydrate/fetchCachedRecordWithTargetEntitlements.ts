@@ -26,7 +26,7 @@ import { memoize } from 'lodash-es';
 
 const DEFAULT_TTL = 60 * 60; // 1 hour
 
-// why: findResourceMiddleware and makeHydrator share the same Redis key, so cached rows must include @permissions(down) lists.
+// why: cache lookups and makeHydrator share the same Redis key, so cached rows must include @permissions(down) lists.
 const downIncludeOfAccessor = memoize((accessor: AccessorName): PrismaIncludeOfDown | undefined => {
   const fields = prismaMap.models[toModelName(accessor)]?.fields;
   if (!fields) return undefined;

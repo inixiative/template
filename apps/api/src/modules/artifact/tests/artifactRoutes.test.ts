@@ -9,6 +9,7 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   createArtifact,
+  createArtifactPermission,
   createArtifactPlacement,
   createOrganizationUser,
   createSpace,
@@ -23,6 +24,8 @@ import { artifactPlacementRouter } from '#/modules/artifactPlacement';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
+import { spaceRouter } from '#/modules/space';
+import { userRouter } from '#/modules/user';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
@@ -34,6 +37,8 @@ const mount: MountFn[] = [
     app.route('/api/v1/me', meRouter);
     app.route('/api/v1/organization', organizationRouter);
     app.route('/api/v1/organizationUser', organizationUserRouter);
+    app.route('/api/v1/space', spaceRouter);
+    app.route('/api/v1/user', userRouter);
   },
 ];
 
@@ -42,6 +47,7 @@ type Fetch = ReturnType<typeof createTestApp>['fetch'];
 describe('artifact routes', () => {
   let organization: Organization;
   let admin: User;
+  let adminMembership: OrganizationUser;
   let member: User;
   let memberMembership: OrganizationUser;
   let outsider: User;
@@ -74,6 +80,7 @@ describe('artifact routes', () => {
     const adminSeat = await createOrganizationUser({ role: 'admin' });
     organization = adminSeat.context.organization;
     admin = adminSeat.context.user;
+    adminMembership = adminSeat.entity;
     memberMembership = (await createOrganizationUser({ role: 'member' }, { organization })).entity;
     member = await db.user.findUniqueOrThrow({ where: { id: memberMembership.userId } });
     outsider = (await createUser()).entity;
@@ -366,6 +373,8 @@ describe('artifact routes', () => {
         nodes.push(entity);
         if (i > 0) {
           await createArtifactPlacement({
+            ownerModel: 'Organization',
+            organizationId: organization.id,
             artifactId: entity.id,
             containerArtifactId: nodes[i - 1]!.id,
           });
@@ -376,7 +385,12 @@ describe('artifact routes', () => {
     const top = await chain(30);
     const sub = await chain(22);
     for (let i = 2; i < sub.length; i++) {
-      await createArtifactPlacement({ artifactId: sub[i]!.id, containerArtifactId: sub[0]!.id });
+      await createArtifactPlacement({
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        artifactId: sub[i]!.id,
+        containerArtifactId: sub[0]!.id,
+      });
     }
     expect((await place(adminFetch, sub[0]!, top[top.length - 1]!)).status).toBe(422);
   }, 15_000);
@@ -505,14 +519,14 @@ describe('artifact routes', () => {
       { access: 'public' },
     );
     const asOutsider = await parseSuccessBody<{
-      effectiveAccess: { role: string | null; public: boolean };
+      effectiveAccess: { role: string | null; access: string };
     }>(await outsiderFetch(get(`/api/v1/artifact/${pub.id}`)));
-    expect(asOutsider.data.effectiveAccess).toEqual({ role: null, public: true });
+    expect(asOutsider.data.effectiveAccess).toEqual({ role: null, access: 'public' });
 
     const asAdmin = await parseSuccessBody<{
-      effectiveAccess: { role: string | null; public: boolean };
+      effectiveAccess: { role: string | null; access: string };
     }>(await adminFetch(get(`/api/v1/artifact/${pub.id}`)));
-    expect(asAdmin.data.effectiveAccess).toEqual({ role: 'admin', public: true });
+    expect(asAdmin.data.effectiveAccess).toEqual({ role: 'admin', access: 'public' });
   });
 
   it('PATCH /artifact/:id lets operate rename, requires manage to change access', async () => {
@@ -690,5 +704,272 @@ describe('artifact routes', () => {
       (await adminFetch(get(`/api/v1/organization/${organization.id}/artifacts?orderBy=name:desc`)))
         .status,
     ).toBe(200);
+  });
+
+  it('public/tenant SQL reflection works on org, space, and user artifact lists for anonymous, outsider, member, and admin', async () => {
+    const anonFetch = createTestApp({ mount }).fetch;
+    const pubOrg = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'pub-org', access: 'public' },
+    );
+    const tenantOrg = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'tenant-org', access: 'tenant' },
+    );
+    const privateOrg = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'private-org', access: 'private' },
+    );
+
+    const asAnon = await parseSuccessBody<(Artifact & { permissions: unknown[] })[]>(
+      await anonFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+    );
+    expect(asAnon.data.map((a) => a.id)).toEqual([pubOrg.id]);
+    expect(asAnon.data[0]!.permissions).toEqual([]);
+
+    const asOutsider = await parseSuccessBody<Artifact[]>(
+      await outsiderFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+    );
+    expect(asOutsider.data.map((a) => a.id)).toEqual([pubOrg.id]);
+
+    const asMember = await parseSuccessBody<Artifact[]>(
+      await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+    );
+    const memberIds = asMember.data.map((a) => a.id);
+    expect(memberIds).toContain(pubOrg.id);
+    expect(memberIds).toContain(tenantOrg.id);
+    expect(memberIds).not.toContain(privateOrg.id);
+
+    const asAdmin = await parseSuccessBody<Artifact[]>(
+      await adminFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+    );
+    const adminIds = asAdmin.data.map((a) => a.id);
+    expect(adminIds).toContain(pubOrg.id);
+    expect(adminIds).toContain(tenantOrg.id);
+    expect(adminIds).toContain(privateOrg.id);
+
+    // Public user catalog via GET /user/:id/artifacts
+    const userPub = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      name: 'user-pub',
+      access: 'public',
+    });
+    const userPriv = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      name: 'user-priv',
+      access: 'private',
+    });
+    const anonUserList = await parseSuccessBody<Artifact[]>(
+      await anonFetch(get(`/api/v1/user/${outsider.id}/artifacts`)),
+    );
+    expect(anonUserList.data.map((a) => a.id)).toEqual([userPub.id]);
+    const selfUserList = await parseSuccessBody<Artifact[]>(
+      await outsiderFetch(get(`/api/v1/user/${outsider.id}/artifacts`)),
+    );
+    expect(selfUserList.data.map((a) => a.id)).toContain(userPriv.id);
+  });
+
+  it('owners can pin external readable artifacts at root, list placements, and remove root pins', async () => {
+    const pubOrg = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'public-handbook', access: 'public' },
+    );
+    const privOrg = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'secret-doc', access: 'private' },
+    );
+    const ownPersonal = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      name: 'my-folder',
+    });
+
+    // Cannot pin own artifact at root (422) or unreadable external artifact (403)
+    expect(
+      (await outsiderFetch(post('/api/v1/me/artifactPlacements', { artifactId: ownPersonal.id })))
+        .status,
+    ).toBe(422);
+    expect(
+      (await outsiderFetch(post('/api/v1/me/artifactPlacements', { artifactId: privOrg.id })))
+        .status,
+    ).toBe(403);
+
+    // Pinning external public artifact at root succeeds; duplicate returns 409
+    const pinResp = await outsiderFetch(
+      post('/api/v1/me/artifactPlacements', { artifactId: pubOrg.id }),
+    );
+    expect(pinResp.status).toBe(201);
+    const pin = (await parseSuccessBody<ArtifactPlacement>(pinResp)).data;
+    expect(pin.containerArtifactId).toBeNull();
+    expect(pin.ownerModel).toBe('User');
+    expect(
+      (await outsiderFetch(post('/api/v1/me/artifactPlacements', { artifactId: pubOrg.id })))
+        .status,
+    ).toBe(409);
+
+    // Also place into a personal folder and verify GET /me/artifactPlacements returns both
+    expect((await place(outsiderFetch, pubOrg, ownPersonal)).status).toBe(201);
+    const listed = await parseSuccessBody<
+      (ArtifactPlacement & { artifact: Artifact; containerArtifact: Artifact | null })[]
+    >(await outsiderFetch(get('/api/v1/me/artifactPlacements')));
+    expect(listed.data).toHaveLength(2);
+    expect(listed.data.some((p) => p.id === pin.id && p.containerArtifact === null)).toBe(true);
+    expect(
+      listed.data.some(
+        (p) => p.containerArtifact?.id === ownPersonal.id && p.artifact.id === pubOrg.id,
+      ),
+    ).toBe(true);
+
+    // Peer/admin cannot read another member's organizationUser/artifactPlacements
+    expect(
+      (await adminFetch(get(`/api/v1/organizationUser/${memberMembership.id}/artifactPlacements`)))
+        .status,
+    ).toBe(403);
+    expect(
+      (await memberFetch(get(`/api/v1/organizationUser/${memberMembership.id}/artifactPlacements`)))
+        .status,
+    ).toBe(200);
+
+    // Unpinning root placement works via DELETE /artifactPlacement/:id (and refuses strangers)
+    expect((await adminFetch(del(`/api/v1/artifactPlacement/${pin.id}`))).status).toBe(403);
+    expect((await outsiderFetch(del(`/api/v1/artifactPlacement/${pin.id}`))).status).toBe(204);
+
+    // Regression: placements relation is rejected by artifactListFilterLens (no cross-tenant pin oracle)
+    expect(
+      (
+        await outsiderFetch(
+          get(
+            `/api/v1/organization/${organization.id}/artifacts?searchFields[placements][some][userId][startsWith]=0`,
+          ),
+        )
+      ).status,
+    ).toBe(400);
+
+    // Regression: expired grant is excluded in SQL so pagination.total stays 0 (no post-expiry count oracle)
+    const expDoc = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'expired-secret-report', access: 'private' },
+    );
+    await createArtifactPermission({
+      artifactId: expDoc.id,
+      granteeModel: 'User',
+      granteeUserId: member.id,
+      role: 'viewer',
+      expiresAt: new Date(Date.now() - 60_000),
+    });
+    const afterExpiry = await parseSuccessBody<Artifact[]>(
+      await memberFetch(
+        get(`/api/v1/organization/${organization.id}/artifacts?search=expired-secret-report`),
+      ),
+    );
+    expect(afterExpiry.data).toEqual([]);
+    expect(afterExpiry.pagination?.total).toBe(0);
+
+    // Regression: demoted viewer member can still delete their own OrganizationUser root pin
+    const memberPinResp = await memberFetch(
+      post(`/api/v1/organizationUser/${memberMembership.id}/artifactPlacements`, {
+        artifactId: pubOrg.id,
+      }),
+    );
+    expect(memberPinResp.status).toBe(201);
+    const memberPin = (await parseSuccessBody<ArtifactPlacement>(memberPinResp)).data;
+    const demotedSeat = await db.organizationUser.update({
+      where: { id: memberMembership.id },
+      data: { role: 'viewer' },
+    });
+    const demotedFetch = createTestApp({
+      mockUser: member,
+      mockOrganizationUsers: [demotedSeat],
+      mount,
+    }).fetch;
+    // Viewer cannot pin a new artifact at their OrganizationUser root (403 even on own org artifact)
+    expect(
+      (
+        await demotedFetch(
+          post(`/api/v1/organizationUser/${memberMembership.id}/artifactPlacements`, {
+            artifactId: ownPersonal.id,
+          }),
+        )
+      ).status,
+    ).toBe(403);
+    // Viewer CAN remove their existing root pin (no permanent orphan)
+    expect((await demotedFetch(del(`/api/v1/artifactPlacement/${memberPin.id}`))).status).toBe(204);
+
+    // Regression: entitlement-only token without ArtifactPlacement:read gets 0 placements (total = 0),
+    // while a full: true Organization token sees the org's placements and private org artifacts.
+    const externalPub = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      name: 'external-pub-ref',
+      access: 'public',
+    });
+    expect(
+      (
+        await adminFetch(
+          post(`/api/v1/organization/${organization.id}/artifactPlacements`, {
+            artifactId: externalPub.id,
+          }),
+        )
+      ).status,
+    ).toBe(201);
+    const { entity: narrowToken } = await createToken({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+      role: null,
+      full: false,
+      entitlements: [
+        {
+          sourceModel: 'Organization',
+          sourceId: organization.id,
+          resource: 'Organization',
+          actions: ['read'],
+        },
+      ],
+    });
+    const narrowFetch = createTestApp({
+      mockToken: {
+        ...narrowToken,
+        targetEntitlements: await db.entitlement.findMany({
+          where: { targetModel: 'Token', targetTokenId: narrowToken.id },
+        }),
+        user: null,
+        organization,
+        organizationUser: null,
+        space: null,
+        spaceUser: null,
+        integration: null,
+      },
+      mount,
+    }).fetch;
+    const narrowPlacements = await parseSuccessBody<ArtifactPlacement[]>(
+      await narrowFetch(get(`/api/v1/organization/${organization.id}/artifactPlacements`)),
+    );
+    expect(narrowPlacements.data).toEqual([]);
+    expect(narrowPlacements.pagination?.total).toBe(0);
+
+    const { entity: fullUserToken } = await createToken({
+      ownerModel: 'User',
+      userId: admin.id,
+      role: null,
+      full: true,
+    });
+    const fullUserFetch = createTestApp({
+      mockOrganizationUsers: [adminMembership],
+      mockToken: {
+        ...fullUserToken,
+        targetEntitlements: [],
+        user: admin,
+        organization: null,
+        organizationUser: null,
+        space: null,
+        spaceUser: null,
+        integration: null,
+      },
+      mount,
+    }).fetch;
+    const fullUserPlacements = await parseSuccessBody<ArtifactPlacement[]>(
+      await fullUserFetch(get(`/api/v1/organization/${organization.id}/artifactPlacements`)),
+    );
+    expect(fullUserPlacements.data.some((p) => p.artifactId === externalPub.id)).toBe(true);
   });
 });

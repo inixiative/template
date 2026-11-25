@@ -13,16 +13,12 @@ export const spaceUserReadManyArtifactsController = makeController(
   spaceUserReadManyArtifactsRoute,
   async (c, respond) => {
     const member = contextResource<'spaceUser'>(c);
-    const { data, pagination } = await paginateOwnerArtifacts(
-      c,
-      {
-        ownerModel: 'SpaceUser',
-        organizationId: member.organizationId,
-        spaceId: member.spaceId,
-        userId: member.userId,
-      },
-      { allReadable: true },
-    );
+    const { data, pagination } = await paginateOwnerArtifacts(c, {
+      ownerModel: 'SpaceUser',
+      organizationId: member.organizationId,
+      spaceId: member.spaceId,
+      userId: member.userId,
+    });
     return respond.ok(data, { pagination });
   },
 );

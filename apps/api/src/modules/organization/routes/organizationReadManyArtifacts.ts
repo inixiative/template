@@ -5,7 +5,6 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { readRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   artifactListFilterLens,
   artifactWithPermissionsSchema,
@@ -18,8 +17,7 @@ export const organizationReadManyArtifactsRoute = readRoute({
   many: true,
   paginate: true,
   filterLens: artifactListFilterLens,
-  middleware: [validatePermission('read')],
   description:
-    "Lists the organization's artifacts (defaults to root artifacts when no search/filter is passed) that the caller can read, with permissions for managers.",
+    "Lists the organization's artifacts (defaults to root artifacts when no search/filter is passed) that the caller can read (public, tenant, granted, or all for managers), with permissions for managers.",
   responseSchema: artifactWithPermissionsSchema,
 });

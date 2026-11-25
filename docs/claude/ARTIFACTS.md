@@ -59,18 +59,19 @@ A fork adds kinds below the template marker in both `enum ArtifactKind` (`packag
 
 ## Placements
 
-An `ArtifactPlacement` says "this artifact sits in that container". Containment organises; it holds no permissions of its own. Materialized tree tables (`ArtifactAncestor` and `ArtifactEffectivePermission`, kept in sync by `artifactTree` hooks) flatten container inheritance to one hop for ReBAC. An artifact may sit in many containers, and so may a container ("compliance" under both "legal" and "operations").
+An `ArtifactPlacement` says "this artifact sits in this owner's workspace" — either inside a container (`containerArtifactId` set, owned by the container's owner) or pinned at the owner's root (`containerArtifactId` null, for external public/shared artifacts). Containment organises; it holds no permissions of its own. Materialized tree tables (`ArtifactAncestor` and `ArtifactEffectivePermission`, kept in sync by `artifactTree` hooks) flatten container inheritance to one hop for ReBAC. An artifact may sit in many containers, and so may a container ("compliance" under both "legal" and "operations").
 
-**Cross-owner placements organise without inheriting.** Placing a shared artifact into another owner's container always sets `ArtifactAncestor.inherits = false` across owner boundaries, so a foreign folder can never widen access or make the artifact `public`. Handing ownership to another owner is still a transfer (§ Ownership).
+**Cross-owner placements organise without inheriting.** Placing a shared or public artifact into another owner's container always sets `ArtifactAncestor.inherits = false` across owner boundaries, and root pins (`containerArtifactId = null`) never touch `ArtifactAncestor`, so a foreign folder or root pin can never widen access or make the artifact `public`. Handing ownership to another owner is still a transfer (§ Ownership).
 
-**The root is not a row.** An artifact with no live same-owner placement is at its owner's root (`placements: { none: { containerArtifact: owner } }`). Removing its last same-owner placement puts it back at the root; deleting stays an explicit action.
+**Own root is not a row.** Your own artifact with no live same-owner container placement is at your root (`placements: { none: { containerArtifactId: { not: null }, containerArtifact: owner } }`). Removing its last same-owner placement puts it back at the root; deleting stays an explicit action. Root placements (`POST /{owner}/artifactPlacements`) are only for pinning external readable artifacts at an owner's root.
 
 | Action | What it does | Needs |
 |---|---|---|
-| **place** (`POST /artifact/:id/artifactPlacements`) | adds a placement | same owner: `manage` on artifact, `operate` on container; cross owner: `read` on artifact, `operate` on container |
+| **place in container** (`POST /artifact/:id/artifactPlacements`) | adds a container placement | same owner: `manage` on artifact, `operate` on container; cross owner: `read` on artifact, `operate` on container |
+| **pin at root** (`POST /{owner}/artifactPlacements`) | pins an external readable artifact at the owner's root (`containerArtifactId = null`) | `read` on artifact + owner operate/manage (`db:ArtifactPlacement.create`) |
 | **move** (`POST /artifact/:id/move`) | replaces one placement with another in one step; either end may be the root | the same, at each container end |
 | **copy** (`POST /artifact/:id/copy`) | a new artifact in the container, owned by its owner; a file copy shares the source's bytes until the sweeper copies them (`tickets/FEAT-030-resource-bindings-and-lazy-copy.md`); a container is copied without its contents | `read` on the source, `operate` on the container |
-| **remove** (`DELETE /artifactPlacement/:id`) | removes a placement | same owner: `manage` on artifact, `operate` on container; cross owner: `operate` on container (even if read access was later revoked) |
+| **remove** (`DELETE /artifactPlacement/:id`) | removes a placement (container or root pin) | same-owner container: `manage` on artifact, `operate` on container; cross-owner container: `operate` on container (even if read access was later revoked); root pin: owner operate/manage (`db:ArtifactPlacement.delete`) |
 
 A placement is refused when the container's kind does not list the artifact's kind (`contains`), it would close a loop, it would nest deeper than `ARTIFACT_MAX_DEPTH` (50, longest path via `ArtifactAncestor`), or the container already holds `ARTIFACT_MAX_CHILDREN` (500) direct items.
 
@@ -84,13 +85,14 @@ Placements are soft-deleted and audit-enabled.
 
 Artifact authorization lives in `schemaMap` (`packages/permissions/src/rebac/artifactResourcePermission.ts`) using `@inixiative/permissions` `down` lists (`ancestors` and `effectivePermissions`) plus `tenantPermissionRules`.
 
-`Artifact.access` defaults to `private` and is `inherit`, `public` or `private`:
+`Artifact.access` defaults to `private` and is `inherit`, `public`, `tenant` or `private`:
 
-| `access` | Public? | Takes same-owner containers' grants? |
+| `access` | Visibility | Takes same-owner containers' grants? |
 |---|---|---|
-| `inherit` | if any inheriting ancestor is `public` | yes, from every inheriting ancestor |
-| `public` | yes | yes |
-| `private` | no | no |
+| `inherit` | inherits from inheriting ancestors (`public` > `tenant` > `private`, default `private`) | yes, from every inheriting ancestor |
+| `public` | readable by any caller (public, subject to token grants ceiling) | yes |
+| `tenant` | readable by anyone with `read` on the owning tenant (`Organization` → org `read`, `Space` → space `read`, `OrganizationUser` → org `read`, `SpaceUser` → space `read`; `User` has no tenant so same as `private`) | yes |
+| `private` | only owner/admins + explicit `ArtifactPermission` grants | no |
 
 **Private means the artifact has only its own permissions.** It takes nothing from its containers, neither their grants nor their public state. You can keep your own things in a public folder. Most artifacts created inside a container inherit.
 
@@ -138,9 +140,10 @@ Artifacts are a flat table of nodes; navigating a tree is reading placements:
 
 | View | Route |
 |---|---|
-| Owner's root (paginated + `filterLens`; pass `search` / `searchFields` to search across the whole owner tree; includes `permissions` for managers) | `GET /me/artifacts`, `/organization/:id/artifacts`, `/space/:id/artifacts`, `/organizationUser/:id/artifacts`, `/spaceUser/:id/artifacts` |
+| Owner's root (paginated + `filterLens` + naive SQL visibility reflection; pass `search` / `searchFields` to search across the whole owner tree; includes `permissions` for managers; `organization`, `space`, and `user` are public-callable and reflect caller visibility) | `GET /me/artifacts`, `/user/:id/artifacts`, `/organization/:id/artifacts`, `/space/:id/artifacts`, `/organizationUser/:id/artifacts`, `/spaceUser/:id/artifacts` |
 | Shared with owner ("Shared with me": paginated active `ArtifactPermission` rows with each `artifact` inline, including `CustomerRelationship` shares) | `GET /me/artifactPermissions`, `/organization/:id/artifactPermissions`, `/space/:id/artifactPermissions`, `/organizationUser/:id/artifactPermissions`, `/spaceUser/:id/artifactPermissions` |
-| Single artifact + 1-step neighborhood (effective access, direct readable `parents` & `children` with their permissions for managers and `exclusive` flag on children, visible `placements` & `bindings`, direct & effective `permissions` for managers) | `GET /artifact/:id` |
+| Owner's placements (paginated root pins + container placements with `artifact` and `containerArtifact` inline, filtered to caller-readable targets) | `GET /me/artifactPlacements`, `/organization/:id/artifactPlacements`, `/space/:id/artifactPlacements`, `/organizationUser/:id/artifactPlacements`, `/spaceUser/:id/artifactPlacements` |
+| Single artifact + 1-step neighborhood (effective access `{ role, access }`, direct readable `parents` & `children` with their permissions for managers and `exclusive` flag on children, visible `placements` & `bindings`, direct & effective `permissions` for managers) | `GET /artifact/:id` |
 
 `GET /artifact/:id` loads its 1-step relations via `resourceContextArgs` (`includeArtifactDetail`) and filters them per-caller in `artifactReadController` (bindings checked via ReBAC `db:User`, `db:Organization`, `db:Space`).
 
@@ -156,8 +159,8 @@ No frontend is built yet (`tickets/FEAT-032-file-browser-ui.md`).
 | Kind catalog & caps | `packages/shared/src/artifact/kinds.ts` |
 | ReBAC rules | `packages/permissions/src/rebac/artifactResourcePermission.ts`, `apps/api/src/modules/artifact/lib/checkArtifactPermission.ts` |
 | Materialized tree | `apps/api/src/hooks/artifactTree/hook.ts`, `syncArtifactTree.ts` |
-| Placements & creation | `apps/api/src/modules/artifact/services/{createArtifact,placeArtifact,moveArtifact,copyArtifact,removeArtifactPlacement}.ts`, `lib/artifactPlacementHelpers.ts` |
-| Navigation & shared | `apps/api/src/modules/artifact/queries/artifactIncludes.ts`, `controllers/artifactRead.ts`, `services/paginateOwnerArtifacts.ts`, `apps/api/src/modules/artifactPermission/lib/sharedWithOwnerWhere.ts` |
+| Placements & creation | `apps/api/src/modules/artifact/services/{createArtifact,placeArtifact,placeArtifactAtRoot,moveArtifact,copyArtifact,removeArtifactPlacement}.ts`, `lib/artifactPlacementHelpers.ts` |
+| Navigation & shared | `apps/api/src/modules/artifact/queries/artifactIncludes.ts`, `controllers/artifactRead.ts`, `lib/readableArtifactWhere.ts`, `services/paginateOwnerArtifacts.ts`, `apps/api/src/modules/artifactPermission/lib/sharedWithOwnerWhere.ts`, `apps/api/src/modules/artifactPlacement/lib/paginateOwnerArtifactPlacements.ts` |
 | Ownership | `apps/api/src/modules/inquiry/services/transferArtifact/` |
 | Deleting | `apps/api/src/modules/artifact/controllers/artifactDelete.ts` |
-| Routes | `apps/api/src/modules/{artifact,artifactPlacement,artifactPermission}/`, `{me,organization,space,organizationUser,spaceUser}{Create,ReadMany}Artifact`, `{me,organization,space,organizationUser,spaceUser}ReadManyArtifactPermissions` |
+| Routes | `apps/api/src/modules/{artifact,artifactPlacement,artifactPermission}/`, `{me,organization,space,organizationUser,spaceUser}{Create,ReadMany}Artifact`, `userReadManyArtifacts`, `{me,organization,space,organizationUser,spaceUser}ReadManyArtifactPermissions`, `{me,organization,space,organizationUser,spaceUser}{Create,ReadMany}ArtifactPlacement` |

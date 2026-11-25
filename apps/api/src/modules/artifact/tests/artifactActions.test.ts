@@ -105,6 +105,8 @@ describe('artifact actions', () => {
     const folder = await orgFolder();
     const item = await orgFolder();
     const { entity: placement } = await createArtifactPlacement({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
       artifactId: item.id,
       containerArtifactId: folder.id,
     });
@@ -124,7 +126,12 @@ describe('artifact actions', () => {
   it('owner list defaults to root, searches nested items when filtered, and reflective artifactPermissions lists shares + allows leaving', async () => {
     const hidden = await orgFolder();
     const report = await orgFolder({ name: 'quarterly-report' });
-    await createArtifactPlacement({ artifactId: report.id, containerArtifactId: hidden.id });
+    await createArtifactPlacement({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+      artifactId: report.id,
+      containerArtifactId: hidden.id,
+    });
     const { entity: grant } = await createArtifactPermission({
       artifactId: report.id,
       granteeModel: 'User',
@@ -223,8 +230,18 @@ describe('artifact actions', () => {
     const hidden = await orgFolder();
     const shown = await orgFolder();
     const logo = await orgFolder();
-    await createArtifactPlacement({ artifactId: logo.id, containerArtifactId: hidden.id });
-    await createArtifactPlacement({ artifactId: logo.id, containerArtifactId: shown.id });
+    await createArtifactPlacement({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+      artifactId: logo.id,
+      containerArtifactId: hidden.id,
+    });
+    await createArtifactPlacement({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+      artifactId: logo.id,
+      containerArtifactId: shown.id,
+    });
     for (const artifact of [logo, shown]) {
       await createArtifactPermission({
         artifactId: artifact.id,
@@ -281,7 +298,12 @@ describe('artifact actions', () => {
       const own = await (
         await createArtifact({ kind: 'folder', ownerModel: 'User', userId: stranger.id })
       ).entity;
-      await createArtifactPlacement({ artifactId: file.id, containerArtifactId: own.id });
+      await createArtifactPlacement({
+        ownerModel: 'User',
+        userId: stranger.id,
+        artifactId: file.id,
+        containerArtifactId: own.id,
+      });
       const inquiry = await transferTo(file, stranger, true);
       const resolved = await adminFetch(
         post(`/api/v1/inquiry/${inquiry.id}/resolve`, {

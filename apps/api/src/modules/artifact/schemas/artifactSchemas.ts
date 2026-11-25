@@ -47,7 +47,7 @@ export const artifactChildSchema = artifactWithPermissionsSchema.extend({
 
 export const artifactAccessResponseSchema = z.object({
   role: z.enum(Role).nullable(),
-  public: z.boolean(),
+  access: z.enum(['public', 'tenant', 'private']),
 });
 
 export const artifactDetailResponseSchema = ArtifactScalarSchema.extend({
@@ -64,11 +64,6 @@ export const artifactListFilterLens: LensNarrowing = {
   parent: lensFor('Artifact'),
   root: {
     omits: ['deletedAt'],
-    relations: {
-      placements: {
-        omits: ['deletedAt'],
-      },
-    },
   },
 };
 

@@ -12,11 +12,10 @@ import { meReadManyArtifactsRoute } from '#/modules/me/routes/meReadManyArtifact
 export const meReadManyArtifactsController = makeController(
   meReadManyArtifactsRoute,
   async (c, respond) => {
-    const { data, pagination } = await paginateOwnerArtifacts(
-      c,
-      { ownerModel: 'User', userId: actingUser(c)!.id },
-      { allReadable: true },
-    );
+    const { data, pagination } = await paginateOwnerArtifacts(c, {
+      ownerModel: 'User',
+      userId: actingUser(c)!.id,
+    });
     return respond.ok(data, { pagination });
   },
 );

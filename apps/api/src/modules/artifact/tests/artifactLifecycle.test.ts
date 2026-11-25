@@ -64,7 +64,14 @@ describe('artifact lifecycle', () => {
     ).entity;
 
   const placeInside = async (artifact: Artifact, container: Artifact) => {
-    await createArtifactPlacement({ artifactId: artifact.id, containerArtifactId: container.id });
+    await createArtifactPlacement({
+      ownerModel: container.ownerModel,
+      userId: container.userId,
+      organizationId: container.organizationId,
+      spaceId: container.spaceId,
+      artifactId: artifact.id,
+      containerArtifactId: container.id,
+    });
     await db.artifact.update({ where: { id: artifact.id }, data: { access: 'inherit' } });
   };
 

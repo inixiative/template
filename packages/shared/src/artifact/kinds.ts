@@ -9,7 +9,7 @@ export const ARTIFACT_MAX_CHILDREN = 500;
 
 export type ArtifactKindDef = {
   contains: readonly string[];
-  defaultAccess: 'public' | 'private';
+  defaultAccess: 'public' | 'tenant' | 'private';
   contentModel?: 'File';
   lazyCopy?: true;
 };

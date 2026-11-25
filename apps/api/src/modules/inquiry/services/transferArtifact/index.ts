@@ -149,17 +149,9 @@ export const transferArtifactService: InquiryService<
     const targetOwner = await fetchOwnerOf(target);
     const existingPlacements = await db.artifactPlacement.findMany({
       where: { artifactId: content.artifactId },
-      include: {
-        containerArtifact: {
-          select: { ownerModel: true, userId: true, organizationId: true, spaceId: true },
-        },
-      },
+      select: { ownerModel: true, userId: true, organizationId: true, spaceId: true },
     });
-    const lockTargets: OwnedArtifact[] = [
-      sourceOwner,
-      targetOwner,
-      ...existingPlacements.map((placement) => placement.containerArtifact),
-    ];
+    const lockTargets: OwnedArtifact[] = [sourceOwner, targetOwner, ...existingPlacements];
 
     await withArtifactOwnersLock(lockTargets, async () => {
       const [artifact] = await db.findForUpdate<Artifact>('Artifact', { id: content.artifactId });

@@ -4,20 +4,16 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
-import { andWhere } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type { Artifact, ArtifactPermission } from '@template/db/generated/client/client';
 import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
-import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
-import { applyFilterLensWheresToPrismaWhere } from '#/lib/prisma/applyFilterLensWheresToPrismaWhere';
-import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
-import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import { paginate } from '#/lib/prisma/paginate';
 import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 import { type OwnerRef, ownerColumns } from '#/modules/artifact/lib/artifactOwner';
 import { hydrateArtifact } from '#/modules/artifact/lib/checkArtifactPermission';
+import { readableArtifactWhereForOwner } from '#/modules/artifact/lib/readableArtifactWhere';
 import type { AppEnv } from '#/types/appEnv';
 
 type ArtifactWithPermissions = Artifact & { permissions: ArtifactPermission[] };
@@ -51,85 +47,43 @@ export const paginateOwnerArtifacts = async (
     }
   >,
   owner: OwnerRef,
-  options: { allReadable: boolean },
 ) => {
   const permix = c.get('permix');
   const query = validatedQuery(c);
   const hasOrderBy = Boolean(query.orderBy?.length);
   const rootWhere = hasClientFilter(c)
     ? {}
-    : { placements: { none: { containerArtifact: ownerColumns(owner) } } };
+    : {
+        placements: {
+          none: { containerArtifactId: { not: null }, containerArtifact: ownerColumns(owner) },
+        },
+      };
   const ownerWhere = { deletedAt: null, ...ownerColumns(owner), ...rootWhere };
+  const visibilityWhere = await readableArtifactWhereForOwner(c, owner);
+  const where = visibilityWhere ? { AND: [ownerWhere, visibilityWhere] } : ownerWhere;
   const include = { permissions: { orderBy: { createdAt: 'asc' as const } } };
 
-  const stripPermissionsIfNotManager = async (rows: ArtifactWithPermissions[]) =>
-    Promise.all(
-      rows.map(async (row) => {
-        const hydrated = await hydrateArtifact(row);
-        const canManage = check(permix, 'artifact', hydrated, 'manage');
-        return { ...row, permissions: canManage ? row.permissions : [] };
-      }),
-    );
+  const result = await paginate(c, db.artifact, {
+    where,
+    include,
+    ...(hasOrderBy ? {} : { orderBy: { name: 'asc' } }),
+  });
 
-  if (options.allReadable) {
-    const result = await paginate(c, db.artifact, {
-      where: ownerWhere,
-      include,
-      ...(hasOrderBy ? {} : { orderBy: { name: 'asc' } }),
-    });
+  const rows = result.data as ArtifactWithPermissions[];
+  if (!c.get('user') && !c.get('token')) {
     return {
-      data: await stripPermissionsIfNotManager(result.data),
+      data: rows.map((row) => ({ ...row, permissions: [] })),
       pagination: result.pagination,
     };
   }
 
-  // why: until AUTH-013 compiles ReBAC into SQL, non-managers listing an org/space filter per-row in memory.
-  const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
-  const bracketSearchFields = c.get('bracketQuery').searchFields;
-  const searchFields = isBracketRecord(bracketSearchFields)
-    ? bracketSearchFields
-    : query.searchFields;
-  const filterLens = c.get('filterLens')!;
-  const searchWhere = buildWhereClause({
-    filterLens,
-    search,
-    searchFields,
-    skipFieldValidation: isSuperadmin(c),
+  const hydratedRows = await Promise.all(rows.map((row) => hydrateArtifact(row)));
+  const data = rows.flatMap((row, index) => {
+    const hydrated = hydratedRows[index]!;
+    if (!check(permix, 'artifact', hydrated, 'read')) return [];
+    const canManage = check(permix, 'artifact', hydrated, 'manage');
+    return [{ ...row, permissions: canManage ? row.permissions : [] }];
   });
-  const where = await applyFilterLensWheresToPrismaWhere(
-    filterLens,
-    andWhere([ownerWhere as Record<string, unknown>, searchWhere as Record<string, unknown>]),
-  );
-  const orderBy = buildOrderBy({
-    callerOrderBy: hasOrderBy ? undefined : { name: 'asc' },
-    clientOrderBy: rawOrderBy,
-  });
-  const candidates = await db.artifact.findMany({ where, include, orderBy });
 
-  const checks = await Promise.all(
-    candidates.map(async (row) => {
-      const hydrated = await hydrateArtifact(row);
-      return {
-        canRead: check(permix, 'artifact', hydrated, 'read'),
-        canManage: check(permix, 'artifact', hydrated, 'manage'),
-      };
-    }),
-  );
-  const readable = candidates.flatMap((row, index) => {
-    const access = checks[index]!;
-    if (!access.canRead) return [];
-    return [{ ...row, permissions: access.canManage ? row.permissions : [] }];
-  });
-  const total = readable.length;
-  const skip = (page - 1) * pageSize;
-
-  return {
-    data: readable.slice(skip, skip + pageSize),
-    pagination: {
-      page,
-      pageSize,
-      total,
-      totalPages: Math.ceil(total / pageSize),
-    },
-  };
+  return { data, pagination: result.pagination };
 };

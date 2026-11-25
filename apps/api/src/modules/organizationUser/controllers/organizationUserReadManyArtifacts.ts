@@ -13,15 +13,11 @@ export const organizationUserReadManyArtifactsController = makeController(
   organizationUserReadManyArtifactsRoute,
   async (c, respond) => {
     const member = contextResource<'organizationUser'>(c);
-    const { data, pagination } = await paginateOwnerArtifacts(
-      c,
-      {
-        ownerModel: 'OrganizationUser',
-        organizationId: member.organizationId,
-        userId: member.userId,
-      },
-      { allReadable: true },
-    );
+    const { data, pagination } = await paginateOwnerArtifacts(c, {
+      ownerModel: 'OrganizationUser',
+      organizationId: member.organizationId,
+      userId: member.userId,
+    });
     return respond.ok(data, { pagination });
   },
 );

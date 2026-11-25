@@ -424,6 +424,21 @@ export const PolymorphismRegistry = {
     ],
   },
 
+  ArtifactPlacement: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
+          Organization: ['organizationId'],
+          Space: ['organizationId', 'spaceId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
+        },
+      },
+    ],
+  },
+
   ArtifactPermission: {
     axes: [
       {

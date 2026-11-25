@@ -119,9 +119,9 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
   },
 });
 
-const artifactIsPublic: ActionRule = {
+const artifactAccessIs = (access: 'public' | 'tenant'): ActionRule => ({
   any: [
-    { rule: { field: 'access', operator: Operator.equals, value: 'public' } },
+    { rule: { field: 'access', operator: Operator.equals, value: access } },
     {
       all: [
         { rule: { field: 'access', operator: Operator.equals, value: 'inherit' } },
@@ -130,17 +130,50 @@ const artifactIsPublic: ActionRule = {
           arrayOperator: 'any',
           condition: {
             all: [
-              { rule: { field: 'inherits', operator: Operator.equals, value: true } },
+              { rule: { field: 'inheritsAccess', operator: Operator.equals, value: true } },
               {
                 rule: {
                   field: 'ancestorArtifact.access',
                   operator: Operator.equals,
-                  value: 'public',
+                  value: access,
                 },
               },
             ],
           },
         },
+      ],
+    },
+  ],
+});
+
+const ownerTenantRead: ActionRule = {
+  any: [
+    { all: [ownerModelIsOneOf(['Organization']), { rel: 'organization', action: 'read' }] },
+    { all: [ownerModelIsOneOf(['Space']), { rel: 'space', action: 'read' }] },
+    {
+      all: [
+        ownerModelIsOneOf(['OrganizationUser']),
+        { rel: 'organizationUser.organization', action: 'read' },
+      ],
+    },
+    { all: [ownerModelIsOneOf(['SpaceUser']), { rel: 'spaceUser.space', action: 'read' }] },
+  ],
+};
+
+const artifactIsPublic: ActionRule = artifactAccessIs('public');
+
+const artifactIsTenant: ActionRule = {
+  all: [artifactAccessIs('tenant'), ownerTenantRead],
+};
+
+const artifactOwnerOperate: ActionRule = {
+  any: [
+    actorOperatesOwnerUserOrManagesOwnerTenant,
+    {
+      all: [
+        ownerModelIsOneOf(['OrganizationUser', 'SpaceUser']),
+        actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
+        operatesAtItsMembersTenant,
       ],
     },
   ],
@@ -181,20 +214,10 @@ export const artifactResourcePermission: ResourcePermission = {
         actorMayPerformActionOnOwner('own', '', ['OrganizationUser', 'SpaceUser']),
         effectiveGrant('read'),
         artifactIsPublic,
+        artifactIsTenant,
       ],
     },
-    create: {
-      any: [
-        actorOperatesOwnerUserOrManagesOwnerTenant,
-        {
-          all: [
-            ownerModelIsOneOf(['OrganizationUser', 'SpaceUser']),
-            actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
-            operatesAtItsMembersTenant,
-          ],
-        },
-      ],
-    },
+    create: artifactOwnerOperate,
   },
 };
 
@@ -276,8 +299,56 @@ export const artifactPermissionResourcePermission: ResourcePermission = {
   },
 };
 
+const placementIsRoot = rowIsThereAnd('id', isNull('containerArtifactId'));
+
+const artifactPlacementRootDelete: ActionRule = {
+  any: [
+    actorOperatesOwnerUserOrManagesOwnerTenant,
+    actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
+    actorMayPerformActionOnOwner('own', '', ['OrganizationUser', 'SpaceUser']),
+  ],
+};
+
 export const artifactPlacementResourcePermission: ResourcePermission = {
   actions: {
-    delete: { rel: 'containerArtifact', action: 'operate' },
+    create: {
+      all: [
+        { rel: 'artifact', action: 'read' },
+        {
+          any: [
+            { rel: 'containerArtifact', action: 'operate' },
+            { all: [placementIsRoot, artifactOwnerOperate] },
+          ],
+        },
+      ],
+    },
+    read: {
+      all: [
+        { rel: 'artifact', action: 'read' },
+        {
+          any: [
+            { rel: 'containerArtifact', action: 'read' },
+            {
+              all: [
+                placementIsRoot,
+                {
+                  any: [
+                    actorMayPerformActionOnOwner('read', '', ['User', 'Organization', 'Space']),
+                    actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
+                    actorMayPerformActionOnOwner('own', '', ['OrganizationUser', 'SpaceUser']),
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    delete: {
+      any: [
+        { rel: 'containerArtifact', action: 'operate' },
+        { all: [placementIsRoot, artifactPlacementRootDelete] },
+      ],
+    },
   },
 };

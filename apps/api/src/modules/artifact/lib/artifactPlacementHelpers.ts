@@ -129,7 +129,11 @@ export const writePlacement = async (
     }
   }
   return db.artifactPlacement.create({
-    data: { artifactId: member.id, containerArtifactId: container.id },
+    data: {
+      ...ownerColumns(container),
+      artifactId: member.id,
+      containerArtifactId: container.id,
+    },
   });
 };
 

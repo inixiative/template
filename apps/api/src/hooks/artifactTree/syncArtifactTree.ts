@@ -9,7 +9,7 @@ import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
 
-type AncestorInfo = { inherits: boolean; depth: number };
+type AncestorInfo = { inherits: boolean; inheritsAccess: boolean; depth: number };
 
 type TreeNode = OwnedArtifact & { access: ArtifactAccess; parents: string[] };
 
@@ -41,7 +41,10 @@ const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphCont
       userId: true,
       organizationId: true,
       spaceId: true,
-      placements: { select: { containerArtifactId: true } },
+      placements: {
+        where: { containerArtifactId: { not: null } },
+        select: { containerArtifactId: true },
+      },
       permissions: { select: { id: true } },
     },
   });
@@ -49,7 +52,9 @@ const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphCont
   const directPermsByArtifact = new Map<string, string[]>();
   const boundaryCandidateIds = new Set<string>();
   for (const row of rows) {
-    const parents = row.placements.map((placement) => placement.containerArtifactId);
+    const parents = row.placements.flatMap((placement) =>
+      placement.containerArtifactId ? [placement.containerArtifactId] : [],
+    );
     nodes.set(row.id, {
       access: row.access,
       ownerModel: row.ownerModel,
@@ -83,7 +88,9 @@ const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphCont
         userId: true,
         organizationId: true,
         spaceId: true,
-        ancestors: { select: { ancestorArtifactId: true, inherits: true, depth: true } },
+        ancestors: {
+          select: { ancestorArtifactId: true, inherits: true, inheritsAccess: true, depth: true },
+        },
         effectivePermissions: { select: { permissionId: true } },
       },
     });
@@ -95,7 +102,7 @@ const fetchSubgraphContext = async (affectedIds: string[]): Promise<SubgraphCont
           new Map(
             parent.ancestors.map((row) => [
               row.ancestorArtifactId,
-              { inherits: row.inherits, depth: row.depth },
+              { inherits: row.inherits, inheritsAccess: row.inheritsAccess, depth: row.depth },
             ]),
           ),
         );
@@ -128,7 +135,8 @@ const computeAncestorsMap = ({ nodes, boundaryParents, boundaryAncestors }: Subg
     if (!node || walking.has(artifactId)) return result;
 
     const nextWalking = new Set(walking).add(artifactId);
-    const canInherit = node.access !== 'private';
+    const canInheritGrants = node.access !== 'private';
+    const canInheritAccess = node.access === 'inherit';
     const merge = (ancestorId: string, info: AncestorInfo) => {
       const current = result.get(ancestorId);
       result.set(
@@ -136,6 +144,7 @@ const computeAncestorsMap = ({ nodes, boundaryParents, boundaryAncestors }: Subg
         current
           ? {
               inherits: current.inherits || info.inherits,
+              inheritsAccess: current.inheritsAccess || info.inheritsAccess,
               depth: Math.max(current.depth, info.depth),
             }
           : info,
@@ -151,13 +160,17 @@ const computeAncestorsMap = ({ nodes, boundaryParents, boundaryAncestors }: Subg
       const parentAncestors = internalParent
         ? visit(parentId, nextWalking)
         : (boundaryAncestors.get(parentId) ?? new Map<string, AncestorInfo>());
-      // why: cross-owner placements organize without leaking permissions or public status across tenants.
-      const edgeInherits = canInherit && sameArtifactOwner(node, parentOwner);
-      merge(parentId, { inherits: edgeInherits, depth: 1 });
+      // why: cross-owner placements organize without leaking permissions or visibility across tenants;
+      // visibility inheritance (inheritsAccess) also stops at explicit non-inherit nodes (e.g., tenant inside public).
+      const sameOwner = sameArtifactOwner(node, parentOwner);
+      const edgeInherits = canInheritGrants && sameOwner;
+      const edgeInheritsAccess = canInheritAccess && sameOwner;
+      merge(parentId, { inherits: edgeInherits, inheritsAccess: edgeInheritsAccess, depth: 1 });
       for (const [ancestorId, ancestorInfo] of parentAncestors) {
         if (ancestorId === artifactId) continue;
         merge(ancestorId, {
           inherits: edgeInherits && ancestorInfo.inherits,
+          inheritsAccess: edgeInheritsAccess && ancestorInfo.inheritsAccess,
           depth: ancestorInfo.depth + 1,
         });
       }
@@ -184,6 +197,7 @@ const syncAncestors = async (
     artifactId: string;
     ancestorArtifactId: string;
     inherits: boolean;
+    inheritsAccess: boolean;
     depth: number;
   }[] = [];
 
@@ -195,7 +209,11 @@ const syncAncestors = async (
         toCreate.push({ artifactId, ancestorArtifactId, ...info });
       } else {
         existingByKey.delete(key);
-        if (current.inherits !== info.inherits || current.depth !== info.depth) {
+        if (
+          current.inherits !== info.inherits ||
+          current.inheritsAccess !== info.inheritsAccess ||
+          current.depth !== info.depth
+        ) {
           toDeleteIds.push(current.id);
           toCreate.push({ artifactId, ancestorArtifactId, ...info });
         }
@@ -357,7 +375,7 @@ export const invalidateInheritingDescendants = async (artifactIds: string[]): Pr
   if (uniqueIds.length === 0) return;
   await db.withoutDeleted(async () => {
     const rows = await db.artifactAncestor.findMany({
-      where: { ancestorArtifactId: { in: uniqueIds }, inherits: true },
+      where: { ancestorArtifactId: { in: uniqueIds }, inheritsAccess: true },
       select: { artifactId: true },
     });
     if (rows.length === 0) return;

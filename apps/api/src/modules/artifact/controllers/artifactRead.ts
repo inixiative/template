@@ -25,8 +25,8 @@ import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import {
   artifactEffectiveRole,
+  effectiveArtifactAccess,
   hydrateArtifact,
-  isArtifactPublic,
 } from '#/modules/artifact/lib/checkArtifactPermission';
 import { artifactReadRoute } from '#/modules/artifact/routes/artifactRead';
 
@@ -92,10 +92,20 @@ export const artifactReadController = makeController(artifactReadRoute, async (c
     ...scalarArtifact
   } = contextResource<'artifact'>(c);
 
+  const containerPlacements = rawPlacements.filter(
+    (
+      placement,
+    ): placement is (typeof rawPlacements)[number] & {
+      containerArtifact: NonNullable<(typeof rawPlacements)[number]['containerArtifact']>;
+    } => placement.containerArtifact !== null,
+  );
+
   const [hydrated, parentAccess, childAccess, bindingFlags] = await Promise.all([
     hydrateArtifact(scalarArtifact),
     Promise.all(
-      rawPlacements.map(({ containerArtifact }) => accessForNeighbor(permix, containerArtifact)),
+      containerPlacements.map(({ containerArtifact }) =>
+        accessForNeighbor(permix, containerArtifact),
+      ),
     ),
     Promise.all(rawContents.map(({ artifact }) => accessForNeighbor(permix, artifact))),
     Promise.all(rawBindings.map((binding) => visibleBindingToCaller(permix, binding))),
@@ -103,12 +113,12 @@ export const artifactReadController = makeController(artifactReadRoute, async (c
 
   const canManage = check(permix, 'artifact', hydrated, 'manage');
 
-  const placements = rawPlacements.flatMap(
+  const placements = containerPlacements.flatMap(
     ({ containerArtifact: _container, ...placement }, index) =>
       parentAccess[index]!.canRead ? [placement] : [],
   );
 
-  const parents = rawPlacements
+  const parents = containerPlacements
     .flatMap(({ containerArtifact }, index) => {
       const access = parentAccess[index]!;
       if (!access.canRead) return [];
@@ -148,7 +158,7 @@ export const artifactReadController = makeController(artifactReadRoute, async (c
     ...scalarArtifact,
     effectiveAccess: {
       role: artifactEffectiveRole(permix, hydrated),
-      public: isArtifactPublic(hydrated),
+      access: effectiveArtifactAccess(hydrated),
     },
     parents,
     children,
