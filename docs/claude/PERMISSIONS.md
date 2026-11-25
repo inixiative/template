@@ -672,7 +672,7 @@ The schema is `schemaMap` in `packages/permissions/src/rebac/schema.ts`, keyed b
 | `memberRowActions(tenant)` | a member row's actions |
 | `memberRoleWrite(tenant)`, `memberRemoval(tenant)` | writing a member's role; removing a member |
 | `integrationAdministering`, `integrationAccess` | `db:Integration`'s `create`, `manage`, `delete`, `delegateFull`; its `operate` and `read` |
-| `actionsForRecordOwnedByAnyOwnerModel` | the same by owner kind without `delegateFull`, for a model owned by any of the five owners (`db:Project`) |
+| `ownerTenantRead` | tenant `read` for `Organization`, `Space`, `OrganizationUser` (`organizationUser.organization`), and `SpaceUser` (`spaceUser.space`), used by `tenant` visibility rules (`db:Project`) |
 | `integrationRoleWrite`, `roleHeldAtOwner(at?)` | writing an integration's role; the role on the row held at its owner |
 | `actorMayCreateTokenAtOwnerWithRole`, `tokenAdministering` | `db:Token`'s `create`; its `read` and `delete` |
 | `chainedStandardActions`, `ownerActions(rels?)` | the standard chain; the owner fan-out over it |
@@ -778,11 +778,9 @@ Models with nullable foreign keys to several owners (Contact, WebhookSubscriptio
 
 For each standard action the helper asks the same action of `user`, `organization` and `space`, chained. Only the populated relation is hydrated, so the others fail and the rule follows the actual owner. Integrations and tokens are owner-polymorphic too but follow their own owner-kind rules ([Integrations and Tokens by Owner Kind](#integrations-and-tokens-by-owner-kind)).
 
-`ownerActions()` reads the `user`, `organization` and `space` relations, so it can't tell a member's row from its tenant's: an OrganizationUser-owned row carries `organizationId` too, and `manage` on the organization would reach it. A model owned by any of the five owner kinds (User, OrganizationUser, Organization, Space, SpaceUser) uses `actionsForRecordOwnedByAnyOwnerModel` instead. It is the integration rules without `delegateFull`, keyed on `ownerModel` ([Integrations](#integrations)): an organization's admin manages its organization's rows but can't reach a member's own; the organization's owner can read and delete a member's row, not change it; only the member manages it.
+`ownerActions()` reads the `user`, `organization` and `space` relations, so it can't tell a member's row from its tenant's: an OrganizationUser-owned row carries `organizationId` too, and `manage` on the organization would reach it. A model owned by any of the five owner kinds (User, OrganizationUser, Organization, Space, SpaceUser) keys its rules on `ownerModel` ([Integrations](#integrations)): an organization's admin manages its organization's rows but can't reach a member's own; the organization's owner can read and delete a member's row, not change it; only the member manages it.
 
-```typescript
-'db:Project': { actions: actionsForRecordOwnedByAnyOwnerModel },
-```
+`db:Project` layers `ProjectAccess` (`public | tenant | private`, default `private`) on top of `omit(integrationAdministering, 'delegateFull')`: `private` keeps `Organization`/`Space` projects admin/owner-only and member projects to the member + tenant owner; `tenant` opens `Organization`/`Space` projects to tenant `read`/`operate` and member projects to coworkers via `ownerTenantRead` (`read`-only); `public` adds unauthenticated/external `read`. Owner list endpoints use `fetchSubmodelVisibilityWhere` to reflect caller visibility (and verified direct entitlements) in SQL.
 
 ---
 
@@ -973,7 +971,7 @@ Routes that still check an action on the owner (`validatePermission` on spaces, 
 
 A model with a five-way owner (`User`, `OrganizationUser`, `Organization`, `Space`, `SpaceUser`; a token also has `Integration`) gets one list per owner kind: `/me/tokens`, `/organizationUser/:id/tokens`, `/organization/:id/tokens`, `/space/:id/tokens`, `/spaceUser/:id/tokens`, `/integration/:id/tokens`. Each tenant and member list returns exactly that owner's rows: an organization's list holds no member's rows. `/me/tokens` is the user's view across tenants: their own tokens and every membership's, each with its `organization`, `organizationUser`, `space` and `spaceUser`.
 
-The controller filters with `submodelOwnerWhere(c)` (`apps/api/src/lib/prisma/submodelOwnerWhere.ts`): the owner keys and kind of the same placement the route's `validateSubmodelPermission('read')` checked. One check on the owner covers every row the list returns, and the two can't drift apart.
+The controller filters with `submodelOwnerWhere(c)` (`apps/api/src/lib/prisma/submodelOwnerWhere.ts`): the owner keys and kind of the same placement the route's `validateSubmodelPermission('read')` checked. One check on the owner covers every row the list returns, and the two can't drift apart. Models with an `access` visibility enum (`Project`) instead omit `validateSubmodelPermission('read')` on their owner list routes and filter with `fetchSubmodelVisibilityWhere(c)` (`apps/api/src/lib/prisma/fetchSubmodelVisibilityWhere.ts`), which evaluates each `access` level on the hydrated placement plus any verified direct entitlements.
 
 ```typescript
 const { data, pagination } = await paginate(c, db.token, {
@@ -982,7 +980,7 @@ const { data, pagination } = await paginate(c, db.token, {
 });
 ```
 
-A member's list is read by the member and by the organization's owner, never by an admin or another member (`memberOwnedLists.test.ts`). In the UI, an organization or space page shows two lists: yours there (the membership's) and the tenant's (`tokenContextQueries` / `integrationContextQueries` with `{ ownedByMyMembership: true }`).
+A member's non-visibility list (integrations, tokens) is read by the member and by the organization's owner, never by an admin or another member (`memberOwnedLists.test.ts`); member `Project` lists return `200` filtered to the caller's visibility (`private` hidden from admins, coworkers, and outsiders). In the UI, an organization or space page shows two lists: yours there (the membership's) and the tenant's (`tokenContextQueries` / `integrationContextQueries` with `{ ownedByMyMembership: true }`).
 
 ### The user as a resource
 

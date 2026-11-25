@@ -2,6 +2,7 @@ export {
   entitlementProblem,
   pseudoRecordsBelowAnchor,
   pseudoRecordsOfEntitlement,
+  reachableFrom,
   validateActionRule,
 } from '@inixiative/permissions';
 export { canGrantEntitlement } from './canGrantEntitlement';

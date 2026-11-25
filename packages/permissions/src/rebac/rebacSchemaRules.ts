@@ -9,7 +9,6 @@ import { makeKindRules, ruleFieldEqualsPath } from '@inixiative/permissions';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
-import { omit } from 'lodash-es';
 
 export const privilegedRoles = ['owner', 'admin'];
 export const unprivilegedRoles = roleHierarchy.filter((role) => !privilegedRoles.includes(role));
@@ -189,10 +188,18 @@ export const integrationAccess = {
   },
 } satisfies Record<string, ActionRule>;
 
-export const actionsForRecordOwnedByAnyOwnerModel = {
-  ...omit(integrationAdministering, 'delegateFull'),
-  ...integrationAccess,
-} satisfies Record<string, ActionRule>;
+export const ownerTenantRead: ActionRule = {
+  any: [
+    actorMayPerformActionOnOwner('read', '', organizationOrSpace),
+    {
+      all: [
+        ownerModelIsOneOf(['OrganizationUser']),
+        { rel: 'organizationUser.organization', action: 'read' },
+      ],
+    },
+    { all: [ownerModelIsOneOf(['SpaceUser']), { rel: 'spaceUser.space', action: 'read' }] },
+  ],
+};
 
 // Read on an integration row, whose owner is never another integration.
 export const integrationRoleWrite: ActionRule = {

@@ -13,12 +13,26 @@ import {
   pseudoRecordsOfEntitlement,
   schemaMap,
 } from '@template/permissions/rebac';
+import { isPlainObject } from 'lodash-es';
 import { makeError } from '#/lib/errors';
+
+// why: visibility (`access`) is mutable; an anchor-level grant must hold even if `access` later tightens to private.
+const withoutMutableAccess = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(withoutMutableAccess);
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => key !== 'access')
+        .map(([key, entry]) => [key, withoutMutableAccess(entry)]),
+    );
+  }
+  return value;
+};
 
 const anchorRecord = async ({ resource, id }: EntitlementEntry['anchor']) => {
   const model = accessorOfResource(resource);
   const row = (await db.delegate(model).findFirst({ where: { id } })) as HydratedRecord | null;
-  return row ? hydrate(model, row) : null;
+  return row ? (withoutMutableAccess(await hydrate(model, row)) as HydratedRecord) : null;
 };
 
 const pseudoRecordsOf = async (entry: EntitlementEntry) => {

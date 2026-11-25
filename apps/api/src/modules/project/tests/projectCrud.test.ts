@@ -190,15 +190,25 @@ describe('Project', () => {
       return { ...created, app: appFor(created.context.user, [created.entity]) };
     };
 
-    it('a member reads an organization project but cannot change it', async () => {
+    it('a member reads a tenant organization project (not a private one) and cannot change it', async () => {
       const member = await memberOf(Role.member);
-      const { entity: project } = await createProject({
+      const { entity: privateProject } = await createProject({
         ownerModel: 'Organization',
         organizationId: organization.id,
       });
-      expect((await member.app.fetch(get(`/api/v1/project/${project.id}`))).status).toBe(200);
+      expect((await member.app.fetch(get(`/api/v1/project/${privateProject.id}`))).status).toBe(
+        403,
+      );
+
+      const { entity: tenantProject } = await createProject({
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        access: 'tenant',
+      });
+      expect((await member.app.fetch(get(`/api/v1/project/${tenantProject.id}`))).status).toBe(200);
       expect(
-        (await member.app.fetch(patch(`/api/v1/project/${project.id}`, { name: 'Edit' }))).status,
+        (await member.app.fetch(patch(`/api/v1/project/${tenantProject.id}`, { name: 'Edit' })))
+          .status,
       ).toBe(403);
       expect(
         (
@@ -209,7 +219,7 @@ describe('Project', () => {
       ).toBe(403);
     });
 
-    it("an admin can't reach a member's own project, while the organization owner can", async () => {
+    it("an admin can't reach a member's own private project, while the organization owner can", async () => {
       const member = await memberOf(Role.member);
       const { entity: project } = await createProject({
         ownerModel: 'OrganizationUser',
@@ -224,13 +234,26 @@ describe('Project', () => {
       expect((await member.app.fetch(get(`/api/v1/project/${project.id}`))).status).toBe(200);
     });
 
-    it("an admin can't list a member's projects", async () => {
+    it("an admin listing a member's projects does not see private ones, and sees tenant ones", async () => {
       const member = await memberOf(Role.member);
       const admin = await memberOf(Role.admin);
+      await createProject({
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: member.context.user.id,
+      });
+      const { entity: sharedProject } = await createProject({
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: member.context.user.id,
+        access: 'tenant',
+      });
       const response = await admin.app.fetch(
         get(`/api/v1/organizationUser/${member.entity.id}/projects`),
       );
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(200);
+      const { data } = await parseSuccessBody<Project[]>(response);
+      expect(data.map((project) => project.id)).toEqual([sharedProject.id]);
     });
 
     it('another organization cannot see the project at all', async () => {
