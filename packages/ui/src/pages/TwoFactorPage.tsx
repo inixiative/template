@@ -18,7 +18,7 @@ import {
 } from '@template/ui/components/primitives/Card';
 import { TwoFactorSecurityCard } from '@template/ui/components/settings';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { safeInternalRedirect } from '@template/ui/lib/routeRedirect';
+import { redirectAfterTwoFactor } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
 import { useState } from 'react';
 
@@ -31,9 +31,6 @@ export const TwoFactorPage = () => {
   const setTwoFactorAction = useAppStore((state) => state.auth.setTwoFactorAction);
   const refreshMe = useAppStore((state) => state.auth.refreshMe);
   const logout = useAppStore((state) => state.auth.logout);
-  const navigateKeepingSearchParams = useAppStore(
-    (state) => state.navigation.navigateKeepingSearchParams,
-  );
   const search = useSearch({ strict: false }) as { redirectTo?: string; mode?: string };
   const [isReturning, setIsReturning] = useState(false);
 
@@ -47,7 +44,7 @@ export const TwoFactorPage = () => {
   });
 
   const navigateBack = () => {
-    navigateKeepingSearchParams(safeInternalRedirect(search.redirectTo), 'context');
+    redirectAfterTwoFactor(useAppStore.getState, search.redirectTo);
   };
 
   const returnToOrigin = async () => {

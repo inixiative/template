@@ -4,8 +4,12 @@
  * @partOf primitive:routeTemplates
  * @uses none
  */
+export type RouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | '*';
+
+export type RoutePattern = readonly [method: RouteMethod, path: string];
+
 type ParsedRoutePattern = {
-  method: string | null;
+  method: RouteMethod | null;
   segments: string[];
   prefixWildcard: boolean;
   suffixWildcard: string | null;
@@ -25,13 +29,9 @@ const normalizeRequestPath = (path: string): string => {
   return pathname;
 };
 
-const parseRoutePattern = (pattern: string): ParsedRoutePattern => {
-  const trimmed = pattern.trim();
-  const spaceIndex = trimmed.indexOf(' ');
-  const hasMethod = spaceIndex > 0;
-  const rawMethod = hasMethod ? trimmed.slice(0, spaceIndex).toUpperCase() : null;
-  const method = rawMethod && rawMethod !== '*' ? rawMethod : null;
-  const rawPath = normalizePatternPath(hasMethod ? trimmed.slice(spaceIndex + 1).trim() : trimmed);
+const parseRoutePattern = ([rawMethod, patternPath]: RoutePattern): ParsedRoutePattern => {
+  const method = rawMethod === '*' ? null : rawMethod;
+  const rawPath = normalizePatternPath(patternPath.trim());
 
   if (rawPath.endsWith('*') && !rawPath.endsWith('/*')) {
     return {
@@ -75,13 +75,17 @@ const matchesParsedPattern = (
   return true;
 };
 
-export const matchesRoutePattern = (method: string, path: string, pattern: string): boolean => {
+export const matchesRoutePattern = (
+  method: string,
+  path: string,
+  pattern: RoutePattern,
+): boolean => {
   const normalizedPath = normalizeRequestPath(path);
   const pathSegments = normalizedPath.split('/').filter(Boolean);
   return matchesParsedPattern(method, normalizedPath, pathSegments, parseRoutePattern(pattern));
 };
 
-export const makeRouteMatcher = (patterns: readonly string[]) => {
+export const makeRouteMatcher = (patterns: readonly RoutePattern[]) => {
   const parsed = patterns.map(parseRoutePattern);
   return (method: string, path: string): boolean => {
     const normalizedPath = normalizeRequestPath(path);

@@ -4,27 +4,14 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates
  */
-import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
-import type { Context } from 'hono';
 import { actingUser } from '#/lib/context/actingUser';
-import { isTwoFactorRequired } from '#/lib/twoFactor/isTwoFactorRequired';
+import { pendingTwoFactorAction } from '#/lib/twoFactor/pendingTwoFactorAction';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadRoute } from '#/modules/me/routes/meRead';
-import type { AppEnv } from '#/types/appEnv';
-
-const twoFactorActionFor = (
-  c: Context<AppEnv>,
-  twoFactorEnabled: boolean,
-): TwoFactorAction | null => {
-  if (c.get('token') || c.get('spoofedBy')) return null;
-  if (isTwoFactorRequired() && !twoFactorEnabled) return 'enroll';
-  if (c.get('jwtTwoFactorVerified')) return null;
-  return twoFactorEnabled ? 'verify' : null;
-};
 
 export const meReadController = makeController(meReadRoute, async (c, respond) => {
   const user = actingUser(c)!;
-  const twoFactorAction = twoFactorActionFor(c, user.twoFactorEnabled);
+  const twoFactorAction = c.get('spoofedBy') ? null : pendingTwoFactorAction(c, user);
 
   return respond.ok({
     ...user,
