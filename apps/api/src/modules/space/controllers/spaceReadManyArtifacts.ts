@@ -4,10 +4,10 @@
  * @partOf feature:files
  * @uses primitive:routeTemplates, primitive:authz
  */
-import { hydrate } from '@template/db';
-import { check } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
+import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import { makeController } from '#/lib/utils/makeController';
+import { ownerColumns } from '#/modules/artifact/lib/artifactOwner';
 import { paginateOwnerArtifacts } from '#/modules/artifact/services/paginateOwnerArtifacts';
 import { spaceReadManyArtifactsRoute } from '#/modules/space/routes/spaceReadManyArtifacts';
 
@@ -15,12 +15,18 @@ export const spaceReadManyArtifactsController = makeController(
   spaceReadManyArtifactsRoute,
   async (c, respond) => {
     const space = contextResource<'space'>(c);
-    const allReadable = check(c.get('permix'), 'space', await hydrate('space', space), 'manage');
-    const { data, pagination } = await paginateOwnerArtifacts(
-      c,
-      { ownerModel: 'Space', organizationId: space.organizationId, spaceId: space.id },
-      { allReadable },
+    const owner = {
+      ownerModel: 'Space' as const,
+      organizationId: space.organizationId,
+      spaceId: space.id,
+    };
+    const allReadable = await holdsOnRecord(
+      c.get('permix'),
+      'artifact',
+      { id: '', access: 'private', ...ownerColumns(owner) },
+      'read',
     );
+    const { data, pagination } = await paginateOwnerArtifacts(c, owner, { allReadable });
     return respond.ok(data, { pagination });
   },
 );

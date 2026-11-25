@@ -63,11 +63,10 @@ export const artifactDetailResponseSchema = ArtifactScalarSchema.extend({
 export const artifactListFilterLens: LensNarrowing = {
   parent: lensFor('Artifact'),
   root: {
+    omits: ['deletedAt'],
     relations: {
       placements: {
-        relations: {
-          containerArtifact: {},
-        },
+        omits: ['deletedAt'],
       },
     },
   },

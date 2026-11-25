@@ -5,24 +5,18 @@
  * @uses primitive:routeTemplates
  */
 import { contextResource } from '#/lib/context/contextResource';
-import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { sharedWithOwnerWhere } from '#/modules/artifactPermission/lib/sharedWithOwnerWhere';
+import { paginateSharedArtifactPermissions } from '#/modules/artifactPermission/lib/sharedWithOwnerWhere';
 import { spaceReadManyArtifactPermissionsRoute } from '#/modules/space/routes/spaceReadManyArtifactPermissions';
 
 export const spaceReadManyArtifactPermissionsController = makeController(
   spaceReadManyArtifactPermissionsRoute,
   async (c, respond) => {
-    const db = c.get('db');
     const space = contextResource<'space'>(c);
-    const { data, pagination } = await paginate(c, db.artifactPermission, {
-      where: sharedWithOwnerWhere({
-        ownerModel: 'Space',
-        organizationId: space.organizationId,
-        spaceId: space.id,
-      }),
-      include: { artifact: true },
-      orderBy: { createdAt: 'desc' },
+    const { data, pagination } = await paginateSharedArtifactPermissions(c, {
+      ownerModel: 'Space',
+      organizationId: space.organizationId,
+      spaceId: space.id,
     });
     return respond.ok(data, { pagination });
   },

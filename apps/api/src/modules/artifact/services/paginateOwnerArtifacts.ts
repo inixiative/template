@@ -33,7 +33,10 @@ const hasClientFilter = (c: Context<AppEnv>): boolean => {
   const searchFields = isBracketRecord(bracketSearchFields)
     ? bracketSearchFields
     : query.searchFields;
-  return Boolean(query.search) || (Boolean(searchFields) && Object.keys(searchFields!).length > 0);
+  return (
+    Boolean(query.search?.trim()) ||
+    (Boolean(searchFields) && Object.keys(searchFields!).length > 0)
+  );
 };
 
 export const paginateOwnerArtifacts = async (
@@ -51,10 +54,12 @@ export const paginateOwnerArtifacts = async (
   options: { allReadable: boolean },
 ) => {
   const permix = c.get('permix');
+  const query = validatedQuery(c);
+  const hasOrderBy = Boolean(query.orderBy?.length);
   const rootWhere = hasClientFilter(c)
     ? {}
     : { placements: { none: { containerArtifact: ownerColumns(owner) } } };
-  const ownerWhere = { ...ownerColumns(owner), ...rootWhere };
+  const ownerWhere = { deletedAt: null, ...ownerColumns(owner), ...rootWhere };
   const include = { permissions: { orderBy: { createdAt: 'asc' as const } } };
 
   const stripPermissionsIfNotManager = async (rows: ArtifactWithPermissions[]) =>
@@ -70,7 +75,7 @@ export const paginateOwnerArtifacts = async (
     const result = await paginate(c, db.artifact, {
       where: ownerWhere,
       include,
-      orderBy: { name: 'asc' },
+      ...(hasOrderBy ? {} : { orderBy: { name: 'asc' } }),
     });
     return {
       data: await stripPermissionsIfNotManager(result.data),
@@ -79,7 +84,6 @@ export const paginateOwnerArtifacts = async (
   }
 
   // why: until AUTH-013 compiles ReBAC into SQL, non-managers listing an org/space filter per-row in memory.
-  const query = validatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
   const bracketSearchFields = c.get('bracketQuery').searchFields;
   const searchFields = isBracketRecord(bracketSearchFields)
@@ -96,7 +100,10 @@ export const paginateOwnerArtifacts = async (
     filterLens,
     andWhere([ownerWhere as Record<string, unknown>, searchWhere as Record<string, unknown>]),
   );
-  const orderBy = buildOrderBy({ callerOrderBy: { name: 'asc' }, clientOrderBy: rawOrderBy });
+  const orderBy = buildOrderBy({
+    callerOrderBy: hasOrderBy ? undefined : { name: 'asc' },
+    clientOrderBy: rawOrderBy,
+  });
   const candidates = await db.artifact.findMany({ where, include, orderBy });
 
   const checks = await Promise.all(
@@ -108,12 +115,11 @@ export const paginateOwnerArtifacts = async (
       };
     }),
   );
-  const readable = candidates
-    .filter((_, index) => checks[index]!.canRead)
-    .map((row, index) => ({
-      ...row,
-      permissions: checks[index]!.canManage ? row.permissions : [],
-    }));
+  const readable = candidates.flatMap((row, index) => {
+    const access = checks[index]!;
+    if (!access.canRead) return [];
+    return [{ ...row, permissions: access.canManage ? row.permissions : [] }];
+  });
   const total = readable.length;
   const skip = (page - 1) * pageSize;
 

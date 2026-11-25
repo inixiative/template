@@ -22,6 +22,7 @@ import { artifactPermissionRouter } from '#/modules/artifactPermission';
 import { artifactPlacementRouter } from '#/modules/artifactPlacement';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
+import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
@@ -32,6 +33,7 @@ const mount: MountFn[] = [
     app.route('/api/v1/artifactPermission', artifactPermissionRouter);
     app.route('/api/v1/me', meRouter);
     app.route('/api/v1/organization', organizationRouter);
+    app.route('/api/v1/organizationUser', organizationUserRouter);
   },
 ];
 
@@ -602,5 +604,91 @@ describe('artifact routes', () => {
       await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
     );
     expect(roots.data.map((artifact) => artifact.id)).toContain(drafts.id);
+  });
+
+  it('organizationUser/artifactPermissions stays private to the member; child permissions never shift across filtered neighbors; deletedAt filter is rejected', async () => {
+    // 1. Peer / org admin cannot read member's OrganizationUser shared artifactPermissions
+    const secret = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      name: 'confidential',
+    });
+    const share = await parseSuccessBody<{ id: string }>(
+      await outsiderFetch(
+        post(`/api/v1/artifact/${secret.id}/artifactPermissions`, {
+          granteeModel: 'OrganizationUser',
+          granteeOrganizationId: organization.id,
+          granteeUserId: member.id,
+          role: 'viewer',
+        }),
+      ),
+    );
+    expect(share.data.id).toBeDefined();
+    expect(
+      (await adminFetch(get(`/api/v1/organizationUser/${memberMembership.id}/artifactPermissions`)))
+        .status,
+    ).toBe(403);
+    const asMember = await parseSuccessBody<{ id: string; artifact: Artifact }[]>(
+      await memberFetch(get(`/api/v1/organizationUser/${memberMembership.id}/artifactPermissions`)),
+    );
+    expect(asMember.data.map((row) => row.artifact.id)).toContain(secret.id);
+
+    // 2. Post-filter index shift regression: [unreadable, manageable, viewerOnly]
+    const unreadable = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'a-unreadable', access: 'private' },
+    );
+    const manageable = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'b-manageable', access: 'private' },
+    );
+    const viewerOnly = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'c-viewer', access: 'private' },
+    );
+    await adminFetch(
+      post(`/api/v1/artifact/${manageable.id}/artifactPermissions`, {
+        granteeModel: 'User',
+        granteeUserId: member.id,
+        role: 'admin',
+      }),
+    );
+    await adminFetch(
+      post(`/api/v1/artifact/${viewerOnly.id}/artifactPermissions`, {
+        granteeModel: 'User',
+        granteeUserId: member.id,
+        role: 'viewer',
+      }),
+    );
+    for (const child of [unreadable, manageable, viewerOnly]) {
+      expect(
+        (
+          await adminFetch(
+            post(`/api/v1/artifact/${child.id}/artifactPlacements`, {
+              containerArtifactId: shared.id,
+              inherit: false,
+            }),
+          )
+        ).status,
+      ).toBe(201);
+    }
+    const detail = await parseSuccessBody<{
+      children: (Artifact & { permissions: unknown[] })[];
+    }>(await memberFetch(get(`/api/v1/artifact/${shared.id}`)));
+    const byId = new Map(detail.data.children.map((child) => [child.id, child]));
+    expect(byId.has(unreadable.id)).toBe(false);
+    expect(byId.get(manageable.id)!.permissions.length).toBeGreaterThan(0);
+    expect(byId.get(viewerOnly.id)!.permissions).toEqual([]);
+
+    // 3. deletedAt filter is rejected by the lens
+    expect(
+      (await memberFetch(get('/api/v1/me/artifactPermissions?searchFields[deletedAt][not]=null')))
+        .status,
+    ).toBe(400);
+    expect(
+      (await adminFetch(get(`/api/v1/organization/${organization.id}/artifacts?orderBy=name:desc`)))
+        .status,
+    ).toBe(200);
   });
 });

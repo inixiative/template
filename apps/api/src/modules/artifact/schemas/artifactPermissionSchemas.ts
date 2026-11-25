@@ -34,8 +34,11 @@ export const artifactPermissionSharedResponseSchema = ArtifactPermissionScalarSc
 export const artifactPermissionListFilterLens: LensNarrowing = {
   parent: lensFor('ArtifactPermission'),
   root: {
+    omits: ['deletedAt'],
     relations: {
-      artifact: {},
+      artifact: {
+        omits: ['deletedAt'],
+      },
     },
   },
 };

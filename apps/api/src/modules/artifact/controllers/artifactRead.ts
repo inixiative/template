@@ -74,6 +74,7 @@ const activeEffectivePermissions = (items: EffectivePermItem[]): ArtifactPermiss
 };
 
 const accessForNeighbor = async (permix: Permix, neighbor: Artifact) => {
+  if (neighbor.deletedAt !== null) return { canRead: false, canManage: false };
   const hydrated = await hydrateArtifact(neighbor);
   return {
     canRead: check(permix, 'artifact', hydrated, 'read'),
@@ -102,31 +103,40 @@ export const artifactReadController = makeController(artifactReadRoute, async (c
 
   const canManage = check(permix, 'artifact', hydrated, 'manage');
 
-  const placements = rawPlacements
-    .filter((_, index) => parentAccess[index]!.canRead)
-    .map(({ containerArtifact: _container, ...placement }) => placement);
+  const placements = rawPlacements.flatMap(
+    ({ containerArtifact: _container, ...placement }, index) =>
+      parentAccess[index]!.canRead ? [placement] : [],
+  );
 
   const parents = rawPlacements
-    .filter((_, index) => parentAccess[index]!.canRead)
-    .map(({ containerArtifact }, index) => ({
-      ...containerArtifact,
-      permissions: parentAccess[index]!.canManage ? containerArtifact.permissions : [],
-    }))
+    .flatMap(({ containerArtifact }, index) => {
+      const access = parentAccess[index]!;
+      if (!access.canRead) return [];
+      return [
+        {
+          ...containerArtifact,
+          permissions: access.canManage ? containerArtifact.permissions : [],
+        },
+      ];
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const children = rawContents
-    .filter((_, index) => childAccess[index]!.canRead)
-    .map(({ artifact }, index) => {
+    .flatMap(({ artifact }, index) => {
+      const access = childAccess[index]!;
+      if (!access.canRead) return [];
       const {
         placements: childPlacements,
         permissions: childPermissions,
         ...childScalar
       } = artifact;
-      return {
-        ...childScalar,
-        permissions: childAccess[index]!.canManage ? childPermissions : [],
-        exclusive: childPlacements.length === 1,
-      };
+      return [
+        {
+          ...childScalar,
+          permissions: access.canManage ? childPermissions : [],
+          exclusive: childPlacements.length === 1,
+        },
+      ];
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 

@@ -149,6 +149,7 @@ export const removePlacement = async (artifactId: string, containerArtifactId: s
 export const insertArtifact = async (
   { containerArtifactId, access, ...data }: CreateArtifactInput,
   permix?: Permix,
+  prelockedContainer?: Artifact,
 ): Promise<Artifact> => {
   const kind = artifactKindDef(data.kind);
   if (!kind) throw makeError({ status: 422, message: `Unknown artifact kind: ${data.kind}` });
@@ -158,6 +159,12 @@ export const insertArtifact = async (
   if (containerArtifactId) {
     const locked = await lockArtifactsInTxn([containerArtifactId]);
     container = locked.get(containerArtifactId)!;
+    if (prelockedContainer && !sameArtifactOwner(container, prelockedContainer)) {
+      throw makeError({
+        status: 409,
+        message: 'Artifact ownership changed while waiting for lock; please retry',
+      });
+    }
     if (permix && !(await canActOnArtifact(permix, container, 'operate'))) {
       throw makeError({ status: 403, message: 'Forbidden' });
     }

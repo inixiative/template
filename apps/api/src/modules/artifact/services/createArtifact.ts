@@ -25,9 +25,16 @@ export const createArtifact = async (
   input: CreateArtifactInput,
 ): Promise<Artifact> => {
   const lockTargets: OwnedArtifact[] = [ownerColumns(input)];
+  let prelockedContainer: Artifact | undefined;
   if (input.containerArtifactId) {
-    const container = await assertArtifactPermission(permix, input.containerArtifactId, 'operate');
-    lockTargets.push(container);
+    prelockedContainer = await assertArtifactPermission(
+      permix,
+      input.containerArtifactId,
+      'operate',
+    );
+    lockTargets.push(prelockedContainer);
   }
-  return withArtifactOwnersLock(lockTargets, () => db.txn(() => insertArtifact(input, permix)));
+  return withArtifactOwnersLock(lockTargets, () =>
+    db.txn(() => insertArtifact(input, permix, prelockedContainer)),
+  );
 };

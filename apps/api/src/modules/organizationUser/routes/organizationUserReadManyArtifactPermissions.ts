@@ -18,7 +18,7 @@ export const organizationUserReadManyArtifactPermissionsRoute = readRoute({
   many: true,
   paginate: true,
   filterLens: artifactPermissionListFilterLens,
-  middleware: [validatePermission('read')],
+  middleware: [validatePermission('operate')],
   description:
     'Lists active artifact permissions granted to this organization member seat, with each shared artifact inline.',
   responseSchema: artifactPermissionSharedResponseSchema,

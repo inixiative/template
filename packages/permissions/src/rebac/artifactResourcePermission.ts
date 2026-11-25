@@ -232,10 +232,44 @@ const artifactPermissionGranteeLeave: ActionRule = {
   ],
 };
 
+const artifactPermissionGranteeRead: ActionRule = {
+  any: [
+    { all: [granteeIs('User', ''), { rel: 'granteeUser', action: 'read' }] },
+    { all: [granteeIs('Organization', ''), { rel: 'granteeOrganization', action: 'read' }] },
+    { all: [granteeIs('Space', ''), { rel: 'granteeSpace', action: 'read' }] },
+    {
+      all: [
+        granteeIs('OrganizationUser', ''),
+        { rel: 'granteeOrganizationUser', action: 'operate' },
+      ],
+    },
+    { all: [granteeIs('SpaceUser', ''), { rel: 'granteeSpaceUser', action: 'operate' }] },
+    {
+      all: [
+        granteeIs('CustomerRelationship', ''),
+        {
+          any: [
+            { rel: 'granteeCustomerRelationship.customerUser', action: 'read' },
+            { rel: 'granteeCustomerRelationship.customerOrganization', action: 'read' },
+            { rel: 'granteeCustomerRelationship.customerSpace', action: 'read' },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 export const artifactPermissionResourcePermission: ResourcePermission = {
   actions: {
     manage: artifactPermissionRoleWrite,
-    read: { any: ['manage', 'leave', { rel: 'artifact', action: 'manage' }] },
+    read: {
+      any: [
+        'manage',
+        'leave',
+        artifactPermissionGranteeRead,
+        { rel: 'artifact', action: 'manage' },
+      ],
+    },
     create: artifactPermissionRoleWrite,
     leave: artifactPermissionGranteeLeave,
     delete: { any: ['leave', artifactPermissionRoleWrite] },
