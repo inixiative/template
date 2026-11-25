@@ -6,6 +6,7 @@
  */
 import { encryptedFieldsByModel } from '@template/db/lib/encryption/registry';
 import { type FieldRegistry, unionRegistries } from '@template/db/registries/fieldRegistry';
+import { mapValues } from 'lodash-es';
 
 const SENSITIVE_FIELDS_BASE: FieldRegistry = {
   Account: ['password'],
@@ -52,10 +53,8 @@ export const maskSensitiveFieldsInChangeDiff = (
   const sensitive = sensitiveFieldsOf(model);
   if (!sensitive.length) return changes;
   const sensitiveSet = new Set(sensitive);
-  return Object.fromEntries(
-    Object.entries(changes).map(([key, delta]) =>
-      sensitiveSet.has(key) ? [key, { before: MASKED_VALUE, after: MASKED_VALUE }] : [key, delta],
-    ),
+  return mapValues(changes, (delta, key) =>
+    sensitiveSet.has(key) ? { before: MASKED_VALUE, after: MASKED_VALUE } : delta,
   );
 };
 
@@ -67,11 +66,9 @@ export const maskSensitiveFieldsInPayload = <T>(
 ): T => {
   if (Array.isArray(data)) return data.map((item) => maskSensitiveFieldsInPayload(item, keys)) as T;
   if (data && typeof data === 'object') {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-      result[key] = keys.has(key) ? MASKED_VALUE : maskSensitiveFieldsInPayload(value, keys);
-    }
-    return result as T;
+    return mapValues(data as Record<string, unknown>, (value, key) =>
+      keys.has(key) ? MASKED_VALUE : maskSensitiveFieldsInPayload(value, keys),
+    ) as T;
   }
   return data;
 };

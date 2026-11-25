@@ -12,6 +12,7 @@ import {
   polymorphismConfigForModel,
 } from '@template/db';
 import type { InquiryType } from '@template/db/generated/client/enums';
+import { pick } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { openInquiryWhere } from '#/modules/inquiry/validations/validateInquiryStatus';
 
@@ -41,7 +42,7 @@ export const validateUniqueInquiry = async (
   };
 
   const pickValues = (fields: readonly string[]): Record<string, unknown> =>
-    Object.fromEntries(fields.map((f) => [f, (inquiry as Record<string, unknown>)[f]]));
+    pick(inquiry as Record<string, unknown>, fields);
 
   const where: Prisma.InquiryWhereInput = {
     type: inquiry.type,

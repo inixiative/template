@@ -15,7 +15,7 @@ import {
   runAllWithConcurrencyLimit,
 } from '@template/shared/utils';
 import { isUuidV7 } from '@template/shared/utils/isUuidV7';
-import { omit } from 'lodash-es';
+import { isEmpty, omit, pickBy } from 'lodash-es';
 import { seeds } from './seeds';
 
 export type SeedFile<T = Record<string, unknown>> = {
@@ -55,12 +55,10 @@ const checkUUIDUniqueness = () => {
     }
   }
 
-  for (const id in idDictionary) {
-    if (idDictionary[id].length === 1) delete idDictionary[id];
-  }
+  const duplicates = pickBy(idDictionary, (entries) => entries.length > 1);
 
-  if (Object.entries(idDictionary).length) {
-    log.error('Duplicate UUIDs detected:', idDictionary, LogScope.seed);
+  if (!isEmpty(duplicates)) {
+    log.error('Duplicate UUIDs detected:', duplicates, LogScope.seed);
     throw new Error('Duplicate UUIDs detected');
   }
 };
@@ -91,8 +89,9 @@ export const seedTable = async (seedFile: SeedFile, savers: SeedSavers = {}): Pr
   log.info(`Seeding ${seedFile.model} (${eligibleRecords.length} records)...`, LogScope.seed);
 
   if (seedFile.savedByApp && save) {
-    for (const { prime: _prime, ...record } of eligibleRecords) {
-      await save(record as SeedRecord);
+    for (const raw of eligibleRecords) {
+      const record = omit(raw, 'prime') as SeedRecord;
+      await save(record);
       log.success(`  - Saved: ${record.id}`, LogScope.seed);
     }
     return;
@@ -102,7 +101,7 @@ export const seedTable = async (seedFile: SeedFile, savers: SeedSavers = {}): Pr
 
   await runAllWithConcurrencyLimit(
     eligibleRecords.map((record) => async () => {
-      const { prime, ...data } = record;
+      const data = omit(record, 'prime');
       const id = data.id as string;
 
       const updateData = seedFile.createOnly

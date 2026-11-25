@@ -6,6 +6,7 @@ import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import { createPermissions, type Permix } from '@template/permissions/client';
 import { makeCheck } from '@template/permissions/rebac/check';
 import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
+import { mapValues } from 'lodash-es';
 
 describe('rebac check', () => {
   let permix: Permix;
@@ -800,19 +801,9 @@ describe('rebac check', () => {
       const cyclicCheck = makeRebacCheck({
         fieldMaps: {
           db: {
-            models: Object.fromEntries(
-              Object.entries(relations).map(([model, fields]) => [
-                model,
-                {
-                  fields: Object.fromEntries(
-                    Object.entries(fields).map(([segment, type]) => [
-                      segment,
-                      toOne(type, segment),
-                    ]),
-                  ),
-                },
-              ]),
-            ),
+            models: mapValues(relations, (fields) => ({
+              fields: mapValues(fields, (type, segment) => toOne(type, segment)),
+            })),
           },
         },
         permissions: {

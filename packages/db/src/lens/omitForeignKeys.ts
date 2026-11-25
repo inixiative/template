@@ -8,6 +8,7 @@
 import { modelOf } from '@inixiative/field-map';
 import type { Lens, LensNarrowing, NarrowingDefaults } from '@inixiative/json-rules';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import { mapValues, pickBy } from 'lodash-es';
 
 const foreignKeyColumns = (model: string): string[] => [
   ...new Set(
@@ -18,10 +19,9 @@ const foreignKeyColumns = (model: string): string[] => [
 ];
 
 const foreignKeyDefaults: NarrowingDefaults = {
-  models: Object.fromEntries(
-    Object.keys(prismaMap.models)
-      .map((model) => [model, { omits: foreignKeyColumns(model) }] as const)
-      .filter(([, { omits }]) => omits.length > 0),
+  models: pickBy(
+    mapValues(prismaMap.models, (_def, model) => ({ omits: foreignKeyColumns(model) })),
+    ({ omits }) => omits.length > 0,
   ),
 };
 

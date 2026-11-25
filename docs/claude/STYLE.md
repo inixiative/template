@@ -8,6 +8,7 @@
   - [Single-Line Early Exits](#single-line-early-exits)
   - [Atomic Files](#atomic-files)
   - [Minimal Index Files](#minimal-index-files)
+  - [Object & Collection Transforms](#object--collection-transforms)
 - [Naming Conventions](#naming-conventions)
   - [Variable Prefixes](#variable-prefixes)
 - [Imports](#imports)
@@ -61,6 +62,10 @@ packages/db/src/index.ts
 // Bad - import directly instead
 #/hooks/webhooks/constants/index.ts
 ```
+
+### Object & Collection Transforms
+
+Use `lodash-es` (`omit`, `pick`, `pickBy`, `omitBy`, `mapValues`, `mapKeys`, `keyBy`, `groupBy`, `countBy`) instead of hand-rolled `Object.fromEntries(Object.entries(...).filter/map(...))`, `const next = { ...prev }; delete next[k]`, or `const { k: _unused, ...rest } = obj` tricks. When keys can contain dots or brackets (e.g. setting keys or filter paths), use `omitBy`/`pickBy` instead of `omit`/`pick` so Lodash does not parse them as nested paths.
 
 ---
 

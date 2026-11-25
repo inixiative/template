@@ -6,14 +6,14 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { canNestMjml, MJML_CHILD_TAGS } from '@template/email/render/mjmlNesting';
+import { pickBy } from 'lodash-es';
 import presetDependencies from 'mjml-preset-core/lib/dependencies.js';
 
 describe('MJML nesting contract', () => {
   test('mirrors the preset exactly, so the editor and the compiler cannot disagree', () => {
-    const isStringList = (entry: [string, unknown[]]): entry is [string, string[]] =>
-      entry[1].every((child) => typeof child === 'string');
-
-    const fromPreset = Object.fromEntries(Object.entries(presetDependencies).filter(isStringList));
+    const fromPreset = pickBy(presetDependencies, (children): children is string[] =>
+      children.every((child) => typeof child === 'string'),
+    );
 
     expect(MJML_CHILD_TAGS).toEqual(fromPreset);
   });

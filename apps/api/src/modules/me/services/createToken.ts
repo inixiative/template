@@ -10,6 +10,7 @@ import type { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { type DelegatePermissions, TokenAction } from '@template/permissions';
 import { check, schemaMap } from '@template/permissions/rebac';
 import type { Context } from 'hono';
+import { omit } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
@@ -39,7 +40,7 @@ type CreateTokenParams = DelegatePermissions & {
 
 export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams) => {
   const db = c.get('db');
-  const { name: _name, expiresAt: _expiresAt, ...row } = params;
+  const row = omit(params, ['name', 'expiresAt']);
   const permix = c.get('permix');
   const pseudo = await hydrate('token', { id: '', ...row } as HydratedRecord);
   if (!check(permix, 'token', pseudo, TokenAction.create))
@@ -56,21 +57,24 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   const keyPrefix = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex.slice(0, 6)}`;
 
   return db.txn(async () => {
-    const { keyHash: _keyHash, ...token } = await db.token.create({
-      data: {
-        name: params.name,
-        keyHash,
-        keyPrefix,
-        ownerModel: params.ownerModel,
-        userId: params.userId,
-        organizationId: params.organizationId,
-        spaceId: params.spaceId,
-        integrationId: params.integrationId,
-        role: params.role,
-        full: params.full,
-        expiresAt: params.expiresAt,
-      },
-    });
+    const token = omit(
+      await db.token.create({
+        data: {
+          name: params.name,
+          keyHash,
+          keyPrefix,
+          ownerModel: params.ownerModel,
+          userId: params.userId,
+          organizationId: params.organizationId,
+          spaceId: params.spaceId,
+          integrationId: params.integrationId,
+          role: params.role,
+          full: params.full,
+          expiresAt: params.expiresAt,
+        },
+      }),
+      'keyHash',
+    );
     const targetEntitlements = await changeEntitlements(
       permix,
       { model: 'Token', id: token.id },

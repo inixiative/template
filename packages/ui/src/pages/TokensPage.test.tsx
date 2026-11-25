@@ -24,6 +24,7 @@ import {
   waitFor,
   waitForElementToBeRemoved,
 } from '@testing-library/react';
+import { omit } from 'lodash-es';
 
 const KEY = 'tmpl_once_only_secret';
 const initialState = useAppStore.getState();
@@ -38,7 +39,7 @@ let owner: Awaited<ReturnType<typeof buildUser>>['entity'];
 
 const buildStoredTokenRow = async (name: string): Promise<StoredToken> => {
   const { entity } = await buildToken({ name, ownerModel: 'User' }, { user: owner });
-  const { keyHash: _keyHash, ...token } = entity.__serialize() as StoredToken;
+  const token = omit(entity.__serialize() as StoredToken, 'keyHash') as StoredToken;
   return { ...token, lastUsedAt: null };
 };
 

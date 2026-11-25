@@ -6,6 +6,7 @@
  */
 import { encryptionEnv } from '@template/db/lib/encryption/envValidation';
 import { type EnvOverrideParser, isTest, wrapEnvWithOverrides } from '@template/shared/utils';
+import { pickBy } from 'lodash-es';
 import { z } from 'zod';
 
 const { fields: encryptionFields, applyRefinements: applyEncryptionRefinements } = encryptionEnv();
@@ -39,14 +40,12 @@ const parseEnvOverride: EnvOverrideParser = (key, override, current) => {
 
 const preprocessEnv = (
   env: Record<string, string | undefined>,
-): Record<string, string | undefined> => {
-  return Object.fromEntries(
-    Object.entries(env).filter(
-      ([key, value]) =>
-        value !== '' || (key.startsWith('OTEL_EXPORTER_OTLP_') && key.endsWith('_HEADERS')),
-    ),
+): Record<string, string | undefined> =>
+  pickBy(
+    env,
+    (value, key) =>
+      value !== '' || (key.startsWith('OTEL_EXPORTER_OTLP_') && key.endsWith('_HEADERS')),
   );
-};
 
 // .passthrough() so unknown keys (NODE_ENV, PROJECT_NAME, etc.) survive — we
 // replace process.env with the parsed object below.

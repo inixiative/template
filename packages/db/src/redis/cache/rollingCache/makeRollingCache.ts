@@ -31,6 +31,7 @@ import {
 import { upsertCache } from '@template/db/redis/cache/upsertCache';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { recordDuration } from '@template/shared/telemetry';
+import { pick } from 'lodash-es';
 
 type MakeRollingCache = {
   <
@@ -135,8 +136,7 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
   const targetFields = selectedFields(selector);
   const targetOf = (params: unknown): unknown => {
     if (!selector) return undefined;
-    const source = params as Record<string, unknown>;
-    return Object.fromEntries(targetFields.map((field) => [field, source[field]]));
+    return pick(params as Record<string, unknown>, targetFields);
   };
 
   const targetKey = (target: unknown): string => {

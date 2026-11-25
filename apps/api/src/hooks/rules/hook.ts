@@ -13,7 +13,7 @@ import {
   withDiscriminatorDefaults,
   withDualPolymorphismIds,
 } from '@template/db';
-import { castArray, without } from 'lodash-es';
+import { castArray, mapValues, without } from 'lodash-es';
 import { RulesRegistry, ruleForModel } from '#/hooks/rules/registry';
 import { makeError } from '#/lib/errors';
 
@@ -28,9 +28,7 @@ const evaluate = (rule: Condition, row: Record<string, unknown>): boolean | stri
 const validateRules = (data: Record<string, unknown>, model: ModelName): void => {
   const result = evaluate(
     ruleForModel(model),
-    Object.fromEntries(
-      Object.entries(data).map(([field, value]) => [field, isPrismaNull(value) ? null : value]),
-    ),
+    mapValues(data, (value) => (isPrismaNull(value) ? null : value)),
   );
   if (result !== true)
     throw makeError({

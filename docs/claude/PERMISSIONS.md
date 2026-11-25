@@ -62,6 +62,8 @@
   - [Dot-path vs. Single-hop Delegation](#dot-path-vs-single-hop-delegation)
   - [Inquiry permissions](#inquiry-permissions)
 - [Owner-Polymorphic Models](#owner-polymorphic-models)
+- [Record `access` Visibility](#record-access-visibility)
+  - [Why `validateEntitlementGrants` strips `access` (`withoutAccessField`)](#why-validateentitlementgrants-strips-access-withoutaccessfield)
 - [Row-Level Overrides](#row-level-overrides)
   - [Schema](#schema)
   - [How `check()` merges](#how-check-merges)
@@ -780,7 +782,31 @@ For each standard action the helper asks the same action of `user`, `organizatio
 
 `ownerActions()` reads the `user`, `organization` and `space` relations, so it can't tell a member's row from its tenant's: an OrganizationUser-owned row carries `organizationId` too, and `manage` on the organization would reach it. A model owned by any of the five owner kinds (User, OrganizationUser, Organization, Space, SpaceUser) keys its rules on `ownerModel` ([Integrations](#integrations)): an organization's admin manages its organization's rows but can't reach a member's own; the organization's owner can read and delete a member's row, not change it; only the member manages it.
 
-`db:Project` layers `ProjectAccess` (`public | tenant | private`, default `private`) on top of `omit(integrationAdministering, 'delegateFull')`: `private` keeps `Organization`/`Space` projects admin/owner-only and member projects to the member + tenant owner; `tenant` opens `Organization`/`Space` projects to tenant `read`/`operate` and member projects to coworkers via `ownerTenantRead` (`read`-only); `public` adds unauthenticated/external `read`. Owner list endpoints use `fetchSubmodelVisibilityWhere` to reflect caller visibility (and verified direct entitlements) in SQL.
+`db:Project` layers `ProjectAccess` (`public | tenant | private`, default `private`) on top of `omit(integrationAdministering, 'delegateFull')`. See [Record `access` Visibility](#record-access-visibility) below.
+
+---
+
+## Record `access` Visibility
+
+Beside role rules, row `permissionRules`, and `tenantPermissionRules`, visibility-bearing models such as `Project` carry an `access` enum column (`public | tenant | private`, defaulting to `private`):
+
+- **`private` (default):** Closed to regular org/space members. On `Organization`/`Space` records, only tenant admins/owners (`manage`) hold access; on `OrganizationUser`/`SpaceUser` records, only the member (`operate` → `manage`) and tenant `owner` (`own` → `read`/`delete`, not `admin`); on `User` records, only the user.
+- **`tenant`:** Opens `Organization`/`Space` projects to tenant `read` (viewer) and `operate` (member), and opens `OrganizationUser`/`SpaceUser` records to coworkers via `ownerTenantRead` (`read`-only — never `operate`). On `User` records, `tenant` behaves identically to `private`.
+- **`public`:** Strictly `read`-only for any caller (including unauthenticated requests and tokens/bots), while keeping tenant `operate`/`manage` intact.
+
+Owner list routes (`/me/projects`, `/user/:id/projects`, `/organization/:id/projects`, `/space/:id/projects`, `/organizationUser/:id/projects`, `/spaceUser/:id/projects`) use `fetchSubmodelVisibilityWhere(c)` with plain `paginate(...)` to reflect caller visibility (and verified direct entitlements) in SQL.
+
+### Why `validateEntitlementGrants` strips `access` (`withoutAccessField`)
+
+An `Entitlement` anchored at a record (e.g. `sourceModel: 'Project'`, `sourceId: P.id`, no `where`) is evaluated at runtime against the holder's backing owner permissions (`organizationOwnerPermissions` / `spaceOwnerPermissions`, which hold `owner` role), not the admin who wrote the row.
+
+Because `access` is mutable, leaving the live `access` value on the hydrated anchor during `canGrantEntitlement` would allow privilege escalation:
+
+1. A member temporarily flips their `OrganizationUser` project `P` from `private` to `tenant` (or a `Space` project is briefly `public`).
+2. An org admin (who cannot read `P` when `private`) grants themselves a self-anchored `db:Project:read` entitlement on `P` with no `where`. If `anchor` carried `access: 'tenant'`, `canGrantEntitlement` would pass.
+3. When the owner flips `P` back to `private`, the stored entitlement still holds forever because its backing `organizationOwnerPermissions` holds `organizationUser:own` → `db:Project:read` even on `private` rows.
+
+`withoutAccessField` in `apps/api/src/lib/permissions/validateEntitlementGrants.ts` recursively omits `access` from the hydrated anchor record before calling `pseudoRecordsOfEntitlement` / `canGrantEntitlement`. Anchor-level grants therefore succeed only when the writer holds the action independent of `access` (e.g. org admin on an `Organization` project, member on their own project, or org owner), while parent-anchored entitlements that explicitly pin `where: { access: 'tenant' }` remain enforced live by `entry.where`.
 
 ---
 
@@ -971,7 +997,7 @@ Routes that still check an action on the owner (`validatePermission` on spaces, 
 
 A model with a five-way owner (`User`, `OrganizationUser`, `Organization`, `Space`, `SpaceUser`; a token also has `Integration`) gets one list per owner kind: `/me/tokens`, `/organizationUser/:id/tokens`, `/organization/:id/tokens`, `/space/:id/tokens`, `/spaceUser/:id/tokens`, `/integration/:id/tokens`. Each tenant and member list returns exactly that owner's rows: an organization's list holds no member's rows. `/me/tokens` is the user's view across tenants: their own tokens and every membership's, each with its `organization`, `organizationUser`, `space` and `spaceUser`.
 
-The controller filters with `submodelOwnerWhere(c)` (`apps/api/src/lib/prisma/submodelOwnerWhere.ts`): the owner keys and kind of the same placement the route's `validateSubmodelPermission('read')` checked. One check on the owner covers every row the list returns, and the two can't drift apart. Models with an `access` visibility enum (`Project`) instead omit `validateSubmodelPermission('read')` on their owner list routes and filter with `fetchSubmodelVisibilityWhere(c)` (`apps/api/src/lib/prisma/fetchSubmodelVisibilityWhere.ts`), which evaluates each `access` level on the hydrated placement plus any verified direct entitlements.
+The controller filters with `submodelOwnerWhere(c)` (`apps/api/src/lib/prisma/submodelOwnerWhere.ts`): the owner keys and kind of the same placement the route's `validateSubmodelPermission('read')` checked. One check on the owner covers every row the list returns, and the two can't drift apart. Models with an `access` visibility enum (`Project`) instead omit `validateSubmodelPermission('read')` on their owner list routes (`/me/projects`, `/user/:id/projects`, `/organization/:id/projects`, `/space/:id/projects`, `/organizationUser/:id/projects`, `/spaceUser/:id/projects`) and filter with `fetchSubmodelVisibilityWhere(c)` (`apps/api/src/lib/prisma/fetchSubmodelVisibilityWhere.ts`), which evaluates each `access` level on the hydrated placement plus any verified direct entitlements.
 
 ```typescript
 const { data, pagination } = await paginate(c, db.token, {

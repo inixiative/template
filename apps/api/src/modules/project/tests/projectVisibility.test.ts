@@ -750,6 +750,35 @@ describe('Project visibility (public | tenant | private)', () => {
     });
     expect((await request('GET', '/me/projects', headers.anon)).status).toBe(401);
 
+    const userPath = `/user/${orgOwnerUser.id}/projects`;
+    expect(await listIds(userPath, headers.anon)).toEqual({ ids: userSet.pubOnly, total: 1 });
+    expect(await listIds(userPath, headers.outsider)).toEqual({ ids: userSet.pubOnly, total: 1 });
+    expect(await listIds(userPath, headers.orgAdmin)).toEqual({ ids: userSet.pubOnly, total: 1 });
+    expect(await listIds(userPath, headers.orgOwner)).toEqual({ ids: userSet.all, total: 3 });
+    expect(await listIds(userPath, headers.ownerViewerToken)).toEqual({
+      ids: userSet.all,
+      total: 3,
+    });
+    expect(await listIds(userPath, headers.superadmin)).toEqual({ ids: userSet.all, total: 3 });
+    expect(await listIds(`${userPath}?searchFields[access]=private`, headers.outsider)).toEqual({
+      ids: [],
+      total: 0,
+    });
+    expect(await listIds(userPath, bearer(entitlementOnlyUserToken.rawKey))).toEqual({
+      ids: [userSet.priv, ...userSet.pubOnly].sort(),
+      total: 2,
+    });
+    expect(await listIds(`/user/${orgMemberUser.id}/projects`, headers.orgMember)).toEqual({
+      ids: [],
+      total: 0,
+    });
+
+    const { entity: deletedUser } = await createUser();
+    await db.user.update({ where: { id: deletedUser.id }, data: { deletedAt: new Date() } });
+    expect((await request('GET', `/user/${deletedUser.id}/projects`, headers.anon)).status).toBe(
+      404,
+    );
+
     const { entity: deletedOrg } = await createOrganization();
     await db.organization.update({ where: { id: deletedOrg.id }, data: { deletedAt: new Date() } });
     expect(

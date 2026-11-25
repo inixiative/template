@@ -5,6 +5,7 @@
  * @uses none
  */
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
+import { mapValues } from 'lodash-es';
 
 export type OrderedListConfig = Record<string, string[]>;
 export type OrderedListRegistry = Record<string, OrderedListConfig>;
@@ -19,10 +20,5 @@ export const orderedListRegistry: OrderedListRegistry = {
   },
 };
 
-export const orderedListFieldsByModel = (): Record<string, string[]> => {
-  const result: Record<string, string[]> = {};
-  for (const [model, config] of Object.entries(orderedListRegistry)) {
-    result[model] = Object.keys(config);
-  }
-  return result;
-};
+export const orderedListFieldsByModel = (): Record<string, string[]> =>
+  mapValues(orderedListRegistry, (config) => Object.keys(config));

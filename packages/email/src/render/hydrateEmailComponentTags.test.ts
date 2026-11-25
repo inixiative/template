@@ -11,11 +11,12 @@ import {
 } from '@template/email/render/hydrateEmailComponentTags';
 import { saveEmailTemplate } from '@template/email/render/save';
 import type { OwnerScope } from '@template/email/render/types';
+import { pick } from 'lodash-es';
 
 const resolverFrom =
   (bodies: Record<string, string>): ResolveHydrateBodies =>
   async (slugs: string[]) =>
-    Object.fromEntries(slugs.map((slug) => [slug, bodies[slug]]));
+    pick(bodies, slugs);
 
 describe('hydrateEmailComponentTags', () => {
   test('returns plain content unchanged', async () => {
