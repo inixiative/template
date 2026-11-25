@@ -38,29 +38,6 @@ const refuseRowsOnFull = async (rows: Row[]) => {
   }
 };
 
-const tombstoneRowsOnFull = async (rows: Row[]) => {
-  const byModel = groupBy(
-    rows.filter((row) => row.deletedAt == null && isDelegateModel(row.targetModel)),
-    'targetModel',
-  );
-  for (const [model, group] of Object.entries(byModel)) {
-    const full = await db.delegate(model).findMany({
-      where: { id: { in: group.map(targetIdOf) }, full: true },
-      select: { id: true },
-    });
-    if (!full.length) continue;
-    const fullIds = new Set(full.map((row) => row.id as string));
-    await db.entitlement.updateManyAndReturn({
-      where: {
-        id: {
-          in: group.filter((row) => fullIds.has(targetIdOf(row))).map((row) => row.id as string),
-        },
-      },
-      data: { deletedAt: new Date() },
-    });
-  }
-};
-
 export const registerFullDelegateTakesNoRoleOrEntitlementsHook = () => {
   registerDbHook(
     'fullDelegate',
@@ -91,14 +68,6 @@ export const registerFullDelegateTakesNoRoleOrEntitlementsHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ args }) => refuseRowsOnFull(castArray((args as { data: Row | Row[] }).data) as Row[]),
-  );
-
-  registerDbHook(
-    'fullDelegate:revivedEntitlements',
-    'Entitlement',
-    HookTiming.after,
-    [DbAction.update, DbAction.updateManyAndReturn],
-    async ({ result }) => tombstoneRowsOnFull(castArray(result ?? []) as Row[]),
   );
 
   // A full delegate is its owner whole; the entitlements it held beside that go.
