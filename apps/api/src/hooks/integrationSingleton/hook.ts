@@ -4,7 +4,7 @@
  * @partOf feature:integrations
  * @uses infrastructure:prisma, primitive:errors
  */
-import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
+import { DbAction, db, HookTiming, type Prisma, registerDbHook } from '@template/db';
 import type { Integration, ProjectIntegration } from '@template/db/generated/client/client';
 import { isIntegrationSingleton } from '@template/shared/integrations/integrationSingletons';
 import { castArray, pickBy } from 'lodash-es';
@@ -14,7 +14,9 @@ import { integrationOwnerKey } from '#/modules/integration/services/integrationO
 type IntegrationRow = Partial<Integration>;
 type ConnectInput = { connect?: { id?: string } };
 type LinkRow = Partial<ProjectIntegration> & { project?: ConnectInput; integration?: ConnectInput };
-type WriteArgs<T> = { data?: T | T[]; create?: T; where?: unknown };
+type WriteArgs<T, W> = { data?: T | T[]; create?: T; where?: W };
+type IntegrationWrite = WriteArgs<IntegrationRow, Prisma.IntegrationWhereInput>;
+type LinkWrite = WriteArgs<LinkRow, Prisma.ProjectIntegrationWhereInput>;
 
 const assertOwnerSingletonFree = async (row: IntegrationRow): Promise<void> => {
   if (!isIntegrationSingleton(row.provider, 'owner')) return;
@@ -61,15 +63,17 @@ const assertProjectSingletonFree = async (link: LinkRow): Promise<void> => {
     });
 };
 
-const createdRows = <T>(args: WriteArgs<T>): T[] =>
+const createdRows = <T, W>(args: WriteArgs<T, W>): T[] =>
   args.create ? [args.create] : args.data ? castArray(args.data) : [];
 
-const isRestore = <T extends { deletedAt?: Date | null }>(args: WriteArgs<T>) =>
+const isRestore = <T extends { deletedAt?: Date | null }, W>(args: WriteArgs<T, W>) =>
   !Array.isArray(args.data) && args.data?.deletedAt === null;
 
-const assertRestoredIntegrationsFree = async (where: unknown): Promise<void> => {
+const assertRestoredIntegrationsFree = async (
+  where: Prisma.IntegrationWhereInput | undefined,
+): Promise<void> => {
   const restored = await db.withDeleted(() =>
-    db.integration.findMany({ where: where as never, include: { projectIntegrations: true } }),
+    db.integration.findMany({ where, include: { projectIntegrations: true } }),
   );
   for (const integration of restored) {
     await assertOwnerSingletonFree(integration);
@@ -78,10 +82,12 @@ const assertRestoredIntegrationsFree = async (where: unknown): Promise<void> => 
   }
 };
 
-const assertRestoredLinksFree = async (where: unknown): Promise<void> => {
+const assertRestoredLinksFree = async (
+  where: Prisma.ProjectIntegrationWhereInput | undefined,
+): Promise<void> => {
   const restored = await db.withDeleted(() =>
     db.projectIntegration.findMany({
-      where: where as never,
+      where,
       select: { projectId: true, integrationId: true },
     }),
   );
@@ -95,8 +101,7 @@ export const registerIntegrationSingletonHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ args }) => {
-      for (const row of createdRows(args as WriteArgs<IntegrationRow>))
-        await assertOwnerSingletonFree(row);
+      for (const row of createdRows(args as IntegrationWrite)) await assertOwnerSingletonFree(row);
     },
   );
 
@@ -106,10 +111,8 @@ export const registerIntegrationSingletonHook = () => {
     HookTiming.before,
     [DbAction.upsert],
     async ({ args }) => {
-      const write = args as WriteArgs<IntegrationRow>;
-      const target = await db.withDeleted(() =>
-        db.integration.findFirst({ where: write.where as never }),
-      );
+      const write = args as IntegrationWrite;
+      const target = await db.withDeleted(() => db.integration.findFirst({ where: write.where }));
       if (!target) return assertOwnerSingletonFree(write.create ?? {});
       if (target.deletedAt) await assertOwnerSingletonFree(target);
     },
@@ -121,7 +124,7 @@ export const registerIntegrationSingletonHook = () => {
     HookTiming.before,
     [DbAction.update, DbAction.updateManyAndReturn],
     async ({ args }) => {
-      const write = args as WriteArgs<IntegrationRow>;
+      const write = args as IntegrationWrite;
       if (isRestore(write)) await assertRestoredIntegrationsFree(write.where);
     },
   );
@@ -132,8 +135,7 @@ export const registerIntegrationSingletonHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn, DbAction.upsert],
     async ({ args }) => {
-      for (const row of createdRows(args as WriteArgs<LinkRow>))
-        await assertProjectSingletonFree(row);
+      for (const row of createdRows(args as LinkWrite)) await assertProjectSingletonFree(row);
     },
   );
 
@@ -143,7 +145,7 @@ export const registerIntegrationSingletonHook = () => {
     HookTiming.before,
     [DbAction.update, DbAction.updateManyAndReturn],
     async ({ args }) => {
-      const write = args as WriteArgs<LinkRow>;
+      const write = args as LinkWrite;
       if (isRestore(write)) await assertRestoredLinksFree(write.where);
     },
   );

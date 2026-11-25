@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
+import type { Provider } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createIntegration,
@@ -9,8 +10,8 @@ import {
 } from '@template/db/test';
 import { INTEGRATION_SINGLETONS } from '@template/shared/integrations/integrationSingletons';
 
-const singletonProvider = 'linear';
-const otherProvider = 'slack';
+const singletonProvider: Provider = 'linear';
+const otherProvider: Provider = 'slack';
 
 beforeEach(() => {
   INTEGRATION_SINGLETONS[singletonProvider] = ['owner', 'project'];
@@ -21,8 +22,8 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-const orgIntegration = (organizationId: string, provider: string) =>
-  createIntegration({ ownerModel: 'Organization', organizationId, provider } as never);
+const orgIntegration = (organizationId: string, provider: Provider) =>
+  createIntegration({ ownerModel: 'Organization', organizationId, provider });
 
 describe('integrationSingleton hook', () => {
   it('allows one live integration of an owner-singleton provider per owner', async () => {
@@ -137,7 +138,7 @@ describe('integrationSingleton hook', () => {
       organizationId: organization.id,
       provider: singletonProvider,
       name: 'Linear',
-    } as never;
+    } as const;
 
     await db.integration.upsert({ where: { id: live.id }, create, update: { name: 'renamed' } });
     await expect(
