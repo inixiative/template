@@ -6,6 +6,7 @@
  */
 import { createRoute } from '#/lib/routeTemplates';
 import {
+  artifactPlacementCreateBodyRefinement,
   artifactPlacementCreateBodySchema,
   artifactPlacementReadResponseSchema,
 } from '#/modules/artifact/schemas/artifactPlacementSchemas';
@@ -15,7 +16,8 @@ export const artifactCreateArtifactPlacementRoute = createRoute({
   model: Modules.artifact,
   submodel: Modules.artifactPlacement,
   description:
-    'Places an artifact in a container. Same-owner placements need manage on the artifact and operate on the container; cross-owner placements need read on the artifact and operate on the container and never inherit permissions.',
+    "Places an artifact in a container (via containerArtifactId) or at an owner's lazy root (via ownerModel + owner keys). Root placements default to private; folder placements default to inherit.",
   bodySchema: artifactPlacementCreateBodySchema,
+  bodyRefinement: artifactPlacementCreateBodyRefinement,
   responseSchema: artifactPlacementReadResponseSchema,
 });

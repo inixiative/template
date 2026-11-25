@@ -21,8 +21,7 @@ export const meReadManyArtifactsRoute = readRoute({
   paginate: true,
   filterLens: artifactListFilterLens,
   middleware: [validateSubmodelPermission('read')],
-  description:
-    "Lists the user's artifacts (defaults to root artifacts when no search/filter is passed) with their permissions.",
+  description: "Lists the user's non-root artifacts with their permissions.",
   responseSchema: artifactWithPermissionsSchema,
   tags: [OpenApiTags.me, OpenApiTags.artifact],
 });

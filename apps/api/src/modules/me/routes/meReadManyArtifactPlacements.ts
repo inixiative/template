@@ -22,7 +22,7 @@ export const meReadManyArtifactPlacementsRoute = readRoute({
   filterLens: artifactPlacementListFilterLens,
   middleware: [validatePermission('read')],
   description:
-    "Lists artifact placements in the acting user's workspace (both root pins and container placements), with artifact and containerArtifact inline.",
+    "Lists artifact placements in the acting user's workspace (defaults to root placements, including owned items and external pins/reshares), with artifact and containerArtifact inline.",
   responseSchema: artifactPlacementWithArtifactsSchema,
   tags: [OpenApiTags.me, OpenApiTags.artifactPlacement],
 });

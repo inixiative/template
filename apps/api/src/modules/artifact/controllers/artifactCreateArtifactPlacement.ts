@@ -13,12 +13,23 @@ export const artifactCreateArtifactPlacementController = makeController(
   artifactCreateArtifactPlacementRoute,
   async (c, respond) => {
     const artifact = contextResource<'artifact'>(c);
-    const { containerArtifactId, inherit } = c.req.valid('json');
-    const edge = await placeArtifact(c.get('permix'), {
-      artifactId: artifact.id,
-      containerArtifactId,
-      inherit,
-    });
+    const body = c.req.valid('json');
+    const edge = body.containerArtifactId
+      ? await placeArtifact(c.get('permix'), {
+          artifactId: artifact.id,
+          containerArtifactId: body.containerArtifactId,
+          access: body.access,
+        })
+      : await placeArtifact(c.get('permix'), {
+          artifactId: artifact.id,
+          owner: {
+            ownerModel: body.ownerModel!,
+            userId: body.userId,
+            organizationId: body.organizationId,
+            spaceId: body.spaceId,
+          },
+          access: body.access,
+        });
     return respond.created(edge);
   },
 );

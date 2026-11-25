@@ -18,6 +18,6 @@ export const organizationReadManyArtifactsRoute = readRoute({
   paginate: true,
   filterLens: artifactListFilterLens,
   description:
-    "Lists the organization's artifacts (defaults to root artifacts when no search/filter is passed) that the caller can read (public, tenant, granted, or all for managers), with permissions for managers.",
+    "Lists the organization's non-root artifacts that the caller can read (public, tenant, granted, or all for managers), with permissions for managers.",
   responseSchema: artifactWithPermissionsSchema,
 });

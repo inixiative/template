@@ -19,6 +19,8 @@ const NOOP_FIELDS_BASE: FieldRegistry = {
   // re-triggers the hook.
   EmailTemplate: ['missingComponentSlugs'],
   EmailComponent: ['missingComponentSlugs'],
+  // Materialized from same-owner placements by artifactTree; syncArtifactAncestors clears caches directly.
+  Artifact: ['effectiveAccess'],
 };
 
 // Semantically-meaningless change fields: a mutation touching only these is not worth recording or

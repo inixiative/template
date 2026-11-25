@@ -18,6 +18,6 @@ export const userReadManyArtifactsRoute = readRoute({
   paginate: true,
   filterLens: artifactListFilterLens,
   description:
-    "Lists the user's artifacts (defaults to root artifacts when no search/filter is passed) that the caller can read (public, granted, or all for the user themselves), with permissions for managers.",
+    "Lists the user's non-root artifacts that the caller can read (public, granted, or all for the user themselves), with permissions for managers.",
   responseSchema: artifactWithPermissionsSchema,
 });

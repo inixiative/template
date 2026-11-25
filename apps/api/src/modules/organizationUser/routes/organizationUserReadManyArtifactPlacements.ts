@@ -18,6 +18,6 @@ export const organizationUserReadManyArtifactPlacementsRoute = readRoute({
   paginate: true,
   filterLens: artifactPlacementListFilterLens,
   description:
-    "Lists artifact placements in the member's organization workspace (both root pins and container placements), with artifact and containerArtifact inline.",
+    "Lists readable artifact placements in the member's organization workspace (defaults to root placements, including public and tenant reshares), with artifact and containerArtifact inline.",
   responseSchema: artifactPlacementWithArtifactsSchema,
 });

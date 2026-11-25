@@ -3,11 +3,12 @@ import { db } from '@template/db';
 import type {
   Artifact,
   ArtifactPermission,
+  ArtifactPlacement,
   Organization,
   OrganizationUser,
   User,
 } from '@template/db/generated/client/client';
-import type { ArtifactKind } from '@template/db/generated/client/enums';
+import type { ArtifactAccess, ArtifactKind } from '@template/db/generated/client/enums';
 import {
   createArtifact,
   createArtifactPermission,
@@ -63,17 +64,18 @@ describe('artifact lifecycle', () => {
       })
     ).entity;
 
-  const placeInside = async (artifact: Artifact, container: Artifact) => {
-    await createArtifactPlacement({
-      ownerModel: container.ownerModel,
-      userId: container.userId,
-      organizationId: container.organizationId,
-      spaceId: container.spaceId,
-      artifactId: artifact.id,
-      containerArtifactId: container.id,
-    });
-    await db.artifact.update({ where: { id: artifact.id }, data: { access: 'inherit' } });
-  };
+  const placeInside = async (
+    artifact: Artifact,
+    container: Artifact,
+    access: ArtifactAccess = 'inherit',
+  ) =>
+    (
+      await createArtifactPlacement({
+        artifactId: artifact.id,
+        containerArtifactId: container.id,
+        access,
+      })
+    ).entity;
 
   const status = async (fetch: Fetch, artifact: Artifact) =>
     (await fetch(get(`/api/v1/artifact/${artifact.id}`))).status;
@@ -142,14 +144,25 @@ describe('artifact lifecycle', () => {
       expect((await ownerFetch(del(`/api/v1/artifact/${note.id}`))).status).toBe(204);
     });
 
-    it('flipping a member artifact to tenant makes it visible to coworkers on GET /organizationUser/:id/artifacts', async () => {
+    it('flipping a member artifact root placement to tenant makes it visible to coworkers on GET /organizationUser/:id/{artifacts,artifactPlacements}', async () => {
+      const rootPlacement = await db.artifactPlacement.findFirstOrThrow({
+        where: { artifactId: note.id },
+      });
       expect(
-        (await memberFetch(patch(`/api/v1/artifact/${note.id}`, { access: 'tenant' }))).status,
+        (
+          await memberFetch(
+            patch(`/api/v1/artifactPlacement/${rootPlacement.id}`, { access: 'tenant' }),
+          )
+        ).status,
       ).toBe(200);
       const adminListTenant = await parseSuccessBody<Artifact[]>(
         await adminFetch(get(`/api/v1/organizationUser/${memberSeat.id}/artifacts`)),
       );
       expect(adminListTenant.data.map((artifact) => artifact.id)).toContain(note.id);
+      const adminPlacements = await parseSuccessBody<ArtifactPlacement[]>(
+        await adminFetch(get(`/api/v1/organizationUser/${memberSeat.id}/artifactPlacements`)),
+      );
+      expect(adminPlacements.data.map((p) => p.artifactId)).toContain(note.id);
     });
 
     it('an explicit grant opens it to an admin', async () => {
@@ -177,26 +190,38 @@ describe('artifact lifecycle', () => {
     }
   });
 
-  describe('navigating a diamond: compliance under legal and operations, both under one root', () => {
-    let root: Artifact;
+  describe('navigating a diamond: compliance under legal and operations, both under one folder', () => {
+    let topFolder: Artifact;
     let legal: Artifact;
     let operations: Artifact;
     let compliance: Artifact;
+    let complianceInLegal: ArtifactPlacement;
+    let complianceInOps: ArtifactPlacement;
     type Neighbor = Artifact & { permissions: ArtifactPermission[] };
-    type Child = Neighbor & { exclusive: boolean };
+    type Child = Neighbor & {
+      exclusive: boolean;
+      placementId: string;
+      placementAccess: ArtifactAccess;
+    };
 
     beforeEach(async () => {
-      root = await orgArtifact('folder', { name: 'root' });
+      const rootResp = await ownerFetch(
+        post(`/api/v1/organization/${organization.id}/artifacts`, {
+          kind: 'folder',
+          name: 'top-folder',
+        }),
+      );
+      topFolder = (await parseSuccessBody<Artifact>(rootResp)).data;
       legal = await orgArtifact('folder', { name: 'legal' });
       operations = await orgArtifact('folder', { name: 'operations' });
       compliance = await orgArtifact('folder', { name: 'compliance' });
-      await placeInside(legal, root);
-      await placeInside(operations, root);
-      await placeInside(compliance, legal);
-      await placeInside(compliance, operations);
+      await placeInside(legal, topFolder);
+      await placeInside(operations, topFolder);
+      complianceInLegal = await placeInside(compliance, legal);
+      complianceInOps = await placeInside(compliance, operations);
     });
 
-    it('GET /artifact/:id returns 1-step parents, children (with permissions for managers), and hides unreadable containers', async () => {
+    it('GET /artifact/:id returns 1-step parents (excluding root), children with placementId/placementAccess, and hides unreadable containers', async () => {
       const { data: complianceDetail } = await parseSuccessBody<{
         parents: Neighbor[];
         children: Child[];
@@ -206,16 +231,28 @@ describe('artifact lifecycle', () => {
       );
       expect(complianceDetail.children).toEqual([]);
 
-      const { data: rootDetail } = await parseSuccessBody<{
+      const { data: topDetail } = await parseSuccessBody<{
         parents: Neighbor[];
         children: Child[];
-      }>(await ownerFetch(get(`/api/v1/artifact/${root.id}`)));
-      expect(rootDetail.children.map((artifact) => artifact.id).sort()).toEqual(
+        placements: ArtifactPlacement[];
+      }>(await ownerFetch(get(`/api/v1/artifact/${topFolder.id}`)));
+      expect(topDetail.parents).toEqual([]); // root container is excluded from parents
+      expect(topDetail.placements).toHaveLength(1); // root placement IS kept in placements
+      expect(topDetail.children.map((artifact) => artifact.id).sort()).toEqual(
         [legal.id, operations.id].sort(),
       );
-      expect(rootDetail.children.every((child) => child.exclusive)).toBe(true);
+      expect(
+        topDetail.children.every((child) => child.exclusive && child.placementAccess === 'inherit'),
+      ).toBe(true);
 
-      await db.artifact.update({ where: { id: compliance.id }, data: { access: 'private' } });
+      await db.artifactPlacement.update({
+        where: { id: complianceInLegal.id },
+        data: { access: 'private' },
+      });
+      await db.artifactPlacement.update({
+        where: { id: complianceInOps.id },
+        data: { access: 'private' },
+      });
       await createArtifactPermission({
         artifactId: compliance.id,
         granteeModel: 'User',
@@ -229,12 +266,12 @@ describe('artifact lifecycle', () => {
       expect(asMember.data.children).toEqual([]);
     });
 
-    it("the owner's root listing holds artifacts in no container", async () => {
-      const { data } = await parseSuccessBody<Artifact[]>(
-        await ownerFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+    it("the owner's root placement listing holds only items placed directly in root", async () => {
+      const { data } = await parseSuccessBody<ArtifactPlacement[]>(
+        await ownerFetch(get(`/api/v1/organization/${organization.id}/artifactPlacements`)),
       );
-      const ids = data.map((artifact) => artifact.id);
-      expect(ids).toContain(root.id);
+      const ids = data.map((placement) => placement.artifactId);
+      expect(ids).toContain(topFolder.id);
       expect(ids).not.toContain(legal.id);
       expect(ids).not.toContain(compliance.id);
     });
@@ -293,7 +330,7 @@ describe('artifact lifecycle', () => {
       expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge?.id}`))).status).toBe(204);
     });
 
-    it('deleting a container keeps its contents; contents only there are listed and deleted through batch', async () => {
+    it('deleting a container keeps its contents, reparents exclusive owned children to root, and supports batch delete', async () => {
       const box = await orgArtifact('folder');
       const onlyHere = await orgArtifact('folder');
       const alsoElsewhere = await orgArtifact('folder');
@@ -310,11 +347,13 @@ describe('artifact lifecycle', () => {
       expect((await ownerFetch(del(`/api/v1/artifact/${box.id}`))).status).toBe(204);
       const kept = await db.artifact.findUniqueOrThrow({ where: { id: onlyHere.id } });
       expect(kept.deletedAt).toBeNull();
-      const roots = await parseSuccessBody<Artifact[]>(
-        await ownerFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+      const rootPlacements = await parseSuccessBody<ArtifactPlacement[]>(
+        await ownerFetch(get(`/api/v1/organization/${organization.id}/artifactPlacements`)),
       );
-      expect(roots.data.map((artifact) => artifact.id)).toContain(onlyHere.id);
-      const stillPlaced = await db.artifact.findUniqueOrThrow({ where: { id: alsoElsewhere.id } });
+      expect(rootPlacements.data.map((placement) => placement.artifactId)).toContain(onlyHere.id);
+      const stillPlaced = await db.artifactPlacement.findFirstOrThrow({
+        where: { artifactId: alsoElsewhere.id, containerArtifactId: other.id },
+      });
       expect(stillPlaced.access).toBe('inherit');
 
       const batch = await ownerFetch(
@@ -363,30 +402,33 @@ describe('artifact lifecycle', () => {
     );
     expect(again.status).toBe(201);
   });
-  it('inherit: false keeps an artifact that left its folders private', async () => {
+
+  it('access: private on placement inside a public folder keeps the artifact private and hidden from outsiders', async () => {
     const outsider = (await createOrganizationUser({}, {})).context.user;
     const outsiderFetch = createTestApp({ mockUser: outsider, mount }).fetch;
-    const box = await orgArtifact('folder');
-    const lobby = await orgArtifact('folder', { access: 'public' });
-    const file = await orgArtifact('file');
-    expect(
-      (
+    const lobby = (
+      await parseSuccessBody<Artifact>(
         await ownerFetch(
-          post(`/api/v1/artifact/${file.id}/artifactPlacements`, { containerArtifactId: box.id }),
-        )
-      ).status,
-    ).toBe(201);
-    const edge = await db.artifactPlacement.findFirstOrThrow({
-      where: { artifactId: file.id, containerArtifactId: box.id },
-    });
-    expect((await ownerFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(204);
+          post(`/api/v1/organization/${organization.id}/artifacts`, {
+            kind: 'folder',
+            name: 'lobby',
+            access: 'public',
+          }),
+        ),
+      )
+    ).data;
+    const file = await orgArtifact('file');
     const placed = await ownerFetch(
       post(`/api/v1/artifact/${file.id}/artifactPlacements`, {
         containerArtifactId: lobby.id,
-        inherit: false,
+        access: 'private',
       }),
     );
     expect(placed.status).toBe(201);
     expect((await outsiderFetch(get(`/api/v1/artifact/${file.id}`))).status).toBe(403);
+    const lobbyAsOutsider = await parseSuccessBody<{ children: Artifact[] }>(
+      await outsiderFetch(get(`/api/v1/artifact/${lobby.id}`)),
+    );
+    expect(lobbyAsOutsider.data.children.map((c) => c.id)).not.toContain(file.id);
   });
 });

@@ -12,7 +12,7 @@ import { Modules } from '#/modules/modules';
 export const artifactPlacementDeleteRoute = deleteRoute({
   model: Modules.artifactPlacement,
   description:
-    "Removes an artifact from a container (it is at its owner's root again if that was its last placement). Same-owner placements need manage on the artifact and operate on the container; cross-owner placements need operate on the container.",
+    "Removes an artifact from a container (reparenting an owned artifact to its owner's lazy root as private if removed from its last non-root folder; refuses removing a root placement if it is the artifact's only same-owner placement).",
   responseSchema: artifactPlacementReadResponseSchema,
   middleware: [validatePermission('delete')],
 });

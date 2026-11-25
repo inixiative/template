@@ -12,16 +12,19 @@ import { makeController } from '#/lib/utils/makeController';
 import { artifactCreateArtifactPermissionRoute } from '#/modules/artifact/routes/artifactCreateArtifactPermission';
 import { withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
 import { hydrateArtifact } from '#/modules/artifact/services/checkArtifactPermission';
+import { assertNotRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
 
 export const artifactCreateArtifactPermissionController = makeController(
   artifactCreateArtifactPermissionRoute,
   async (c, respond) => {
     const db = c.get('db');
     const artifact = contextResource<'artifact'>(c);
+    assertNotRootArtifact(artifact, 'Permissions cannot be granted directly on a root container');
     const body = c.req.valid('json');
     const permix = c.get('permix');
     const permission = await withLockedArtifacts([artifact], async (locked) => {
       const target = locked.get(artifact.id)!;
+      assertNotRootArtifact(target, 'Permissions cannot be granted directly on a root container');
       const hydrated = await hydrateArtifact(target);
       if (
         !check(

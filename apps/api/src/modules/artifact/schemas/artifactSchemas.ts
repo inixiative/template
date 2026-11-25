@@ -32,7 +32,6 @@ export const artifactCreateBodySchema = ArtifactScalarInputSchema.pick({ name: t
 
 export const artifactUpdateBodySchema = ArtifactScalarInputSchema.pick({
   name: true,
-  access: true,
 }).partial();
 
 export const artifactReadResponseSchema = ArtifactScalarSchema;
@@ -43,15 +42,12 @@ export const artifactWithPermissionsSchema = ArtifactScalarSchema.extend({
 
 export const artifactChildSchema = artifactWithPermissionsSchema.extend({
   exclusive: z.boolean(),
-});
-
-export const artifactAccessResponseSchema = z.object({
-  role: z.enum(Role).nullable(),
-  access: z.enum(['public', 'tenant', 'private']),
+  placementId: z.string(),
+  placementAccess: z.enum(ArtifactAccess),
 });
 
 export const artifactDetailResponseSchema = ArtifactScalarSchema.extend({
-  effectiveAccess: artifactAccessResponseSchema,
+  effectiveRole: z.enum(Role).nullable(),
   parents: z.array(artifactWithPermissionsSchema),
   children: z.array(artifactChildSchema),
   placements: z.array(ArtifactPlacementScalarSchema),
@@ -70,6 +66,7 @@ export const artifactListFilterLens: LensNarrowing = {
 export const artifactMoveBodySchema = z.object({
   fromContainerArtifactId: z.string().optional(),
   toContainerArtifactId: z.string().optional(),
+  access: z.enum(ArtifactAccess).optional(),
 });
 
 export const artifactCopyBodySchema = z.object({

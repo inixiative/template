@@ -37,7 +37,6 @@ model SpaceUser {
   emailComponents    EmailComponent[]
   auditLogsAsSubject AuditLog[]           @relation("AuditLogSubjectSpaceUser")
   ownedArtifacts     Artifact[]           @relation("ArtifactOwnerSpaceUser")
-  artifactPlacements ArtifactPlacement[]  @relation("ArtifactPlacementOwnerSpaceUser")
   artifactGrants     ArtifactPermission[] @relation("ArtifactPermissionGranteeSpaceUser")
 
   // ==========================================================================

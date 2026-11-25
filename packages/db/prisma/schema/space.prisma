@@ -52,7 +52,6 @@ model Space {
   segments                        Segment[]
   settings                        Setting[]
   ownedArtifacts                  Artifact[]             @relation("ArtifactOwnerSpace")
-  artifactPlacements              ArtifactPlacement[]    @relation("ArtifactPlacementOwnerSpace")
   artifactGrants                  ArtifactPermission[]   @relation("ArtifactPermissionGranteeSpace")
   resourceBindings                ResourceBinding[]      @relation("ResourceBindingSpace")
 

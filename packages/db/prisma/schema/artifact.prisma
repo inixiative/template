@@ -4,9 +4,9 @@ model Artifact {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  kind   ArtifactKind
-  name   String
-  access ArtifactAccess @default(private)
+  kind            ArtifactKind
+  name            String
+  effectiveAccess ArtifactAccess @default(private)
 
   ownerModel     ArtifactOwnerModel
   userId         String?            @db.VarChar(36)
@@ -25,7 +25,6 @@ model Artifact {
   placements  ArtifactPlacement[] @relation("ArtifactPlacementArtifact")
   contents    ArtifactPlacement[] @relation("ArtifactPlacementContainer")
 
-  /// @permissions(down: [ancestorArtifact])
   ancestors   ArtifactAncestor[] @relation("ArtifactAncestorDescendant")
   descendants ArtifactAncestor[] @relation("ArtifactAncestorAncestor")
 
@@ -38,6 +37,11 @@ model Artifact {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
+  @@unique([userId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "Artifact_root_user_key")
+  @@unique([organizationId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "Artifact_root_organization_key")
+  @@unique([spaceId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "Artifact_root_space_key")
+  @@unique([organizationId, userId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "Artifact_root_organization_user_key")
+  @@unique([spaceId, userId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "Artifact_root_space_user_key")
   @@index([ownerModel])
   @@index([userId])
   @@index([organizationId])
@@ -46,6 +50,7 @@ model Artifact {
 }
 
 enum ArtifactKind {
+  root
   file
   folder
 

@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type {
   Artifact,
+  ArtifactPlacement,
   Organization,
   OrganizationUser,
   User,
 } from '@template/db/generated/client/client';
 import {
+  ArtifactKind,
   InquiryResourceModel,
   InquiryStatus,
   InquiryType,
@@ -101,34 +103,28 @@ describe('artifact actions', () => {
     expect(after.kind).toBe('file');
   });
 
-  it('at root means no live placement: a removed placement puts the item back at root', async () => {
+  it('removing an owned artifact from its last folder reparents it back to the owner root', async () => {
     const folder = await orgFolder();
     const item = await orgFolder();
     const { entity: placement } = await createArtifactPlacement({
-      ownerModel: 'Organization',
-      organizationId: organization.id,
       artifactId: item.id,
       containerArtifactId: folder.id,
     });
-    const atRoot = () =>
-      db.artifact.findMany({
-        where: { id: item.id, placements: { none: {} } },
-        select: { id: true },
-      });
-    expect(await atRoot()).toEqual([]);
-    await db.artifactPlacement.update({
-      where: { id: placement.id },
-      data: { deletedAt: new Date() },
-    });
-    expect(await atRoot()).toEqual([{ id: item.id }]);
+    expect((await adminFetch(del(`/api/v1/artifactPlacement/${placement.id}`))).status).toBe(204);
+
+    const rootPlacements = await parseSuccessBody<
+      (ArtifactPlacement & { artifact: Artifact; containerArtifact: Artifact })[]
+    >(await adminFetch(get(`/api/v1/organization/${organization.id}/artifactPlacements`)));
+    const reparented = rootPlacements.data.find((p) => p.artifactId === item.id);
+    expect(reparented).toBeDefined();
+    expect(reparented!.containerArtifact.kind).toBe(ArtifactKind.root);
+    expect(reparented!.access).toBe('private');
   });
 
-  it('owner list defaults to root, searches nested items when filtered, and reflective artifactPermissions lists shares + allows leaving', async () => {
+  it('owner artifacts is a flat searchable list, artifactPlacements lists root items, and artifactPermissions lists shares + allows leaving', async () => {
     const hidden = await orgFolder();
     const report = await orgFolder({ name: 'quarterly-report' });
     await createArtifactPlacement({
-      ownerModel: 'Organization',
-      organizationId: organization.id,
       artifactId: report.id,
       containerArtifactId: hidden.id,
     });
@@ -138,10 +134,15 @@ describe('artifact actions', () => {
       granteeUserId: member.id,
       role: 'viewer',
     });
-    const rootAsMember = await parseSuccessBody<Artifact[]>(
+    const rootPlacementsAsMember = await parseSuccessBody<ArtifactPlacement[]>(
+      await memberFetch(get(`/api/v1/organization/${organization.id}/artifactPlacements`)),
+    );
+    expect(rootPlacementsAsMember.data.map((p) => p.artifactId)).not.toContain(report.id);
+
+    const flatAsMember = await parseSuccessBody<Artifact[]>(
       await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
     );
-    expect(ids(rootAsMember.data)).not.toContain(report.id);
+    expect(ids(flatAsMember.data)).toContain(report.id);
 
     const searchAsMember = await parseSuccessBody<Artifact[]>(
       await memberFetch(
@@ -162,14 +163,38 @@ describe('artifact actions', () => {
     expect((await memberFetch(get(`/api/v1/artifact/${report.id}`))).status).toBe(403);
   });
 
-  it('move replaces a placement, from and to the root too', async () => {
-    const a = await orgFolder();
-    const b = await orgFolder();
-    const item = await orgFolder();
+  it('move replaces a placement, from and to the owner lazy root too', async () => {
+    const a = (
+      await parseSuccessBody<Artifact>(
+        await adminFetch(
+          post(`/api/v1/organization/${organization.id}/artifacts`, { kind: 'folder', name: 'a' }),
+        ),
+      )
+    ).data;
+    const b = (
+      await parseSuccessBody<Artifact>(
+        await adminFetch(
+          post(`/api/v1/organization/${organization.id}/artifacts`, { kind: 'folder', name: 'b' }),
+        ),
+      )
+    ).data;
+    const item = (
+      await parseSuccessBody<Artifact>(
+        await adminFetch(
+          post(`/api/v1/organization/${organization.id}/artifacts`, {
+            kind: 'folder',
+            name: 'item',
+          }),
+        ),
+      )
+    ).data;
+
+    // Move from root -> a
     const into = await adminFetch(
       post(`/api/v1/artifact/${item.id}/move`, { toContainerArtifactId: a.id }),
     );
     expect(into.status).toBe(200);
+    // Move from a -> b
     const across = await adminFetch(
       post(`/api/v1/artifact/${item.id}/move`, {
         fromContainerArtifactId: a.id,
@@ -179,11 +204,19 @@ describe('artifact actions', () => {
     expect(across.status).toBe(200);
     const placements = await db.artifactPlacement.findMany({ where: { artifactId: item.id } });
     expect(placements.map((placement) => placement.containerArtifactId)).toEqual([b.id]);
+
+    // Move from b -> root
     const out = await adminFetch(
       post(`/api/v1/artifact/${item.id}/move`, { fromContainerArtifactId: b.id }),
     );
     expect(out.status).toBe(200);
-    expect(await db.artifactPlacement.count({ where: { artifactId: item.id } })).toBe(0);
+    const rootPlacements = await db.artifactPlacement.findMany({
+      where: { artifactId: item.id },
+      include: { containerArtifact: true },
+    });
+    expect(rootPlacements).toHaveLength(1);
+    expect(rootPlacements[0]!.containerArtifact.kind).toBe(ArtifactKind.root);
+    expect(rootPlacements[0]!.access).toBe('private');
   });
 
   it("copy makes a new artifact in the container's owner, sharing the file's bytes until swept", async () => {
@@ -231,14 +264,10 @@ describe('artifact actions', () => {
     const shown = await orgFolder();
     const logo = await orgFolder();
     await createArtifactPlacement({
-      ownerModel: 'Organization',
-      organizationId: organization.id,
       artifactId: logo.id,
       containerArtifactId: hidden.id,
     });
     await createArtifactPlacement({
-      ownerModel: 'Organization',
-      organizationId: organization.id,
       artifactId: logo.id,
       containerArtifactId: shown.id,
     });
@@ -293,14 +322,12 @@ describe('artifact actions', () => {
         })
       ).entity;
 
-    it('on accept the artifact changes owner, its old grants go, and the sender keeps a read pointer', async () => {
+    it('on accept the artifact changes owner, moves to target root as private, old grants go, and sender keeps a read pointer', async () => {
       const file = await userFile(stranger);
-      const own = await (
+      const own = (
         await createArtifact({ kind: 'folder', ownerModel: 'User', userId: stranger.id })
       ).entity;
       await createArtifactPlacement({
-        ownerModel: 'User',
-        userId: stranger.id,
         artifactId: file.id,
         containerArtifactId: own.id,
       });
@@ -315,15 +342,24 @@ describe('artifact actions', () => {
       const after = await db.artifact.findUniqueOrThrow({ where: { id: file.id } });
       expect(after.ownerModel).toBe('Organization');
       expect(after.organizationId).toBe(organization.id);
-      expect(await db.artifactPlacement.count({ where: { artifactId: file.id } })).toBe(0);
+      expect(after.effectiveAccess).toBe('private');
+      const placements = await db.artifactPlacement.findMany({
+        where: { artifactId: file.id },
+        include: { containerArtifact: true },
+      });
+      expect(placements).toHaveLength(1);
+      expect(placements[0]!.containerArtifact.kind).toBe(ArtifactKind.root);
+      expect(placements[0]!.containerArtifact.organizationId).toBe(organization.id);
+      expect(placements[0]!.access).toBe('private');
+
       const tracking = await db.resourceBinding.findMany({ where: { sourceArtifactId: file.id } });
       expect(tracking.map((binding) => [binding.bindingType, binding.resourceUserId])).toEqual([
         ['tracking', stranger.id],
       ]);
-      const detail = await parseSuccessBody<{ effectiveAccess: { role: string } }>(
+      const detail = await parseSuccessBody<{ effectiveRole: string | null }>(
         await strangerFetch(get(`/api/v1/artifact/${file.id}`)),
       );
-      expect(detail.data.effectiveAccess.role).toBe('viewer');
+      expect(detail.data.effectiveRole).toBe('viewer');
       expect(
         (await strangerFetch(patch(`/api/v1/artifact/${file.id}`, { name: 'x' }))).status,
       ).toBe(403);
@@ -341,7 +377,13 @@ describe('artifact actions', () => {
       );
       expect(await db.resourceBinding.count({ where: { sourceArtifactId: file.id } })).toBe(0);
       const copies = await db.artifact.findMany({
-        where: { ownerModel: 'User', userId: stranger.id, name: file.name, id: { not: file.id } },
+        where: {
+          ownerModel: 'User',
+          userId: stranger.id,
+          name: file.name,
+          id: { not: file.id },
+          kind: { not: ArtifactKind.root },
+        },
       });
       expect(copies).toHaveLength(1);
     });

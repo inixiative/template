@@ -5,21 +5,43 @@
  * @uses infrastructure:prisma, primitive:caching
  */
 import { db } from '@template/db';
-import type { ArtifactAccess } from '@template/db/generated/client/enums';
+import type { ArtifactAccess, ArtifactKind } from '@template/db/generated/client/enums';
 import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 
-type AncestorEdge = { inherits: boolean; inheritsAccess: boolean; depth: number };
+type AncestorEdge = { inherits: boolean; depth: number };
 
-type ArtifactNode = OwnedArtifact & { access: ArtifactAccess; parentIds: string[] };
+type PlacementEdge = { containerArtifactId: string; access: ArtifactAccess };
+
+type ArtifactNode = OwnedArtifact & {
+  kind: ArtifactKind;
+  effectiveAccess: ArtifactAccess;
+  placements: PlacementEdge[];
+};
+
+type ExternalParentNode = OwnedArtifact & {
+  kind: ArtifactKind;
+  effectiveAccess: ArtifactAccess;
+};
 
 type TreeAround = {
   artifacts: Map<string, ArtifactNode>;
   directPermissions: Map<string, string[]>;
-  externalParents: Map<string, OwnedArtifact>;
+  externalParents: Map<string, ExternalParentNode>;
   externalAncestors: Map<string, Map<string, AncestorEdge>>;
   externalPermissions: Map<string, string[]>;
 };
+
+const ACCESS_RANK: Record<'private' | 'tenant' | 'public', number> = {
+  private: 0,
+  tenant: 1,
+  public: 2,
+};
+
+const ACCESS_BY_RANK = ['private', 'tenant', 'public'] as const;
+
+const rankOf = (access: ArtifactAccess): number =>
+  access === 'public' ? ACCESS_RANK.public : access === 'tenant' ? ACCESS_RANK.tenant : 0;
 
 const fetchDescendantIds = async (artifactIds: string[]): Promise<Set<string>> => {
   const rows = await db.artifactAncestor.findMany({
@@ -36,14 +58,14 @@ const fetchTreeAround = async (descendantIds: string[]): Promise<TreeAround> => 
     where: { id: { in: descendantIds } },
     select: {
       id: true,
-      access: true,
+      kind: true,
+      effectiveAccess: true,
       ownerModel: true,
       userId: true,
       organizationId: true,
       spaceId: true,
       placements: {
-        where: { containerArtifactId: { not: null } },
-        select: { containerArtifactId: true },
+        select: { containerArtifactId: true, access: true },
       },
       permissions: { select: { id: true } },
     },
@@ -54,16 +76,14 @@ const fetchTreeAround = async (descendantIds: string[]): Promise<TreeAround> => 
   const externalParentIds = new Set<string>();
 
   for (const row of rows) {
-    const parentIds = row.placements.flatMap((placement) =>
-      placement.containerArtifactId ? [placement.containerArtifactId] : [],
-    );
     artifacts.set(row.id, {
-      access: row.access,
+      kind: row.kind,
+      effectiveAccess: row.effectiveAccess,
       ownerModel: row.ownerModel,
       userId: row.userId,
       organizationId: row.organizationId,
       spaceId: row.spaceId,
-      parentIds,
+      placements: row.placements,
     });
     if (row.permissions.length > 0) {
       directPermissions.set(
@@ -74,12 +94,12 @@ const fetchTreeAround = async (descendantIds: string[]): Promise<TreeAround> => 
   }
 
   for (const node of artifacts.values()) {
-    for (const parentId of node.parentIds) {
-      if (!artifacts.has(parentId)) externalParentIds.add(parentId);
+    for (const { containerArtifactId } of node.placements) {
+      if (!artifacts.has(containerArtifactId)) externalParentIds.add(containerArtifactId);
     }
   }
 
-  const externalParents = new Map<string, OwnedArtifact>();
+  const externalParents = new Map<string, ExternalParentNode>();
   const externalAncestors = new Map<string, Map<string, AncestorEdge>>();
   const externalPermissions = new Map<string, string[]>();
 
@@ -88,12 +108,14 @@ const fetchTreeAround = async (descendantIds: string[]): Promise<TreeAround> => 
       where: { id: { in: [...externalParentIds] } },
       select: {
         id: true,
+        kind: true,
+        effectiveAccess: true,
         ownerModel: true,
         userId: true,
         organizationId: true,
         spaceId: true,
         ancestors: {
-          select: { ancestorArtifactId: true, inherits: true, inheritsAccess: true, depth: true },
+          select: { ancestorArtifactId: true, inherits: true, depth: true },
         },
         effectivePermissions: { select: { permissionId: true } },
       },
@@ -106,7 +128,7 @@ const fetchTreeAround = async (descendantIds: string[]): Promise<TreeAround> => 
           new Map(
             parent.ancestors.map((row) => [
               row.ancestorArtifactId,
-              { inherits: row.inherits, inheritsAccess: row.inheritsAccess, depth: row.depth },
+              { inherits: row.inherits, depth: row.depth },
             ]),
           ),
         );
@@ -141,8 +163,6 @@ const ancestorsOf = ({ artifacts, externalParents, externalAncestors }: TreeArou
     if (!node || visiting.has(artifactId)) return result;
 
     const nextVisiting = new Set(visiting).add(artifactId);
-    const canInheritGrants = node.access !== 'private';
-    const canInheritAccess = node.access === 'inherit';
 
     const merge = (ancestorId: string, edge: AncestorEdge) => {
       const current = result.get(ancestorId);
@@ -151,14 +171,13 @@ const ancestorsOf = ({ artifacts, externalParents, externalAncestors }: TreeArou
         current
           ? {
               inherits: current.inherits || edge.inherits,
-              inheritsAccess: current.inheritsAccess || edge.inheritsAccess,
               depth: Math.max(current.depth, edge.depth),
             }
           : edge,
       );
     };
 
-    for (const parentId of node.parentIds) {
+    for (const { containerArtifactId: parentId, access } of node.placements) {
       const internalParent = artifacts.get(parentId);
       const parentOwner = internalParent ?? externalParents.get(parentId);
       if (!parentOwner) continue;
@@ -167,18 +186,16 @@ const ancestorsOf = ({ artifacts, externalParents, externalAncestors }: TreeArou
         ? walk(parentId, nextVisiting)
         : (externalAncestors.get(parentId) ?? new Map<string, AncestorEdge>());
 
-      // why: cross-owner placements never inherit across tenants; visibility inheritance
-      // (inheritsAccess) also stops at explicit non-inherit nodes (e.g. tenant inside public).
+      // why: cross-owner placements never inherit across tenants; private and explicit tenant
+      // placements stop explicit folder grants from cascading down from ancestors.
       const sameOwner = sameArtifactOwner(node, parentOwner);
-      const edgeInherits = canInheritGrants && sameOwner;
-      const edgeInheritsAccess = canInheritAccess && sameOwner;
+      const edgeInherits = sameOwner && (access === 'inherit' || access === 'public');
 
-      merge(parentId, { inherits: edgeInherits, inheritsAccess: edgeInheritsAccess, depth: 1 });
+      merge(parentId, { inherits: edgeInherits, depth: 1 });
       for (const [ancestorId, ancestorEdge] of parentAncestors) {
         if (ancestorId === artifactId) continue;
         merge(ancestorId, {
           inherits: edgeInherits && ancestorEdge.inherits,
-          inheritsAccess: edgeInheritsAccess && ancestorEdge.inheritsAccess,
           depth: ancestorEdge.depth + 1,
         });
       }
@@ -189,6 +206,49 @@ const ancestorsOf = ({ artifacts, externalParents, externalAncestors }: TreeArou
   };
 
   return (artifactId: string) => walk(artifactId, new Set());
+};
+
+const effectiveAccessOf = ({ artifacts, externalParents }: TreeAround) => {
+  const memo = new Map<string, number>();
+
+  const walk = (artifactId: string, visiting: Set<string>): number => {
+    const cached = memo.get(artifactId);
+    if (cached !== undefined) return cached;
+
+    const node = artifacts.get(artifactId);
+    if (!node || node.kind === 'root' || visiting.has(artifactId)) return 0;
+
+    const nextVisiting = new Set(visiting).add(artifactId);
+    const hasTenant = node.ownerModel !== 'User';
+    let best = 0;
+
+    for (const { containerArtifactId: parentId, access } of node.placements) {
+      const internalParent = artifacts.get(parentId);
+      const parent = internalParent ?? externalParents.get(parentId);
+      if (!parent || !sameArtifactOwner(node, parent)) continue;
+
+      let contribution = 0;
+      if (access === 'public') {
+        contribution = ACCESS_RANK.public;
+      } else if (access === 'tenant') {
+        contribution = hasTenant ? ACCESS_RANK.tenant : 0;
+      } else if (access === 'inherit') {
+        if (parent.kind !== 'root') {
+          contribution = internalParent
+            ? walk(parentId, nextVisiting)
+            : rankOf(parent.effectiveAccess);
+          if (!hasTenant && contribution === ACCESS_RANK.tenant) contribution = 0;
+        }
+      }
+      if (contribution > best) best = contribution;
+    }
+
+    memo.set(artifactId, best);
+    return best;
+  };
+
+  return (artifactId: string): 'private' | 'tenant' | 'public' =>
+    ACCESS_BY_RANK[walk(artifactId, new Set())]!;
 };
 
 const syncAncestors = async (
@@ -207,7 +267,6 @@ const syncAncestors = async (
     artifactId: string;
     ancestorArtifactId: string;
     inherits: boolean;
-    inheritsAccess: boolean;
     depth: number;
   }[] = [];
 
@@ -219,11 +278,7 @@ const syncAncestors = async (
         toCreate.push({ artifactId, ancestorArtifactId, ...edge });
       } else {
         existingByKey.delete(key);
-        if (
-          current.inherits !== edge.inherits ||
-          current.inheritsAccess !== edge.inheritsAccess ||
-          current.depth !== edge.depth
-        ) {
+        if (current.inherits !== edge.inherits || current.depth !== edge.depth) {
           toDeleteIds.push(current.id);
           toCreate.push({ artifactId, ancestorArtifactId, ...edge });
         }
@@ -285,6 +340,41 @@ const syncEffectivePermissions = async (
   }
 };
 
+const syncEffectiveAccess = async (artifactIds: string[], tree: TreeAround): Promise<void> => {
+  const resolveAccess = effectiveAccessOf(tree);
+  const byTarget: Record<'private' | 'tenant' | 'public', string[]> = {
+    private: [],
+    tenant: [],
+    public: [],
+  };
+  const changedIds: string[] = [];
+
+  for (const id of artifactIds) {
+    const desired = resolveAccess(id);
+    if (tree.artifacts.get(id)?.effectiveAccess !== desired) {
+      byTarget[desired].push(id);
+      changedIds.push(id);
+    }
+  }
+
+  for (const access of ACCESS_BY_RANK) {
+    const ids = byTarget[access];
+    if (ids.length === 0) continue;
+    await db.artifact.updateManyAndReturn({
+      where: { id: { in: ids } },
+      data: { effectiveAccess: access },
+    });
+  }
+
+  if (changedIds.length > 0) {
+    // why: Artifact.effectiveAccess is in NOOP_FIELDS so the cache hook skips it; invalidate directly.
+    await queueCacheClear(
+      'Artifact',
+      changedIds.map((id) => ({ id })),
+    );
+  }
+};
+
 export const syncArtifactAncestors = async (artifactIds: string[]): Promise<void> => {
   const uniqueIds = [...new Set(artifactIds)];
   if (uniqueIds.length === 0) return;
@@ -308,22 +398,6 @@ export const syncArtifactAncestors = async (artifactIds: string[]): Promise<void
 
     await syncAncestors(liveIds, desiredByArtifact);
     await syncEffectivePermissions(liveIds, tree, desiredByArtifact);
-  });
-};
-
-export const clearDescendantCaches = async (artifactIds: string[]): Promise<void> => {
-  const uniqueIds = [...new Set(artifactIds)];
-  if (uniqueIds.length === 0) return;
-
-  await db.withoutDeleted(async () => {
-    const rows = await db.artifactAncestor.findMany({
-      where: { ancestorArtifactId: { in: uniqueIds }, inheritsAccess: true },
-      select: { artifactId: true },
-    });
-    if (rows.length === 0) return;
-    await queueCacheClear(
-      'Artifact',
-      [...new Set(rows.map((row) => row.artifactId))].map((id) => ({ id })),
-    );
+    await syncEffectiveAccess(liveIds, tree);
   });
 };

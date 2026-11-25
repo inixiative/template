@@ -6,10 +6,10 @@
  */
 import type { Prisma } from '@template/db';
 import type { Artifact, ArtifactPermission } from '@template/db/generated/client/client';
+import { ArtifactKind } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
-import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 import { readableArtifactWhereForOwner } from '#/modules/artifact/queries/readableArtifactWhere';
 import { type OwnerRef, ownerColumns } from '#/modules/artifact/services/artifactOwner';
 import { hydrateArtifact } from '#/modules/artifact/services/checkArtifactPermission';
@@ -21,23 +21,6 @@ export const includeArtifactList = {
   permissions: { orderBy: { createdAt: 'asc' as const } },
 } satisfies Prisma.ArtifactInclude;
 
-const isBracketRecord = (value: unknown): value is BracketQueryRecord =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const hasClientFilter = (c: Context<AppEnv>): boolean => {
-  const query = validatedQuery(
-    c as ValidatedContext<'query', { search?: string; searchFields?: BracketQueryRecord }>,
-  );
-  const bracketSearchFields = c.get('bracketQuery').searchFields;
-  const searchFields = isBracketRecord(bracketSearchFields)
-    ? bracketSearchFields
-    : query.searchFields;
-  return (
-    Boolean(query.search?.trim()) ||
-    (Boolean(searchFields) && Object.keys(searchFields!).length > 0)
-  );
-};
-
 export const defaultArtifactOrderBy = (
   c: ValidatedContext<'query', { orderBy?: string[] }>,
 ): Prisma.ArtifactOrderByWithRelationInput | undefined =>
@@ -47,17 +30,10 @@ export const ownerArtifactsWhere = async (
   c: Context<AppEnv>,
   owner: OwnerRef,
 ): Promise<Prisma.ArtifactWhereInput> => {
-  const rootWhere: Prisma.ArtifactWhereInput = hasClientFilter(c)
-    ? {}
-    : {
-        placements: {
-          none: { containerArtifactId: { not: null }, containerArtifact: ownerColumns(owner) },
-        },
-      };
   const ownerWhere: Prisma.ArtifactWhereInput = {
     deletedAt: null,
+    kind: { not: ArtifactKind.root },
     ...ownerColumns(owner),
-    ...rootWhere,
   };
   const visibilityWhere = await readableArtifactWhereForOwner(c, owner);
   return visibilityWhere ? { AND: [ownerWhere, visibilityWhere] } : ownerWhere;

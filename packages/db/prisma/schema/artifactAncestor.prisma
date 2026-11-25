@@ -3,7 +3,6 @@ model ArtifactAncestor {
   artifactId         String  @db.VarChar(36)
   ancestorArtifactId String  @db.VarChar(36)
   inherits           Boolean
-  inheritsAccess     Boolean
   depth              Int
 
   artifact         Artifact @relation("ArtifactAncestorDescendant", fields: [artifactId], references: [id], onDelete: Cascade)
@@ -11,5 +10,4 @@ model ArtifactAncestor {
 
   @@unique([artifactId, ancestorArtifactId], map: "ArtifactAncestor_pair_key")
   @@index([ancestorArtifactId, inherits])
-  @@index([ancestorArtifactId, inheritsAccess])
 }

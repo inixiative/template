@@ -8,7 +8,7 @@ import type { Prisma } from '@template/db';
 
 export const includeArtifactDetail = {
   placements: {
-    where: { containerArtifactId: { not: null }, containerArtifact: { deletedAt: null } },
+    where: { containerArtifact: { deletedAt: null } },
     orderBy: { createdAt: 'asc' as const },
     include: {
       containerArtifact: {
@@ -24,8 +24,18 @@ export const includeArtifactDetail = {
         include: {
           permissions: { orderBy: { createdAt: 'asc' as const } },
           placements: {
-            where: { containerArtifactId: { not: null }, containerArtifact: { deletedAt: null } },
-            select: { id: true },
+            where: { containerArtifact: { deletedAt: null } },
+            select: {
+              id: true,
+              containerArtifact: {
+                select: {
+                  ownerModel: true,
+                  userId: true,
+                  organizationId: true,
+                  spaceId: true,
+                },
+              },
+            },
           },
         },
       },

@@ -18,6 +18,6 @@ export const spaceUserReadManyArtifactsRoute = readRoute({
   paginate: true,
   filterLens: artifactListFilterLens,
   description:
-    "Lists a member's artifacts inside a space (defaults to root artifacts when no search/filter is passed) that the caller can read (public, tenant, granted, or all for the member/space owner).",
+    "Lists a member's non-root artifacts inside a space that the caller can read (public, tenant, granted, or all for the member/space owner).",
   responseSchema: artifactWithPermissionsSchema,
 });

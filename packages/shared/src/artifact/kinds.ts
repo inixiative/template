@@ -14,16 +14,25 @@ export const containerChildren = {
   // ==========================================================================
 } as const;
 
-export type ArtifactKind = 'file' | 'folder';
+export type ArtifactKind = 'root' | 'file' | 'folder';
 
-export const containerArtifactKinds: ArtifactKind[] = Object.keys(
-  containerChildren,
-) as ArtifactKind[];
+export const containerArtifactKinds: ArtifactKind[] = [
+  'root',
+  ...(Object.keys(containerChildren) as ArtifactKind[]),
+];
 
 export const plainArtifactKinds: ArtifactKind[] = ['folder'];
 
-export const isContainerKind = (kind: string): boolean => kind in containerChildren;
+export const isContainerKind = (kind: string): boolean =>
+  kind === 'root' || kind in containerChildren;
 
-export const canContain = (containerKind: string, childKind: string): boolean =>
-  (containerChildren as Record<string, readonly string[]>)[containerKind]?.includes(childKind) ??
-  false;
+export const isRootKind = (kind: string): boolean => kind === 'root';
+
+export const canContain = (containerKind: string, childKind: string): boolean => {
+  if (childKind === 'root') return false;
+  if (containerKind === 'root') return true;
+  return (
+    (containerChildren as Record<string, readonly string[]>)[containerKind]?.includes(childKind) ??
+    false
+  );
+};

@@ -5,19 +5,12 @@
  * @uses infrastructure:prisma, primitive:authz
  */
 import type { Prisma } from '@template/db';
+import type { Role } from '@template/db/generated/client/enums';
 import type { Action, Permix } from '@template/permissions/client';
 import type { Context } from 'hono';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import { type OwnerRef, ownerColumns } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
-
-const visibilityWhere = (access: 'public' | 'tenant'): Prisma.ArtifactWhereInput[] => [
-  { access },
-  {
-    access: 'inherit',
-    ancestors: { some: { inheritsAccess: true, ancestorArtifact: { access } } },
-  },
-];
 
 const ACTIONS_IMPLYING: Record<'own' | 'manage' | 'operate' | 'read', readonly Action[]> = {
   own: ['own'],
@@ -61,6 +54,12 @@ const permixIds = (
   }
   return [...ids];
 };
+
+export const entitlementsCovering = (
+  permix: Permix,
+  resource: string,
+  actions: readonly Action[],
+) => actions.flatMap((action) => permix.entitlements(resource, action));
 
 const callerGranteeClauses = (permix: Permix): Prisma.ArtifactPermissionWhereInput[] => {
   const readableUserIds = permixIds(permix, 'db:User', 'read');
@@ -142,7 +141,10 @@ const callerGranteeClauses = (permix: Permix): Prisma.ArtifactPermissionWhereInp
   return clauses;
 };
 
-const effectiveGrantWhere = (permix: Permix): Prisma.ArtifactWhereInput | null => {
+export const effectiveGrantWhere = (
+  permix: Permix,
+  roles?: Role[],
+): Prisma.ArtifactWhereInput | null => {
   const granteeClauses = callerGranteeClauses(permix);
   if (granteeClauses.length === 0) return null;
   const now = new Date();
@@ -151,6 +153,7 @@ const effectiveGrantWhere = (permix: Permix): Prisma.ArtifactWhereInput | null =
       some: {
         permission: {
           deletedAt: null,
+          ...(roles ? { role: { in: roles } } : {}),
           AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, { OR: granteeClauses }],
         },
       },
@@ -168,23 +171,42 @@ export const readableArtifactWhereForOwner = async (
 
   const ownerFields = ownerColumns(owner);
   if (
-    await holdsOnRecord(permix, 'artifact', { id: '', access: 'private', ...ownerFields }, 'read')
+    await holdsOnRecord(
+      permix,
+      'artifact',
+      { id: '', effectiveAccess: 'private', ...ownerFields },
+      'read',
+    )
   ) {
     return null;
   }
 
   const [canReadPublic, canReadTenant] = await Promise.all([
-    holdsOnRecord(permix, 'artifact', { id: '', access: 'public', ...ownerFields }, 'read'),
-    holdsOnRecord(permix, 'artifact', { id: '', access: 'tenant', ...ownerFields }, 'read'),
+    holdsOnRecord(
+      permix,
+      'artifact',
+      { id: '', effectiveAccess: 'public', ...ownerFields },
+      'read',
+    ),
+    holdsOnRecord(
+      permix,
+      'artifact',
+      { id: '', effectiveAccess: 'tenant', ...ownerFields },
+      'read',
+    ),
   ]);
-  const artifactEntitlements = permix.entitlements('db:Artifact', 'read');
-  const directArtifactIds = artifactEntitlements.flatMap((ent) =>
-    ent.anchor.resource === 'db:Artifact' && ent.anchor.id ? [ent.anchor.id] : [],
-  );
+  const artifactEntitlements = entitlementsCovering(permix, 'db:Artifact', ACTIONS_IMPLYING.read);
+  const directArtifactIds = [
+    ...new Set(
+      artifactEntitlements.flatMap((ent) =>
+        ent.anchor.resource === 'db:Artifact' && ent.anchor.id ? [ent.anchor.id] : [],
+      ),
+    ),
+  ];
 
   const orClauses: Prisma.ArtifactWhereInput[] = [];
-  if (canReadPublic) orClauses.push(...visibilityWhere('public'));
-  if (canReadTenant) orClauses.push(...visibilityWhere('tenant'));
+  if (canReadPublic) orClauses.push({ effectiveAccess: 'public' });
+  if (canReadTenant) orClauses.push({ effectiveAccess: 'tenant' });
   if (canReadPublic || artifactEntitlements.length > 0) {
     const grantClause = effectiveGrantWhere(permix);
     if (grantClause) orClauses.push(grantClause);
@@ -208,18 +230,22 @@ export const readableAnyArtifactWhere = async (
   const canReadPublic = await holdsOnRecord(
     permix,
     'artifact',
-    { id: '', access: 'public', ownerModel: 'User', userId: '' },
+    { id: '', effectiveAccess: 'public', ownerModel: 'User', userId: '' },
     'read',
   );
-  const artifactEntitlements = permix.entitlements('db:Artifact', 'read');
+  const artifactEntitlements = entitlementsCovering(permix, 'db:Artifact', ACTIONS_IMPLYING.read);
   if (!canReadPublic && artifactEntitlements.length === 0) return { id: { in: [] } };
 
   const orClauses: Prisma.ArtifactWhereInput[] = [];
-  if (canReadPublic) orClauses.push(...visibilityWhere('public'));
+  if (canReadPublic) orClauses.push({ effectiveAccess: 'public' });
 
-  const directArtifactIds = artifactEntitlements.flatMap((ent) =>
-    ent.anchor.resource === 'db:Artifact' && ent.anchor.id ? [ent.anchor.id] : [],
-  );
+  const directArtifactIds = [
+    ...new Set(
+      artifactEntitlements.flatMap((ent) =>
+        ent.anchor.resource === 'db:Artifact' && ent.anchor.id ? [ent.anchor.id] : [],
+      ),
+    ),
+  ];
   if (directArtifactIds.length > 0) {
     orClauses.push({ id: { in: directArtifactIds } });
   } else if (!canReadPublic && artifactEntitlements.length > 0) {
@@ -250,7 +276,7 @@ export const readableAnyArtifactWhere = async (
     orClauses.push({
       ownerModel: { in: ['Organization', 'OrganizationUser'] },
       organizationId: { in: readableOrgIds },
-      OR: visibilityWhere('tenant'),
+      effectiveAccess: 'tenant',
     });
   }
   if (ownedOrgIds.length > 0) {
@@ -267,7 +293,7 @@ export const readableAnyArtifactWhere = async (
     orClauses.push({
       ownerModel: { in: ['Space', 'SpaceUser'] },
       spaceId: { in: readableSpaceIds },
-      OR: visibilityWhere('tenant'),
+      effectiveAccess: 'tenant',
     });
   }
   if (ownedSpaceIds.length > 0) {

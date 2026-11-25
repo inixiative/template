@@ -9,6 +9,7 @@ import { registerFactory } from '@template/db/test/factory';
 const artifactPlacementFactory = registerFactory('ArtifactPlacement', {
   defaults: () => ({}),
   dependencies: {
+    containerArtifact: { modelName: 'Artifact', foreignKey: { id: 'containerArtifactId' } },
     artifact: { modelName: 'Artifact', foreignKey: { id: 'artifactId' } },
   },
 });

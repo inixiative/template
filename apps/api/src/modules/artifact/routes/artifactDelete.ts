@@ -12,7 +12,7 @@ import { Modules } from '#/modules/modules';
 export const artifactDeleteRoute = deleteRoute({
   model: Modules.artifact,
   description:
-    'Deletes an artifact. Deleting a container deletes the container only, never its contents: they stay at root as access inherit with no ancestors. To delete exclusive contents too, read them from GET /artifact/:id (children with exclusive=true) and delete them through /v1/batch. Deleting needs own on the artifact, or organization/space owner break-glass on a member-owned artifact.',
+    "Deletes an artifact (root containers cannot be deleted). Deleting a container deletes the container only, never its contents: exclusive same-owner children are reparented to the owner's lazy root as private. To delete exclusive contents too, read them from GET /artifact/:id (children with exclusive=true) and delete them through /v1/batch. Deleting needs own on the artifact, or organization/space owner break-glass on a member-owned artifact.",
   responseSchema: artifactReadResponseSchema,
   middleware: [validatePermission('delete')],
 });

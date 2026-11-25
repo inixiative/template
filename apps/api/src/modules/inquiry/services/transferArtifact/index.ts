@@ -22,7 +22,9 @@ import {
   sameArtifactOwner,
   withArtifactOwnersLock,
 } from '#/modules/artifact/services/artifactOwner';
+import { writePlacement } from '#/modules/artifact/services/artifactPlacementHelpers';
 import { copyArtifactInto } from '#/modules/artifact/services/copyArtifact';
+import { ensureOwnerRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
 import { openInquiryWhere } from '#/modules/inquiry/validations/validateInquiryStatus';
 
@@ -149,9 +151,17 @@ export const transferArtifactService: InquiryService<
     const targetOwner = await fetchOwnerOf(target);
     const existingPlacements = await db.artifactPlacement.findMany({
       where: { artifactId: content.artifactId },
-      select: { ownerModel: true, userId: true, organizationId: true, spaceId: true },
+      select: {
+        containerArtifact: {
+          select: { ownerModel: true, userId: true, organizationId: true, spaceId: true },
+        },
+      },
     });
-    const lockTargets: OwnedArtifact[] = [sourceOwner, targetOwner, ...existingPlacements];
+    const lockTargets: OwnedArtifact[] = [
+      sourceOwner,
+      targetOwner,
+      ...existingPlacements.map((placement) => placement.containerArtifact),
+    ];
 
     await withArtifactOwnersLock(lockTargets, async () => {
       const [artifact] = await db.findForUpdate<Artifact>('Artifact', { id: content.artifactId });
@@ -178,7 +188,12 @@ export const transferArtifactService: InquiryService<
         where: { artifactId: artifact.id },
         data: { deletedAt: new Date() },
       });
-      await db.artifact.update({ where: { id: artifact.id }, data: targetOwner });
+      const transferred = await db.artifact.update({
+        where: { id: artifact.id },
+        data: { ...targetOwner, effectiveAccess: 'private' },
+      });
+      const targetRoot = await ensureOwnerRootArtifact(targetOwner);
+      await writePlacement(transferred, targetRoot, 'private');
       if (tracked) await grantSourceRead(artifact.id, source);
     });
     return {};

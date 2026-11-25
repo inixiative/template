@@ -62,7 +62,6 @@ model User {
   flows                           Flow[]
   settings                        Setting[]
   ownedArtifacts                  Artifact[]             @relation("ArtifactOwnerUser")
-  artifactPlacements              ArtifactPlacement[]    @relation("ArtifactPlacementOwnerUser")
   artifactGrants                  ArtifactPermission[]   @relation("ArtifactPermissionGranteeUser")
   resourceBindings                ResourceBinding[]      @relation("ResourceBindingUser")
 

@@ -493,9 +493,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Artifacts and Files
 
-- ✅ **One Node, Many Kinds** — `Artifact` (file, folder, fork kinds) with a code catalog of kinds; a container is an artifact, and an artifact may sit in many containers (`ArtifactPlacement`).
-- ✅ **Access as a Union** — `inherit | public | private`: inherit takes every container's audience, private overrides, and inherit without a container resolves to private. Grants (`ArtifactPermission`) reach users, orgs, spaces, members and customers, with expiry; roles cap by membership and token.
-- ✅ **Placements** — containers and objects; place, move, copy within one owner; an item in no container is at its owner's root; placements need control over both ends; loop and depth refusal under the owner's `containers` lock; `uses` lists placements, bindings, owner and access as the caller sees them.
+- ✅ **One Node, Many Kinds** — `Artifact` (`root`, `file`, `folder`, fork kinds) with a code catalog of kinds; every owner gets a lazy `root` container, and an artifact may sit in many containers (`ArtifactPlacement`).
+- ✅ **Visibility on Placements, Grants on Artifacts** — `ArtifactPlacement.access` (`inherit | private | tenant | public`, root rejects `inherit`) controls visibility per placement and materializes `Artifact.effectiveAccess` across same-owner placements. Explicit grants (`ArtifactPermission`) stay on `Artifact`, reach users, orgs, spaces, members and customers with expiry, and cap roles by membership and token.
+- ✅ **Placements** — containers and objects; same-owner and cross-owner placements (private bookmarks vs public/tenant reshares at root or in folders); deleting a container or removing a last folder placement reparents owned items to the owner's lazy `root`; loop and depth refusal under the owner's `containers` lock; `GET /artifact/:id` returns the 1-step neighborhood as the caller sees it.
 - ✅ **Ownership Transfer** — the `transferArtifact` Inquiry, with a tracking pointer or a copy for the sender.
 - ✅ **Deleting and Governance** — deleting a container keeps its contents (listed separately, deleted through batch); deleting needs `own`; grants and edges are soft-deleted and audited; org-user content is reachable by org owners, not admins.
 - ✅ **Artifact Webhooks** — grant and edge changes fire the parent Artifact to its owner and grantees only.

@@ -14,12 +14,6 @@ import { makeError } from '#/lib/errors';
 
 export type ArtifactAction = 'own' | 'delete' | 'manage' | 'operate' | 'read';
 
-type HydratedAncestor = {
-  inherits?: boolean;
-  inheritsAccess?: boolean;
-  ancestorArtifact?: { access?: string } | null;
-};
-
 export const hydrateArtifact = (artifact: Artifact): Promise<HydratedRecord> =>
   hydrate('artifact', artifact);
 
@@ -46,11 +40,9 @@ export const assertArtifactPermission = async (
   return hydrated;
 };
 
-export type ResolvedArtifactAccess = 'public' | 'tenant' | 'private';
-
 export const artifactEffectiveRole = (permix: Permix, hydrated: HydratedRecord): Role | null => {
-  // why: public/tenant visibility is reported separately in `effectiveAccess.access`, not synthesized as a viewer role.
-  const withoutVisibility = { ...hydrated, access: 'private' };
+  // why: public/tenant visibility is reported on artifact.effectiveAccess, not synthesized as a viewer role.
+  const withoutVisibility = { ...hydrated, effectiveAccess: 'private' };
   for (const role of [...roleHierarchy].reverse()) {
     if (check(permix, 'artifact', withoutVisibility, roleToStandardAction(role))) {
       return role;
@@ -58,21 +50,3 @@ export const artifactEffectiveRole = (permix: Permix, hydrated: HydratedRecord):
   }
   return null;
 };
-
-export const effectiveArtifactAccess = (hydrated: HydratedRecord): ResolvedArtifactAccess => {
-  const hasTenant = hydrated.ownerModel !== 'User';
-  if (hydrated.access === 'public') return 'public';
-  if (hydrated.access === 'tenant') return hasTenant ? 'tenant' : 'private';
-  if (hydrated.access === 'private') return 'private';
-  const ancestors = (hydrated.ancestors ?? []) as HydratedAncestor[];
-  let inheritedTenant = false;
-  for (const ancestor of ancestors) {
-    if (ancestor.inheritsAccess !== true) continue;
-    if (ancestor.ancestorArtifact?.access === 'public') return 'public';
-    if (ancestor.ancestorArtifact?.access === 'tenant') inheritedTenant = true;
-  }
-  return inheritedTenant && hasTenant ? 'tenant' : 'private';
-};
-
-export const isArtifactPublic = (hydrated: HydratedRecord): boolean =>
-  effectiveArtifactAccess(hydrated) === 'public';

@@ -8,6 +8,7 @@ import { db } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions/client';
 import { makeError } from '#/lib/errors';
+import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import {
   type OwnedArtifact,
   ownerColumns,
@@ -18,6 +19,7 @@ import {
   assertArtifactPermission,
   canActOnArtifact,
 } from '#/modules/artifact/services/checkArtifactPermission';
+import { assertNotRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
 
 export type CopyArtifactInput = {
   artifactId: string;
@@ -25,16 +27,30 @@ export type CopyArtifactInput = {
   name?: string;
 };
 
+const assertCanCreateCopyAtOwner = async (
+  permix: Permix,
+  source: Pick<Artifact, 'kind'>,
+  owner: OwnedArtifact,
+): Promise<void> => {
+  const allowed = await holdsOnRecord(
+    permix,
+    'artifact',
+    { id: '', kind: source.kind, effectiveAccess: 'private', ...ownerColumns(owner) },
+    'create',
+  );
+  if (!allowed) throw makeError({ status: 403, message: 'Forbidden' });
+};
+
 export const copyArtifactInto = async (
   source: Artifact,
   owner: OwnedArtifact,
   { containerArtifactId, name }: { containerArtifactId?: string; name?: string },
 ): Promise<Artifact> => {
+  assertNotRootArtifact(source, 'Root container cannot be copied');
   const copy = await insertArtifact({
     ...ownerColumns(owner),
     kind: source.kind,
     name: name ?? source.name,
-    access: containerArtifactId ? 'inherit' : 'private',
     containerArtifactId,
   });
   if (source.kind === 'file') {
@@ -66,16 +82,20 @@ export const copyArtifact = async (
   { artifactId, containerArtifactId, name }: CopyArtifactInput,
 ): Promise<Artifact> => {
   const source = await assertArtifactPermission(permix, artifactId, 'read');
+  assertNotRootArtifact(source, 'Root container cannot be copied');
   const container = await assertArtifactPermission(permix, containerArtifactId, 'operate');
+  await assertCanCreateCopyAtOwner(permix, source, container);
   return withLockedArtifacts([source, container], async (locked) => {
     const lockedSource = locked.get(artifactId)!;
     const lockedContainer = locked.get(containerArtifactId)!;
+    assertNotRootArtifact(lockedSource, 'Root container cannot be copied');
     if (!(await canActOnArtifact(permix, lockedSource, 'read'))) {
       throw makeError({ status: 403, message: 'Forbidden' });
     }
     if (!(await canActOnArtifact(permix, lockedContainer, 'operate'))) {
       throw makeError({ status: 403, message: 'Forbidden' });
     }
+    await assertCanCreateCopyAtOwner(permix, lockedSource, lockedContainer);
     return copyArtifactInto(lockedSource, lockedContainer, {
       containerArtifactId: lockedContainer.id,
       name,

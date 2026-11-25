@@ -6,7 +6,7 @@
  */
 import { DateOperator, Operator } from '@inixiative/json-rules';
 import { makeKindRules } from '@inixiative/permissions';
-import type { Role } from '@template/db/generated/client/enums';
+import { ArtifactKind, type Role } from '@template/db/generated/client/enums';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import {
   actorMayPerformActionOnOwner,
@@ -30,6 +30,8 @@ const rolesCovering: Record<StandardAction, readonly Role[]> = {
   operate: roleHierarchy.slice(roleHierarchy.indexOf('member')),
   read: roleHierarchy,
 };
+
+const nonRootArtifactKinds = Object.values(ArtifactKind).filter((k) => k !== ArtifactKind.root);
 
 const actingAsMemberToken: ActionRule = kind.ruleForEachKind('actor:Acting', 'model', {
   Token: kind.ruleKindIsOneOf('actor:Token', 'ownerModel', ['OrganizationUser', 'SpaceUser']),
@@ -119,51 +121,33 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
   },
 });
 
-const artifactAccessIs = (access: 'public' | 'tenant'): ActionRule => ({
+const ownerTenantRead = (at = ''): ActionRule => ({
   any: [
-    { rule: { field: 'access', operator: Operator.equals, value: access } },
+    {
+      all: [ownerModelIsOneOf(['Organization'], at), { rel: `${at}organization`, action: 'read' }],
+    },
+    { all: [ownerModelIsOneOf(['Space'], at), { rel: `${at}space`, action: 'read' }] },
     {
       all: [
-        { rule: { field: 'access', operator: Operator.equals, value: 'inherit' } },
-        {
-          rel: 'ancestors',
-          arrayOperator: 'any',
-          condition: {
-            all: [
-              { rule: { field: 'inheritsAccess', operator: Operator.equals, value: true } },
-              {
-                rule: {
-                  field: 'ancestorArtifact.access',
-                  operator: Operator.equals,
-                  value: access,
-                },
-              },
-            ],
-          },
-        },
+        ownerModelIsOneOf(['OrganizationUser'], at),
+        { rel: `${at}organizationUser.organization`, action: 'read' },
       ],
+    },
+    {
+      all: [ownerModelIsOneOf(['SpaceUser'], at), { rel: `${at}spaceUser.space`, action: 'read' }],
     },
   ],
 });
 
-const ownerTenantRead: ActionRule = {
-  any: [
-    { all: [ownerModelIsOneOf(['Organization']), { rel: 'organization', action: 'read' }] },
-    { all: [ownerModelIsOneOf(['Space']), { rel: 'space', action: 'read' }] },
-    {
-      all: [
-        ownerModelIsOneOf(['OrganizationUser']),
-        { rel: 'organizationUser.organization', action: 'read' },
-      ],
-    },
-    { all: [ownerModelIsOneOf(['SpaceUser']), { rel: 'spaceUser.space', action: 'read' }] },
-  ],
+const artifactIsPublic: ActionRule = {
+  rule: { field: 'effectiveAccess', operator: Operator.equals, value: 'public' },
 };
 
-const artifactIsPublic: ActionRule = artifactAccessIs('public');
-
 const artifactIsTenant: ActionRule = {
-  all: [artifactAccessIs('tenant'), ownerTenantRead],
+  all: [
+    { rule: { field: 'effectiveAccess', operator: Operator.equals, value: 'tenant' } },
+    ownerTenantRead(),
+  ],
 };
 
 const artifactOwnerOperate: ActionRule = {
@@ -299,13 +283,19 @@ export const artifactPermissionResourcePermission: ResourcePermission = {
   },
 };
 
-const placementIsRoot = rowIsThereAnd('id', isNull('containerArtifactId'));
+const containerIsRoot: ActionRule = {
+  rule: { field: 'containerArtifact.kind', operator: Operator.equals, value: ArtifactKind.root },
+};
 
-const artifactPlacementRootDelete: ActionRule = {
+const containerIsNotRoot: ActionRule = {
+  rule: { field: 'containerArtifact.kind', operator: Operator.in, value: nonRootArtifactKinds },
+};
+
+const containerOwnerRead: ActionRule = {
   any: [
-    actorOperatesOwnerUserOrManagesOwnerTenant,
-    actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
-    actorMayPerformActionOnOwner('own', '', ['OrganizationUser', 'SpaceUser']),
+    { rel: 'containerArtifact', action: 'manage' },
+    actorMayPerformActionOnOwner('read', 'containerArtifact.', ['User']),
+    actorMayPerformActionOnOwner('own', 'containerArtifact.', ['OrganizationUser', 'SpaceUser']),
   ],
 };
 
@@ -314,40 +304,117 @@ export const artifactPlacementResourcePermission: ResourcePermission = {
     create: {
       all: [
         { rel: 'artifact', action: 'read' },
-        {
-          any: [
-            { rel: 'containerArtifact', action: 'operate' },
-            { all: [placementIsRoot, artifactOwnerOperate] },
-          ],
-        },
+        { rel: 'containerArtifact', action: 'operate' },
       ],
     },
-    read: {
+    manage: {
       all: [
         { rel: 'artifact', action: 'read' },
+        { rel: 'containerArtifact', action: 'manage' },
+      ],
+    },
+    delete: {
+      any: [
         {
-          any: [
-            { rel: 'containerArtifact', action: 'read' },
+          all: [
+            { rule: { field: 'access', operator: Operator.in, value: ['inherit', 'public'] } },
+            { rel: 'containerArtifact', action: 'operate' },
+          ],
+        },
+        {
+          all: [
+            { rule: { field: 'access', operator: Operator.equals, value: 'tenant' } },
             {
-              all: [
-                placementIsRoot,
+              any: [
+                { rel: 'containerArtifact', action: 'manage' },
                 {
-                  any: [
-                    actorMayPerformActionOnOwner('read', '', ['User', 'Organization', 'Space']),
-                    actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
-                    actorMayPerformActionOnOwner('own', '', ['OrganizationUser', 'SpaceUser']),
+                  all: [
+                    { rel: 'containerArtifact', action: 'operate' },
+                    ownerTenantRead('containerArtifact.'),
                   ],
                 },
               ],
             },
           ],
         },
+        {
+          all: [
+            { rule: { field: 'access', operator: Operator.equals, value: 'private' } },
+            { rel: 'containerArtifact', action: 'manage' },
+          ],
+        },
       ],
     },
-    delete: {
+    read: {
       any: [
-        { rel: 'containerArtifact', action: 'operate' },
-        { all: [placementIsRoot, artifactPlacementRootDelete] },
+        'manage',
+        {
+          all: [
+            { rel: 'artifact', action: 'read' },
+            {
+              any: [
+                {
+                  all: [
+                    containerIsRoot,
+                    {
+                      any: [
+                        { rule: { field: 'access', operator: Operator.equals, value: 'public' } },
+                        {
+                          all: [
+                            {
+                              rule: { field: 'access', operator: Operator.equals, value: 'tenant' },
+                            },
+                            ownerTenantRead('containerArtifact.'),
+                          ],
+                        },
+                        containerOwnerRead,
+                      ],
+                    },
+                  ],
+                },
+                {
+                  all: [
+                    containerIsNotRoot,
+                    { rel: 'containerArtifact', action: 'read' },
+                    {
+                      any: [
+                        {
+                          rule: {
+                            field: 'access',
+                            operator: Operator.in,
+                            value: ['inherit', 'public'],
+                          },
+                        },
+                        {
+                          all: [
+                            {
+                              rule: { field: 'access', operator: Operator.equals, value: 'tenant' },
+                            },
+                            {
+                              any: [ownerTenantRead('containerArtifact.'), containerOwnerRead],
+                            },
+                          ],
+                        },
+                        {
+                          all: [
+                            {
+                              rule: {
+                                field: 'access',
+                                operator: Operator.equals,
+                                value: 'private',
+                              },
+                            },
+                            containerOwnerRead,
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       ],
     },
   },

@@ -58,8 +58,9 @@ export const lockArtifactsInTxn = async (ids: string[]): Promise<Map<string, Art
 export const withLockedArtifacts = <T>(
   artifacts: Artifact[],
   fn: (locked: Map<string, Artifact>) => Promise<T>,
+  extraOwners: OwnedArtifact[] = [],
 ): Promise<T> =>
-  withArtifactOwnersLock(artifacts, () =>
+  withArtifactOwnersLock([...artifacts, ...extraOwners], () =>
     db.txn(async () => {
       const locked = await lockArtifactsInTxn(artifacts.map((artifact) => artifact.id));
       for (const prelocked of artifacts) {
@@ -81,10 +82,15 @@ const emptyOwnerKeys = emptySideKeyColumns(polymorphicAxis('Artifact', 'ownerMod
   'userId' | 'organizationId' | 'spaceId'
 >;
 
-export const ownerColumns = (artifact: OwnerRef): OwnedArtifact => ({
-  ...emptyOwnerKeys,
-  ownerModel: artifact.ownerModel,
-  ...(artifact.userId != null ? { userId: artifact.userId } : {}),
-  ...(artifact.organizationId != null ? { organizationId: artifact.organizationId } : {}),
-  ...(artifact.spaceId != null ? { spaceId: artifact.spaceId } : {}),
-});
+export const ownerColumns = (artifact: OwnerRef): OwnedArtifact => {
+  const allowed = new Set(polymorphicKeyColumns('Artifact', 'ownerModel', artifact.ownerModel));
+  return {
+    ...emptyOwnerKeys,
+    ownerModel: artifact.ownerModel,
+    ...(allowed.has('userId') && artifact.userId != null ? { userId: artifact.userId } : {}),
+    ...(allowed.has('organizationId') && artifact.organizationId != null
+      ? { organizationId: artifact.organizationId }
+      : {}),
+    ...(allowed.has('spaceId') && artifact.spaceId != null ? { spaceId: artifact.spaceId } : {}),
+  };
+};

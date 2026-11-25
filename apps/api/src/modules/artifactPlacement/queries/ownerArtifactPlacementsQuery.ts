@@ -7,21 +7,29 @@
 import type { Prisma } from '@template/db';
 import { hydrate } from '@template/db';
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
+import { type ArtifactAccess, ArtifactKind } from '@template/db/generated/client/enums';
+import type { Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
-import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
+import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 import {
+  effectiveGrantWhere,
+  entitlementsCovering,
   readableAnyArtifactWhere,
   readableArtifactWhereForOwner,
 } from '#/modules/artifact/queries/readableArtifactWhere';
-import { type OwnerRef, ownerColumns } from '#/modules/artifact/services/artifactOwner';
+import {
+  type OwnedArtifact,
+  type OwnerRef,
+  ownerColumns,
+} from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
 export type PlacementWithArtifacts = ArtifactPlacement & {
   artifact: Artifact;
-  containerArtifact: Artifact | null;
+  containerArtifact: Artifact;
 };
 
 export const includeArtifactPlacementList = {
@@ -34,6 +42,73 @@ export const defaultArtifactPlacementOrderBy = (
 ): Prisma.ArtifactPlacementOrderByWithRelationInput | undefined =>
   validatedQuery(c).orderBy?.length ? undefined : { createdAt: 'desc' };
 
+const isBracketRecord = (value: unknown): value is BracketQueryRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const hasContainerFilter = (c: Context<AppEnv>): boolean => {
+  const query = validatedQuery(
+    c as ValidatedContext<'query', { searchFields?: BracketQueryRecord }>,
+  );
+  const bracketSearchFields = c.get('bracketQuery').searchFields;
+  const searchFields = isBracketRecord(bracketSearchFields)
+    ? bracketSearchFields
+    : query.searchFields;
+  if (!searchFields) return false;
+  return 'containerArtifactId' in searchFields || 'containerArtifact' in searchFields;
+};
+
+const canReadOwnerPrivatePlacements = async (
+  permix: Permix,
+  ownerFields: OwnedArtifact,
+): Promise<boolean> => {
+  if (permix.isSuperadmin()) return true;
+  if (
+    await holdsOnRecord(
+      permix,
+      'artifact',
+      { id: '', kind: ArtifactKind.root, effectiveAccess: 'private', ...ownerFields },
+      'manage',
+    )
+  ) {
+    return true;
+  }
+  if (ownerFields.ownerModel === 'User' && ownerFields.userId) {
+    return holdsOnRecord(permix, 'user', { id: ownerFields.userId }, 'read');
+  }
+  if (
+    ownerFields.ownerModel === 'OrganizationUser' &&
+    ownerFields.organizationId &&
+    ownerFields.userId
+  ) {
+    return holdsOnRecord(
+      permix,
+      'organizationUser',
+      { organizationId: ownerFields.organizationId, userId: ownerFields.userId },
+      'own',
+    );
+  }
+  if (
+    ownerFields.ownerModel === 'SpaceUser' &&
+    ownerFields.organizationId &&
+    ownerFields.spaceId &&
+    ownerFields.userId
+  ) {
+    return holdsOnRecord(
+      permix,
+      'spaceUser',
+      {
+        organizationId: ownerFields.organizationId,
+        spaceId: ownerFields.spaceId,
+        userId: ownerFields.userId,
+      },
+      'own',
+    );
+  }
+  return false;
+};
+
+const PLACEMENT_READ_ACTIONS = ['read', 'manage'] as const;
+
 export const ownerArtifactPlacementsWhere = async (
   c: Context<AppEnv>,
   owner: OwnerRef,
@@ -41,46 +116,120 @@ export const ownerArtifactPlacementsWhere = async (
   const permix = c.get('permix');
   const ownerFields = ownerColumns(owner);
 
-  if (owner.ownerModel === 'OrganizationUser' || owner.ownerModel === 'SpaceUser') {
-    const canViewSeat = await holdsOnRecord(
-      permix,
-      'artifact',
-      { id: '', access: 'private', ...ownerFields },
-      'read',
-    );
-    if (!canViewSeat) throw makeError({ status: 403, message: 'Forbidden' });
-  }
-
-  // Entitlement-only tokens without any db:ArtifactPlacement.read entitlement cannot read placements.
+  // Entitlement-only tokens without any db:ArtifactPlacement read/manage entitlement cannot read placements.
   const token = c.get('token');
+  const placementEntitlements = entitlementsCovering(
+    permix,
+    'db:ArtifactPlacement',
+    PLACEMENT_READ_ACTIONS,
+  );
   if (
     !permix.isSuperadmin() &&
     token &&
     !token.full &&
     token.role === null &&
-    permix.entitlements('db:ArtifactPlacement', 'read').length === 0
+    placementEntitlements.length === 0
   ) {
     return { id: { in: [] } };
   }
 
-  const [anyArtifactWhere, ownerContainerWhere] = await Promise.all([
+  const directPlacementIds = [
+    ...new Set(
+      placementEntitlements.flatMap((ent) =>
+        ent.anchor.resource === 'db:ArtifactPlacement' && ent.anchor.id ? [ent.anchor.id] : [],
+      ),
+    ),
+  ];
+  const hasBroadPlacementEntitlement =
+    placementEntitlements.length > 0 && directPlacementIds.length < placementEntitlements.length;
+
+  const [anyArtifactWhere, canOwnerReadPrivate, canReadTenant, canReadPublic] = await Promise.all([
     readableAnyArtifactWhere(c),
-    readableArtifactWhereForOwner(c, owner),
+    canReadOwnerPrivatePlacements(permix, ownerFields),
+    permix.isSuperadmin()
+      ? Promise.resolve(true)
+      : holdsOnRecord(
+          permix,
+          'artifact',
+          { id: '', kind: ArtifactKind.folder, effectiveAccess: 'tenant', ...ownerFields },
+          'read',
+        ),
+    permix.isSuperadmin()
+      ? Promise.resolve(true)
+      : holdsOnRecord(
+          permix,
+          'artifact',
+          { id: '', kind: ArtifactKind.folder, effectiveAccess: 'public', ...ownerFields },
+          'read',
+        ),
   ]);
 
   const artifactWhere: Prisma.ArtifactWhereInput = anyArtifactWhere
     ? { AND: [{ deletedAt: null }, anyArtifactWhere] }
     : { deletedAt: null };
-  const containerWhere: Prisma.ArtifactWhereInput = ownerContainerWhere
-    ? { AND: [{ deletedAt: null }, ownerContainerWhere] }
-    : { deletedAt: null };
+
+  const rootContainerWhere: Prisma.ArtifactWhereInput = {
+    deletedAt: null,
+    kind: ArtifactKind.root,
+    ...ownerFields,
+  };
+
+  const buildRootWhere = (): Prisma.ArtifactPlacementWhereInput | null => {
+    if (canOwnerReadPrivate || hasBroadPlacementEntitlement) {
+      return { containerArtifact: rootContainerWhere };
+    }
+    const allowedAccess: ArtifactAccess[] = [];
+    if (canReadPublic) allowedAccess.push('public');
+    if (canReadTenant) allowedAccess.push('tenant');
+    const rootOr: Prisma.ArtifactPlacementWhereInput[] = [];
+    if (allowedAccess.length > 0) rootOr.push({ access: { in: allowedAccess } });
+    if (directPlacementIds.length > 0) rootOr.push({ id: { in: directPlacementIds } });
+    if (rootOr.length === 0) return null;
+    return { containerArtifact: rootContainerWhere, OR: rootOr };
+  };
+
+  if (!hasContainerFilter(c)) {
+    const rootWhere = buildRootWhere();
+    if (!rootWhere) return { id: { in: [] } };
+    return {
+      deletedAt: null,
+      artifact: artifactWhere,
+      ...rootWhere,
+    };
+  }
+
+  const ownerContainerWhere = await readableArtifactWhereForOwner(c, owner);
+  const nonRootContainerWhere: Prisma.ArtifactWhereInput = ownerContainerWhere
+    ? {
+        AND: [
+          { deletedAt: null, kind: { not: ArtifactKind.root }, ...ownerFields },
+          ownerContainerWhere,
+        ],
+      }
+    : { deletedAt: null, kind: { not: ArtifactKind.root }, ...ownerFields };
+
+  const buildNonRootWhere = (): Prisma.ArtifactPlacementWhereInput => {
+    if (canOwnerReadPrivate || hasBroadPlacementEntitlement) {
+      return { containerArtifact: nonRootContainerWhere };
+    }
+    const nonRootOr: Prisma.ArtifactPlacementWhereInput[] = [
+      { access: { in: ['inherit', 'public'] } },
+    ];
+    if (canReadTenant) nonRootOr.push({ access: 'tenant' });
+    const manageGrant = effectiveGrantWhere(permix, ['admin', 'owner']);
+    if (manageGrant) nonRootOr.push({ containerArtifact: manageGrant });
+    if (directPlacementIds.length > 0) nonRootOr.push({ id: { in: directPlacementIds } });
+    return { containerArtifact: nonRootContainerWhere, OR: nonRootOr };
+  };
+
+  const branches: Prisma.ArtifactPlacementWhereInput[] = [buildNonRootWhere()];
+  const rootWhere = buildRootWhere();
+  if (rootWhere) branches.push(rootWhere);
 
   return {
-    AND: [
-      { deletedAt: null, ...ownerFields },
-      { artifact: artifactWhere },
-      { OR: [{ containerArtifactId: null }, { containerArtifact: containerWhere }] },
-    ],
+    deletedAt: null,
+    artifact: artifactWhere,
+    OR: branches,
   };
 };
 

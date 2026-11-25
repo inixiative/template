@@ -20,7 +20,7 @@ export const ParentEdgeRegistry = {
   ArtifactAncestor: { parent: 'Artifact', foreignKey: 'artifactId' },
   ArtifactEffectivePermission: { parent: 'Artifact', foreignKey: 'artifactId' },
   ArtifactPermission: { parent: 'Artifact', foreignKey: 'artifactId' },
-  ArtifactPlacement: { parent: 'Artifact', foreignKey: 'artifactId' },
+  ArtifactPlacement: { parent: 'Artifact', foreignKey: 'containerArtifactId' },
   Entitlement: { axis: 'targetModel' },
   ProjectIntegration: { parent: 'Project', foreignKey: 'projectId' },
   Setting: { axis: 'resourceModel' },
