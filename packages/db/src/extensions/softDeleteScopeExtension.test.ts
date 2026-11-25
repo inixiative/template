@@ -10,6 +10,7 @@ import { ContactOwnerModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import {
   cleanupTouchedTables,
+  createCommunicationLog,
   createContact,
   createOrganizationUser,
   createSession,
@@ -100,6 +101,50 @@ describe('softDeleteScope extension', () => {
     const ids = loaded?.contacts.map((c) => c.id) ?? [];
     expect(ids).toContain(notDeletedContact.id);
     expect(ids).not.toContain(deletedContact.id);
+  });
+
+  const logToTombstonedContact = async () => {
+    const { entity: user } = await createUser();
+    const { entity: contact } = await createContact(
+      { ownerModel: ContactOwnerModel.User },
+      { user },
+    );
+    const { entity: log } = await createCommunicationLog({
+      senderModel: 'platform',
+      recipientContactId: contact.id,
+    });
+    await tombstone('contact', contact.id);
+    return { log, contact };
+  };
+
+  it('reads a soft-deleted row under an optional to-one include as null', async () => {
+    const { log } = await logToTombstonedContact();
+
+    const loaded = await db.communicationLog.findUnique({
+      where: { id: log.id },
+      include: { recipientContact: true },
+    });
+
+    expect(loaded?.recipientContactId).not.toBeNull();
+    expect(loaded?.recipientContact).toBeNull();
+  });
+
+  it('withDeleted, or an explicit deletedAt on the level, returns the row under an optional to-one', async () => {
+    const { log, contact } = await logToTombstonedContact();
+
+    const inside = await db.withDeleted(() =>
+      db.communicationLog.findUnique({
+        where: { id: log.id },
+        include: { recipientContact: true },
+      }),
+    );
+    const optedOut = await db.communicationLog.findUnique({
+      where: { id: log.id },
+      include: { recipientContact: { where: { deletedAt: undefined } } },
+    });
+
+    expect(inside?.recipientContact?.id).toBe(contact.id);
+    expect(optedOut?.recipientContact?.id).toBe(contact.id);
   });
 
   const userWithOneNotDeletedOneDeletedContact = async () => {
