@@ -6,7 +6,6 @@
  */
 import type { MeReadResponses } from '@template/sdk';
 import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
-import type { ChangePasswordInput } from '@template/ui/lib/auth/changePassword';
 import type { AuthMethod, SignInResult, SignUpResult } from '@template/ui/lib/auth/types';
 import type { createAuthClient } from 'better-auth/client';
 
@@ -48,7 +47,6 @@ export type AuthSlice = {
     ) => void;
     setTwoFactorAction: (action: TwoFactorAction | null) => void;
     signUp: (method: AuthMethod) => Promise<SignUpResult>;
-    changePassword: (input: ChangePasswordInput) => Promise<void>;
     setStrategy: (strategy: AuthStrategy) => void;
     setSpoof: (email: string | null) => Promise<void>;
     logout: () => Promise<void>;
