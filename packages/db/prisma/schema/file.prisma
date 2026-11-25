@@ -7,11 +7,11 @@ model File {
   artifactId String   @unique @db.VarChar(36)
   artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
 
-  sourceFileId String? @db.VarChar(36)
-  source       File?   @relation("FileLazyCopy", fields: [sourceFileId], references: [id])
-  copies       File[]  @relation("FileLazyCopy")
+  sourceFileId  String? @db.VarChar(36)
+  sourceFile    File?   @relation("FileLazyCopy", fields: [sourceFileId], references: [id])
+  filesAsSource File[]  @relation("FileLazyCopy")
 
-  versions FileVersion[]
+  fileVersions FileVersion[]
 
   @@index([sourceFileId])
 }

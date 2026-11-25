@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { db, fetchCachedRecordWithTargetEntitlements } from '@template/db';
+import { db, fetchCachedRecordWithTargetEntitlements, hydrate } from '@template/db';
 import type { Artifact, Organization, Space, User } from '@template/db/generated/client/client';
 import type { ArtifactAccess, Role } from '@template/db/generated/client/enums';
 import {
@@ -13,15 +13,11 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { delegate, permissionsOfUser } from '@template/permissions';
+import { artifactEffectiveRole, delegate, permissionsOfUser } from '@template/permissions';
 import { createPermissions, installPermissions } from '@template/permissions/client';
 import { check, schemaMap } from '@template/permissions/rebac';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { ARTIFACT_MAX_DEPTH } from '@template/shared/artifact';
-import {
-  artifactEffectiveRole,
-  hydrateArtifact,
-} from '#/modules/artifact/services/checkArtifactPermission';
 import { ensureOwnerRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
 
 const folderOf = async (organization: Organization, access?: ArtifactAccess): Promise<Artifact> => {
@@ -103,7 +99,7 @@ describe('artifact ReBAC & closure inheritance', () => {
 
     const { artifact: inPublic, placement: publicEdge } = await place(file, shared);
     expect(inPublic.effectiveAccess).toBe('public');
-    const hydrated = await hydrateArtifact(inPublic);
+    const hydrated = await hydrate('artifact', inPublic);
     const spaceMember = permixForUser(reader, [], [{ id: space.id, role: 'member' }]);
     expect(artifactEffectiveRole(spaceMember, hydrated)).toBe('member');
 
@@ -126,7 +122,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     });
     const { artifact: secret } = await place(await folderOf(organization), shared, 'private');
 
-    const hydrated = await hydrateArtifact(secret);
+    const hydrated = await hydrate('artifact', secret);
     expect(secret.effectiveAccess).toBe('private');
     expect(artifactEffectiveRole(permixForUser(reader), hydrated)).toBeNull();
     const orgOwner = permixForUser(reader, [{ id: organization.id, role: 'owner' }]);
@@ -143,7 +139,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     });
     const { artifact: page } = await place(await folderOf(organization), team, 'public');
 
-    const hydrated = await hydrateArtifact(page);
+    const hydrated = await hydrate('artifact', page);
     expect(page.effectiveAccess).toBe('public');
     expect(artifactEffectiveRole(permixForUser(reader), hydrated)).toBe('admin');
   });
@@ -162,13 +158,13 @@ describe('artifact ReBAC & closure inheritance', () => {
     );
     const { artifact: leaf } = await place(await folderOf(organization), middle);
     const readerPermix = permixForUser(reader);
-    expect(artifactEffectiveRole(readerPermix, await hydrateArtifact(leaf))).toBe('viewer');
+    expect(artifactEffectiveRole(readerPermix, await hydrate('artifact', leaf))).toBe('viewer');
 
     await db.artifactPlacement.update({
       where: { id: middleEdge.id },
       data: { access: 'private' },
     });
-    expect(artifactEffectiveRole(readerPermix, await hydrateArtifact(leaf))).toBeNull();
+    expect(artifactEffectiveRole(readerPermix, await hydrate('artifact', leaf))).toBeNull();
   });
 
   it('a file at depth ARTIFACT_MAX_DEPTH still takes its top grant in one hop', async () => {
@@ -189,7 +185,7 @@ describe('artifact ReBAC & closure inheritance', () => {
       organizationId: organization.id,
     });
     const { artifact: leaf } = await place(file, parent);
-    expect(artifactEffectiveRole(permixForUser(reader), await hydrateArtifact(leaf))).toBe(
+    expect(artifactEffectiveRole(permixForUser(reader), await hydrate('artifact', leaf))).toBe(
       'viewer',
     );
   }, 15_000);
@@ -203,7 +199,9 @@ describe('artifact ReBAC & closure inheritance', () => {
       role: 'viewer',
       expiresAt: new Date(Date.now() - 1_000),
     });
-    expect(artifactEffectiveRole(permixForUser(reader), await hydrateArtifact(folder))).toBeNull();
+    expect(
+      artifactEffectiveRole(permixForUser(reader), await hydrate('artifact', folder)),
+    ).toBeNull();
   });
 
   it('5-way OrganizationUser and SpaceUser artifacts give owner break-glass read/delete only', async () => {
@@ -215,7 +213,7 @@ describe('artifact ReBAC & closure inheritance', () => {
       { role: 'member' },
       { organization, space, organizationUser: orgUser, user: orgUserCtx.user },
     );
-    const orgMemberArtifact = (
+    const orgMemberArtifact: Artifact = (
       await createArtifact({
         kind: 'file',
         ownerModel: 'OrganizationUser',
@@ -223,7 +221,7 @@ describe('artifact ReBAC & closure inheritance', () => {
         userId: orgUserCtx.user.id,
       })
     ).entity;
-    const spaceMemberArtifact = (
+    const spaceMemberArtifact: Artifact = (
       await createArtifact({
         kind: 'file',
         ownerModel: 'SpaceUser',
@@ -242,7 +240,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     const orgAdminPermix = permixForUser(reader, [{ id: organization.id, role: 'admin' }]);
 
     for (const artifact of [orgMemberArtifact, spaceMemberArtifact]) {
-      const hydrated = await hydrateArtifact(artifact);
+      const hydrated = await hydrate('artifact', artifact);
       expect(check(selfPermix, 'artifact', hydrated, 'own')).toBe(true);
       expect(check(orgOwnerPermix, 'artifact', hydrated, 'read')).toBe(true);
       expect(check(orgOwnerPermix, 'artifact', hydrated, 'delete')).toBe(true);
@@ -257,7 +255,7 @@ describe('artifact ReBAC & closure inheritance', () => {
       { role: 'member' },
       { organization },
     );
-    const privateMemberArtifact = (
+    const privateMemberArtifact: Artifact = (
       await createArtifact({
         kind: 'file',
         ownerModel: 'OrganizationUser',
@@ -266,7 +264,7 @@ describe('artifact ReBAC & closure inheritance', () => {
       })
     ).entity;
     const memberPermix = permixForUser(reader, [{ id: organization.id, role: 'member' }]);
-    expect(check(memberPermix, 'artifact', await hydrateArtifact(folder), 'read')).toBe(false);
+    expect(check(memberPermix, 'artifact', await hydrate('artifact', folder), 'read')).toBe(false);
 
     await db.organization.update({
       where: { id: organization.id },
@@ -276,9 +274,9 @@ describe('artifact ReBAC & closure inheritance', () => {
         },
       },
     });
-    expect(check(memberPermix, 'artifact', await hydrateArtifact(folder), 'read')).toBe(true);
+    expect(check(memberPermix, 'artifact', await hydrate('artifact', folder), 'read')).toBe(true);
     expect(
-      check(memberPermix, 'artifact', await hydrateArtifact(privateMemberArtifact), 'read'),
+      check(memberPermix, 'artifact', await hydrate('artifact', privateMemberArtifact), 'read'),
     ).toBe(false);
     expect(actionsTenantMayExtend('Organization', 'db:Artifact')).not.toContain('own');
     expect(actionsTenantMayExtend('Organization', 'db:Artifact')).not.toContain('delete');
@@ -322,7 +320,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     await installPermissions(permix, delegate(schemaMap, base, { ceiling: 'manage' }));
 
     for (const artifact of [memberOwned, orgFolder]) {
-      const hydrated = await hydrateArtifact(artifact);
+      const hydrated = await hydrate('artifact', artifact);
       expect(check(permix, 'artifact', hydrated, 'manage')).toBe(true);
       expect(check(permix, 'artifact', hydrated, 'own')).toBe(false);
       expect(check(permix, 'artifact', hydrated, 'delete')).toBe(false);
@@ -351,9 +349,9 @@ describe('artifact ReBAC & closure inheritance', () => {
     await db.withDeleted(() =>
       db.artifactPermission.update({ where: { id: perm.id }, data: { deletedAt: new Date() } }),
     );
-    expect(await db.artifactEffectivePermission.count({ where: { permissionId: perm.id } })).toBe(
-      0,
-    );
+    expect(
+      await db.artifactEffectivePermission.count({ where: { artifactPermissionId: perm.id } }),
+    ).toBe(0);
 
     // Remove placement before tombstoning child, then tombstone and revive child inside withDeleted.
     await db.artifactPlacement.update({
@@ -365,18 +363,99 @@ describe('artifact ReBAC & closure inheritance', () => {
       db.artifact.update({ where: { id: child.id }, data: { deletedAt: null } }),
     );
 
-    expect(await db.artifactAncestor.count({ where: { artifactId: child.id } })).toBe(0);
+    // Removing the last folder placement reparents child privately to root; reviving child keeps that root placement and never resurrects parent or perm.
+    expect(
+      await db.artifactAncestor.count({
+        where: { artifactId: child.id, ancestorArtifactId: parent.id },
+      }),
+    ).toBe(0);
+    expect(
+      await db.artifactAncestor.count({
+        where: { artifactId: child.id, ancestorArtifact: { kind: 'root' } },
+      }),
+    ).toBe(1);
     expect(await db.artifactEffectivePermission.count({ where: { artifactId: child.id } })).toBe(0);
     expect(revived.effectiveAccess).toBe('private');
-    expect(artifactEffectiveRole(permixForUser(reader), await hydrateArtifact(revived))).toBeNull();
+    expect(
+      artifactEffectiveRole(permixForUser(reader), await hydrate('artifact', revived)),
+    ).toBeNull();
   });
 
-  it('direct fetchCachedRecordWithTargetEntitlements populates effectivePermissions down list so hydrate succeeds', async () => {
+  it('direct fetchCachedRecordWithTargetEntitlements populates artifactEffectivePermissions down list so hydrate succeeds', async () => {
     const folder = await folderOf(organization);
     const cached = await fetchCachedRecordWithTargetEntitlements('artifact', folder.id);
     expect(cached).not.toBeNull();
-    const hydrated = await hydrateArtifact(folder);
-    expect(Array.isArray(hydrated.effectivePermissions)).toBe(true);
+    const hydrated = await hydrate('artifact', folder);
+    expect(Array.isArray(hydrated.artifactEffectivePermissions)).toBe(true);
+  });
+
+  it('eager ownerRootArtifact hook provisions root containers on owner creation and skips rows created soft-deleted', async () => {
+    const userRoot = await db.artifact.findFirst({
+      where: { ownerModel: 'User', userId: reader.id, kind: 'root' },
+    });
+    const orgRoot = await db.artifact.findFirst({
+      where: { ownerModel: 'Organization', organizationId: organization.id, kind: 'root' },
+    });
+    const spaceRoot = await db.artifact.findFirst({
+      where: {
+        ownerModel: 'Space',
+        organizationId: organization.id,
+        spaceId: space.id,
+        kind: 'root',
+      },
+    });
+    expect(userRoot).not.toBeNull();
+    expect(orgRoot).not.toBeNull();
+    expect(spaceRoot).not.toBeNull();
+
+    const deletedUser = (await createUser({ deletedAt: new Date() })).entity;
+    const deletedUserRoot = await db.withDeleted(() =>
+      db.artifact.findFirst({
+        where: { ownerModel: 'User', userId: deletedUser.id, kind: 'root' },
+      }),
+    );
+    expect(deletedUserRoot).toBeNull();
+
+    // Upsert reviving a tombstoned OrganizationUser (e.g. inviteOrganizationUser after transferSpace) provisions its root.
+    const rehiredUser = (await createUser()).entity;
+    const tombstonedSeat = (
+      await createOrganizationUser(
+        { role: 'member', deletedAt: new Date() },
+        { organization, user: rehiredUser },
+      )
+    ).entity;
+    expect(
+      await db.withDeleted(() =>
+        db.artifact.findFirst({
+          where: {
+            ownerModel: 'OrganizationUser',
+            organizationId: organization.id,
+            userId: rehiredUser.id,
+            kind: 'root',
+          },
+        }),
+      ),
+    ).toBeNull();
+    await db.withDeleted(() =>
+      db.organizationUser.upsert({
+        where: { id: tombstonedSeat.id },
+        create: {
+          organizationId: organization.id,
+          userId: rehiredUser.id,
+          role: 'member',
+        },
+        update: { deletedAt: null },
+      }),
+    );
+    const revivedSeatRoot = await db.artifact.findFirst({
+      where: {
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: rehiredUser.id,
+        kind: 'root',
+      },
+    });
+    expect(revivedSeatRoot).not.toBeNull();
   });
 
   it('tenant access grants read to tenant members (including inherited and member workspaces) but never outsiders or User artifacts', async () => {
@@ -385,7 +464,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     const orgMemberPermix = permixForUser(reader, [{ id: organization.id, role: 'member' }]);
     const outsiderPermix = permixForUser(reader);
 
-    const hydratedChild = await hydrateArtifact(inheritedChild);
+    const hydratedChild = await hydrate('artifact', inheritedChild);
     expect(inheritedChild.effectiveAccess).toBe('tenant');
     expect(check(orgMemberPermix, 'artifact', hydratedChild, 'read')).toBe(true);
     expect(check(outsiderPermix, 'artifact', hydratedChild, 'read')).toBe(false);
@@ -404,7 +483,9 @@ describe('artifact ReBAC & closure inheritance', () => {
     const soloParent = await folderOf(organization);
     const { placement: soloRootEdge } = await place(soloParent, orgRoot, 'tenant');
     const { artifact: soloChild } = await place(await folderOf(organization), soloParent);
-    expect(check(orgMemberPermix, 'artifact', await hydrateArtifact(soloChild), 'read')).toBe(true);
+    expect(check(orgMemberPermix, 'artifact', await hydrate('artifact', soloChild), 'read')).toBe(
+      true,
+    );
     await db.artifactPlacement.update({
       where: { id: soloRootEdge.id },
       data: { access: 'private' },
@@ -412,7 +493,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     const refreshedSoloChild = await db.artifact.findUniqueOrThrow({ where: { id: soloChild.id } });
     expect(refreshedSoloChild.effectiveAccess).toBe('private');
     expect(
-      check(orgMemberPermix, 'artifact', await hydrateArtifact(refreshedSoloChild), 'read'),
+      check(orgMemberPermix, 'artifact', await hydrate('artifact', refreshedSoloChild), 'read'),
     ).toBe(false);
 
     // OrganizationUser tenant placement is readable by org peers, not outsiders
@@ -434,10 +515,10 @@ describe('artifact ReBAC & closure inheritance', () => {
       peerRoot,
       'tenant',
     );
-    expect(check(orgMemberPermix, 'artifact', await hydrateArtifact(memberDraft), 'read')).toBe(
+    expect(check(orgMemberPermix, 'artifact', await hydrate('artifact', memberDraft), 'read')).toBe(
       true,
     );
-    expect(check(outsiderPermix, 'artifact', await hydrateArtifact(memberDraft), 'read')).toBe(
+    expect(check(outsiderPermix, 'artifact', await hydrate('artifact', memberDraft), 'read')).toBe(
       false,
     );
 
@@ -464,10 +545,12 @@ describe('artifact ReBAC & closure inheritance', () => {
       [{ id: organization.id, role: 'member' }],
       [{ id: space.id, role: 'member' }],
     );
-    expect(check(spaceMemberPermix, 'artifact', await hydrateArtifact(spaceDoc), 'read')).toBe(
+    expect(check(spaceMemberPermix, 'artifact', await hydrate('artifact', spaceDoc), 'read')).toBe(
       true,
     );
-    expect(check(orgMemberPermix, 'artifact', await hydrateArtifact(spaceDoc), 'read')).toBe(false);
+    expect(check(orgMemberPermix, 'artifact', await hydrate('artifact', spaceDoc), 'read')).toBe(
+      false,
+    );
 
     // User placement with access: 'tenant' has no tenant, so effectiveAccess resolves to 'private'
     const userRoot = await ensureOwnerRootArtifact({
@@ -486,7 +569,9 @@ describe('artifact ReBAC & closure inheritance', () => {
       'tenant',
     );
     expect(userDoc.effectiveAccess).toBe('private');
-    expect(check(outsiderPermix, 'artifact', await hydrateArtifact(userDoc), 'read')).toBe(false);
+    expect(check(outsiderPermix, 'artifact', await hydrate('artifact', userDoc), 'read')).toBe(
+      false,
+    );
 
     // public parent -> tenant placement child -> inherit grandchild: stops BOTH public visibility AND parent folder external grants
     const pubTop = await folderOf(organization, 'public');
@@ -498,7 +583,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     });
     const { artifact: tenantMid } = await place(await folderOf(organization), pubTop, 'tenant');
     const { artifact: inheritLeaf } = await place(await folderOf(organization), tenantMid);
-    const hydratedLeaf = await hydrateArtifact(inheritLeaf);
+    const hydratedLeaf = await hydrate('artifact', inheritLeaf);
     expect(inheritLeaf.effectiveAccess).toBe('tenant');
     expect(check(outsiderPermix, 'artifact', hydratedLeaf, 'read')).toBe(false);
     expect(check(orgMemberPermix, 'artifact', hydratedLeaf, 'read')).toBe(true);

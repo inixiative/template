@@ -4,28 +4,27 @@
  * @partOf feature:files
  * @uses primitive:routeTemplates, primitive:authz
  */
-import type { Prisma } from '@template/db';
+import { hydrate, type Prisma } from '@template/db';
 import { check } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactCreateArtifactPermissionRoute } from '#/modules/artifact/routes/artifactCreateArtifactPermission';
 import { withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
-import { hydrateArtifact } from '#/modules/artifact/services/checkArtifactPermission';
-import { assertNotRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
+import { validateNotRootArtifact } from '#/modules/artifact/validations/validateNotRootArtifact';
 
 export const artifactCreateArtifactPermissionController = makeController(
   artifactCreateArtifactPermissionRoute,
   async (c, respond) => {
     const db = c.get('db');
     const artifact = contextResource<'artifact'>(c);
-    assertNotRootArtifact(artifact, 'Permissions cannot be granted directly on a root container');
+    validateNotRootArtifact(artifact, 'Permissions cannot be granted directly on a root container');
     const body = c.req.valid('json');
     const permix = c.get('permix');
     const permission = await withLockedArtifacts([artifact], async (locked) => {
       const target = locked.get(artifact.id)!;
-      assertNotRootArtifact(target, 'Permissions cannot be granted directly on a root container');
-      const hydrated = await hydrateArtifact(target);
+      validateNotRootArtifact(target, 'Permissions cannot be granted directly on a root container');
+      const hydrated = await hydrate('artifact', target);
       if (
         !check(
           permix,

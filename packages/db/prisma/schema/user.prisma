@@ -61,8 +61,8 @@ model User {
   segments                        Segment[]
   flows                           Flow[]
   settings                        Setting[]
-  ownedArtifacts                  Artifact[]             @relation("ArtifactOwnerUser")
-  artifactGrants                  ArtifactPermission[]   @relation("ArtifactPermissionGranteeUser")
+  artifacts                       Artifact[]             @relation("ArtifactOwnerUser")
+  granteeArtifactPermissions      ArtifactPermission[]   @relation("ArtifactPermissionGranteeUser")
   resourceBindings                ResourceBinding[]      @relation("ResourceBindingUser")
 
   // ==========================================================================

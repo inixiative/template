@@ -16,7 +16,7 @@ export const artifactCreateArtifactPlacementRoute = createRoute({
   model: Modules.artifact,
   submodel: Modules.artifactPlacement,
   description:
-    "Places an artifact in a container (via containerArtifactId) or at an owner's lazy root (via ownerModel + owner keys). Root placements default to private; folder placements default to inherit.",
+    "Places an artifact in a container (via containerArtifactId) or at an owner's root (via ownerModel + owner keys). Root placements default to private; folder placements default to inherit.",
   bodySchema: artifactPlacementCreateBodySchema,
   bodyRefinement: artifactPlacementCreateBodyRefinement,
   responseSchema: artifactPlacementReadResponseSchema,

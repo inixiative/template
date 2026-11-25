@@ -14,38 +14,36 @@ import {
   sameArtifactOwner,
   withLockedArtifacts,
 } from '#/modules/artifact/services/artifactOwner';
+import { fetchArtifactOrThrow } from '#/modules/artifact/services/artifactPlacementUtils';
 import {
-  assertEdgeAuthority,
-  assertPlacementDeletable,
-  fetchArtifact,
-  reparentOrphanedOwnedArtifacts,
-} from '#/modules/artifact/services/artifactPlacementHelpers';
+  validateEdgeAuthority,
+  validatePlacementDeletable,
+} from '#/modules/artifact/validations/validateEdgeAuthority';
 
 export const removeArtifactPlacement = async (
   permix: Permix,
   placement: ArtifactPlacement,
 ): Promise<void> => {
-  const member = await fetchArtifact(placement.artifactId);
-  const container = await fetchArtifact(placement.containerArtifactId);
-  await assertEdgeAuthority(permix, member, container, 'remove');
-  await assertPlacementDeletable(permix, placement);
-  await withLockedArtifacts([member, container], async (locked) => {
+  const artifact = await fetchArtifactOrThrow(placement.artifactId);
+  const container = await fetchArtifactOrThrow(placement.containerArtifactId);
+  await validateEdgeAuthority(permix, artifact, container, 'remove');
+  await validatePlacementDeletable(permix, placement);
+  await withLockedArtifacts([artifact, container], async (locked) => {
     const current = await db.artifactPlacement.findUnique({ where: { id: placement.id } });
     if (!current) {
       throw makeError({ status: 404, message: 'The artifact is not in that container' });
     }
-    const lockedMember = locked.get(current.artifactId)!;
+    const lockedArtifact = locked.get(current.artifactId)!;
     const lockedContainer = locked.get(current.containerArtifactId)!;
-    await assertEdgeAuthority(permix, lockedMember, lockedContainer, 'remove');
-    await assertPlacementDeletable(permix, current);
+    await validateEdgeAuthority(permix, lockedArtifact, lockedContainer, 'remove');
+    await validatePlacementDeletable(permix, current);
 
-    const sameOwner = sameArtifactOwner(lockedMember, lockedContainer);
-    if (sameOwner && isRootKind(lockedContainer.kind)) {
+    if (sameArtifactOwner(lockedArtifact, lockedContainer) && isRootKind(lockedContainer.kind)) {
       const otherSameOwnerPlacements = await db.artifactPlacement.count({
         where: {
           id: { not: current.id },
-          artifactId: lockedMember.id,
-          containerArtifact: ownerColumns(lockedMember),
+          artifactId: lockedArtifact.id,
+          containerArtifact: ownerColumns(lockedArtifact),
         },
       });
       if (otherSameOwnerPlacements === 0) {
@@ -60,8 +58,5 @@ export const removeArtifactPlacement = async (
       where: { id: current.id },
       data: { deletedAt: new Date() },
     });
-    if (sameOwner && !isRootKind(lockedContainer.kind)) {
-      await reparentOrphanedOwnedArtifacts(lockedMember, [lockedMember.id]);
-    }
   });
 };

@@ -8,9 +8,9 @@ import { actingUser } from '#/lib/context/actingUser';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import {
-  assertCanReadSharedArtifactPermissions,
   defaultSharedPermissionOrderBy,
   sharedWithOwnerWhere,
+  validateCanReadSharedArtifactPermissions,
 } from '#/modules/artifactPermission/queries/sharedWithOwnerWhere';
 import { meReadManyArtifactPermissionsRoute } from '#/modules/me/routes/meReadManyArtifactPermissions';
 
@@ -19,7 +19,7 @@ export const meReadManyArtifactPermissionsController = makeController(
   async (c, respond) => {
     const db = c.get('db');
     const owner = { ownerModel: 'User' as const, userId: actingUser(c)!.id };
-    await assertCanReadSharedArtifactPermissions(c, owner);
+    await validateCanReadSharedArtifactPermissions(c, owner);
     const { data, pagination } = await paginate(c, db.artifactPermission, {
       where: sharedWithOwnerWhere(owner),
       include: { artifact: true },

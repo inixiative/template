@@ -493,13 +493,12 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Artifacts and Files
 
-- ✅ **One Node, Many Kinds** — `Artifact` (`root`, `file`, `folder`, fork kinds) with a code catalog of kinds; every owner gets a lazy `root` container, and an artifact may sit in many containers (`ArtifactPlacement`).
+- ✅ **One Node, Many Kinds** — `Artifact` (`root`, `file`, `folder`, fork kinds) with a code catalog of kinds; every owner gets an eager `root` container (`ownerRootArtifact` hook), and an artifact may sit in many containers (`ArtifactPlacement`).
 - ✅ **Visibility on Placements, Grants on Artifacts** — `ArtifactPlacement.access` (`inherit | private | tenant | public`, root rejects `inherit`) controls visibility per placement and materializes `Artifact.effectiveAccess` across same-owner placements. Explicit grants (`ArtifactPermission`) stay on `Artifact`, reach users, orgs, spaces, members and customers with expiry, and cap roles by membership and token.
-- ✅ **Placements** — containers and objects; same-owner and cross-owner placements (private bookmarks vs public/tenant reshares at root or in folders); deleting a container or removing a last folder placement reparents owned items to the owner's lazy `root`; loop and depth refusal under the owner's `containers` lock; `GET /artifact/:id` returns the 1-step neighborhood as the caller sees it.
+- ✅ **Placements** — containers and objects; same-owner and cross-owner placements (private bookmarks vs public/tenant reshares at root or in folders); deleting a container or removing a last same-owner placement reparents owned items to the owner's `root` via DB hook; loop and depth refusal under the owner's `containers` lock; `GET /artifact/:id` returns the 1-step neighborhood with exact Prisma relation names filtered to what the caller can access.
 - ✅ **Ownership Transfer** — the `transferArtifact` Inquiry, with a tracking pointer or a copy for the sender.
-- ✅ **Deleting and Governance** — deleting a container keeps its contents (listed separately, deleted through batch); deleting needs `own`; grants and edges are soft-deleted and audited; org-user content is reachable by org owners, not admins.
-- ✅ **Artifact Webhooks** — grant and edge changes fire the parent Artifact to its owner and grantees only.
-- 🟡 **Remaining Work** — upload/download/public serving, system folders, bindings enforcement (`requiresPublic`), lazy copy, sweeper (FEAT-009).
+- ✅ **Deleting and Governance** — deleting a container keeps its contents (marked `exclusive` on `artifactPlacementsAsContainer[].artifact`, deleted through batch); deleting needs `own`; grants and edges are soft-deleted and audited; org-user content is reachable by org owners, not admins.
+- 🟡 **Remaining Work** — file storage & versioning (`FEAT-029`), resource bindings & lazy copy sweeper (`FEAT-030`), artifact webhooks (`FEAT-031`), file browser UI (`FEAT-032`).
 
 [Learn more: ARTIFACTS.md](docs/claude/ARTIFACTS.md)
 

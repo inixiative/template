@@ -7,23 +7,23 @@
 import type { Prisma } from '@template/db';
 
 export const includeArtifactDetail = {
-  placements: {
+  artifactPlacementsAsArtifact: {
     where: { containerArtifact: { deletedAt: null } },
     orderBy: { createdAt: 'asc' as const },
     include: {
       containerArtifact: {
-        include: { permissions: { orderBy: { createdAt: 'asc' as const } } },
+        include: { artifactPermissions: { orderBy: { createdAt: 'asc' as const } } },
       },
     },
   },
-  contents: {
+  artifactPlacementsAsContainer: {
     where: { artifact: { deletedAt: null } },
     orderBy: { createdAt: 'asc' as const },
     include: {
       artifact: {
         include: {
-          permissions: { orderBy: { createdAt: 'asc' as const } },
-          placements: {
+          artifactPermissions: { orderBy: { createdAt: 'asc' as const } },
+          artifactPlacementsAsArtifact: {
             where: { containerArtifact: { deletedAt: null } },
             select: {
               id: true,
@@ -41,6 +41,6 @@ export const includeArtifactDetail = {
       },
     },
   },
-  permissions: { orderBy: { createdAt: 'asc' as const } },
-  bindings: { orderBy: { createdAt: 'asc' as const } },
+  artifactPermissions: { orderBy: { createdAt: 'asc' as const } },
+  resourceBindings: { orderBy: { createdAt: 'asc' as const } },
 } satisfies Prisma.ArtifactInclude;

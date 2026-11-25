@@ -163,7 +163,7 @@ describe('artifact actions', () => {
     expect((await memberFetch(get(`/api/v1/artifact/${report.id}`))).status).toBe(403);
   });
 
-  it('move replaces a placement, from and to the owner lazy root too', async () => {
+  it('move replaces a placement, from and to the owner root too', async () => {
     const a = (
       await parseSuccessBody<Artifact>(
         await adminFetch(
@@ -191,14 +191,14 @@ describe('artifact actions', () => {
 
     // Move from root -> a
     const into = await adminFetch(
-      post(`/api/v1/artifact/${item.id}/move`, { toContainerArtifactId: a.id }),
+      post(`/api/v1/artifact/${item.id}/move`, { targetContainerArtifactId: a.id }),
     );
     expect(into.status).toBe(200);
     // Move from a -> b
     const across = await adminFetch(
       post(`/api/v1/artifact/${item.id}/move`, {
-        fromContainerArtifactId: a.id,
-        toContainerArtifactId: b.id,
+        sourceContainerArtifactId: a.id,
+        targetContainerArtifactId: b.id,
       }),
     );
     expect(across.status).toBe(200);
@@ -207,7 +207,7 @@ describe('artifact actions', () => {
 
     // Move from b -> root
     const out = await adminFetch(
-      post(`/api/v1/artifact/${item.id}/move`, { fromContainerArtifactId: b.id }),
+      post(`/api/v1/artifact/${item.id}/move`, { sourceContainerArtifactId: b.id }),
     );
     expect(out.status).toBe(200);
     const rootPlacements = await db.artifactPlacement.findMany({
@@ -231,17 +231,17 @@ describe('artifact actions', () => {
     });
     const inbox = await orgFolder();
     const response = await adminFetch(
-      post(`/api/v1/artifact/${source.id}/copy`, { containerArtifactId: inbox.id }),
+      post(`/api/v1/artifact/${source.id}/copy`, { targetContainerArtifactId: inbox.id }),
     );
     expect(response.status).toBe(200);
     const copy = (await parseSuccessBody<Artifact>(response)).data;
     expect(copy.ownerModel).toBe('Organization');
     const copied = await db.file.findUniqueOrThrow({
       where: { artifactId: copy.id },
-      include: { versions: true },
+      include: { fileVersions: true },
     });
     expect(copied.sourceFileId).toBe(file.id);
-    expect(copied.versions.map((version) => [version.key, version.status])).toEqual([
+    expect(copied.fileVersions.map((version) => [version.key, version.status])).toEqual([
       ['k-1', 'pending'],
     ]);
   });
@@ -289,23 +289,26 @@ describe('artifact actions', () => {
     });
     const { data } = await parseSuccessBody<{
       ownerModel: string;
-      permissions: unknown[];
-      effectivePermissions: unknown[];
-      placements: { containerArtifactId: string }[];
-      bindings: { bindingType: string }[];
+      artifactPermissions: unknown[];
+      artifactEffectivePermissions: unknown[];
+      artifactPlacementsAsArtifact: { containerArtifactId: string }[];
+      resourceBindings: { bindingType: string }[];
     }>(await memberFetch(get(`/api/v1/artifact/${logo.id}`)));
     expect(data.ownerModel).toBe('Organization');
-    expect(data.permissions).toEqual([]);
-    expect(data.effectivePermissions).toEqual([]);
-    expect(data.placements.map((placement) => placement.containerArtifactId)).toEqual([shown.id]);
-    expect(data.bindings.map((binding) => binding.bindingType)).toEqual(['logo']);
+    expect(data.artifactPermissions).toEqual([]);
+    expect(data.artifactEffectivePermissions).toEqual([]);
+    expect(
+      data.artifactPlacementsAsArtifact.map((placement) => placement.containerArtifactId),
+    ).toEqual([shown.id]);
+    expect(data.resourceBindings.map((binding) => binding.bindingType)).toEqual(['logo']);
 
     const { data: adminDetail } = await parseSuccessBody<{
-      permissions: unknown[];
-      effectivePermissions: unknown[];
+      artifactPermissions: unknown[];
+      artifactEffectivePermissions: { artifactPermission: { id: string } }[];
     }>(await adminFetch(get(`/api/v1/artifact/${logo.id}`)));
-    expect(adminDetail.permissions.length).toBeGreaterThan(0);
-    expect(adminDetail.effectivePermissions.length).toBeGreaterThan(0);
+    expect(adminDetail.artifactPermissions.length).toBeGreaterThan(0);
+    expect(adminDetail.artifactEffectivePermissions.length).toBeGreaterThan(0);
+    expect(adminDetail.artifactEffectivePermissions[0]!.artifactPermission.id).toBeDefined();
   });
 
   describe('transferArtifact', () => {
@@ -363,6 +366,42 @@ describe('artifact actions', () => {
       expect(
         (await strangerFetch(patch(`/api/v1/artifact/${file.id}`, { name: 'x' }))).status,
       ).toBe(403);
+    });
+
+    it('succeeds when the artifact is already cross-owner pinned at the receiver root (no P2002)', async () => {
+      const file = await userFile(stranger);
+      await createArtifactPermission({
+        artifactId: file.id,
+        granteeModel: 'Organization',
+        granteeOrganizationId: organization.id,
+        role: 'viewer',
+      });
+      const pinResp = await adminFetch(
+        post(`/api/v1/artifact/${file.id}/artifactPlacements`, {
+          ownerModel: 'Organization',
+          organizationId: organization.id,
+          access: 'public',
+        }),
+      );
+      expect(pinResp.status).toBe(201);
+      const inquiry = await transferTo(file, stranger, false);
+      const resolved = await adminFetch(
+        post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+          status: 'approved',
+          expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        }),
+      );
+      expect(resolved.status).toBe(200);
+      const after = await db.artifact.findUniqueOrThrow({ where: { id: file.id } });
+      expect(after.ownerModel).toBe('Organization');
+      expect(after.effectiveAccess).toBe('private');
+      const placements = await db.artifactPlacement.findMany({
+        where: { artifactId: file.id },
+        include: { containerArtifact: true },
+      });
+      expect(placements).toHaveLength(1);
+      expect(placements[0]!.containerArtifact.kind).toBe(ArtifactKind.root);
+      expect(placements[0]!.access).toBe('private');
     });
 
     it('a receiver refusing the pointer leaves the sender a copy', async () => {

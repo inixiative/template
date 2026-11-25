@@ -13,6 +13,7 @@ import { registerFullDelegateTakesNoRoleOrEntitlementsHook } from '#/hooks/fullD
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
+import { registerOwnerRootArtifactHook } from '#/hooks/ownerRootArtifact/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerProjectIntegrationOwnerHook } from '#/hooks/projectIntegrationOwner/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
@@ -50,6 +51,7 @@ export const registerHooks = () => {
   registerSegmentConditionsHook();
   registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook();
   registerSoftDeleteCascadeHook();
+  registerOwnerRootArtifactHook();
   registerArtifactTreeHook();
   registerTagOwnerCategoryHook();
   registerUserEmailAddressValidationHook();

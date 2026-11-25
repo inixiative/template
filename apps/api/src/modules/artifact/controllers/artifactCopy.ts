@@ -10,10 +10,10 @@ import { artifactCopyRoute } from '#/modules/artifact/routes/artifactCopy';
 import { copyArtifact } from '#/modules/artifact/services/copyArtifact';
 
 export const artifactCopyController = makeController(artifactCopyRoute, async (c, respond) => {
-  const { containerArtifactId, name } = c.req.valid('json');
+  const { targetContainerArtifactId, name } = c.req.valid('json');
   const copy = await copyArtifact(c.get('permix'), {
     artifactId: contextResource<'artifact'>(c).id,
-    containerArtifactId,
+    targetContainerArtifactId,
     name,
   });
   return respond.ok(copy);

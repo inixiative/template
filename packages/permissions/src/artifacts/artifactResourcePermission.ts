@@ -8,6 +8,7 @@ import { DateOperator, Operator } from '@inixiative/json-rules';
 import { makeKindRules } from '@inixiative/permissions';
 import { ArtifactKind, type Role } from '@template/db/generated/client/enums';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
+import type { StandardAction } from '@template/permissions/client';
 import {
   actorMayPerformActionOnOwner,
   actorOperatesOwnerUserOrManagesOwnerTenant,
@@ -21,8 +22,6 @@ import type { ActionRule, ResourcePermission } from '@template/permissions/rebac
 import { roleHierarchy } from '@template/permissions/roles/shared';
 
 const kind = makeKindRules(schemaMapWithoutPermissions);
-
-type StandardAction = 'own' | 'manage' | 'operate' | 'read';
 
 const rolesCovering: Record<StandardAction, readonly Role[]> = {
   own: roleHierarchy.slice(roleHierarchy.indexOf('owner')),
@@ -47,19 +46,19 @@ const memberOwns = (
   ],
 });
 
-const granteeIs = (granteeModel: string, prefix = 'permission.'): ActionRule => ({
+const granteeIs = (granteeModel: string, prefix = 'artifactPermission.'): ActionRule => ({
   rule: { field: `${prefix}granteeModel`, operator: Operator.equals, value: granteeModel },
 });
 
 const grantNotExpired: ActionRule = {
   any: [
-    rowIsThereAnd('permission.id', isNull('permission.expiresAt')),
+    rowIsThereAnd('artifactPermission.id', isNull('artifactPermission.expiresAt')),
     {
       rule: {
         all: [
-          { field: 'permission.expiresAt', operator: Operator.exists },
+          { field: 'artifactPermission.expiresAt', operator: Operator.exists },
           {
-            field: 'permission.expiresAt',
+            field: 'artifactPermission.expiresAt',
             dateOperator: DateOperator.after,
             path: 'actor:Clock.now',
           },
@@ -70,13 +69,13 @@ const grantNotExpired: ActionRule = {
 };
 
 const effectiveGrant = (action: StandardAction): ActionRule => ({
-  rel: 'effectivePermissions',
+  rel: 'artifactEffectivePermissions',
   arrayOperator: 'any',
   condition: {
     all: [
       {
         rule: {
-          field: 'permission.role',
+          field: 'artifactPermission.role',
           operator: Operator.in,
           value: [...rolesCovering[action]],
         },
@@ -84,23 +83,28 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
       grantNotExpired,
       {
         any: [
-          { all: [granteeIs('User'), { rel: 'permission.granteeUser', action }] },
-          { all: [granteeIs('Organization'), { rel: 'permission.granteeOrganization', action }] },
-          { all: [granteeIs('Space'), { rel: 'permission.granteeSpace', action }] },
+          { all: [granteeIs('User'), { rel: 'artifactPermission.granteeUser', action }] },
+          {
+            all: [
+              granteeIs('Organization'),
+              { rel: 'artifactPermission.granteeOrganization', action },
+            ],
+          },
+          { all: [granteeIs('Space'), { rel: 'artifactPermission.granteeSpace', action }] },
           {
             all: [
               granteeIs('OrganizationUser'),
               action === 'own'
-                ? memberOwns('granteeOrganizationUser', 'permission.')
-                : { rel: 'permission.granteeOrganizationUser', action: 'operate' },
+                ? memberOwns('granteeOrganizationUser', 'artifactPermission.')
+                : { rel: 'artifactPermission.granteeOrganizationUser', action: 'operate' },
             ],
           },
           {
             all: [
               granteeIs('SpaceUser'),
               action === 'own'
-                ? memberOwns('granteeSpaceUser', 'permission.')
-                : { rel: 'permission.granteeSpaceUser', action: 'operate' },
+                ? memberOwns('granteeSpaceUser', 'artifactPermission.')
+                : { rel: 'artifactPermission.granteeSpaceUser', action: 'operate' },
             ],
           },
           {
@@ -108,9 +112,12 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
               granteeIs('CustomerRelationship'),
               {
                 any: [
-                  { rel: 'permission.granteeCustomerRelationship.customerUser', action },
-                  { rel: 'permission.granteeCustomerRelationship.customerOrganization', action },
-                  { rel: 'permission.granteeCustomerRelationship.customerSpace', action },
+                  { rel: 'artifactPermission.granteeCustomerRelationship.customerUser', action },
+                  {
+                    rel: 'artifactPermission.granteeCustomerRelationship.customerOrganization',
+                    action,
+                  },
+                  { rel: 'artifactPermission.granteeCustomerRelationship.customerSpace', action },
                 ],
               },
             ],

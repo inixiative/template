@@ -12,22 +12,22 @@ export const syncPermissionDescendants = async (permissionIds: string[]): Promis
   if (uniqueIds.length === 0) return;
 
   await db.withoutDeleted(async () => {
-    const livePermissions = await db.artifactPermission.findMany({
+    const activePermissions = await db.artifactPermission.findMany({
       where: { id: { in: uniqueIds } },
       select: { id: true, artifactId: true },
     });
     const existingRows = await db.artifactEffectivePermission.findMany({
-      where: { permissionId: { in: uniqueIds } },
+      where: { artifactPermissionId: { in: uniqueIds } },
     });
 
-    const liveById = new Map(livePermissions.map((permission) => [permission.id, permission]));
+    const activeById = new Map(activePermissions.map((permission) => [permission.id, permission]));
     const existingByKey = new Map(
-      existingRows.map((row) => [`${row.artifactId}:${row.permissionId}`, row]),
+      existingRows.map((row) => [`${row.artifactId}:${row.artifactPermissionId}`, row]),
     );
     const cacheEvictIds = new Set(existingRows.map((row) => row.artifactId));
 
     const sourceArtifactIds = [
-      ...new Set(livePermissions.map((permission) => permission.artifactId)),
+      ...new Set(activePermissions.map((permission) => permission.artifactId)),
     ];
     const descendantRows =
       sourceArtifactIds.length > 0
@@ -43,8 +43,8 @@ export const syncPermissionDescendants = async (permissionIds: string[]): Promis
       descendantsBySource.set(row.ancestorArtifactId, list);
     }
 
-    const toCreate: { artifactId: string; permissionId: string }[] = [];
-    for (const permission of liveById.values()) {
+    const toCreate: { artifactId: string; artifactPermissionId: string }[] = [];
+    for (const permission of activeById.values()) {
       const targetIds = new Set([
         permission.artifactId,
         ...(descendantsBySource.get(permission.artifactId) ?? []),
@@ -55,7 +55,7 @@ export const syncPermissionDescendants = async (permissionIds: string[]): Promis
         if (existingByKey.has(key)) {
           existingByKey.delete(key);
         } else {
-          toCreate.push({ artifactId, permissionId: permission.id });
+          toCreate.push({ artifactId, artifactPermissionId: permission.id });
         }
       }
     }

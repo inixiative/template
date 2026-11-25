@@ -9,7 +9,7 @@ import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import {
   defaultArtifactPlacementOrderBy,
-  filterReadableArtifactPlacements,
+  filterAccessibleArtifactPlacements,
   includeArtifactPlacementList,
   ownerArtifactPlacementsWhere,
 } from '#/modules/artifactPlacement/queries/ownerArtifactPlacementsQuery';
@@ -25,6 +25,6 @@ export const meReadManyArtifactPlacementsController = makeController(
       include: includeArtifactPlacementList,
       orderBy: defaultArtifactPlacementOrderBy(c),
     });
-    return respond.ok(await filterReadableArtifactPlacements(c, data), { pagination });
+    return respond.ok(await filterAccessibleArtifactPlacements(c, data), { pagination });
   },
 );

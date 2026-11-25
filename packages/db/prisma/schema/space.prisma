@@ -51,8 +51,8 @@ model Space {
   communicationsSent              CommunicationLog[]     @relation("CommunicationSenderSpace")
   segments                        Segment[]
   settings                        Setting[]
-  ownedArtifacts                  Artifact[]             @relation("ArtifactOwnerSpace")
-  artifactGrants                  ArtifactPermission[]   @relation("ArtifactPermissionGranteeSpace")
+  artifacts                       Artifact[]             @relation("ArtifactOwnerSpace")
+  granteeArtifactPermissions      ArtifactPermission[]   @relation("ArtifactPermissionGranteeSpace")
   resourceBindings                ResourceBinding[]      @relation("ResourceBindingSpace")
 
   // ==========================================================================

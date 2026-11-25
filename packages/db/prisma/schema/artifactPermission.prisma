@@ -25,8 +25,8 @@ model ArtifactPermission {
   fromVersion      Int       @default(1)
   preserveOnRevoke Boolean   @default(false)
 
-  effectiveOn ArtifactEffectivePermission[]
-  auditLogs   AuditLog[]
+  artifactEffectivePermissions ArtifactEffectivePermission[]
+  auditLogs                    AuditLog[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

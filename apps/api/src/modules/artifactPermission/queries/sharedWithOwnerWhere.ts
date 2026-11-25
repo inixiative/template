@@ -26,7 +26,7 @@ export const defaultSharedPermissionOrderBy = (
 ): Prisma.ArtifactPermissionOrderByWithRelationInput | undefined =>
   validatedQuery(c).orderBy?.length ? undefined : { createdAt: 'desc' };
 
-export const assertCanReadSharedArtifactPermissions = async (
+export const validateCanReadSharedArtifactPermissions = async (
   c: Context<AppEnv>,
   owner: OwnerRef,
 ): Promise<void> => {
@@ -61,7 +61,7 @@ export const sharedWithOwnerWhere = (owner: OwnerRef): Prisma.ArtifactPermission
                 granteeUserId: owner.userId!,
               };
 
-  const customerRelGrantee: Prisma.ArtifactPermissionWhereInput | null =
+  const customerRelationshipGrantee: Prisma.ArtifactPermissionWhereInput | null =
     owner.ownerModel === 'User'
       ? {
           granteeModel: 'CustomerRelationship',
@@ -94,7 +94,11 @@ export const sharedWithOwnerWhere = (owner: OwnerRef): Prisma.ArtifactPermission
   return {
     AND: [
       { deletedAt: null },
-      { OR: customerRelGrantee ? [directGrantee, customerRelGrantee] : [directGrantee] },
+      {
+        OR: customerRelationshipGrantee
+          ? [directGrantee, customerRelationshipGrantee]
+          : [directGrantee],
+      },
       { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
       { artifact: { deletedAt: null } },
     ],

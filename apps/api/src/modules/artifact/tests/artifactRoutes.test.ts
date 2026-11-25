@@ -154,13 +154,13 @@ describe('artifact routes', () => {
       await parseSuccessBody<{
         effectiveRole: string | null;
         effectiveAccess: string;
-        placements: ArtifactPlacement[];
+        artifactPlacementsAsArtifact: ArtifactPlacement[];
       }>(detail)
     ).data;
     expect(parsed.effectiveRole).toBe('admin');
     expect(parsed.effectiveAccess).toBe('private');
-    expect(parsed.placements).toHaveLength(1);
-    expect(parsed.placements[0]!.access).toBe('private');
+    expect(parsed.artifactPlacementsAsArtifact).toHaveLength(1);
+    expect(parsed.artifactPlacementsAsArtifact[0]!.access).toBe('private');
   });
 
   it('creating inside a container defaults placement access to inherit; root rejects inherit', async () => {
@@ -512,7 +512,7 @@ describe('artifact routes', () => {
       (
         await outsiderFetch(
           post(`/api/v1/artifact/${aliceFile.id}/move`, {
-            fromContainerArtifactId: aliceFolder.id,
+            sourceContainerArtifactId: aliceFolder.id,
           }),
         )
       ).status,
@@ -531,7 +531,7 @@ describe('artifact routes', () => {
     expect((await memberFetch(get(`/api/v1/artifact/${aliceFile.id}`))).status).toBe(403);
   });
 
-  it('moveArtifact refuses cross-owner fromContainer when the artifact is not in it without leaking existence', async () => {
+  it('moveArtifact refuses cross-owner sourceContainer when the artifact is not in it without leaking existence', async () => {
     const victimPrivate = await createFolder(outsiderFetch, '/api/v1/me/artifacts');
     const attackerFolder = await createFolder(
       adminFetch,
@@ -541,7 +541,7 @@ describe('artifact routes', () => {
       (
         await adminFetch(
           post(`/api/v1/artifact/${victimPrivate.id}/move`, {
-            fromContainerArtifactId: attackerFolder.id,
+            sourceContainerArtifactId: attackerFolder.id,
           }),
         )
       ).status,
@@ -625,14 +625,14 @@ describe('artifact routes', () => {
     expect(
       (
         await ownerFetch(
-          post(`/api/v1/artifact/${orgRoot.id}/move`, { toContainerArtifactId: shared.id }),
+          post(`/api/v1/artifact/${orgRoot.id}/move`, { targetContainerArtifactId: shared.id }),
         )
       ).status,
     ).toBe(422);
     expect(
       (
         await ownerFetch(
-          post(`/api/v1/artifact/${orgRoot.id}/copy`, { containerArtifactId: shared.id }),
+          post(`/api/v1/artifact/${orgRoot.id}/copy`, { targetContainerArtifactId: shared.id }),
         )
       ).status,
     ).toBe(422);
@@ -658,15 +658,21 @@ describe('artifact routes', () => {
     );
     await place(adminFetch, hidden, shared, { access: 'private' });
 
-    const asAdmin = await parseSuccessBody<{ children: Artifact[] }>(
-      await adminFetch(get(`/api/v1/artifact/${shared.id}`)),
+    const asAdmin = await parseSuccessBody<{
+      artifactPlacementsAsContainer: { artifact: Artifact }[];
+    }>(await adminFetch(get(`/api/v1/artifact/${shared.id}`)));
+    expect(asAdmin.data.artifactPlacementsAsContainer.map((p) => p.artifact.id)).toContain(
+      hidden.id,
     );
-    expect(asAdmin.data.children.map((artifact) => artifact.id)).toContain(hidden.id);
-    const asMember = await parseSuccessBody<{ children: Artifact[] }>(
-      await memberFetch(get(`/api/v1/artifact/${shared.id}`)),
+    const asMember = await parseSuccessBody<{
+      artifactPlacementsAsContainer: { artifact: Artifact }[];
+    }>(await memberFetch(get(`/api/v1/artifact/${shared.id}`)));
+    expect(asMember.data.artifactPlacementsAsContainer.map((p) => p.artifact.id)).toContain(
+      drafts.id,
     );
-    expect(asMember.data.children.map((artifact) => artifact.id)).toContain(drafts.id);
-    expect(asMember.data.children.map((artifact) => artifact.id)).not.toContain(hidden.id);
+    expect(asMember.data.artifactPlacementsAsContainer.map((p) => p.artifact.id)).not.toContain(
+      hidden.id,
+    );
   });
 
   it('a grant cannot exceed the granter own role', async () => {
@@ -786,12 +792,16 @@ describe('artifact routes', () => {
       expect((await place(adminFetch, child, shared, { access: 'inherit' })).status).toBe(201);
     }
     const detail = await parseSuccessBody<{
-      children: (Artifact & { permissions: unknown[] })[];
+      artifactPlacementsAsContainer: {
+        artifact: Artifact & { artifactPermissions: unknown[] };
+      }[];
     }>(await memberFetch(get(`/api/v1/artifact/${shared.id}`)));
-    const byId = new Map(detail.data.children.map((child) => [child.id, child]));
+    const byId = new Map(
+      detail.data.artifactPlacementsAsContainer.map((p) => [p.artifact.id, p.artifact]),
+    );
     expect(byId.has(unreadable.id)).toBe(false);
-    expect(byId.get(manageable.id)!.permissions.length).toBeGreaterThan(0);
-    expect(byId.get(viewerOnly.id)!.permissions).toEqual([]);
+    expect(byId.get(manageable.id)!.artifactPermissions.length).toBeGreaterThan(0);
+    expect(byId.get(viewerOnly.id)!.artifactPermissions).toEqual([]);
 
     expect(
       (await memberFetch(get('/api/v1/me/artifactPermissions?searchFields[deletedAt][not]=null')))
@@ -821,11 +831,11 @@ describe('artifact routes', () => {
       { name: 'private-org', access: 'private' },
     );
 
-    const asAnon = await parseSuccessBody<(Artifact & { permissions: unknown[] })[]>(
+    const asAnon = await parseSuccessBody<(Artifact & { artifactPermissions: unknown[] })[]>(
       await anonFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
     );
     expect(asAnon.data.map((a) => a.id)).toEqual([pubOrg.id]);
-    expect(asAnon.data[0]!.permissions).toEqual([]);
+    expect(asAnon.data[0]!.artifactPermissions).toEqual([]);
 
     const asOutsider = await parseSuccessBody<Artifact[]>(
       await outsiderFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
@@ -992,25 +1002,29 @@ describe('artifact routes', () => {
       access: 'public',
     });
     expect((await place(outsiderFetch, waifu, pubFolder, { access: 'private' })).status).toBe(201);
-    const showcaseAnon = await parseSuccessBody<{ children: Artifact[] }>(
-      await anonFetch(get(`/api/v1/artifact/${pubFolder.id}`)),
+    const showcaseAnon = await parseSuccessBody<{
+      artifactPlacementsAsContainer: { artifact: Artifact }[];
+    }>(await anonFetch(get(`/api/v1/artifact/${pubFolder.id}`)));
+    expect(showcaseAnon.data.artifactPlacementsAsContainer.map((p) => p.artifact.id)).not.toContain(
+      waifu.id,
     );
-    expect(showcaseAnon.data.children.map((c) => c.id)).not.toContain(waifu.id);
-    const showcaseOwner = await parseSuccessBody<{ children: Artifact[] }>(
-      await outsiderFetch(get(`/api/v1/artifact/${pubFolder.id}`)),
+    const showcaseOwner = await parseSuccessBody<{
+      artifactPlacementsAsContainer: { artifact: Artifact }[];
+    }>(await outsiderFetch(get(`/api/v1/artifact/${pubFolder.id}`)));
+    expect(showcaseOwner.data.artifactPlacementsAsContainer.map((p) => p.artifact.id)).toContain(
+      waifu.id,
     );
-    expect(showcaseOwner.data.children.map((c) => c.id)).toContain(waifu.id);
 
     // Unpinning root placement works via DELETE /artifactPlacement/:id (and refuses strangers)
     expect((await adminFetch(del(`/api/v1/artifactPlacement/${waifuPin.id}`))).status).toBe(403);
     expect((await outsiderFetch(del(`/api/v1/artifactPlacement/${waifuPin.id}`))).status).toBe(204);
 
-    // Regression: placements relation is rejected by artifactListFilterLens (no cross-tenant pin oracle)
+    // Regression: artifactPlacementsAsArtifact relation is rejected by artifactListFilterLens (no cross-tenant pin oracle)
     expect(
       (
         await outsiderFetch(
           get(
-            `/api/v1/organization/${organization.id}/artifacts?searchFields[placements][some][id][startsWith]=0`,
+            `/api/v1/organization/${organization.id}/artifacts?searchFields[artifactPlacementsAsArtifact][some][id][startsWith]=0`,
           ),
         )
       ).status,
@@ -1141,7 +1155,7 @@ describe('artifact routes', () => {
       (
         await memberFetch(
           post(`/api/v1/artifact/${drafts.id}/move`, {
-            toContainerArtifactId: shared.id,
+            targetContainerArtifactId: shared.id,
             access: 'public',
           }),
         )
@@ -1234,8 +1248,8 @@ describe('artifact routes', () => {
       (
         await memberFetch(
           post(`/api/v1/artifact/${pubFolder.id}/move`, {
-            fromContainerArtifactId: shared.id,
-            toContainerArtifactId: drafts.id,
+            sourceContainerArtifactId: shared.id,
+            targetContainerArtifactId: drafts.id,
           }),
         )
       ).status,
@@ -1268,7 +1282,9 @@ describe('artifact routes', () => {
     expect(
       (
         await demotedFetch(
-          post(`/api/v1/artifact/${pubFolder.id}/copy`, { containerArtifactId: memberOwned.id }),
+          post(`/api/v1/artifact/${pubFolder.id}/copy`, {
+            targetContainerArtifactId: memberOwned.id,
+          }),
         )
       ).status,
     ).toBe(403);
@@ -1338,7 +1354,7 @@ describe('artifact routes', () => {
       (
         await adminFetch(
           post(`/api/v1/artifact/${adminPersonal.id}/move`, {
-            toContainerArtifactId: shared.id,
+            targetContainerArtifactId: shared.id,
           }),
         )
       ).status,
@@ -1374,9 +1390,57 @@ describe('artifact routes', () => {
     });
     expect((await place(adminFetch, ownedChild, shared, { access: 'private' })).status).toBe(201);
     const pubFolderDetail = await parseSuccessBody<{
-      children: (Artifact & { exclusive: boolean })[];
+      artifactPlacementsAsContainer: { artifact: Artifact & { exclusive: boolean } }[];
     }>(await outsiderFetch(get(`/api/v1/artifact/${pubFolder.id}`)));
-    const childRow = pubFolderDetail.data.children.find((c) => c.id === ownedChild.id);
-    expect(childRow?.exclusive).toBe(true);
+    const childRow = pubFolderDetail.data.artifactPlacementsAsContainer.find(
+      (p) => p.artifact.id === ownedChild.id,
+    );
+    expect(childRow?.artifact.exclusive).toBe(true);
+
+    // 9. ArtifactPermission.fromVersion requires >= 1 on create and update, and may move both up and down
+    expect(
+      (
+        await adminFetch(
+          post(`/api/v1/artifact/${pubOrgDoc.id}/artifactPermissions`, {
+            granteeModel: 'User',
+            granteeUserId: outsider.id,
+            role: 'viewer',
+            fromVersion: 0,
+          }),
+        )
+      ).status,
+    ).toBe(422);
+    const versionGrant = (
+      await parseSuccessBody<{ id: string; fromVersion: number }>(
+        await adminFetch(
+          post(`/api/v1/artifact/${pubOrgDoc.id}/artifactPermissions`, {
+            granteeModel: 'User',
+            granteeUserId: outsider.id,
+            role: 'viewer',
+            fromVersion: 1,
+          }),
+        ),
+      )
+    ).data;
+    expect(versionGrant.fromVersion).toBe(1);
+    expect(
+      (await adminFetch(patch(`/api/v1/artifactPermission/${versionGrant.id}`, { fromVersion: 0 })))
+        .status,
+    ).toBe(422);
+    expect(
+      (
+        await adminFetch(
+          patch(`/api/v1/artifactPermission/${versionGrant.id}`, { fromVersion: 2_147_483_648 }),
+        )
+      ).status,
+    ).toBe(422);
+    const raised = await parseSuccessBody<{ fromVersion: number }>(
+      await adminFetch(patch(`/api/v1/artifactPermission/${versionGrant.id}`, { fromVersion: 3 })),
+    );
+    expect(raised.data.fromVersion).toBe(3);
+    const lowered = await parseSuccessBody<{ fromVersion: number }>(
+      await adminFetch(patch(`/api/v1/artifactPermission/${versionGrant.id}`, { fromVersion: 2 })),
+    );
+    expect(lowered.data.fromVersion).toBe(2);
   });
 });

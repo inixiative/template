@@ -7,13 +7,15 @@
 import { z } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import {
+  ArtifactEffectivePermissionScalarSchema,
   ArtifactPermissionScalarSchema,
+  ArtifactPlacementScalarInputSchema,
   ArtifactPlacementScalarSchema,
   ArtifactScalarInputSchema,
   ArtifactScalarSchema,
   ResourceBindingScalarSchema,
 } from '@template/db';
-import { ArtifactAccess, Role } from '@template/db/generated/client/enums';
+import { Role } from '@template/db/generated/client/enums';
 import { lensFor } from '@template/db/lens';
 import { type ArtifactKind, plainArtifactKinds } from '@template/shared/artifact';
 
@@ -24,11 +26,14 @@ export const ARTIFACT_CREATE_IMMUTABLE_FIELDS = [
   'spaceId',
 ] as const;
 
-export const artifactCreateBodySchema = ArtifactScalarInputSchema.pick({ name: true }).extend({
-  kind: z.enum(plainArtifactKinds as [ArtifactKind, ...ArtifactKind[]]),
-  access: z.enum(ArtifactAccess).optional(),
-  containerArtifactId: z.string().optional(),
-});
+export const artifactCreateBodySchema = ArtifactScalarInputSchema.pick({ name: true })
+  .extend({
+    kind: z.enum(plainArtifactKinds as [ArtifactKind, ...ArtifactKind[]]),
+  })
+  .extend(
+    ArtifactPlacementScalarInputSchema.pick({ containerArtifactId: true, access: true }).partial()
+      .shape,
+  );
 
 export const artifactUpdateBodySchema = ArtifactScalarInputSchema.pick({
   name: true,
@@ -37,23 +42,30 @@ export const artifactUpdateBodySchema = ArtifactScalarInputSchema.pick({
 export const artifactReadResponseSchema = ArtifactScalarSchema;
 
 export const artifactWithPermissionsSchema = ArtifactScalarSchema.extend({
-  permissions: z.array(ArtifactPermissionScalarSchema),
+  artifactPermissions: z.array(ArtifactPermissionScalarSchema),
 });
 
-export const artifactChildSchema = artifactWithPermissionsSchema.extend({
-  exclusive: z.boolean(),
-  placementId: z.string(),
-  placementAccess: z.enum(ArtifactAccess),
+const artifactPlacementAsArtifactSchema = ArtifactPlacementScalarSchema.extend({
+  containerArtifact: artifactWithPermissionsSchema,
+});
+
+const artifactPlacementAsContainerSchema = ArtifactPlacementScalarSchema.extend({
+  artifact: artifactWithPermissionsSchema.extend({
+    exclusive: z.boolean(),
+  }),
+});
+
+const artifactEffectivePermissionWithGrantSchema = ArtifactEffectivePermissionScalarSchema.extend({
+  artifactPermission: ArtifactPermissionScalarSchema,
 });
 
 export const artifactDetailResponseSchema = ArtifactScalarSchema.extend({
   effectiveRole: z.enum(Role).nullable(),
-  parents: z.array(artifactWithPermissionsSchema),
-  children: z.array(artifactChildSchema),
-  placements: z.array(ArtifactPlacementScalarSchema),
-  permissions: z.array(ArtifactPermissionScalarSchema),
-  effectivePermissions: z.array(ArtifactPermissionScalarSchema),
-  bindings: z.array(ResourceBindingScalarSchema),
+  artifactPlacementsAsArtifact: z.array(artifactPlacementAsArtifactSchema),
+  artifactPlacementsAsContainer: z.array(artifactPlacementAsContainerSchema),
+  artifactPermissions: z.array(ArtifactPermissionScalarSchema),
+  artifactEffectivePermissions: z.array(artifactEffectivePermissionWithGrantSchema),
+  resourceBindings: z.array(ResourceBindingScalarSchema),
 });
 
 export const artifactListFilterLens: LensNarrowing = {
@@ -64,12 +76,12 @@ export const artifactListFilterLens: LensNarrowing = {
 };
 
 export const artifactMoveBodySchema = z.object({
-  fromContainerArtifactId: z.string().optional(),
-  toContainerArtifactId: z.string().optional(),
-  access: z.enum(ArtifactAccess).optional(),
+  sourceContainerArtifactId: z.string().optional(),
+  targetContainerArtifactId: z.string().optional(),
+  access: ArtifactPlacementScalarInputSchema.shape.access.optional(),
 });
 
 export const artifactCopyBodySchema = z.object({
-  containerArtifactId: z.string(),
-  name: z.string().optional(),
+  targetContainerArtifactId: z.string(),
+  name: ArtifactScalarInputSchema.shape.name.optional(),
 });

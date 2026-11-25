@@ -24,6 +24,7 @@ export const artifactPermissionUpdateController = makeController(
       if (!canWrite(current.role) || (body.role && !canWrite(body.role))) {
         throw makeError({ status: 403, message: 'Forbidden' });
       }
+      // why: moving fromVersion forward (revoking older versions) triggers preserveOnRevoke / copy-on-revoke in FEAT-030 once FileVersion writes exist.
       return db.artifactPermission.update({ where: { id: current.id }, data: body });
     });
     return respond.ok(updated);

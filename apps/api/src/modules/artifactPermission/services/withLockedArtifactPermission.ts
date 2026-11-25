@@ -4,11 +4,10 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
-import { db, type HydratedRecord } from '@template/db';
+import { db, type HydratedRecord, hydrate } from '@template/db';
 import type { ArtifactPermission } from '@template/db/generated/client/client';
 import { makeError } from '#/lib/errors';
 import { withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
-import { hydrateArtifact } from '#/modules/artifact/services/checkArtifactPermission';
 
 export const withLockedArtifactPermission = async <T>(
   permission: ArtifactPermission,
@@ -22,6 +21,6 @@ export const withLockedArtifactPermission = async <T>(
     if (!current || current.artifactId !== target.id) {
       throw makeError({ status: 404, message: 'ArtifactPermission not found' });
     }
-    return fn(current, await hydrateArtifact(target));
+    return fn(current, await hydrate('artifact', target));
   });
 };

@@ -11,7 +11,7 @@ import {
   defaultArtifactOrderBy,
   includeArtifactList,
   ownerArtifactsWhere,
-  shapeReadableArtifacts,
+  shapeAccessibleArtifacts,
 } from '#/modules/artifact/queries/ownerArtifactsQuery';
 import { spaceReadManyArtifactsRoute } from '#/modules/space/routes/spaceReadManyArtifacts';
 
@@ -30,6 +30,6 @@ export const spaceReadManyArtifactsController = makeController(
       include: includeArtifactList,
       orderBy: defaultArtifactOrderBy(c),
     });
-    return respond.ok(await shapeReadableArtifacts(c, data), { pagination });
+    return respond.ok(await shapeAccessibleArtifacts(c, data), { pagination });
   },
 );

@@ -1,11 +1,11 @@
 model ArtifactEffectivePermission {
-  id           String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  artifactId   String @db.VarChar(36)
-  permissionId String @db.VarChar(36)
+  id                   String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  artifactId           String @db.VarChar(36)
+  artifactPermissionId String @db.VarChar(36)
 
-  artifact   Artifact           @relation(fields: [artifactId], references: [id], onDelete: Cascade)
-  permission ArtifactPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  artifact           Artifact           @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  artifactPermission ArtifactPermission @relation(fields: [artifactPermissionId], references: [id], onDelete: Cascade)
 
-  @@unique([artifactId, permissionId], map: "ArtifactEffectivePermission_pair_key")
-  @@index([permissionId])
+  @@unique([artifactId, artifactPermissionId], map: "ArtifactEffectivePermission_pair_key")
+  @@index([artifactPermissionId])
 }

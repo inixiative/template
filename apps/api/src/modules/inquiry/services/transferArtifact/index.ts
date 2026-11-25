@@ -15,6 +15,7 @@ import {
   transferArtifactResolutionInputSchema,
 } from '@template/shared/inquiry';
 import type { ResourceBindingType } from '@template/shared/resourceBinding';
+import { syncArtifactAncestors } from '#/hooks/artifactTree/syncArtifactAncestors';
 import { makeError } from '#/lib/errors';
 import {
   type OwnedArtifact,
@@ -22,7 +23,7 @@ import {
   sameArtifactOwner,
   withArtifactOwnersLock,
 } from '#/modules/artifact/services/artifactOwner';
-import { writePlacement } from '#/modules/artifact/services/artifactPlacementHelpers';
+import { writePlacement } from '#/modules/artifact/services/artifactPlacementUtils';
 import { copyArtifactInto } from '#/modules/artifact/services/copyArtifact';
 import { ensureOwnerRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
@@ -180,20 +181,33 @@ export const transferArtifactService: InquiryService<
       if (content.keepTracking && allowTracking === false) {
         await copyArtifactInto(artifact, sourceOwner, {});
       }
-      await db.artifactPlacement.updateManyAndReturn({
-        where: { artifactId: artifact.id },
-        data: { deletedAt: new Date() },
-      });
       await db.artifactPermission.updateManyAndReturn({
         where: { artifactId: artifact.id },
         data: { deletedAt: new Date() },
       });
+      // why: update owner and ensure a target-root placement BEFORE soft-deleting old placements so the
+      // orphan-reparenting hook sees an active target-owner placement and does not reparent back to source.
       const transferred = await db.artifact.update({
         where: { id: artifact.id },
         data: { ...targetOwner, effectiveAccess: 'private' },
       });
       const targetRoot = await ensureOwnerRootArtifact(targetOwner);
-      await writePlacement(transferred, targetRoot, 'private');
+      const existingAtTargetRoot = await db.artifactPlacement.findFirst({
+        where: { artifactId: transferred.id, containerArtifactId: targetRoot.id },
+      });
+      const targetPlacement = existingAtTargetRoot
+        ? await db.artifactPlacement.update({
+            where: { id: existingAtTargetRoot.id },
+            data: { access: 'private' },
+          })
+        : await writePlacement(transferred, targetRoot, 'private');
+      const removedPlacements = await db.artifactPlacement.updateManyAndReturn({
+        where: { artifactId: artifact.id, id: { not: targetPlacement.id } },
+        data: { deletedAt: new Date() },
+      });
+      if (existingAtTargetRoot && removedPlacements.length === 0) {
+        await syncArtifactAncestors([artifact.id]);
+      }
       if (tracked) await grantSourceRead(artifact.id, source);
     });
     return {};

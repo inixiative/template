@@ -25,7 +25,7 @@ export const clearSpaceRowCaches = async (spaceId: string, organizationId: strin
   const sharedArtifacts = await db.withDeleted(() =>
     db.artifactEffectivePermission.findMany({
       where: {
-        permission: {
+        artifactPermission: {
           OR: [
             { granteeSpaceId: spaceId },
             { granteeCustomerRelationship: { customerSpaceId: spaceId } },

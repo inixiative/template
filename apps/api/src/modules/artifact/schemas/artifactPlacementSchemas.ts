@@ -4,21 +4,30 @@
  * @partOf feature:files
  * @uses infrastructure:prisma
  */
-import { z } from '@hono/zod-openapi';
+import type { z } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
-import { ArtifactPlacementScalarSchema, ArtifactScalarSchema } from '@template/db';
-import { ArtifactAccess, ArtifactOwnerModel } from '@template/db/generated/client/enums';
+import {
+  ArtifactPlacementScalarInputSchema,
+  ArtifactPlacementScalarSchema,
+  ArtifactScalarInputSchema,
+  ArtifactScalarSchema,
+} from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { polymorphicBodyRefinement } from '#/lib/routeTemplates/polymorphicBodyRefinement';
 
-export const artifactPlacementCreateBodySchema = z.object({
-  containerArtifactId: z.string().optional(),
-  ownerModel: z.enum(ArtifactOwnerModel).optional(),
-  userId: z.string().optional(),
-  organizationId: z.string().optional(),
-  spaceId: z.string().optional(),
-  access: z.enum(ArtifactAccess).optional(),
-});
+export const artifactPlacementCreateBodySchema = ArtifactPlacementScalarInputSchema.pick({
+  containerArtifactId: true,
+  access: true,
+})
+  .partial()
+  .extend(
+    ArtifactScalarInputSchema.pick({
+      ownerModel: true,
+      userId: true,
+      organizationId: true,
+      spaceId: true,
+    }).partial().shape,
+  );
 
 const ownerPlacementRefinement = polymorphicBodyRefinement('Artifact', 'ownerModel');
 const OWNER_FK_KEYS = ['userId', 'organizationId', 'spaceId'] as const;
@@ -38,7 +47,7 @@ export const artifactPlacementCreateBodyRefinement = (
   }
   if (hasContainer) {
     for (const column of OWNER_FK_KEYS) {
-      if (body[column] !== undefined) {
+      if (body[column] !== undefined && body[column] !== null) {
         ctx.addIssue({
           code: 'custom',
           path: [column],
@@ -51,9 +60,9 @@ export const artifactPlacementCreateBodyRefinement = (
   ownerPlacementRefinement(body as Record<string, unknown>, ctx);
 };
 
-export const artifactPlacementUpdateBodySchema = z.object({
-  access: z.enum(ArtifactAccess),
-});
+export const artifactPlacementUpdateBodySchema = ArtifactPlacementScalarInputSchema.pick({
+  access: true,
+}).required();
 
 export const artifactPlacementReadResponseSchema = ArtifactPlacementScalarSchema;
 

@@ -4,21 +4,20 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
-import type { Prisma } from '@template/db';
+import { hydrate, type Prisma } from '@template/db';
 import type { Artifact, ArtifactPermission } from '@template/db/generated/client/client';
 import { ArtifactKind } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
-import { readableArtifactWhereForOwner } from '#/modules/artifact/queries/readableArtifactWhere';
+import { accessibleArtifactWhereForOwner } from '#/modules/artifact/queries/accessibleArtifactWhere';
 import { type OwnerRef, ownerColumns } from '#/modules/artifact/services/artifactOwner';
-import { hydrateArtifact } from '#/modules/artifact/services/checkArtifactPermission';
 import type { AppEnv } from '#/types/appEnv';
 
-export type ArtifactWithPermissions = Artifact & { permissions: ArtifactPermission[] };
+export type ArtifactWithPermissions = Artifact & { artifactPermissions: ArtifactPermission[] };
 
 export const includeArtifactList = {
-  permissions: { orderBy: { createdAt: 'asc' as const } },
+  artifactPermissions: { orderBy: { createdAt: 'asc' as const } },
 } satisfies Prisma.ArtifactInclude;
 
 export const defaultArtifactOrderBy = (
@@ -35,23 +34,23 @@ export const ownerArtifactsWhere = async (
     kind: { not: ArtifactKind.root },
     ...ownerColumns(owner),
   };
-  const visibilityWhere = await readableArtifactWhereForOwner(c, owner);
-  return visibilityWhere ? { AND: [ownerWhere, visibilityWhere] } : ownerWhere;
+  const accessWhere = await accessibleArtifactWhereForOwner(c, owner);
+  return accessWhere ? { AND: [ownerWhere, accessWhere] } : ownerWhere;
 };
 
-export const shapeReadableArtifacts = async (
+export const shapeAccessibleArtifacts = async (
   c: Context<AppEnv>,
   rows: ArtifactWithPermissions[],
 ): Promise<ArtifactWithPermissions[]> => {
   if (!c.get('user') && !c.get('token')) {
-    return rows.map((row) => ({ ...row, permissions: [] }));
+    return rows.map((row) => ({ ...row, artifactPermissions: [] }));
   }
   const permix = c.get('permix');
-  const hydratedRows = await Promise.all(rows.map((row) => hydrateArtifact(row)));
+  const hydratedRows = await Promise.all(rows.map((row) => hydrate('artifact', row)));
   return rows.flatMap((row, index) => {
     const hydrated = hydratedRows[index]!;
     if (!check(permix, 'artifact', hydrated, 'read')) return [];
     const canManage = check(permix, 'artifact', hydrated, 'manage');
-    return [{ ...row, permissions: canManage ? row.permissions : [] }];
+    return [{ ...row, artifactPermissions: canManage ? row.artifactPermissions : [] }];
   });
 };

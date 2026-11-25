@@ -197,12 +197,9 @@ describe('artifact lifecycle', () => {
     let compliance: Artifact;
     let complianceInLegal: ArtifactPlacement;
     let complianceInOps: ArtifactPlacement;
-    type Neighbor = Artifact & { permissions: ArtifactPermission[] };
-    type Child = Neighbor & {
-      exclusive: boolean;
-      placementId: string;
-      placementAccess: ArtifactAccess;
-    };
+    type Neighbor = Artifact & { artifactPermissions: ArtifactPermission[] };
+    type ParentPlacement = ArtifactPlacement & { containerArtifact: Neighbor };
+    type ChildPlacement = ArtifactPlacement & { artifact: Neighbor & { exclusive: boolean } };
 
     beforeEach(async () => {
       const rootResp = await ownerFetch(
@@ -221,28 +218,31 @@ describe('artifact lifecycle', () => {
       complianceInOps = await placeInside(compliance, operations);
     });
 
-    it('GET /artifact/:id returns 1-step parents (excluding root), children with placementId/placementAccess, and hides unreadable containers', async () => {
+    it('GET /artifact/:id returns 1-step artifactPlacementsAsArtifact and artifactPlacementsAsContainer and hides unreadable containers', async () => {
       const { data: complianceDetail } = await parseSuccessBody<{
-        parents: Neighbor[];
-        children: Child[];
+        artifactPlacementsAsArtifact: ParentPlacement[];
+        artifactPlacementsAsContainer: ChildPlacement[];
       }>(await ownerFetch(get(`/api/v1/artifact/${compliance.id}`)));
-      expect(complianceDetail.parents.map((artifact) => artifact.id).sort()).toEqual(
-        [legal.id, operations.id].sort(),
-      );
-      expect(complianceDetail.children).toEqual([]);
+      expect(
+        complianceDetail.artifactPlacementsAsArtifact
+          .map((placement) => placement.containerArtifact.id)
+          .sort(),
+      ).toEqual([legal.id, operations.id].sort());
+      expect(complianceDetail.artifactPlacementsAsContainer).toEqual([]);
 
       const { data: topDetail } = await parseSuccessBody<{
-        parents: Neighbor[];
-        children: Child[];
-        placements: ArtifactPlacement[];
+        artifactPlacementsAsArtifact: ParentPlacement[];
+        artifactPlacementsAsContainer: ChildPlacement[];
       }>(await ownerFetch(get(`/api/v1/artifact/${topFolder.id}`)));
-      expect(topDetail.parents).toEqual([]); // root container is excluded from parents
-      expect(topDetail.placements).toHaveLength(1); // root placement IS kept in placements
-      expect(topDetail.children.map((artifact) => artifact.id).sort()).toEqual(
-        [legal.id, operations.id].sort(),
-      );
+      expect(topDetail.artifactPlacementsAsArtifact).toHaveLength(1);
+      expect(topDetail.artifactPlacementsAsArtifact[0]!.containerArtifact.kind).toBe('root');
       expect(
-        topDetail.children.every((child) => child.exclusive && child.placementAccess === 'inherit'),
+        topDetail.artifactPlacementsAsContainer.map((placement) => placement.artifact.id).sort(),
+      ).toEqual([legal.id, operations.id].sort());
+      expect(
+        topDetail.artifactPlacementsAsContainer.every(
+          (placement) => placement.artifact.exclusive && placement.access === 'inherit',
+        ),
       ).toBe(true);
 
       await db.artifactPlacement.update({
@@ -259,11 +259,12 @@ describe('artifact lifecycle', () => {
         granteeUserId: member.id,
         role: 'viewer',
       });
-      const asMember = await parseSuccessBody<{ parents: Neighbor[]; children: Child[] }>(
-        await memberFetch(get(`/api/v1/artifact/${compliance.id}`)),
-      );
-      expect(asMember.data.parents).toEqual([]);
-      expect(asMember.data.children).toEqual([]);
+      const asMember = await parseSuccessBody<{
+        artifactPlacementsAsArtifact: ParentPlacement[];
+        artifactPlacementsAsContainer: ChildPlacement[];
+      }>(await memberFetch(get(`/api/v1/artifact/${compliance.id}`)));
+      expect(asMember.data.artifactPlacementsAsArtifact).toEqual([]);
+      expect(asMember.data.artifactPlacementsAsContainer).toEqual([]);
     });
 
     it("the owner's root placement listing holds only items placed directly in root", async () => {
@@ -339,9 +340,11 @@ describe('artifact lifecycle', () => {
       await placeInside(alsoElsewhere, other);
 
       const boxDetail = await parseSuccessBody<{
-        children: (Artifact & { exclusive: boolean })[];
+        artifactPlacementsAsContainer: { artifact: Artifact & { exclusive: boolean } }[];
       }>(await ownerFetch(get(`/api/v1/artifact/${box.id}`)));
-      const exclusiveChildren = boxDetail.data.children.filter((child) => child.exclusive);
+      const exclusiveChildren = boxDetail.data.artifactPlacementsAsContainer
+        .map((placement) => placement.artifact)
+        .filter((child) => child.exclusive);
       expect(exclusiveChildren.map((artifact) => artifact.id)).toEqual([onlyHere.id]);
 
       expect((await ownerFetch(del(`/api/v1/artifact/${box.id}`))).status).toBe(204);
@@ -426,9 +429,11 @@ describe('artifact lifecycle', () => {
     );
     expect(placed.status).toBe(201);
     expect((await outsiderFetch(get(`/api/v1/artifact/${file.id}`))).status).toBe(403);
-    const lobbyAsOutsider = await parseSuccessBody<{ children: Artifact[] }>(
-      await outsiderFetch(get(`/api/v1/artifact/${lobby.id}`)),
-    );
-    expect(lobbyAsOutsider.data.children.map((c) => c.id)).not.toContain(file.id);
+    const lobbyAsOutsider = await parseSuccessBody<{
+      artifactPlacementsAsContainer: { artifact: Artifact }[];
+    }>(await outsiderFetch(get(`/api/v1/artifact/${lobby.id}`)));
+    expect(
+      lobbyAsOutsider.data.artifactPlacementsAsContainer.map((p) => p.artifact.id),
+    ).not.toContain(file.id);
   });
 });

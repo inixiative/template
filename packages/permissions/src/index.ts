@@ -1,5 +1,13 @@
 export { Role } from '@template/db/generated/client/enums';
 export { actorFromRecordOmittingSensitiveFields } from './actorFromRecordOmittingSensitiveFields';
+export {
+  type AccessibleArtifactGranteeIds,
+  type AccessibleArtifactOwnerIds,
+  type ArtifactAction,
+  accessibleArtifactGranteeIds,
+  accessibleArtifactOwnerIds,
+  artifactEffectiveRole,
+} from './artifacts/artifactAccess';
 // Client
 export {
   type Action,
@@ -24,6 +32,12 @@ export {
   toEntitlementEntry,
   toEntitlementInput,
 } from './entitlementRows';
+export {
+  directEntitledIds,
+  entitlementsCovering,
+  permixIdsWithAction,
+  STANDARD_ACTIONS_IMPLYING,
+} from './permix';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { INQUIRY_TYPES, type InquiryParty, type InquiryTypeParties } from './rebac/inquiryTypes';

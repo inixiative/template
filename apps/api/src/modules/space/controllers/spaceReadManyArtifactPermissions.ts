@@ -8,9 +8,9 @@ import { contextResource } from '#/lib/context/contextResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import {
-  assertCanReadSharedArtifactPermissions,
   defaultSharedPermissionOrderBy,
   sharedWithOwnerWhere,
+  validateCanReadSharedArtifactPermissions,
 } from '#/modules/artifactPermission/queries/sharedWithOwnerWhere';
 import { spaceReadManyArtifactPermissionsRoute } from '#/modules/space/routes/spaceReadManyArtifactPermissions';
 
@@ -24,7 +24,7 @@ export const spaceReadManyArtifactPermissionsController = makeController(
       organizationId: space.organizationId,
       spaceId: space.id,
     };
-    await assertCanReadSharedArtifactPermissions(c, owner);
+    await validateCanReadSharedArtifactPermissions(c, owner);
     const { data, pagination } = await paginate(c, db.artifactPermission, {
       where: sharedWithOwnerWhere(owner),
       include: { artifact: true },

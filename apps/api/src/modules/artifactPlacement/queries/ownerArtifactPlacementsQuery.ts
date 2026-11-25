@@ -5,21 +5,19 @@
  * @uses infrastructure:prisma, primitive:authz
  */
 import type { Prisma } from '@template/db';
-import { hydrate } from '@template/db';
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
 import { type ArtifactAccess, ArtifactKind } from '@template/db/generated/client/enums';
+import { directEntitledIds } from '@template/permissions';
 import type { Permix } from '@template/permissions/client';
-import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 import {
+  accessibleAnyArtifactWhere,
+  accessibleArtifactWhereForOwner,
   effectiveGrantWhere,
-  entitlementsCovering,
-  readableAnyArtifactWhere,
-  readableArtifactWhereForOwner,
-} from '#/modules/artifact/queries/readableArtifactWhere';
+} from '#/modules/artifact/queries/accessibleArtifactWhere';
 import {
   type OwnedArtifact,
   type OwnerRef,
@@ -57,7 +55,7 @@ const hasContainerFilter = (c: Context<AppEnv>): boolean => {
   return 'containerArtifactId' in searchFields || 'containerArtifact' in searchFields;
 };
 
-const canReadOwnerPrivatePlacements = async (
+const canAccessOwnerPrivatePlacements = async (
   permix: Permix,
   ownerFields: OwnedArtifact,
 ): Promise<boolean> => {
@@ -118,11 +116,12 @@ export const ownerArtifactPlacementsWhere = async (
 
   // Entitlement-only tokens without any db:ArtifactPlacement read/manage entitlement cannot read placements.
   const token = c.get('token');
-  const placementEntitlements = entitlementsCovering(
-    permix,
-    'db:ArtifactPlacement',
-    PLACEMENT_READ_ACTIONS,
-  );
+  const {
+    entitlements: placementEntitlements,
+    directIds: directPlacementIds,
+    hasBroadEntitlement: hasBroadPlacementEntitlement,
+  } = directEntitledIds(permix, 'db:ArtifactPlacement', PLACEMENT_READ_ACTIONS);
+
   if (
     !permix.isSuperadmin() &&
     token &&
@@ -133,19 +132,9 @@ export const ownerArtifactPlacementsWhere = async (
     return { id: { in: [] } };
   }
 
-  const directPlacementIds = [
-    ...new Set(
-      placementEntitlements.flatMap((ent) =>
-        ent.anchor.resource === 'db:ArtifactPlacement' && ent.anchor.id ? [ent.anchor.id] : [],
-      ),
-    ),
-  ];
-  const hasBroadPlacementEntitlement =
-    placementEntitlements.length > 0 && directPlacementIds.length < placementEntitlements.length;
-
   const [anyArtifactWhere, canOwnerReadPrivate, canReadTenant, canReadPublic] = await Promise.all([
-    readableAnyArtifactWhere(c),
-    canReadOwnerPrivatePlacements(permix, ownerFields),
+    accessibleAnyArtifactWhere(c),
+    canAccessOwnerPrivatePlacements(permix, ownerFields),
     permix.isSuperadmin()
       ? Promise.resolve(true)
       : holdsOnRecord(
@@ -198,7 +187,7 @@ export const ownerArtifactPlacementsWhere = async (
     };
   }
 
-  const ownerContainerWhere = await readableArtifactWhereForOwner(c, owner);
+  const ownerContainerWhere = await accessibleArtifactWhereForOwner(c, owner);
   const nonRootContainerWhere: Prisma.ArtifactWhereInput = ownerContainerWhere
     ? {
         AND: [
@@ -233,16 +222,13 @@ export const ownerArtifactPlacementsWhere = async (
   };
 };
 
-export const filterReadableArtifactPlacements = async (
+export const filterAccessibleArtifactPlacements = async (
   c: Context<AppEnv>,
   rows: PlacementWithArtifacts[],
 ): Promise<PlacementWithArtifacts[]> => {
   const permix = c.get('permix');
   const checked = await Promise.all(
-    rows.map(async (row) => {
-      const hydrated = await hydrate('artifactPlacement', row);
-      return check(permix, 'artifactPlacement', hydrated, 'read');
-    }),
+    rows.map((row) => holdsOnRecord(permix, 'artifactPlacement', row, 'read')),
   );
   return rows.filter((_, index) => checked[index]);
 };

@@ -19,17 +19,17 @@ model Artifact {
   space            Space?            @relation("ArtifactOwnerSpace", fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
   spaceUser        SpaceUser?        @relation("ArtifactOwnerSpaceUser", fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
 
-  file        File?
-  bindings    ResourceBinding[]
-  permissions ArtifactPermission[]
-  placements  ArtifactPlacement[] @relation("ArtifactPlacementArtifact")
-  contents    ArtifactPlacement[] @relation("ArtifactPlacementContainer")
+  file                          File?
+  resourceBindings              ResourceBinding[]
+  artifactPermissions           ArtifactPermission[]
+  artifactPlacementsAsArtifact  ArtifactPlacement[] @relation("ArtifactPlacementArtifact")
+  artifactPlacementsAsContainer ArtifactPlacement[] @relation("ArtifactPlacementContainer")
 
-  ancestors   ArtifactAncestor[] @relation("ArtifactAncestorDescendant")
-  descendants ArtifactAncestor[] @relation("ArtifactAncestorAncestor")
+  artifactAncestorsAsDescendant ArtifactAncestor[] @relation("ArtifactAncestorDescendant")
+  artifactAncestorsAsAncestor   ArtifactAncestor[] @relation("ArtifactAncestorAncestor")
 
-  /// @permissions(down: [permission.granteeUser, permission.granteeOrganization, permission.granteeSpace.organization, permission.granteeOrganizationUser.user, permission.granteeOrganizationUser.organization, permission.granteeSpaceUser.user, permission.granteeSpaceUser.space.organization, permission.granteeCustomerRelationship.customerUser, permission.granteeCustomerRelationship.customerOrganization, permission.granteeCustomerRelationship.customerSpace.organization])
-  effectivePermissions ArtifactEffectivePermission[]
+  /// @permissions(down: [artifactPermission.granteeUser, artifactPermission.granteeOrganization, artifactPermission.granteeSpace.organization, artifactPermission.granteeOrganizationUser.user, artifactPermission.granteeOrganizationUser.organization, artifactPermission.granteeSpaceUser.user, artifactPermission.granteeSpaceUser.space.organization, artifactPermission.granteeCustomerRelationship.customerUser, artifactPermission.granteeCustomerRelationship.customerOrganization, artifactPermission.granteeCustomerRelationship.customerSpace.organization])
+  artifactEffectivePermissions ArtifactEffectivePermission[]
 
   auditLogs AuditLog[]
 

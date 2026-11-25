@@ -10,7 +10,10 @@ const artifactEffectivePermissionFactory = registerFactory('ArtifactEffectivePer
   defaults: () => ({}),
   dependencies: {
     artifact: { modelName: 'Artifact', foreignKey: { id: 'artifactId' } },
-    permission: { modelName: 'ArtifactPermission', foreignKey: { id: 'permissionId' } },
+    artifactPermission: {
+      modelName: 'ArtifactPermission',
+      foreignKey: { id: 'artifactPermissionId' },
+    },
   },
 });
 

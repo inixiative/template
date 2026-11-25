@@ -9,54 +9,64 @@ import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/
 import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
 import { makeError } from '#/lib/errors';
+import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import { sameArtifactOwner, withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
 import {
-  assertEdgeAuthority,
-  assertPlacementDeletable,
-  fetchArtifact,
+  fetchArtifactOrThrow,
   writePlacement,
-} from '#/modules/artifact/services/artifactPlacementHelpers';
-import { canActOnArtifact } from '#/modules/artifact/services/checkArtifactPermission';
+} from '#/modules/artifact/services/artifactPlacementUtils';
 import {
-  assertNotRootArtifact,
   ensureOwnerRootArtifact,
   fetchOwnerRootArtifact,
 } from '#/modules/artifact/services/ownerRootArtifact';
+import { validateArtifactPermission } from '#/modules/artifact/validations/validateArtifactPermission';
+import {
+  validateEdgeAuthority,
+  validatePlacementDeletable,
+} from '#/modules/artifact/validations/validateEdgeAuthority';
+import { validateNotRootArtifact } from '#/modules/artifact/validations/validateNotRootArtifact';
 
 export type MoveArtifactInput = {
   artifactId: string;
-  fromContainerArtifactId?: string;
-  toContainerArtifactId?: string;
+  sourceContainerArtifactId?: string;
+  targetContainerArtifactId?: string;
   access?: ArtifactAccess;
 };
 
-const assertAndFetchSourcePlacement = async (
+const fetchAuthorizedSourcePlacement = async (
   permix: Permix,
-  member: Artifact,
-  fromContainer: Artifact,
+  artifact: Artifact,
+  sourceContainer: Artifact,
 ): Promise<ArtifactPlacement> => {
-  await assertEdgeAuthority(permix, member, fromContainer, 'remove');
+  await validateEdgeAuthority(permix, artifact, sourceContainer, 'remove');
   const edge = await db.artifactPlacement.findFirst({
-    where: { artifactId: member.id, containerArtifactId: fromContainer.id },
+    where: { artifactId: artifact.id, containerArtifactId: sourceContainer.id },
   });
   if (!edge) {
     if (
-      !sameArtifactOwner(member, fromContainer) &&
-      !(await canActOnArtifact(permix, member, 'read'))
+      !sameArtifactOwner(artifact, sourceContainer) &&
+      !(await holdsOnRecord(permix, 'artifact', artifact, 'read'))
     ) {
       throw makeError({ status: 403, message: 'Forbidden' });
     }
     throw makeError({ status: 404, message: 'The artifact is not in that container' });
   }
-  await assertPlacementDeletable(permix, edge);
+  await validatePlacementDeletable(permix, edge);
   return edge;
 };
 
-const assertMovePairValid = (member: Artifact, fromContainer: Artifact, toContainer: Artifact) => {
-  if (fromContainer.id === toContainer.id) {
+const validateMovePair = (
+  artifact: Artifact,
+  sourceContainer: Artifact,
+  targetContainer: Artifact,
+) => {
+  if (sourceContainer.id === targetContainer.id) {
     throw makeError({ status: 422, message: 'A move needs a different destination' });
   }
-  if (sameArtifactOwner(member, fromContainer) && !sameArtifactOwner(member, toContainer)) {
+  if (
+    sameArtifactOwner(artifact, sourceContainer) &&
+    !sameArtifactOwner(artifact, targetContainer)
+  ) {
     throw makeError({
       status: 422,
       message:
@@ -67,77 +77,55 @@ const assertMovePairValid = (member: Artifact, fromContainer: Artifact, toContai
 
 export const moveArtifact = async (
   permix: Permix,
-  { artifactId, fromContainerArtifactId, toContainerArtifactId, access }: MoveArtifactInput,
+  { artifactId, sourceContainerArtifactId, targetContainerArtifactId, access }: MoveArtifactInput,
 ): Promise<Artifact> => {
-  const member = await fetchArtifact(artifactId);
-  assertNotRootArtifact(member, 'Root container cannot be moved');
+  const artifact = await fetchArtifactOrThrow(artifactId);
+  validateNotRootArtifact(artifact, 'Root container cannot be moved');
 
-  if (!fromContainerArtifactId && !toContainerArtifactId) {
-    if (!(await canActOnArtifact(permix, member, 'manage'))) {
-      throw makeError({ status: 403, message: 'Forbidden' });
-    }
+  if (!sourceContainerArtifactId && !targetContainerArtifactId) {
+    await validateArtifactPermission(permix, artifact, 'manage');
     throw makeError({ status: 422, message: 'A move needs a different destination' });
   }
 
-  // Gate container lookups when the caller cannot even read the member (prevents container existence oracle).
+  // Gate container lookups when the caller cannot even read the artifact (prevents container existence oracle).
   if (
-    !(await canActOnArtifact(permix, member, 'read')) &&
-    (!fromContainerArtifactId ||
-      !(await canActOnArtifact(permix, await fetchArtifact(fromContainerArtifactId), 'operate')))
+    !(await holdsOnRecord(permix, 'artifact', artifact, 'read')) &&
+    (!sourceContainerArtifactId ||
+      !(await holdsOnRecord(
+        permix,
+        'artifact',
+        await fetchArtifactOrThrow(sourceContainerArtifactId),
+        'operate',
+      )))
   ) {
     throw makeError({ status: 403, message: 'Forbidden' });
   }
 
-  const resolvedFrom = fromContainerArtifactId
-    ? await fetchArtifact(fromContainerArtifactId)
-    : await fetchOwnerRootArtifact(member);
-  if (!resolvedFrom) {
-    if (!(await canActOnArtifact(permix, member, 'manage'))) {
-      throw makeError({ status: 403, message: 'Forbidden' });
-    }
+  const sourceContainer = sourceContainerArtifactId
+    ? await fetchArtifactOrThrow(sourceContainerArtifactId)
+    : await fetchOwnerRootArtifact(artifact);
+  if (!sourceContainer) {
+    await validateArtifactPermission(permix, artifact, 'manage');
     throw makeError({ status: 404, message: 'The artifact is not in that container' });
   }
 
-  const resolvedTo = toContainerArtifactId
-    ? await fetchArtifact(toContainerArtifactId)
-    : await fetchOwnerRootArtifact(member);
+  const targetContainer = targetContainerArtifactId
+    ? await fetchArtifactOrThrow(targetContainerArtifactId)
+    : await ensureOwnerRootArtifact(artifact);
 
-  if (resolvedTo) {
-    await assertAndFetchSourcePlacement(permix, member, resolvedFrom);
-    await assertEdgeAuthority(permix, member, resolvedTo, 'create', access);
-    assertMovePairValid(member, resolvedFrom, resolvedTo);
+  await fetchAuthorizedSourcePlacement(permix, artifact, sourceContainer);
+  await validateEdgeAuthority(permix, artifact, targetContainer, 'create', access);
+  validateMovePair(artifact, sourceContainer, targetContainer);
 
-    return withLockedArtifacts([member, resolvedFrom, resolvedTo], async (locked) => {
-      const lockedMember = locked.get(artifactId)!;
-      const lockedFrom = locked.get(resolvedFrom.id)!;
-      const lockedTo = locked.get(resolvedTo.id)!;
-      assertNotRootArtifact(lockedMember, 'Root container cannot be moved');
-      const sourceEdge = await assertAndFetchSourcePlacement(permix, lockedMember, lockedFrom);
-      await assertEdgeAuthority(permix, lockedMember, lockedTo, 'create', access);
-      assertMovePairValid(lockedMember, lockedFrom, lockedTo);
-      await writePlacement(lockedMember, lockedTo, access);
-      await db.artifactPlacement.update({
-        where: { id: sourceEdge.id },
-        data: { deletedAt: new Date() },
-      });
-      return db.artifact.findUniqueOrThrow({ where: { id: artifactId } });
-    });
-  }
-
-  // Moving to member's root when root does not exist yet: check authority first, then create root under lock.
-  await assertAndFetchSourcePlacement(permix, member, resolvedFrom);
-  if (!(await canActOnArtifact(permix, member, 'manage'))) {
-    throw makeError({ status: 403, message: 'Forbidden' });
-  }
-  return withLockedArtifacts([member, resolvedFrom], async (locked) => {
-    const lockedMember = locked.get(artifactId)!;
-    const lockedFrom = locked.get(resolvedFrom.id)!;
-    assertNotRootArtifact(lockedMember, 'Root container cannot be moved');
-    const sourceEdge = await assertAndFetchSourcePlacement(permix, lockedMember, lockedFrom);
-    const targetRoot = await ensureOwnerRootArtifact(lockedMember);
-    await assertEdgeAuthority(permix, lockedMember, targetRoot, 'create', access);
-    assertMovePairValid(lockedMember, lockedFrom, targetRoot);
-    await writePlacement(lockedMember, targetRoot, access);
+  return withLockedArtifacts([artifact, sourceContainer, targetContainer], async (locked) => {
+    const lockedArtifact = locked.get(artifactId)!;
+    const lockedSource = locked.get(sourceContainer.id)!;
+    const lockedTarget = locked.get(targetContainer.id)!;
+    validateNotRootArtifact(lockedArtifact, 'Root container cannot be moved');
+    const sourceEdge = await fetchAuthorizedSourcePlacement(permix, lockedArtifact, lockedSource);
+    await validateEdgeAuthority(permix, lockedArtifact, lockedTarget, 'create', access);
+    validateMovePair(lockedArtifact, lockedSource, lockedTarget);
+    await writePlacement(lockedArtifact, lockedTarget, access);
     await db.artifactPlacement.update({
       where: { id: sourceEdge.id },
       data: { deletedAt: new Date() },
