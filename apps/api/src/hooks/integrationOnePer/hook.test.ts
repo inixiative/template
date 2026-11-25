@@ -8,49 +8,49 @@ import {
   createProject,
   createProjectIntegration,
 } from '@template/db/test';
-import { INTEGRATION_SINGLETONS } from '@template/shared/integrations/integrationSingletons';
+import { INTEGRATION_ONE_PER } from '@template/shared/integrations/integrationOnePer';
 
-const singletonProvider: Provider = 'linear';
+const onePerProvider: Provider = 'linear';
 const otherProvider: Provider = 'slack';
 
 beforeEach(() => {
-  INTEGRATION_SINGLETONS[singletonProvider] = ['owner', 'project'];
+  INTEGRATION_ONE_PER[onePerProvider] = ['owner', 'project'];
 });
 
 afterEach(async () => {
-  delete INTEGRATION_SINGLETONS[singletonProvider];
+  delete INTEGRATION_ONE_PER[onePerProvider];
   await cleanupTouchedTables(db);
 });
 
 const orgIntegration = (organizationId: string, provider: Provider) =>
   createIntegration({ ownerModel: 'Organization', organizationId, provider });
 
-describe('integrationSingleton hook', () => {
-  it('allows one live integration of an owner-singleton provider per owner', async () => {
+describe('integrationOnePer hook', () => {
+  it('allows one live integration of an one-per-owner provider per owner', async () => {
     const { entity: organization } = await createOrganization();
     const { entity: other } = await createOrganization();
-    const { entity: first } = await orgIntegration(organization.id, singletonProvider);
+    const { entity: first } = await orgIntegration(organization.id, onePerProvider);
 
-    await expect(orgIntegration(organization.id, singletonProvider)).rejects.toMatchObject({
+    await expect(orgIntegration(organization.id, onePerProvider)).rejects.toMatchObject({
       status: 409,
     });
-    await orgIntegration(other.id, singletonProvider);
+    await orgIntegration(other.id, onePerProvider);
     await orgIntegration(organization.id, otherProvider);
     await orgIntegration(organization.id, otherProvider);
 
     await db.integration.update({ where: { id: first.id }, data: { deletedAt: new Date() } });
-    await orgIntegration(organization.id, singletonProvider);
+    await orgIntegration(organization.id, onePerProvider);
   });
 
-  it('allows one live link per project to an integration of a project-singleton provider', async () => {
-    INTEGRATION_SINGLETONS[singletonProvider] = ['project'];
+  it('allows one live link per project to an integration of a one-per-project provider', async () => {
+    INTEGRATION_ONE_PER[onePerProvider] = ['project'];
     const { entity: organization } = await createOrganization();
     const { entity: project } = await createProject({
       ownerModel: 'Organization',
       organizationId: organization.id,
     });
-    const { entity: first } = await orgIntegration(organization.id, singletonProvider);
-    const { entity: second } = await orgIntegration(organization.id, singletonProvider);
+    const { entity: first } = await orgIntegration(organization.id, onePerProvider);
+    const { entity: second } = await orgIntegration(organization.id, onePerProvider);
     const { entity: firstLink } = await createProjectIntegration(
       {},
       { project, integration: first },
@@ -93,30 +93,30 @@ describe('integrationSingleton hook', () => {
     expect(secondLink.integrationId).toBe(second.id);
   });
 
-  it('refuses a provider change, an integration restore and a connect-form link that would break a singleton', async () => {
+  it('refuses a provider change, an integration restore and a connect-form link that would break a one-per rule', async () => {
     const { entity: organization } = await createOrganization();
     const { entity: project } = await createProject({
       ownerModel: 'Organization',
       organizationId: organization.id,
     });
     const { entity: slack } = await orgIntegration(organization.id, otherProvider);
-    const { entity: first } = await orgIntegration(organization.id, singletonProvider);
+    const { entity: first } = await orgIntegration(organization.id, onePerProvider);
 
     await expect(
-      db.integration.update({ where: { id: slack.id }, data: { provider: singletonProvider } }),
+      db.integration.update({ where: { id: slack.id }, data: { provider: onePerProvider } }),
     ).rejects.toMatchObject({ status: 422 });
 
     await createProjectIntegration({}, { project, integration: first });
     await db.integration.update({ where: { id: first.id }, data: { deletedAt: new Date() } });
-    const { entity: second } = await orgIntegration(organization.id, singletonProvider);
+    const { entity: second } = await orgIntegration(organization.id, onePerProvider);
     await expect(
       db.withDeleted(() =>
         db.integration.update({ where: { id: first.id }, data: { deletedAt: null } }),
       ),
     ).rejects.toMatchObject({ status: 409 });
 
-    INTEGRATION_SINGLETONS[singletonProvider] = ['project'];
-    const { entity: third } = await orgIntegration(organization.id, singletonProvider);
+    INTEGRATION_ONE_PER[onePerProvider] = ['project'];
+    const { entity: third } = await orgIntegration(organization.id, onePerProvider);
     await createProjectIntegration({}, { project, integration: second });
     await expect(
       db.projectIntegration.upsert({
@@ -132,15 +132,15 @@ describe('integrationSingleton hook', () => {
     ).rejects.toMatchObject({ status: 409 });
   });
 
-  it('an upsert refreshes the live singleton itself, and reviving a removed one onto a live one is refused', async () => {
+  it('an upsert refreshes the live one-per-owner integration itself, and reviving a removed one beside a live one is refused', async () => {
     const { entity: organization } = await createOrganization();
-    const { entity: removed } = await orgIntegration(organization.id, singletonProvider);
+    const { entity: removed } = await orgIntegration(organization.id, onePerProvider);
     await db.integration.update({ where: { id: removed.id }, data: { deletedAt: new Date() } });
-    const { entity: live } = await orgIntegration(organization.id, singletonProvider);
+    const { entity: live } = await orgIntegration(organization.id, onePerProvider);
     const create = {
       ownerModel: 'Organization',
       organizationId: organization.id,
-      provider: singletonProvider,
+      provider: onePerProvider,
       name: 'Linear',
     } as const;
 

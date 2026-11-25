@@ -13,14 +13,10 @@ import {
 import type { Setting } from '@template/db/generated/client/client';
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
-import {
-  settingAppliesToIntegrationProvider,
-  settingDefinitionForKeyOrThrow,
-} from '@template/shared/settings';
+import { settingDefinitionForKeyOrThrow } from '@template/shared/settings';
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
 import type { SettingUpsertItem } from '#/modules/setting/schemas/settingSchemas';
-import { settingIntegrationProvider } from '#/modules/setting/services/settingIntegrationProvider';
 import type { AppEnv } from '#/types/appEnv';
 
 /**
@@ -55,20 +51,6 @@ export const upsertResourceSettings = async (
   const resource = c.get('resource') as Record<string, unknown>;
   const resourceId = resource.id as string;
   const targetFks = polymorphicArmKeys('Setting', 'resourceModel', resourceModel, resource);
-
-  const integrationProvider = await settingIntegrationProvider(resourceModel, resource);
-  for (const item of items) {
-    if (
-      !settingAppliesToIntegrationProvider(
-        settingDefinitionForKeyOrThrow(item.key),
-        integrationProvider,
-      )
-    )
-      throw makeError({
-        status: 422,
-        message: `Setting '${item.key}' does not apply to ${integrationProvider ? `a ${integrationProvider}` : 'this'} integration`,
-      });
-  }
 
   const hydratedBase = await hydrate('setting', {
     id: '',

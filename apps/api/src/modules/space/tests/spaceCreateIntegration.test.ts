@@ -18,7 +18,7 @@ import {
   createUser,
   nextFactorySequenceNumber,
 } from '@template/db/test';
-import { INTEGRATION_SINGLETONS } from '@template/shared/integrations/integrationSingletons';
+import { INTEGRATION_ONE_PER } from '@template/shared/integrations/integrationOnePer';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { parseSuccessBody, post } from '#tests/utils/request';
@@ -75,8 +75,8 @@ describe('POST /api/v1/space/:id/integrations', () => {
     expect(data.organizationId).toBe(org.id);
   });
 
-  it('connecting an owner-singleton provider again revives the removed integration, with what was removed with it', async () => {
-    INTEGRATION_SINGLETONS.linear = ['owner'];
+  it('connecting an one-per-owner provider again revives the removed integration, with what was removed with it', async () => {
+    INTEGRATION_ONE_PER.linear = ['owner'];
     const connect = () =>
       fetch(
         post(`/api/v1/space/${space.id}/integrations`, {
@@ -102,7 +102,7 @@ describe('POST /api/v1/space/:id/integrations', () => {
       expect(await db.projectIntegration.count({ where: { integrationId: first.id } })).toBe(1);
       expect((await connect()).status).toBe(409);
     } finally {
-      delete INTEGRATION_SINGLETONS.linear;
+      delete INTEGRATION_ONE_PER.linear;
     }
   });
 });

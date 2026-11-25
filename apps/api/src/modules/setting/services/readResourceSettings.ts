@@ -40,7 +40,7 @@ export const readResourceSettings = async (
 
   const definitions = settingDefinitionsForResourceModel(
     resourceModel,
-    await settingIntegrationProvider(resourceModel, resource),
+    await settingIntegrationProvider({ resourceModel, ...targetFks }),
   ).filter((definition) => {
     if (query.category && definition.category !== query.category) return false;
     if (query.key && definition.key !== query.key) return false;

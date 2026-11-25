@@ -10,7 +10,7 @@ import { registerValidateEntitlementLensHook } from '#/hooks/entitlementLens/hoo
 import { registerCarriedOwnerKeysHook } from '#/hooks/falsePolymorphism/carriedOwnerKeysHook';
 import { registerFullDelegateTakesNoRoleOrEntitlementsHook } from '#/hooks/fullDelegate/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerIntegrationSingletonHook } from '#/hooks/integrationSingleton/hook';
+import { registerIntegrationOnePerHook } from '#/hooks/integrationOnePer/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
@@ -20,6 +20,7 @@ import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHoo
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook } from '#/hooks/segmentMemberOwner/hook';
+import { registerSettingIntegrationProviderHook } from '#/hooks/settingIntegrationProvider/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 import { registerUserEmailAddressValidationHook } from '#/hooks/userEmail/hook';
@@ -36,7 +37,8 @@ export const registerHooks = () => {
   registerRulesHook();
   registerAttributeValidationHook();
   registerAuditLogHook();
-  registerIntegrationSingletonHook();
+  registerIntegrationOnePerHook();
+  registerSettingIntegrationProviderHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();
   registerClearCacheHook();

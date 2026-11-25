@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { Provider, Role, SettingResourceModel } from '@template/db/generated/client/enums';
 import { ROLES } from '@template/shared/auth/roles';
-import { INTEGRATION_SINGLETONS } from '@template/shared/integrations/integrationSingletons';
+import { INTEGRATION_ONE_PER } from '@template/shared/integrations/integrationOnePer';
 import { SETTING_DEFINITIONS, SETTING_RESOURCE_MODELS } from '@template/shared/settings';
 
 describe('shared enum mirrors', () => {
@@ -13,9 +13,9 @@ describe('shared enum mirrors', () => {
     expect([...SETTING_RESOURCE_MODELS]).toEqual(Object.values(SettingResourceModel));
   });
 
-  it('every INTEGRATION_SINGLETONS key and setting integrationProviders entry is a Prisma Provider value', () => {
+  it('every INTEGRATION_ONE_PER key and setting integrationProviders entry is a Prisma Provider value', () => {
     const providers = new Set<string>(Object.values(Provider));
-    for (const provider of Object.keys(INTEGRATION_SINGLETONS)) {
+    for (const provider of Object.keys(INTEGRATION_ONE_PER)) {
       expect(providers.has(provider)).toBe(true);
     }
     for (const definition of Object.values(SETTING_DEFINITIONS)) {

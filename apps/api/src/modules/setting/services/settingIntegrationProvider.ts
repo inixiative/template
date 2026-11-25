@@ -5,17 +5,26 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import type { Provider, SettingResourceModel } from '@template/db/generated/client/enums';
+import type { Setting } from '@template/db/generated/client/client';
+import type { Provider } from '@template/db/generated/client/enums';
 
 export const settingIntegrationProvider = async (
-  resourceModel: SettingResourceModel,
-  resource: Record<string, unknown>,
+  setting: Partial<
+    Pick<Setting, 'resourceModel' | 'resourceIntegrationId' | 'resourceProjectIntegrationId'>
+  >,
 ): Promise<Provider | undefined> => {
-  if (resourceModel === 'Integration') return (resource.provider as Provider | null) ?? undefined;
-  if (resourceModel !== 'ProjectIntegration') return undefined;
-  const integration = await db.integration.findUniqueOrThrow({
-    where: { id: resource.integrationId as string },
-    select: { provider: true },
+  if (setting.resourceModel === 'Integration' && setting.resourceIntegrationId) {
+    const integration = await db.integration.findUniqueOrThrow({
+      where: { id: setting.resourceIntegrationId },
+      select: { provider: true },
+    });
+    return integration.provider ?? undefined;
+  }
+  if (setting.resourceModel !== 'ProjectIntegration' || !setting.resourceProjectIntegrationId)
+    return undefined;
+  const link = await db.projectIntegration.findUniqueOrThrow({
+    where: { id: setting.resourceProjectIntegrationId },
+    select: { integration: { select: { provider: true } } },
   });
-  return integration.provider ?? undefined;
+  return link.integration.provider ?? undefined;
 };
