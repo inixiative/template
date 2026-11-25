@@ -10,7 +10,6 @@ import { registerValidateEntitlementLensHook } from '#/hooks/entitlementLens/hoo
 import { registerCarriedOwnerKeysHook } from '#/hooks/falsePolymorphism/carriedOwnerKeysHook';
 import { registerFullDelegateTakesNoRoleOrEntitlementsHook } from '#/hooks/fullDelegate/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerIntegrationOnePerHook } from '#/hooks/integrationOnePer/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
@@ -37,7 +36,6 @@ export const registerHooks = () => {
   registerRulesHook();
   registerAttributeValidationHook();
   registerAuditLogHook();
-  registerIntegrationOnePerHook();
   registerSettingIntegrationProviderHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();

@@ -10,6 +10,7 @@ import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import { makeController } from '#/lib/utils/makeController';
 import { projectCreateProjectIntegrationRoute } from '#/modules/project/routes/projectCreateProjectIntegration';
+import { validateOnePerProjectLinkFree } from '#/modules/projectIntegration/validations/validateOnePerProjectLinkFree';
 
 export const projectCreateProjectIntegrationController = makeController(
   projectCreateProjectIntegrationRoute,
@@ -27,13 +28,16 @@ export const projectCreateProjectIntegrationController = makeController(
     )
       throw makeError({ status: 403, message: 'Access denied' });
 
-    const linked = await db.withDeleted(() =>
-      db.projectIntegration.upsert({
-        where: { projectId_integrationId: pair },
-        create: pair,
-        update: { deletedAt: null },
-      }),
-    );
+    const linked = await db.txn(async () => {
+      await validateOnePerProjectLinkFree(project.id, integration);
+      return db.withDeleted(() =>
+        db.projectIntegration.upsert({
+          where: { projectId_integrationId: pair },
+          create: pair,
+          update: { deletedAt: null },
+        }),
+      );
+    });
 
     return respond.created(linked);
   },

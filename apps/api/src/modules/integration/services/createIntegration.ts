@@ -8,7 +8,7 @@ import { db, type EntitlementInput, type Prisma } from '@template/db';
 import type { Permix } from '@template/permissions';
 import { omit } from 'lodash-es';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
-import { fetchRemovedOnePerOwnerIntegration } from '#/modules/integration/services/fetchRemovedOnePerOwnerIntegration';
+import { fetchOnePerOwnerIntegrationForUpdate } from '#/modules/integration/services/fetchOnePerOwnerIntegrationForUpdate';
 import { integrationOwnerKey } from '#/modules/integration/services/integrationOwnerKey';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
 
@@ -22,12 +22,15 @@ export const createIntegration = (
 ) =>
   db.txn(async () => {
     await validateIntegrationRole(writer, row);
-    const removed = await fetchRemovedOnePerOwnerIntegration(row);
-    const integration = removed
+    const existing = await fetchOnePerOwnerIntegrationForUpdate(row);
+    const integration = existing
       ? await db.withDeleted(() =>
           db.integration.update({
-            where: { id: removed.id },
-            data: { ...omit(row, Object.keys(integrationOwnerKey(row))), deletedAt: null },
+            where: { id: existing.id },
+            data: {
+              ...omit(row, Object.keys(integrationOwnerKey(row))),
+              ...(existing.deletedAt ? { deletedAt: null } : {}),
+            },
           }),
         )
       : await db.integration.create({ data: row });

@@ -28,6 +28,7 @@ import {
   createSpaceUser,
   createUser,
 } from '@template/db/test';
+import { INTEGRATION_ONE_PER } from '@template/shared/integrations/integrationOnePer';
 import { inquiryRouter } from '#/modules/inquiry';
 import { projectRouter } from '#/modules/project';
 import {
@@ -441,5 +442,30 @@ describe('ProjectIntegration CRUD, tenant boundary hook, ReBAC, AuditLog, and sp
       where: { id: spaceLink.id },
     });
     expect(survivingSpaceLink).not.toBeNull();
+  });
+
+  it('a one-per-project provider takes one live link per project: another integration of it is 409, re-linking the same one is not', async () => {
+    INTEGRATION_ONE_PER.linear = ['project'];
+    try {
+      const linearFor = async () =>
+        (
+          await createIntegration({
+            ownerModel: 'Organization',
+            organizationId: organization.id,
+            provider: 'linear',
+          })
+        ).entity;
+      const [first, second] = [await linearFor(), await linearFor()];
+      const link = (integrationId: string) =>
+        ownerApp.fetch(
+          post(`/api/v1/project/${orgProject.id}/projectIntegrations`, { integrationId }),
+        );
+
+      expect((await link(first.id)).status).toBe(201);
+      expect((await link(second.id)).status).toBe(409);
+      expect((await link(first.id)).status).toBe(201);
+    } finally {
+      delete INTEGRATION_ONE_PER.linear;
+    }
   });
 });

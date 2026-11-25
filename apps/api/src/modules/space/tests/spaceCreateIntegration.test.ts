@@ -75,7 +75,7 @@ describe('POST /api/v1/space/:id/integrations', () => {
     expect(data.organizationId).toBe(org.id);
   });
 
-  it('connecting an one-per-owner provider again revives the removed integration, with what was removed with it', async () => {
+  it('connecting a one-per-owner provider again revives the removed integration with what was removed with it, and over a live one updates it', async () => {
     INTEGRATION_ONE_PER.linear = ['owner'];
     const connect = () =>
       fetch(
@@ -100,7 +100,8 @@ describe('POST /api/v1/space/:id/integrations', () => {
       expect(again.status).toBe(201);
       expect(revived).toMatchObject({ id: first.id, deletedAt: null });
       expect(await db.projectIntegration.count({ where: { integrationId: first.id } })).toBe(1);
-      expect((await connect()).status).toBe(409);
+      const { data: refreshed } = await parseSuccessBody<Integration>(await connect());
+      expect(refreshed.id).toBe(first.id);
     } finally {
       delete INTEGRATION_ONE_PER.linear;
     }
