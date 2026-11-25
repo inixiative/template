@@ -6,6 +6,7 @@ import {
   createIntegration,
   createOrganization,
   createOrganizationUser,
+  storeEntitlements,
 } from '@template/db/test';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { heldEntitlements } from '#tests/utils/entitlements';
@@ -55,5 +56,26 @@ describe('writing full clears the role and tombstones the entitlement rows besid
       db.entitlement.findMany({ where: { targetModel: 'Token', targetId: token.id } }),
     );
     expect(tombstoned.map((row) => row.deletedAt != null)).toEqual([true]);
+  });
+
+  it('an integration revived as full brings back none of the entitlements removed with it', async () => {
+    const { entity: member } = await createOrganizationUser({ role: 'owner' }, { organization });
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'OrganizationUser',
+      organizationId: member.organizationId,
+      userId: member.userId,
+      role: 'viewer',
+    });
+    await storeEntitlements({ model: 'Integration', row: integration }, operate(organization.id));
+    await db.integration.update({ where: { id: integration.id }, data: { deletedAt: new Date() } });
+
+    await db.withDeleted(() =>
+      db.integration.update({
+        where: { id: integration.id },
+        data: { deletedAt: null, full: true },
+      }),
+    );
+
+    expect(await heldEntitlements({ model: 'Integration', id: integration.id })).toEqual([]);
   });
 });
