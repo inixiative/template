@@ -18,6 +18,7 @@ import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
 import { useAuthProviders } from '@template/ui/hooks';
 import { type DescribedError, describeError } from '@template/ui/lib/describeError';
+import { redirectAfterLogin } from '@template/ui/lib/routeRedirect';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
 import { useState } from 'react';
@@ -42,9 +43,6 @@ export const SignUpForm = ({ onLoginClick }: SignUpFormProps) => {
 
   const search = useSearch({ strict: false }) as { redirectTo?: string };
   const signUp = useAppStore((state) => state.auth.signUp);
-  const navigateKeepingSearchParams = useAppStore(
-    (state) => state.navigation.navigateKeepingSearchParams,
-  );
   const { providers, isLoading: _isLoadingProviders, error: providerError } = useAuthProviders();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,7 +55,7 @@ export const SignUpForm = ({ onLoginClick }: SignUpFormProps) => {
       setPassword('');
       if (result.status === 'verification-pending') setVerificationEmail(result.email);
       else if (result.status === 'authenticated')
-        navigateKeepingSearchParams(search.redirectTo || '/dashboard', 'context');
+        redirectAfterLogin(useAppStore.getState, search.redirectTo);
     } catch (err) {
       const described = describeError(err, 'Sign up failed. Please try again.');
       setError(described);

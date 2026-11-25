@@ -16,7 +16,10 @@ import type { MiddlewareHandler } from 'hono';
 import { makeRouteMatcher } from '#/lib/http/routeMatcher';
 import type { AppEnv } from '#/types/appEnv';
 
-const isTelemetryExcludedRoute = makeRouteMatcher(['/health*', '/api/telemetry/browser']);
+const isTelemetryExcludedRoute = makeRouteMatcher([
+  ['*', '/health*'],
+  ['*', '/api/telemetry/browser'],
+]);
 
 export const telemetryMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (isTelemetryExcludedRoute(c.req.method, c.req.path)) return next();

@@ -7,13 +7,22 @@
 import { redirect } from '@tanstack/react-router';
 import { isAppPath } from '@template/shared/utils/isAppPath';
 import { currentLocation, currentPath } from '@template/ui/lib/currentLocation';
-import { pickSearchParams } from '@template/ui/lib/searchParams';
+import { pickSearchParams, searchParamValue } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
 
 export const TWO_FACTOR_PATH = '/two-factor';
 export const PRESERVED_REDIRECT_PARAMS = ['org', 'space', 'spoof', 'flow'] as const;
 
-const NON_RETURN_AUTH_PATHS = ['/login', '/signup', TWO_FACTOR_PATH] as const;
+const NON_RETURN_AUTH_PATHS = ['/login', '/signup', '/auth/callback', TWO_FACTOR_PATH] as const;
+
+const withCurrentFlow = (to: string): string => {
+  const flow = searchParamValue(currentLocation().search, 'flow');
+  if (!flow) return to;
+  const parsed = new URL(to, 'http://localhost');
+  if (parsed.searchParams.has('flow')) return to;
+  parsed.searchParams.set('flow', flow);
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+};
 
 type BeforeLoadContext = {
   location: {
@@ -68,6 +77,44 @@ export const navigateToTwoFactorReverify = (currentAppStore: () => AppStore): vo
   const params = new URLSearchParams({ mode: 'reverify', redirectTo });
   currentAppStore().navigation.navigateKeepingSearchParams(
     `${TWO_FACTOR_PATH}?${params.toString()}`,
+    'context',
+  );
+};
+
+export const redirectAfterLogin = (
+  currentAppStore: () => AppStore,
+  redirectTo?: string,
+  preserveParams: 'all' | 'context' | 'spoof' = 'context',
+): void => {
+  const store = currentAppStore();
+  const target = withCurrentFlow(safeInternalRedirect(redirectTo));
+
+  switch (store.auth.twoFactorAction) {
+    case 'enroll':
+    case 'verify': {
+      const params = new URLSearchParams({ redirectTo: target });
+      store.navigation.navigateKeepingSearchParams(
+        withCurrentFlow(`${TWO_FACTOR_PATH}?${params.toString()}`),
+        preserveParams,
+      );
+      return;
+    }
+    case null:
+      store.navigation.navigateKeepingSearchParams(target, preserveParams);
+      return;
+    default: {
+      const exhaustive: never = store.auth.twoFactorAction;
+      void exhaustive;
+    }
+  }
+};
+
+export const redirectAfterTwoFactor = (
+  currentAppStore: () => AppStore,
+  redirectTo?: string,
+): void => {
+  currentAppStore().navigation.navigateKeepingSearchParams(
+    withCurrentFlow(safeInternalRedirect(redirectTo)),
     'context',
   );
 };

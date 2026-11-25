@@ -6,7 +6,6 @@
  */
 import { db } from '@template/db';
 import type { TwoFactor } from '@template/db/generated/client/client';
-import { isSuperadmin } from '@template/permissions';
 import { TWO_FACTOR_REVERIFY_REQUIRED_CODE } from '@template/shared/auth/twoFactor';
 import type { Context } from 'hono';
 import { TWO_FACTOR_REVERIFY_TTL_SECONDS } from '#/lib/auth/userJwt';
@@ -40,17 +39,7 @@ export const assertFirstFactorOrRecentVerify = async (
 };
 
 export const assertRecentTwoFactor = async (c: Context<AppEnv>): Promise<void> => {
-  const token = c.get('token');
-  if (token || c.get('authCredentialKind') === 'token') {
-    const tokenUser = token?.user ?? c.get('spoofedBy');
-    if (tokenUser?.twoFactorEnabled && isSuperadmin(tokenUser)) {
-      throw makeError({
-        status: 403,
-        message: 'Two-factor verification required; use a signed-in user session',
-      });
-    }
-    return;
-  }
+  if (c.get('token') || c.get('authCredentialKind') === 'token') return;
 
   const sessionUser = c.get('spoofedBy') ?? c.get('user');
   if (!sessionUser?.twoFactorEnabled) return;
