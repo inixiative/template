@@ -128,8 +128,9 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       },
 
       changePassword: async (input: ChangePasswordInput) => {
-        const handoff = await changePasswordFn(input);
-        if (get().auth.spoofUserEmail || !handoff.token) return;
+        const spoofUserEmail = get().auth.spoofUserEmail;
+        const handoff = await changePasswordFn(input, { spoofUserEmail });
+        if (spoofUserEmail || !handoff.token) return;
         storeJwtHandoff(handoff);
         syncWsAuth();
       },
