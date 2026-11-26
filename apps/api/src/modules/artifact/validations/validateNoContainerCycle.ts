@@ -34,7 +34,7 @@ export const validateNoContainerCycle = async (
     where: { ancestorArtifactId: artifactId, artifact: { kind: { in: containerArtifactKinds } } },
     _max: { depth: true },
   });
-  if ((above._max.depth ?? 0) + 1 + (below._max.depth ?? 0) > ARTIFACT_MAX_DEPTH) {
+  if ((above._max.depth ?? 0) + (below._max.depth ?? 0) + 2 > ARTIFACT_MAX_DEPTH) {
     throw makeError({
       status: 422,
       message: `Containers nest at most ${ARTIFACT_MAX_DEPTH} deep`,

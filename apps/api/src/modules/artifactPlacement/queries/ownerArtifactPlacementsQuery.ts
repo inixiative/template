@@ -7,7 +7,6 @@
 import { hydrateMany, type Prisma } from '@template/db';
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
 import { ArtifactKind, type PlacementReadAccess } from '@template/db/generated/client/enums';
-import { directEntitledIds } from '@template/permissions';
 import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { isPlainObject } from 'lodash-es';
@@ -28,8 +27,6 @@ import {
   ownerColumns,
 } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
-
-const PLACEMENT_READ_ACTIONS = ['read', 'manage'] as const;
 
 const hasContainerFilter = (c: Context<AppEnv>): boolean => {
   const bracketSearchFields = c.get('bracketQuery').searchFields;
@@ -56,17 +53,8 @@ const ownerArtifactPlacementsWhere = async (
     };
   }
 
-  // Entitlement-only tokens without any db:ArtifactPlacement read/manage entitlement cannot read placements.
   const token = c.get('token');
-  const {
-    entitlements: placementEntitlements,
-    directIds: directPlacementIds,
-    hasBroadEntitlement: hasBroadPlacementEntitlement,
-  } = directEntitledIds(permix, 'db:ArtifactPlacement', PLACEMENT_READ_ACTIONS);
-
-  if (token && !token.full && token.role === null && placementEntitlements.length === 0) {
-    return { id: { in: [] } };
-  }
+  if (token && !token.full && token.role === null) return { id: { in: [] } };
 
   const [anyArtifactWhere, probed] = await Promise.all([
     accessibleAnyArtifactWhere(c),
@@ -77,7 +65,7 @@ const ownerArtifactPlacementsWhere = async (
     containerWhere: Prisma.ArtifactWhereInput,
     isRoot: boolean,
   ): Prisma.ArtifactPlacementWhereInput | null => {
-    if (probed.canOwnerReadPrivate || hasBroadPlacementEntitlement) {
+    if (probed.canOwnerReadPrivate) {
       return { containerArtifact: containerWhere };
     }
     const allowedReadAccess: PlacementReadAccess[] = isRoot ? [] : ['inherit', 'public'];
@@ -99,7 +87,6 @@ const ownerArtifactPlacementsWhere = async (
       const manageGrant = effectiveGrantWhere(permix, ['admin', 'owner']);
       if (manageGrant) orClauses.push({ containerArtifact: manageGrant });
     }
-    if (directPlacementIds.length > 0) orClauses.push({ id: { in: directPlacementIds } });
     return orClauses.length > 0 ? { containerArtifact: containerWhere, OR: orClauses } : null;
   };
 

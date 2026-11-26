@@ -153,21 +153,8 @@ export const transferArtifactService: InquiryService<
     }
     const sourceOwner = await fetchOwnerOf(source);
     const targetOwner = await fetchOwnerOf(target);
-    const existingPlacements = await db.artifactPlacement.findMany({
-      where: { artifactId: content.artifactId },
-      select: {
-        containerArtifact: {
-          select: { ownerModel: true, userId: true, organizationId: true, spaceId: true },
-        },
-      },
-    });
-    const lockTargets: OwnedArtifact[] = [
-      sourceOwner,
-      targetOwner,
-      ...existingPlacements.map((placement) => placement.containerArtifact),
-    ];
 
-    await withArtifactOwnersLock(lockTargets, async () => {
+    await withArtifactOwnersLock([sourceOwner, targetOwner], async () => {
       const [lockedRow] = await db.findForUpdate<Artifact>('Artifact', { id: content.artifactId });
       const artifact = validateTransferableArtifact(lockedRow, sourceOwner);
       const allowTracking = response.allowTracking ?? content.allowTracking;
@@ -181,8 +168,7 @@ export const transferArtifactService: InquiryService<
         where: { artifactId: artifact.id },
         data: { deletedAt: new Date() },
       });
-      // why: update owner and ensure a target-root placement BEFORE deleting old placements so the
-      // orphan-reparenting hook sees an active target-owner placement and does not reparent back to source.
+      // why: switch owner and place at target root before deleting old placements so orphan-reparenting stays idle.
       const transferred = await db.artifact.update({
         where: { id: artifact.id },
         data: {
@@ -205,7 +191,11 @@ export const transferArtifactService: InquiryService<
             operateAccess: 'private',
           });
       await db.artifactPlacement.deleteMany({
-        where: { artifactId: artifact.id, id: { not: targetPlacement.id } },
+        where: {
+          artifactId: artifact.id,
+          id: { not: targetPlacement.id },
+          containerArtifact: { OR: [sourceOwner, targetOwner] },
+        },
       });
       if (tracked) await grantSourceRead(artifact.id, source);
     });

@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma, primitive:authz
  */
 import {
+  type AccessorName,
   db,
   type HydratedRecord,
   hydrate,
@@ -18,24 +19,53 @@ import { artifactEffectiveRole } from '@template/permissions';
 import type { Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
-import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import { includeArtifactDetail } from '#/modules/artifact/queries/artifactIncludes';
 import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
-const visibleBindingToCaller = async (
+const filterVisibleBindings = async (
   permix: Permix,
-  binding: ResourceBinding,
-): Promise<boolean> => {
-  const ref = rowPolymorphicAxisPointsAt(
-    binding as Record<string, unknown>,
-    'ResourceBinding',
-    'resourceModel',
+  bindings: ResourceBinding[],
+): Promise<ResourceBinding[]> => {
+  if (bindings.length === 0) return [];
+  const refsByAccessor = new Map<AccessorName, Set<string>>();
+  const refByIndex: ({ accessor: AccessorName; id: string } | null)[] = bindings.map((binding) => {
+    const ref = rowPolymorphicAxisPointsAt(
+      binding as Record<string, unknown>,
+      'ResourceBinding',
+      'resourceModel',
+    );
+    if (!ref || !isBindableOwnerModel(ref.model)) return null;
+    const accessor = toAccessor(ref.model);
+    let ids = refsByAccessor.get(accessor);
+    if (!ids) {
+      ids = new Set();
+      refsByAccessor.set(accessor, ids);
+    }
+    ids.add(ref.id);
+    return { accessor, id: ref.id };
+  });
+
+  const readableKeys = new Set<string>();
+  await Promise.all(
+    [...refsByAccessor.entries()].map(async ([accessor, idSet]) => {
+      const records = (await db.delegate(accessor).findMany({
+        where: { id: { in: [...idSet] } },
+      })) as HydratedRecord[];
+      if (records.length === 0) return;
+      const hydratedRecords = await hydrateMany(accessor, records);
+      for (const hydrated of hydratedRecords) {
+        if (check(permix, accessor, hydrated, 'read')) {
+          readableKeys.add(`${accessor}:${hydrated.id}`);
+        }
+      }
+    }),
   );
-  if (!ref || !isBindableOwnerModel(ref.model)) return false;
-  const accessor = toAccessor(ref.model);
-  const record = await db.delegate(accessor).findUnique({ where: { id: ref.id } });
-  return record ? holdsOnRecord(permix, accessor, record as HydratedRecord, 'read') : false;
+
+  return bindings.filter((_, index) => {
+    const ref = refByIndex[index];
+    return ref !== null && readableKeys.has(`${ref.accessor}:${ref.id}`);
+  });
 };
 
 const callerPlacementPermissions = (
@@ -76,9 +106,9 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
     ...rawContents.map(({ artifact: _child, ...placement }) => placement),
   ];
 
-  const [hydratedPlacements, bindingFlags] = await Promise.all([
+  const [hydratedPlacements, visibleBindings] = await Promise.all([
     hydrateMany('artifactPlacement', placementRows),
-    Promise.all(rawBindings.map((binding) => visibleBindingToCaller(permix, binding))),
+    filterVisibleBindings(permix, rawBindings),
   ]);
 
   const artifactPlacementsAsArtifact = rawPlacements
@@ -125,7 +155,10 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
           artifact: {
             ...childScalar,
             artifactPermissions: permissions.canManage ? childPermissions : [],
-            exclusive: permissions.canManage && sameOwnerPlacementCount === 1,
+            exclusive:
+              permissions.canManage &&
+              sameArtifactOwner(child, artifact) &&
+              sameOwnerPlacementCount === 1,
           },
         },
       ];
@@ -145,6 +178,6 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
             !artifactPermission.expiresAt || artifactPermission.expiresAt > now,
         )
       : [],
-    resourceBindings: rawBindings.filter((_, index) => bindingFlags[index]),
+    resourceBindings: visibleBindings,
   };
 };

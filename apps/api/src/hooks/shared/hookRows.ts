@@ -34,7 +34,6 @@ export const isManyAction = (action: DbAction): action is ManyAction =>
 const isUpdateAction = (action: DbAction): boolean =>
   action === DbAction.update || action === DbAction.updateManyAndReturn;
 
-// Pairs each post-write row with its matching pre-write row across single and bulk actions.
 export const changedPairs = (
   options: HookOptions,
   { skipNoOp = false }: { skipNoOp?: boolean } = {},
@@ -69,7 +68,6 @@ export const changedPairs = (
   return pairs;
 };
 
-// The rows a write sets, coalesced: `data` for create and update (single or bulk), both arms of an upsert.
 export const rowsBeingWritten = ({ action, args }: HookOptions): HookRow[] => {
   const { data, create, update } = (args ?? {}) as {
     data?: unknown;

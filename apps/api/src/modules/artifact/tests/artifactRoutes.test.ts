@@ -451,14 +451,17 @@ describe('artifact routes', () => {
       return nodes;
     };
     const top = await chain(30);
-    const sub = await chain(22);
+    const sub = await chain(21);
     for (let i = 2; i < sub.length; i++) {
       await createArtifactPlacement({
         artifactId: sub[i]!.id,
         containerArtifactId: sub[0]!.id,
       });
     }
+    // 30 + 21 = 51 non-root levels (> ARTIFACT_MAX_DEPTH = 50) must be rejected
     expect((await place(adminFetch, sub[0]!, top[top.length - 1]!)).status).toBe(422);
+    // 30 + 20 = 50 non-root levels (== ARTIFACT_MAX_DEPTH) succeeds
+    expect((await place(adminFetch, sub[1]!, top[top.length - 1]!)).status).toBe(201);
   }, 15_000);
 
   it('answers 403 when the caller cannot access the container', async () => {
@@ -1478,7 +1481,8 @@ describe('artifact routes', () => {
       ).status,
     ).toBe(422);
 
-    // 8. Cross-owner private pin does NOT flip exclusive to false on owner's folder detail
+    // 8. Cross-owner private pin does NOT flip exclusive to false on owner's folder detail,
+    // and a personal file pinned inside an org folder is NEVER marked exclusive on that org folder.
     const ownedChild = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
       name: 'owned-child',
       containerArtifactId: pubFolder.id,
@@ -1493,6 +1497,18 @@ describe('artifact routes', () => {
       (p) => p.artifact.id === ownedChild.id,
     );
     expect(childRow?.artifact.exclusive).toBe(true);
+
+    const adminPersonalPin = await createFolder(adminFetch, '/api/v1/me/artifacts', {
+      name: 'admin-personal-pin',
+    });
+    expect((await place(adminFetch, adminPersonalPin, shared)).status).toBe(201);
+    const sharedDetail = await parseSuccessBody<{
+      artifactPlacementsAsContainer: { artifact: Artifact & { exclusive: boolean } }[];
+    }>(await adminFetch(get(`/api/v1/artifact/${shared.id}`)));
+    const pinnedPersonalRow = sharedDetail.data.artifactPlacementsAsContainer.find(
+      (p) => p.artifact.id === adminPersonalPin.id,
+    );
+    expect(pinnedPersonalRow?.artifact.exclusive).toBe(false);
 
     // 9. ArtifactPermission.fromVersion requires >= 1 on create and update, and may move both up and down
     expect(

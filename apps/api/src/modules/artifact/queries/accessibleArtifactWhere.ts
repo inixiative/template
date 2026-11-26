@@ -6,12 +6,7 @@
  */
 import { hydrate, type Prisma } from '@template/db';
 import type { OperateAccess, ReadAccess, Role } from '@template/db/generated/client/enums';
-import {
-  directEntitledIds,
-  ownerPrivateRead,
-  permixIdsWithAction,
-  STANDARD_ACTIONS_IMPLYING,
-} from '@template/permissions';
+import { ownerPrivateRead, permixIdsWithAction } from '@template/permissions';
 import type { Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
@@ -95,8 +90,15 @@ const callerGranteeClauses = (ids: CallerPrincipalIds): Prisma.ArtifactPermissio
       [
         ids.manageableUserIds,
         {
-          granteeModel: { in: ['OrganizationUser', 'SpaceUser'] },
-          granteeUserId: { in: ids.manageableUserIds },
+          granteeModel: 'OrganizationUser',
+          granteeOrganizationUser: { userId: { in: ids.manageableUserIds } },
+        },
+      ],
+      [
+        ids.manageableUserIds,
+        {
+          granteeModel: 'SpaceUser',
+          granteeSpaceUser: { userId: { in: ids.manageableUserIds } },
         },
       ],
     ]),
@@ -160,7 +162,7 @@ export const probeOwnerArtifactAccess = async (
   };
 };
 
-// why: naive SQL reflection of artifactResourcePermission.read until INFRA-026 compiles ReBAC into SQL.
+// why: SQL reflection of artifactResourcePermission.read until INFRA-026 compiles ReBAC into SQL.
 export const accessibleArtifactWhereForOwner = async (
   c: Context<AppEnv>,
   owner: OwnerRef,
@@ -173,22 +175,14 @@ export const accessibleArtifactWhereForOwner = async (
     probed ?? (await probeOwnerArtifactAccess(permix, ownerColumns(owner)));
   if (canReadPrivate) return null;
 
-  const {
-    entitlements: artifactEntitlements,
-    directIds: directArtifactIds,
-    hasBroadEntitlement,
-  } = directEntitledIds(permix, 'db:Artifact', STANDARD_ACTIONS_IMPLYING.read);
-  if (hasBroadEntitlement) return null;
-
   const orClauses: Prisma.ArtifactWhereInput[] = [];
   if (canReadPublic) orClauses.push({ effectiveReadAccess: 'public' });
   if (canReadTenant) orClauses.push({ effectiveReadAccess: 'tenant' });
   if (canOperateTenant) orClauses.push({ effectiveOperateAccess: 'tenant' });
-  if (canReadPublic || artifactEntitlements.length > 0) {
+  if (canReadPublic) {
     const grantClause = effectiveGrantWhere(permix);
     if (grantClause) orClauses.push(grantClause);
   }
-  if (directArtifactIds.length > 0) orClauses.push({ id: { in: directArtifactIds } });
 
   return orClauses.length > 0 ? { OR: orClauses } : { id: { in: [] } };
 };
@@ -211,21 +205,14 @@ export const accessibleAnyArtifactWhere = async (
     },
     'read',
   );
-  const {
-    entitlements: artifactEntitlements,
-    directIds: directArtifactIds,
-    hasBroadEntitlement,
-  } = directEntitledIds(permix, 'db:Artifact', STANDARD_ACTIONS_IMPLYING.read);
-  if (hasBroadEntitlement) return null;
-  if (!canReadPublic && artifactEntitlements.length === 0) return { id: { in: [] } };
+  if (!canReadPublic) return { id: { in: [] } };
 
   const ids = callerPrincipalIds(permix);
   const grantClause = effectiveGrantWhere(permix, undefined, ids);
   const orClauses: Prisma.ArtifactWhereInput[] = [
-    ...(canReadPublic ? [{ effectiveReadAccess: 'public' as const }] : []),
+    { effectiveReadAccess: 'public' as const },
     ...(grantClause ? [grantClause] : []),
     ...nonEmptyClauses<Prisma.ArtifactWhereInput>([
-      [directArtifactIds, { id: { in: directArtifactIds } }],
       [ids.readableUserIds, { ownerModel: 'User', userId: { in: ids.readableUserIds } }],
       [
         ids.manageableOrganizationIds,
@@ -282,8 +269,15 @@ export const accessibleAnyArtifactWhere = async (
       [
         ids.manageableUserIds,
         {
-          ownerModel: { in: ['OrganizationUser', 'SpaceUser'] },
-          userId: { in: ids.manageableUserIds },
+          ownerModel: 'OrganizationUser',
+          organizationUser: { userId: { in: ids.manageableUserIds } },
+        },
+      ],
+      [
+        ids.manageableUserIds,
+        {
+          ownerModel: 'SpaceUser',
+          spaceUser: { userId: { in: ids.manageableUserIds } },
         },
       ],
       [

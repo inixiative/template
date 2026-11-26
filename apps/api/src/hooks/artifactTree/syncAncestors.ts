@@ -87,8 +87,7 @@ export const resolveArtifactTree = ({ artifacts, externalParents }: TreeAround) 
               [row.ancestorArtifactId, { inherits: row.inherits, depth: row.depth }] as const,
           ) ?? []);
 
-      // why: cross-owner placements never inherit across tenants; explicit private/tenant readAccess
-      // stops explicit folder grants from cascading down from ancestors.
+      // why: cross-owner and explicit private/tenant edges stop ancestor grant inheritance.
       const sameOwner = sameArtifactOwner(node, parent);
       const edgeInherits = sameOwner && (readAccess === 'inherit' || readAccess === 'public');
 
