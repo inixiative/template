@@ -110,11 +110,19 @@ describe('notDeletedWhere', () => {
 });
 
 describe('notDeletedIncludes', () => {
-  it('a bare to-many include grows a not-deleted-scope where; to-one and column-less stay bare', () => {
+  it('a bare to-many include grows a not-deleted-scope where; a column-less target stays bare', () => {
     expect(notDeletedIncludes('User', { contacts: true, sessions: true })).toEqual({
       contacts: { where: NOT_DELETED },
       sessions: true,
     });
+  });
+
+  it('a bare optional to-one include grows a not-deleted-scope where', () => {
+    expect(notDeletedIncludes('Contact', { user: true })).toEqual({ user: { where: NOT_DELETED } });
+  });
+
+  it('a required to-one include stays bare, because Prisma gives it no where', () => {
+    expect(notDeletedIncludes('Account', { user: true })).toEqual({ user: true });
   });
 
   it('an existing include where is walked and scoped', () => {
@@ -133,7 +141,7 @@ describe('notDeletedIncludes', () => {
 
   it('recurses through nested include trees', () => {
     expect(notDeletedIncludes('User', { contacts: { include: { user: true } } })).toEqual({
-      contacts: { where: NOT_DELETED, include: { user: true } },
+      contacts: { where: NOT_DELETED, include: { user: { where: NOT_DELETED } } },
     });
   });
 

@@ -11,7 +11,7 @@ import { isBatchSubRequest } from '#/lib/context/isBatchSubRequest';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
-import { isTwoFactorRequired } from '#/lib/twoFactor/isTwoFactorRequired';
+import { pendingTwoFactorAction } from '#/lib/twoFactor/pendingTwoFactorAction';
 import { findUserByEmail, findUserWithRelations } from '#/modules/user/services/find';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import type { AppEnv } from '#/types/appEnv';
@@ -25,11 +25,7 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const rawEmail = c.req.header('x-spoof-user-email');
   if (!rawEmail) return next();
 
-  if (
-    !c.get('token') &&
-    !c.get('jwtTwoFactorVerified') &&
-    (spoofer.twoFactorEnabled || isTwoFactorRequired())
-  ) {
+  if (pendingTwoFactorAction(c, spoofer)) {
     throw makeError({
       status: 403,
       message: 'Two-factor verification is required before spoofing another user',

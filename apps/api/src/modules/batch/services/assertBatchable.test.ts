@@ -8,7 +8,7 @@ const { app } = createTestApp({
       app.openAPIRegistry.registerPath({
         method: 'post',
         path: '/api/v1/organization/{id}/consent',
-        'x-batch': false,
+        'x-forbid-batch': true,
         responses: {},
       }),
   ],

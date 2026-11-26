@@ -366,7 +366,7 @@ data.batch.forEach((round, roundIndex) => {
 **Exception:** Only returns non-200 for:
 - `400` - Invalid batch request syntax (validation failure)
 - `400` - Nested batch request attempt (security violation)
-- `400` - A request reaches a route marked `'x-batch': false`
+- `400` - A request reaches a route marked `forbid: { batch: true }` (`x-forbid-batch: true` in OpenAPI)
 - `500` - Unexpected server error (not request failures)
 
 ---
@@ -405,7 +405,7 @@ Only relative paths are allowed.
 
 ### Routes That Cannot Batch
 
-A route whose effect a batch transaction cannot roll back (a signed JWT, a password, a 2FA mutation) declares `forbid: { batch: true }` in its route args; `toOpenApi` emits `'x-batch': false` as an OpenAPI operation extension and `makeForbidMiddleware` also rejects batch sub-requests at runtime. `assertBatchable` (`modules/batch/services/assertBatchable.ts`) scans every request of every round against the app's OpenAPI registry before anything runs, and one match refuses the whole batch with a 400. An interpolated segment (`<<0.0.body.id>>`) is resolved only when its round runs, so it counts as matching any route below it. Today: `POST /api/v1/batch/execute`, `POST /api/v1/me/changePassword`, `POST /api/v1/me/rotateJwts`, `POST /api/v1/me/redact`, all `POST /api/v1/me/twoFactor/*` mutations, `POST /api/admin/user/{id}/resetTwoFactor`, and every Better Auth endpoint (`/api/auth/*`, any method), which signs, revokes and resets credentials outside the registry.
+A route whose effect a batch transaction cannot roll back (a signed JWT, a password, a 2FA mutation) declares `forbid: { batch: true }` in its route args; `toOpenApi` emits `'x-forbid-batch': true` as an OpenAPI operation extension and `makeForbidMiddleware` also rejects batch sub-requests at runtime. `assertBatchable` (`modules/batch/services/assertBatchable.ts`) scans every request of every round against the app's OpenAPI registry before anything runs, and one match refuses the whole batch with a 400. An interpolated segment (`<<0.0.body.id>>`) is resolved only when its round runs, so it counts as matching any route below it. Today: `POST /api/v1/batch/execute`, `POST /api/v1/me/changePassword`, `POST /api/v1/me/rotateJwts`, `POST /api/v1/me/redact`, all `POST /api/v1/me/twoFactor/*` mutations, `POST /api/admin/user/{id}/resetTwoFactor`, and every Better Auth endpoint (`/api/auth/*`, any method), which signs, revokes and resets credentials outside the registry.
 
 ### Limits
 

@@ -50,7 +50,7 @@ export const assertBatchable = (app: OpenAPIHono<AppEnv>, rounds: BatchRequest[]
   const unbatchable = [
     betterAuth,
     ...app.openAPIRegistry.definitions.flatMap((definition) =>
-      definition.type === 'route' && definition.route['x-batch'] === false
+      definition.type === 'route' && definition.route['x-forbid-batch'] === true
         ? [definition.route]
         : [],
     ),

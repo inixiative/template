@@ -3,7 +3,12 @@ import { TWO_FACTOR_REVERIFY_REQUIRED_CODE } from '@template/shared/auth/twoFact
 import { createAuthGuards } from '@template/ui/guards/authGuard';
 import { isTwoFactorReverifyError } from '@template/ui/lib/auth/twoFactor';
 import { isOnFlowPath } from '@template/ui/lib/flows/isOnFlowPath';
-import { safeInternalRedirect, TWO_FACTOR_PATH } from '@template/ui/lib/routeRedirect';
+import {
+  redirectAfterLogin,
+  redirectAfterTwoFactor,
+  safeInternalRedirect,
+  TWO_FACTOR_PATH,
+} from '@template/ui/lib/routeRedirect';
 import type { AppStore } from '@template/ui/store/types';
 
 const makeGuard = (overrides: {
@@ -98,6 +103,7 @@ describe('frontend two-factor helpers', () => {
   it('prevents auth-page redirect loops and keeps /two-factor flow-safe', async () => {
     expect(safeInternalRedirect('/two-factor')).toBe('/dashboard');
     expect(safeInternalRedirect('/login')).toBe('/dashboard');
+    expect(safeInternalRedirect('/auth/callback')).toBe('/dashboard');
     expect(safeInternalRedirect('/settings/tokens')).toBe('/settings/tokens');
 
     const verifiedGuard = makeGuard({ isAuthenticated: true, twoFactorAction: null });
@@ -123,5 +129,29 @@ describe('frontend two-factor helpers', () => {
         steps: [],
       } as unknown as Parameters<typeof isOnFlowPath>[1]),
     ).toBe(true);
+  });
+
+  it('routes post-login across all three two-factor paths and returns cleanly after two-factor', () => {
+    const calls: Array<{ to: string; preserve: string }> = [];
+    const makeStore = (twoFactorAction: 'enroll' | 'verify' | null) => () =>
+      ({
+        auth: { twoFactorAction },
+        navigation: {
+          navigateKeepingSearchParams: (to: string, preserve: string) =>
+            calls.push({ to, preserve }),
+        },
+      }) as unknown as AppStore;
+
+    redirectAfterLogin(makeStore('enroll'), '/settings/tokens');
+    redirectAfterLogin(makeStore('verify'), '/settings/tokens');
+    redirectAfterLogin(makeStore(null), '/settings/tokens');
+    redirectAfterTwoFactor(makeStore(null), '/settings/tokens');
+
+    expect(calls).toEqual([
+      { to: '/two-factor?redirectTo=%2Fsettings%2Ftokens', preserve: 'context' },
+      { to: '/two-factor?redirectTo=%2Fsettings%2Ftokens', preserve: 'context' },
+      { to: '/settings/tokens', preserve: 'context' },
+      { to: '/settings/tokens', preserve: 'context' },
+    ]);
   });
 });
