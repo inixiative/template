@@ -189,37 +189,43 @@ describe('artifact actions', () => {
       )
     ).data;
 
-    // Move from root -> a
+    const initialPlacement = await db.artifactPlacement.findFirstOrThrow({
+      where: { artifactId: item.id },
+    });
+
+    // Move placement from root -> a (preserves placement id in-place)
     const into = await adminFetch(
-      post(`/api/v1/artifact/${item.id}/move`, { targetContainerArtifactId: a.id }),
+      post(`/api/v1/artifactPlacement/${initialPlacement.id}/move`, {
+        targetContainerArtifactId: a.id,
+      }),
     );
     expect(into.status).toBe(200);
-    // Move from a -> b
+    // Move placement from a -> b
     const across = await adminFetch(
-      post(`/api/v1/artifact/${item.id}/move`, {
-        sourceContainerArtifactId: a.id,
+      post(`/api/v1/artifactPlacement/${initialPlacement.id}/move`, {
         targetContainerArtifactId: b.id,
       }),
     );
     expect(across.status).toBe(200);
     const placements = await db.artifactPlacement.findMany({ where: { artifactId: item.id } });
-    expect(placements.map((placement) => placement.containerArtifactId)).toEqual([b.id]);
+    expect(placements.map((placement) => [placement.id, placement.containerArtifactId])).toEqual([
+      [initialPlacement.id, b.id],
+    ]);
 
-    // Move from b -> root
-    const out = await adminFetch(
-      post(`/api/v1/artifact/${item.id}/move`, { sourceContainerArtifactId: b.id }),
-    );
+    // Move placement from b -> root (omit targetContainerArtifactId)
+    const out = await adminFetch(post(`/api/v1/artifactPlacement/${initialPlacement.id}/move`, {}));
     expect(out.status).toBe(200);
     const rootPlacements = await db.artifactPlacement.findMany({
       where: { artifactId: item.id },
       include: { containerArtifact: true },
     });
     expect(rootPlacements).toHaveLength(1);
+    expect(rootPlacements[0]!.id).toBe(initialPlacement.id);
     expect(rootPlacements[0]!.containerArtifact.kind).toBe(ArtifactKind.root);
     expect(rootPlacements[0]!.access).toBe('private');
   });
 
-  it("copy makes a new artifact in the container's owner, sharing the file's bytes until swept", async () => {
+  it("copy makes a new artifact in the container's owner, sharing the file's bytes until swept, and defaults to root when targetContainerArtifactId is omitted", async () => {
     const source = await userFile(member);
     const { entity: file } = await createFile({ artifactId: source.id });
     await createFileVersion({ fileId: file.id, key: 'k-1', version: 1 });
@@ -244,6 +250,34 @@ describe('artifact actions', () => {
     expect(copied.fileVersions.map((version) => [version.key, version.status])).toEqual([
       ['k-1', 'pending'],
     ]);
+
+    // Copy omitting targetContainerArtifactId places in caller's personal root with optional name
+    const personalCopyResponse = await adminFetch(
+      post(`/api/v1/artifact/${source.id}/copy`, { name: 'personal-copy' }),
+    );
+    expect(personalCopyResponse.status).toBe(200);
+    const personalCopy = (await parseSuccessBody<Artifact>(personalCopyResponse)).data;
+    expect(personalCopy.ownerModel).toBe('User');
+    expect(personalCopy.userId).toBe(admin.id);
+    expect(personalCopy.name).toBe('personal-copy');
+    const personalCopyPlacement = await db.artifactPlacement.findFirstOrThrow({
+      where: { artifactId: personalCopy.id },
+      include: { containerArtifact: true },
+    });
+    expect(personalCopyPlacement.containerArtifact.kind).toBe(ArtifactKind.root);
+
+    // Copy targeting an organization's root via ownerModel + organizationId
+    const orgRootCopyResponse = await adminFetch(
+      post(`/api/v1/artifact/${source.id}/copy`, {
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        name: 'org-root-copy',
+      }),
+    );
+    expect(orgRootCopyResponse.status).toBe(200);
+    const orgRootCopy = (await parseSuccessBody<Artifact>(orgRootCopyResponse)).data;
+    expect(orgRootCopy.ownerModel).toBe('Organization');
+    expect(orgRootCopy.name).toBe('org-root-copy');
 
     // Soft-deleting the source file (via artifact delete) must NOT cascade-delete the lazy copy (CASCADE_EXEMPT File.sourceFile).
     await db.artifact.update({ where: { id: source.id }, data: { deletedAt: new Date() } });

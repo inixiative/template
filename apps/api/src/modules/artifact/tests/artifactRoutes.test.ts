@@ -507,20 +507,68 @@ describe('artifact routes', () => {
     );
     expect((await place(adminFetch, aliceFile, orgPublic)).status).toBe(201);
 
-    // Move out of aliceFolder -> back to alice's root
+    // Move placement out of aliceFolder -> back to alice's root
+    const aliceFolderEdge = await db.artifactPlacement.findFirstOrThrow({
+      where: { artifactId: aliceFile.id, containerArtifactId: aliceFolder.id },
+    });
     expect(
-      (
-        await outsiderFetch(
-          post(`/api/v1/artifact/${aliceFile.id}/move`, {
-            sourceContainerArtifactId: aliceFolder.id,
-          }),
-        )
-      ).status,
+      (await outsiderFetch(post(`/api/v1/artifactPlacement/${aliceFolderEdge.id}/move`, {})))
+        .status,
     ).toBe(200);
     const rootPlacements = await parseSuccessBody<ArtifactPlacement[]>(
       await outsiderFetch(get('/api/v1/me/artifactPlacements')),
     );
     expect(rootPlacements.data.map((p) => p.artifactId)).toContain(aliceFile.id);
+
+    // Cross-owner placement in orgPublic refuses unauthorized target with 403 (no existence/owner oracle)
+    // and can move to org root (sourceContainer owner) when targetContainerArtifactId is omitted
+    const orgPublicEdge = await db.artifactPlacement.findFirstOrThrow({
+      where: { artifactId: aliceFile.id, containerArtifactId: orgPublic.id },
+    });
+    expect(
+      (
+        await adminFetch(
+          post(`/api/v1/artifactPlacement/${orgPublicEdge.id}/move`, {
+            targetContainerArtifactId: alicePublic.id,
+          }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await adminFetch(
+          post(`/api/v1/artifactPlacement/${orgPublicEdge.id}/move`, {
+            targetContainerArtifactId: '',
+          }),
+        )
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await adminFetch(
+          post(`/api/v1/artifact/${aliceFile.id}/copy`, {
+            ownerModel: 'User',
+            userId: '00000000-0000-7000-8000-000000000000',
+          }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await adminFetch(
+          post(`/api/v1/artifact/${aliceFile.id}/copy`, { targetContainerArtifactId: '' }),
+        )
+      ).status,
+    ).toBe(422);
+    expect(
+      (await adminFetch(post(`/api/v1/artifactPlacement/${orgPublicEdge.id}/move`, {}))).status,
+    ).toBe(200);
+    const movedOrgPin = await db.artifactPlacement.findUniqueOrThrow({
+      where: { id: orgPublicEdge.id },
+      include: { containerArtifact: true },
+    });
+    expect(movedOrgPin.containerArtifact.kind).toBe(ArtifactKind.root);
+    expect(movedOrgPin.containerArtifact.ownerModel).toBe('Organization');
 
     // Placing into alicePublic with explicit access: 'private' keeps effectiveAccess private
     expect((await place(outsiderFetch, aliceFile, alicePublic, { access: 'private' })).status).toBe(
@@ -531,21 +579,39 @@ describe('artifact routes', () => {
     expect((await memberFetch(get(`/api/v1/artifact/${aliceFile.id}`))).status).toBe(403);
   });
 
-  it('moveArtifact refuses cross-owner sourceContainer when the artifact is not in it without leaking existence', async () => {
-    const victimPrivate = await createFolder(outsiderFetch, '/api/v1/me/artifacts');
-    const attackerFolder = await createFolder(
-      adminFetch,
-      `/api/v1/organization/${organization.id}/artifacts`,
-    );
+  it('hard-deletes placements (keeping AuditLog) and revives artifacts fresh at root without resurrecting old folder placements', async () => {
+    const folder = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      name: 'temp-folder',
+    });
+    const doc = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      name: 'revivable-doc',
+      containerArtifactId: folder.id,
+    });
+    const folderEdge = await db.artifactPlacement.findFirstOrThrow({
+      where: { artifactId: doc.id, containerArtifactId: folder.id },
+    });
+
+    // Soft-deleting doc hard-deletes its placement via HARD_DELETE_ON_TOMBSTONE while keeping its delete AuditLog.
+    expect((await outsiderFetch(del(`/api/v1/artifact/${doc.id}`))).status).toBe(204);
     expect(
-      (
-        await adminFetch(
-          post(`/api/v1/artifact/${victimPrivate.id}/move`, {
-            sourceContainerArtifactId: attackerFolder.id,
-          }),
-        )
-      ).status,
-    ).toBe(403);
+      await db.withDeleted(() => db.artifactPlacement.findUnique({ where: { id: folderEdge.id } })),
+    ).toBeNull();
+    const deleteAudit = await db.auditLog.findFirst({
+      where: { subjectModel: 'ArtifactPlacement', subjectId: folderEdge.id, action: 'delete' },
+    });
+    expect(deleteAudit).not.toBeNull();
+
+    // Reviving doc places it fresh at its owner's root (private) and does NOT resurrect folderEdge.
+    await db.withDeleted(() =>
+      db.artifact.update({ where: { id: doc.id }, data: { deletedAt: null } }),
+    );
+    const revivedPlacements = await db.artifactPlacement.findMany({
+      where: { artifactId: doc.id },
+      include: { containerArtifact: true },
+    });
+    expect(revivedPlacements).toHaveLength(1);
+    expect(revivedPlacements[0]!.containerArtifact.kind).toBe(ArtifactKind.root);
+    expect(revivedPlacements[0]!.access).toBe('private');
   });
 
   it('GET /artifact/:id reports effectiveRole as null for strangers on public artifacts and scalar effectiveAccess as public', async () => {
@@ -603,7 +669,7 @@ describe('artifact routes', () => {
     ).toBe(422);
   });
 
-  it('root container cannot be deleted, updated, moved, copied, placed, or granted permissions', async () => {
+  it('root container cannot be deleted, updated, copied, placed, or granted permissions', async () => {
     const orgRoot = await db.artifact.findFirstOrThrow({
       where: {
         ownerModel: 'Organization',
@@ -621,13 +687,6 @@ describe('artifact routes', () => {
     expect((await ownerFetch(del(`/api/v1/artifact/${orgRoot.id}`))).status).toBe(422);
     expect(
       (await ownerFetch(patch(`/api/v1/artifact/${orgRoot.id}`, { name: 'nope' }))).status,
-    ).toBe(422);
-    expect(
-      (
-        await ownerFetch(
-          post(`/api/v1/artifact/${orgRoot.id}/move`, { targetContainerArtifactId: shared.id }),
-        )
-      ).status,
     ).toBe(422);
     expect(
       (
@@ -1151,10 +1210,13 @@ describe('artifact routes', () => {
 
     // 1. operate-only on container cannot set non-default access via place/move; member User token cannot publish public root
     expect((await place(memberFetch, drafts, shared, { access: 'public' })).status).toBe(403);
+    const draftsRootEdge = await db.artifactPlacement.findFirstOrThrow({
+      where: { artifactId: drafts.id },
+    });
     expect(
       (
         await memberFetch(
-          post(`/api/v1/artifact/${drafts.id}/move`, {
+          post(`/api/v1/artifactPlacement/${draftsRootEdge.id}/move`, {
             targetContainerArtifactId: shared.id,
             access: 'public',
           }),
@@ -1247,8 +1309,7 @@ describe('artifact routes', () => {
     expect(
       (
         await memberFetch(
-          post(`/api/v1/artifact/${pubFolder.id}/move`, {
-            sourceContainerArtifactId: shared.id,
+          post(`/api/v1/artifactPlacement/${hiddenPinInShared.id}/move`, {
             targetContainerArtifactId: drafts.id,
           }),
         )
@@ -1350,10 +1411,13 @@ describe('artifact routes', () => {
         )
       ).status,
     ).toBe(422);
+    const adminPersonalEdge = await db.artifactPlacement.findFirstOrThrow({
+      where: { artifactId: adminPersonal.id },
+    });
     expect(
       (
         await adminFetch(
-          post(`/api/v1/artifact/${adminPersonal.id}/move`, {
+          post(`/api/v1/artifactPlacement/${adminPersonalEdge.id}/move`, {
             targetContainerArtifactId: shared.id,
           }),
         )

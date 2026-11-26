@@ -5,8 +5,10 @@
  * @uses infrastructure:prisma, mutex
  */
 import {
+  cacheKey,
   db,
   emptySideKeyColumns,
+  fetchThroughCache,
   polymorphicAxis,
   polymorphicKeyColumns,
   toModelName,
@@ -153,10 +155,23 @@ export const ownerColumns = (artifact: OwnerRef): OwnedArtifact => {
   };
 };
 
+export const ownerRootCacheKey = (owner: Partial<OwnedArtifact>): string | null => {
+  if (!owner.ownerModel) return null;
+  const columns = polymorphicKeyColumns('Artifact', 'ownerModel', owner.ownerModel);
+  const values: string[] = [];
+  for (const column of columns) {
+    const value = owner[column as keyof OwnedArtifact];
+    if (typeof value !== 'string' || value.length === 0) return null;
+    values.push(value);
+  }
+  return cacheKey('artifact', { root: `${owner.ownerModel}:${values.join(':')}` });
+};
+
 export const fetchOwnerRootArtifactOrThrow = async (owner: OwnerRef): Promise<Artifact> => {
-  const root = await db.artifact.findFirst({
-    where: { ...ownerColumns(owner), kind: ArtifactKind.root },
-  });
+  const columns = ownerColumns(owner);
+  const key = ownerRootCacheKey(columns);
+  const fetchRoot = () => db.artifact.findFirst({ where: { ...columns, kind: ArtifactKind.root } });
+  const root = key ? await fetchThroughCache(key, fetchRoot) : await fetchRoot();
   if (!root) throw makeError({ status: 404, message: 'Owner root container not found' });
   return root;
 };

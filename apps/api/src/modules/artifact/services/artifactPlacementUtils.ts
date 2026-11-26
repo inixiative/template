@@ -27,11 +27,11 @@ export const fetchArtifactOrThrow = async (artifactId: string): Promise<Artifact
   return artifact;
 };
 
-export const writePlacement = async (
+export const validatePlacementTarget = async (
   artifact: Artifact,
   container: Artifact,
   access?: ArtifactAccess,
-): Promise<ArtifactPlacement> => {
+): Promise<ArtifactAccess> => {
   validateContainable(container, artifact);
   const resolvedAccess = access ?? defaultPlacementAccess(container);
   validatePlacementAccess(container, resolvedAccess);
@@ -47,6 +47,15 @@ export const writePlacement = async (
       message: `A container can hold at most ${ARTIFACT_MAX_CHILDREN} direct items`,
     });
   }
+  return resolvedAccess;
+};
+
+export const writePlacement = async (
+  artifact: Artifact,
+  container: Artifact,
+  access?: ArtifactAccess,
+): Promise<ArtifactPlacement> => {
+  const resolvedAccess = await validatePlacementTarget(artifact, container, access);
   return db.artifactPlacement.create({
     data: {
       artifactId: artifact.id,

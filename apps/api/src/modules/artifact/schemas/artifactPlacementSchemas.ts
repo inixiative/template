@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses infrastructure:prisma
  */
-import type { z } from '@hono/zod-openapi';
+import { z } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import {
   ArtifactPlacementScalarInputSchema,
@@ -16,52 +16,86 @@ import {
 import { lensFor } from '@template/db/lens';
 import { polymorphicBodyRefinement } from '#/lib/routeTemplates/polymorphicBodyRefinement';
 
-export const artifactPlacementCreateBodySchema = ArtifactPlacementScalarInputSchema.pick({
-  containerArtifactId: true,
-  access: true,
-})
-  .partial()
-  .extend(
-    ArtifactScalarInputSchema.pick({
-      ownerModel: true,
-      userId: true,
-      organizationId: true,
-      spaceId: true,
-    }).partial().shape,
-  );
+const ownerTargetFields = ArtifactScalarInputSchema.pick({
+  ownerModel: true,
+  userId: true,
+  organizationId: true,
+  spaceId: true,
+}).partial().shape;
 
 const ownerPlacementRefinement = polymorphicBodyRefinement('Artifact', 'ownerModel');
 const OWNER_FK_KEYS = [
   ...new Set(Object.values(polymorphicAxis('Artifact', 'ownerModel').fkMap).flat()),
 ] as ('userId' | 'organizationId' | 'spaceId')[];
 
-export const artifactPlacementCreateBodyRefinement = (
-  body: z.infer<typeof artifactPlacementCreateBodySchema>,
-  ctx: z.RefinementCtx,
-) => {
-  const hasContainer = body.containerArtifactId !== undefined;
-  const hasOwner = body.ownerModel !== undefined;
-  if (hasContainer === hasOwner) {
-    ctx.addIssue({
-      code: 'custom',
-      message: 'Provide either containerArtifactId or ownerModel (not both)',
-    });
-    return;
-  }
-  if (hasContainer) {
-    for (const column of OWNER_FK_KEYS) {
-      if (body[column] !== undefined && body[column] !== null) {
+export const makeContainerOrOwnerRefinement =
+  (containerField: 'containerArtifactId' | 'targetContainerArtifactId', allowEmpty = false) =>
+  (body: Record<string, unknown>, ctx: z.RefinementCtx) => {
+    const hasContainer = body[containerField] !== undefined;
+    const hasOwner = body.ownerModel !== undefined;
+    if (hasContainer && hasOwner) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Provide either ${containerField} or ownerModel (not both)`,
+      });
+      return;
+    }
+    if (!hasContainer && !hasOwner) {
+      if (!allowEmpty) {
         ctx.addIssue({
           code: 'custom',
-          path: [column],
-          message: `${column} cannot be combined with containerArtifactId`,
+          message: `Provide either ${containerField} or ownerModel (not both)`,
         });
+        return;
       }
+      for (const column of OWNER_FK_KEYS) {
+        if (body[column] !== undefined && body[column] !== null) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [column],
+            message: `${column} requires ownerModel`,
+          });
+        }
+      }
+      return;
     }
-    return;
-  }
-  ownerPlacementRefinement(body as Record<string, unknown>, ctx);
-};
+    if (hasContainer) {
+      for (const column of OWNER_FK_KEYS) {
+        if (body[column] !== undefined && body[column] !== null) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [column],
+            message: `${column} cannot be combined with ${containerField}`,
+          });
+        }
+      }
+      return;
+    }
+    ownerPlacementRefinement(body, ctx);
+  };
+
+export const artifactPlacementCreateBodySchema = ArtifactPlacementScalarInputSchema.pick({
+  access: true,
+})
+  .partial()
+  .extend({
+    containerArtifactId: ArtifactPlacementScalarInputSchema.shape.containerArtifactId
+      .min(1)
+      .optional(),
+  })
+  .extend(ownerTargetFields);
+
+export const artifactPlacementCreateBodyRefinement = makeContainerOrOwnerRefinement(
+  'containerArtifactId',
+  false,
+);
+
+export const artifactPlacementMoveBodySchema = z.object({
+  targetContainerArtifactId: ArtifactPlacementScalarInputSchema.shape.containerArtifactId
+    .min(1)
+    .optional(),
+  access: ArtifactPlacementScalarInputSchema.shape.access.optional(),
+});
 
 export const artifactPlacementUpdateBodySchema = ArtifactPlacementScalarInputSchema.pick({
   access: true,
@@ -77,7 +111,6 @@ export const artifactPlacementWithArtifactsSchema = ArtifactPlacementScalarSchem
 export const artifactPlacementListFilterLens: LensNarrowing = {
   parent: lensFor('ArtifactPlacement'),
   root: {
-    omits: ['deletedAt'],
     relations: {
       artifact: { omits: ['deletedAt'] },
       containerArtifact: { omits: ['deletedAt'] },

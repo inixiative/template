@@ -131,7 +131,8 @@ One word per party, used in code and prose alike. Names in code are composed of 
 | **actor** | who is acting this request: `{ model: 'User' \| 'Token', record }` |
 | **owner** | the row a token or integration belongs to (its `ownerModel`): a user, a member, a tenant, or (for a token) an integration |
 | **delegate** | a token or an integration |
-| **permissions** | a delegate's `{ role, full, entitlements }` |
+| **permissions** | a principal's authority — a delegate's `{ role, full, entitlements }`, a member's tenant role, or an explicit per-record grant (`ArtifactPermission`) |
+| **access** | a resource's visibility (`private`, `tenant`, `public`, plus `inherit` on `ArtifactPlacement`) — the resource-side mirror of permissions; controls who can discover or read a record without an explicit grant |
 | **entitlement** | a named grant `{ resource, anchor: { resource, id, path? }, where?, actions }`, stored as one `Entitlement` row whose **source** is the anchor and whose **target** is the holder ([Entitlements](#entitlements)) |
 | **member self-grant** | the entitlement every member row carries to `operate` on itself, backed by its user ([The Member Self-Grant](#the-member-self-grant)) |
 | **delegateFull** | the person-only action on an owner that lets you set `full` on its delegate ([Full and delegateFull](#full-and-delegatefull)) |

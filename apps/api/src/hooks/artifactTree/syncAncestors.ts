@@ -5,26 +5,49 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
+import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import type { AncestorEdge, TreeAround } from '#/hooks/artifactTree/fetchArtifactTreeAround';
 import { syncJoinRows } from '#/hooks/artifactTree/syncJoinRows';
 import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 
-export const ancestorsOf = ({ artifacts, externalParents, externalAncestors }: TreeAround) => {
-  const memo = new Map<string, Map<string, AncestorEdge>>();
+export type EffectiveAccess = 'private' | 'tenant' | 'public';
 
-  const walk = (artifactId: string, visiting: Set<string>): Map<string, AncestorEdge> => {
+export type ResolvedNodeState = {
+  ancestors: Map<string, AncestorEdge>;
+  effectiveAccess: EffectiveAccess;
+};
+
+const ACCESS_RANK: Record<EffectiveAccess, number> = { private: 0, tenant: 1, public: 2 };
+const ACCESS_BY_RANK = ['private', 'tenant', 'public'] as const;
+
+const rankOf = (access: ArtifactAccess): number =>
+  access === 'public' ? ACCESS_RANK.public : access === 'tenant' ? ACCESS_RANK.tenant : 0;
+
+export const resolveArtifactTree = ({
+  artifacts,
+  externalParents,
+  externalAncestors,
+}: TreeAround) => {
+  const memo = new Map<string, { ancestors: Map<string, AncestorEdge>; accessRank: number }>();
+
+  const walk = (
+    artifactId: string,
+    visiting: Set<string>,
+  ): { ancestors: Map<string, AncestorEdge>; accessRank: number } => {
     const cached = memo.get(artifactId);
     if (cached) return cached;
 
     const node = artifacts.get(artifactId);
-    const result = new Map<string, AncestorEdge>();
-    if (!node || visiting.has(artifactId)) return result;
+    const ancestors = new Map<string, AncestorEdge>();
+    if (!node || visiting.has(artifactId)) return { ancestors, accessRank: 0 };
 
     const nextVisiting = new Set(visiting).add(artifactId);
+    const hasTenant = node.ownerModel !== 'User';
+    let accessRank = 0;
 
     const merge = (ancestorId: string, edge: AncestorEdge) => {
-      const current = result.get(ancestorId);
-      result.set(
+      const current = ancestors.get(ancestorId);
+      ancestors.set(
         ancestorId,
         current
           ? {
@@ -37,16 +60,17 @@ export const ancestorsOf = ({ artifacts, externalParents, externalAncestors }: T
 
     for (const { containerArtifactId: parentId, access } of node.placements) {
       const internalParent = artifacts.get(parentId);
-      const parentOwner = internalParent ?? externalParents.get(parentId);
-      if (!parentOwner) continue;
+      const parent = internalParent ?? externalParents.get(parentId);
+      if (!parent) continue;
 
-      const parentAncestors = internalParent
-        ? walk(parentId, nextVisiting)
-        : (externalAncestors.get(parentId) ?? new Map<string, AncestorEdge>());
-
+      const parentState = internalParent ? walk(parentId, nextVisiting) : undefined;
+      const parentAncestors =
+        parentState?.ancestors ??
+        externalAncestors.get(parentId) ??
+        new Map<string, AncestorEdge>();
       // why: cross-owner placements never inherit across tenants; private and explicit tenant
       // placements stop explicit folder grants from cascading down from ancestors.
-      const sameOwner = sameArtifactOwner(node, parentOwner);
+      const sameOwner = sameArtifactOwner(node, parent);
       const edgeInherits = sameOwner && (access === 'inherit' || access === 'public');
 
       merge(parentId, { inherits: edgeInherits, depth: 1 });
@@ -57,13 +81,30 @@ export const ancestorsOf = ({ artifacts, externalParents, externalAncestors }: T
           depth: ancestorEdge.depth + 1,
         });
       }
+
+      if (sameOwner && node.kind !== 'root') {
+        let contribution = 0;
+        if (access === 'public') {
+          contribution = ACCESS_RANK.public;
+        } else if (access === 'tenant') {
+          contribution = hasTenant ? ACCESS_RANK.tenant : 0;
+        } else if (access === 'inherit' && parent.kind !== 'root') {
+          contribution = parentState ? parentState.accessRank : rankOf(parent.effectiveAccess);
+          if (!hasTenant && contribution === ACCESS_RANK.tenant) contribution = 0;
+        }
+        if (contribution > accessRank) accessRank = contribution;
+      }
     }
 
-    memo.set(artifactId, result);
-    return result;
+    const state = { ancestors, accessRank };
+    memo.set(artifactId, state);
+    return state;
   };
 
-  return (artifactId: string) => walk(artifactId, new Set());
+  return (artifactId: string): ResolvedNodeState => {
+    const { ancestors, accessRank } = walk(artifactId, new Set());
+    return { ancestors, effectiveAccess: ACCESS_BY_RANK[accessRank]! };
+  };
 };
 
 export const syncAncestors = async (

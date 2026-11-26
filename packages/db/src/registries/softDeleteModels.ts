@@ -5,6 +5,7 @@
  * @uses none
  */
 import { AUDIT_ENABLED_MODELS } from '@template/db/registries/auditEnabledModels';
+import { isHardDeletedOnTombstone } from '@template/db/registries/hardDeleteOnTombstone';
 
 const SOFT_DELETE_ONLY = [
   'Contact',
@@ -18,7 +19,10 @@ const SOFT_DELETE_ONLY = [
   'TagCategory',
 ] as const;
 
-export const SOFT_DELETE_MODELS: readonly string[] = [...AUDIT_ENABLED_MODELS, ...SOFT_DELETE_ONLY];
+export const SOFT_DELETE_MODELS: readonly string[] = [
+  ...AUDIT_ENABLED_MODELS.filter((model) => !isHardDeletedOnTombstone(model)),
+  ...SOFT_DELETE_ONLY,
+];
 
 export const SOFT_DELETE_MODEL_SET = new Set<string>(SOFT_DELETE_MODELS);
 

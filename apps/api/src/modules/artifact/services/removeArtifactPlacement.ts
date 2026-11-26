@@ -55,9 +55,6 @@ export const removeArtifactPlacement = async (
       }
     }
 
-    await db.artifactPlacement.update({
-      where: { id: current.id },
-      data: { deletedAt: new Date() },
-    });
+    await db.artifactPlacement.delete({ where: { id: current.id } });
   });
 };

@@ -18,6 +18,7 @@ import {
 import { Role } from '@template/db/generated/client/enums';
 import { lensFor } from '@template/db/lens';
 import { type ArtifactKind, plainArtifactKinds } from '@template/shared/artifact';
+import { makeContainerOrOwnerRefinement } from '#/modules/artifact/schemas/artifactPlacementSchemas';
 
 export const ARTIFACT_CREATE_IMMUTABLE_FIELDS = [
   'ownerModel',
@@ -75,13 +76,21 @@ export const artifactListFilterLens: LensNarrowing = {
   },
 };
 
-export const artifactMoveBodySchema = z.object({
-  sourceContainerArtifactId: z.string().optional(),
-  targetContainerArtifactId: z.string().optional(),
-  access: ArtifactPlacementScalarInputSchema.shape.access.optional(),
-});
+export const artifactCopyBodySchema = ArtifactScalarInputSchema.pick({
+  ownerModel: true,
+  userId: true,
+  organizationId: true,
+  spaceId: true,
+  name: true,
+})
+  .partial()
+  .extend({
+    targetContainerArtifactId: ArtifactPlacementScalarInputSchema.shape.containerArtifactId
+      .min(1)
+      .optional(),
+  });
 
-export const artifactCopyBodySchema = z.object({
-  targetContainerArtifactId: z.string(),
-  name: ArtifactScalarInputSchema.shape.name.optional(),
-});
+export const artifactCopyBodyRefinement = makeContainerOrOwnerRefinement(
+  'targetContainerArtifactId',
+  true,
+);

@@ -82,9 +82,13 @@ const resetRevivedUsersTwoFactorFlag = async (rows: Row[]) => {
 
 export const reviveChildren = async (model: string, rows: Row[], priorDeletedAt: unknown) => {
   if (model === 'User') await resetRevivedUsersTwoFactorFlag(rows);
+  const regenerated = new Set<string>();
   for (const child of childRelations(model)) {
     if (isHardDeletedOnTombstone(child.model)) {
-      await REGENERATE_ON_REVIVE[child.model]?.(model, rows);
+      if (!regenerated.has(child.model)) {
+        regenerated.add(child.model);
+        await REGENERATE_ON_REVIVE[child.model]?.(model, rows);
+      }
       continue;
     }
     if (isSkippedOnRevive(child.model) || isClosedOnParentDelete(child.model)) continue;

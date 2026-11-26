@@ -104,10 +104,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     expect(artifactEffectiveRole(spaceMember, hydrated)).toBe('member');
 
     // Removing the public placement immediately drops effectiveAccess back to private
-    await db.artifactPlacement.update({
-      where: { id: publicEdge.id },
-      data: { deletedAt: new Date() },
-    });
+    await db.artifactPlacement.delete({ where: { id: publicEdge.id } });
     const afterRemove = await db.artifact.findUniqueOrThrow({ where: { id: file.id } });
     expect(afterRemove.effectiveAccess).toBe('private');
   });
@@ -354,10 +351,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     ).toBe(0);
 
     // Remove placement before tombstoning child, then tombstone and revive child inside withDeleted.
-    await db.artifactPlacement.update({
-      where: { id: placement.id },
-      data: { deletedAt: new Date() },
-    });
+    await db.artifactPlacement.delete({ where: { id: placement.id } });
     await db.artifact.update({ where: { id: child.id }, data: { deletedAt: new Date() } });
     const revived = await db.withDeleted(() =>
       db.artifact.update({ where: { id: child.id }, data: { deletedAt: null } }),

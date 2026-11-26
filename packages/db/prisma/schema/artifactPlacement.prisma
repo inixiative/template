@@ -1,8 +1,7 @@
 model ArtifactPlacement {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   containerArtifactId String         @db.VarChar(36)
   artifactId          String         @db.VarChar(36)
@@ -13,7 +12,7 @@ model ArtifactPlacement {
 
   auditLogs AuditLog[]
 
-  @@unique([containerArtifactId, artifactId], where: raw("\"deletedAt\" IS NULL"), map: "ArtifactPlacement_edge_key")
+  @@unique([containerArtifactId, artifactId], map: "ArtifactPlacement_edge_key")
   @@index([containerArtifactId])
   @@index([artifactId])
 }

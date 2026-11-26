@@ -14,6 +14,7 @@ export const HARD_DELETE_ON_TOMBSTONE = [
   'WebhookEvent',
   'RuleReference',
   'Flow',
+  'ArtifactPlacement',
   'ArtifactAncestor',
   'ArtifactEffectivePermission',
 ] as const;

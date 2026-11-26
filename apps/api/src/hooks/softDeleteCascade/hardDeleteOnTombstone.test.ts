@@ -208,7 +208,6 @@ const awaitingClassification = [
   'AuditLog.subjectSettingId belongs to Setting',
   'AuditLog.subjectProjectIntegrationId belongs to ProjectIntegration',
   'AuditLog.subjectArtifactId belongs to Artifact',
-  'AuditLog.subjectArtifactPlacementId belongs to ArtifactPlacement',
   'AuditLog.subjectArtifactPermissionId belongs to ArtifactPermission',
   'AuditLog.subjectTwoFactorId belongs to TwoFactor',
   'AuditLog.subjectPasskeyId belongs to Passkey',

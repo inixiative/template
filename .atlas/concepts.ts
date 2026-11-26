@@ -11,7 +11,10 @@ export const CONCEPTS: ConceptRegistry = {
   'feature:contact': { module: ['contact'] },
   'feature:customer': { module: ['customerRelationship'] },
   'feature:segment': { module: ['segment'] },
-  'feature:files': { module: ['artifact'], docs: ['ARTIFACTS.md'] },
+  'feature:files': {
+    module: ['artifact', 'artifactPlacement', 'artifactPermission'],
+    docs: ['ARTIFACTS.md'],
+  },
   'feature:auditLogs': { module: ['auditLog'], docs: ['HOOKS.md'] }, // lives under modules/admin/, but is its own feature
   'feature:cronJob': { module: ['cronJob'] }, // admin/cronJob — scheduled job management (own model + CRUD)
   'primitive:caching': { module: ['cache'], docs: ['REDIS.md'] }, // built on infrastructure:redis

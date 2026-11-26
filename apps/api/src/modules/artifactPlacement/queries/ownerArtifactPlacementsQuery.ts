@@ -70,7 +70,6 @@ const ownerArtifactPlacementsWhere = async (
 
   if (permix.isSuperadmin()) {
     return {
-      deletedAt: null,
       artifact: { deletedAt: null },
       containerArtifact: hasContainerFilter(c)
         ? { deletedAt: null, ...ownerFields }
@@ -128,14 +127,12 @@ const ownerArtifactPlacementsWhere = async (
 
   const rootWhere = containerPlacementWhere(rootContainerWhere, true);
   if (!hasContainerFilter(c)) {
-    return rootWhere
-      ? { deletedAt: null, artifact: artifactWhere, ...rootWhere }
-      : { id: { in: [] } };
+    return rootWhere ? { artifact: artifactWhere, ...rootWhere } : { id: { in: [] } };
   }
 
   const nonRootWhere = containerPlacementWhere(await ownerArtifactsWhere(c, owner, probed), false)!;
   const branches = rootWhere ? [nonRootWhere, rootWhere] : [nonRootWhere];
-  return { deletedAt: null, artifact: artifactWhere, OR: branches };
+  return { artifact: artifactWhere, OR: branches };
 };
 
 const filterAccessibleArtifactPlacements = async (

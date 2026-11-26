@@ -45,6 +45,10 @@ const baseImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOve
     include: ['kind'],
     exclude: ['userId', 'organizationId', 'spaceId'],
   },
+  ArtifactPlacement: {
+    exclude: ['containerArtifactId'],
+    refuse: ['artifactId'],
+  },
   WebhookSubscription: {
     ...polymorphismImmutableFields.WebhookSubscription,
     include: [...(polymorphismImmutableFields.WebhookSubscription?.include ?? []), 'resourceModel'],

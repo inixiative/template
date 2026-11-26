@@ -10,7 +10,11 @@ import {
   fetchArtifactTreeAround,
   fetchDescendantIds,
 } from '#/hooks/artifactTree/fetchArtifactTreeAround';
-import { ancestorsOf, syncAncestors } from '#/hooks/artifactTree/syncAncestors';
+import {
+  type EffectiveAccess,
+  resolveArtifactTree,
+  syncAncestors,
+} from '#/hooks/artifactTree/syncAncestors';
 import { syncEffectiveAccess } from '#/hooks/artifactTree/syncEffectiveAccess';
 import { syncEffectivePermissions } from '#/hooks/artifactTree/syncEffectivePermissions';
 
@@ -32,13 +36,17 @@ export const syncArtifactAncestors = async (artifactIds: string[]): Promise<void
     }
     if (activeIds.length === 0) return;
 
-    const resolveAncestors = ancestorsOf(tree);
-    const desiredByArtifact = new Map<string, Map<string, AncestorEdge>>(
-      activeIds.map((id) => [id, resolveAncestors(id)]),
-    );
+    const resolveNode = resolveArtifactTree(tree);
+    const desiredAncestors = new Map<string, Map<string, AncestorEdge>>();
+    const desiredAccess = new Map<string, EffectiveAccess>();
+    for (const id of activeIds) {
+      const state = resolveNode(id);
+      desiredAncestors.set(id, state.ancestors);
+      desiredAccess.set(id, state.effectiveAccess);
+    }
 
-    await syncAncestors(activeIds, desiredByArtifact);
-    await syncEffectivePermissions(activeIds, tree, desiredByArtifact);
-    await syncEffectiveAccess(activeIds, tree);
+    await syncAncestors(activeIds, desiredAncestors);
+    await syncEffectivePermissions(activeIds, tree, desiredAncestors);
+    await syncEffectiveAccess(activeIds, tree, desiredAccess);
   });
 };

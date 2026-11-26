@@ -14,22 +14,23 @@ export const artifactCreateArtifactPlacementController = makeController(
   async (c, respond) => {
     const artifact = contextResource<'artifact'>(c);
     const body = c.req.valid('json');
-    const edge = body.containerArtifactId
-      ? await placeArtifact(c.get('permix'), {
-          artifact,
-          containerArtifactId: body.containerArtifactId,
-          access: body.access,
-        })
-      : await placeArtifact(c.get('permix'), {
-          artifact,
-          owner: {
-            ownerModel: body.ownerModel!,
-            userId: body.userId,
-            organizationId: body.organizationId,
-            spaceId: body.spaceId,
-          },
-          access: body.access,
-        });
+    const edge =
+      body.containerArtifactId !== undefined
+        ? await placeArtifact(c.get('permix'), {
+            artifact,
+            containerArtifactId: body.containerArtifactId,
+            access: body.access,
+          })
+        : await placeArtifact(c.get('permix'), {
+            artifact,
+            owner: {
+              ownerModel: body.ownerModel!,
+              userId: body.userId,
+              organizationId: body.organizationId,
+              spaceId: body.spaceId,
+            },
+            access: body.access,
+          });
     return respond.created(edge);
   },
 );

@@ -181,7 +181,7 @@ export const transferArtifactService: InquiryService<
         where: { artifactId: artifact.id },
         data: { deletedAt: new Date() },
       });
-      // why: update owner and ensure a target-root placement BEFORE soft-deleting old placements so the
+      // why: update owner and ensure a target-root placement BEFORE deleting old placements so the
       // orphan-reparenting hook sees an active target-owner placement and does not reparent back to source.
       const transferred = await db.artifact.update({
         where: { id: artifact.id },
@@ -197,9 +197,8 @@ export const transferArtifactService: InquiryService<
             data: { access: 'private' },
           })
         : await writePlacement(transferred, targetRoot, 'private');
-      await db.artifactPlacement.updateManyAndReturn({
+      await db.artifactPlacement.deleteMany({
         where: { artifactId: artifact.id, id: { not: targetPlacement.id } },
-        data: { deletedAt: new Date() },
       });
       if (tracked) await grantSourceRead(artifact.id, source);
     });
