@@ -9,13 +9,17 @@ import { deduplicateMultiSelect } from '@template/shared/attributes/parsing/dedu
 import { isStringArray } from '@template/shared/attributes/parsing/isStringArray';
 import { parseAttributeValue } from '@template/shared/attributes/parsing/parseAttributeValue';
 import { AttributeValidationError } from '@template/shared/attributes/typing/columns';
-import type { AttributeValueRules } from '@template/shared/attributes/typing/definition';
+import type {
+  AttributeOption,
+  AttributeValueRules,
+} from '@template/shared/attributes/typing/definition';
 import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
+import { castArray } from 'lodash-es';
 
 const notAnOption = (rules: AttributeValueRules, value: unknown): unknown[] => {
   if (!rules.options) return [];
   const allowed = new Set(rules.options.map((option) => option.value));
-  return (Array.isArray(value) ? value : [value]).filter((entry) => !allowed.has(entry));
+  return castArray(value).filter((entry) => !allowed.has(entry as AttributeOption['value']));
 };
 
 /** The value's type, AND in `options` when there are options, AND `conditions` when there are conditions. */
