@@ -10,7 +10,7 @@ import { redirectPreservingContext } from '@template/ui/lib';
 export const Route = createFileRoute('/_authenticated/settings')({
   beforeLoad: (context) => {
     if (context.location.pathname === '/settings') {
-      redirectPreservingContext(context, '/settings/settings');
+      redirectPreservingContext(context, '/settings/profile');
     }
   },
 });

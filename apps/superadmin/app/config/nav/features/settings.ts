@@ -11,8 +11,8 @@ export const settingsItem: NavItem = {
   path: '/settings',
   icon: 'lucide:settings',
   items: [
-    { label: 'Settings', path: '/settings', icon: 'lucide:sliders-horizontal' },
     { label: 'Profile', path: '/profile', icon: 'lucide:user' },
+    { label: 'Settings', path: '/settings', icon: 'lucide:sliders-horizontal' },
     { label: 'Tokens', path: '/tokens', icon: 'lucide:key' },
     { label: 'Webhooks', path: '/webhooks', icon: 'lucide:webhook' },
     { label: 'Integrations', path: '/integrations', icon: 'lucide:plug' },
