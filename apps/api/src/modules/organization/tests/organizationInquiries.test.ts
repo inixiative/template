@@ -515,6 +515,24 @@ describe('POST /api/v1/organization/:id/inquiries — createSpace', () => {
 
     expect(response.status).toBe(403);
   });
+
+  it('rejects non-manager callers at route middleware without creating guest users', async () => {
+    const { entity: outsider } = await createUser();
+    const outsiderFetch = createTestApp({ mockUser: outsider, mount }).fetch;
+    const probeEmail = 'unauthed-guest-probe@example.com';
+
+    const response = await outsiderFetch(
+      post(`/api/v1/organization/${org.id}/inquiries`, {
+        type: InquiryType.inviteOrganizationUser,
+        targetModel: InquiryResourceModel.User,
+        targetEmail: probeEmail,
+        content: { organizationId: org.id, role: 'member' },
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await db.user.findUnique({ where: { email: probeEmail } })).toBeNull();
+  });
 });
 
 describe('GET /api/v1/organization/:id/inquiries/received', () => {

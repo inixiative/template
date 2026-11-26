@@ -10,5 +10,5 @@ import { Modules } from '#/modules/modules';
 
 export const organizationReadRoute = readRoute({
   model: Modules.organization,
-  responseSchema: OrganizationScalarSchema,
+  responseSchema: OrganizationScalarSchema.omit({ tenantPermissionRules: true }).strip(),
 });

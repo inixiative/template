@@ -16,7 +16,7 @@ import { countFrameAndCheckOverFrameLimit } from '#/ws/frameRateLimit';
 import { setSocketIdentityAndDropSubscriptionsOnChange } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
 import { isMeChannel, meChannel } from '#/ws/meChannel';
-import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
+import { probeChannelAccess, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
 import { addConnection, connectionsById, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
 import type { StreamFrame, WSData, WSMessage, WSSocket } from '#/ws/types';
@@ -114,10 +114,14 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
       return;
     }
     case 'subscribe': {
-      const granted = await canSubscribe(ws.data.headers, msg.channel);
+      const access = await probeChannelAccess(ws.data.headers, msg.channel);
       if (!connectionsById.has(ws.data.connectionId)) return;
+      if (access === 'retryable') {
+        sendTo(ws, retryableErrorFrame(msg));
+        return;
+      }
       const indexed = filedUnder(ws, msg.channel);
-      if (!granted || !indexed) {
+      if (access !== 'granted' || !indexed) {
         sendTo(ws, { type: 'subscribeRejected', channel: msg.channel });
         return;
       }
