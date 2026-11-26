@@ -56,7 +56,7 @@ export const integrationFamilies = [
 // a product names its family, and lists the family as one of its auth methods
 { key: 'drive', integrationFamily: 'google', authMethods: ['integrationFamily'] }
 { key: 'githubUser', integrationFamily: 'github', authMethods: ['integrationFamily', 'bearer'] }
-{ key: 'jira', integrationFamily: 'atlassian', authMethods: ['integrationFamily', 'bearer', 'oauth2'] }
+{ key: 'jira', integrationFamily: 'atlassian', authMethods: ['bearer', 'oauth2'] } // membership only until Atlassian consent is supported
 { key: 'slack', authMethods: ['bearer', 'oauth2'] }
 
 // contracts.ts: authMethods is a superset of the stored credential's method
@@ -93,7 +93,8 @@ Aron, 2026-11-26: "I don't know why we would refuse direct credentials. We have 
 - **Auth methods vs. the credential.** `authMethods` (on a provider and on a family) lists the ways something can authenticate. A `Credential` is what a call actually uses, and its `method` is always a real one (`bearer`, `apiKey`, `oauth2`, `clientCredentials`). `integrationFamily` is an auth method and never a credential's method, so the auth-method enum is a superset of `credentialMethodSchema`.
 - **The credential belongs to whatever you authenticated through.** A credential entered on a product hangs off the `Integration`. Connecting through the family puts the credential on the `IntegrationFamily` (Kingdom's `Credential` gets a polymorphic parent, `integration` or `integrationFamily`, with a dual id per R-2026-11-17-04). A product that lists `integrationFamily` may then use its family's credential.
 - **Adding a credential.** Every method on the list can be added; nothing in front of the list refuses one. `bearer`, `apiKey` and `clientCredentials` are entered; `oauth2` goes through a consent flow (the product's own OAuth app, for example Jira's or Slack's); `integrationFamily` connects the family through the family's own `authMethods`.
-- **Choosing at call time** (`eligibleCredential`): the product's own eligible credential first, then its family's if the product lists `integrationFamily`. The more specific one wins.
+- **Choosing at call time** (`eligibleCredential`): the product's own eligible credential first, then its family's if the product lists `integrationFamily`. The more specific one wins. A credential is checked against `acceptedCredentialMethods(provider)` (the provider's own methods plus its family's), never against `authMethods` directly: Drive's list is `['integrationFamily']`, but the call carries Google's `oauth2`.
+- **Renewal follows the owner.** `refreshProviderCredential` takes `{ integrationFamily }` for a family credential and `{ provider }` for one entered on the integration. GitHub user OAuth now comes through the `github` family, so it renews as the family's.
 - **The connect UI offers every listed method.** Drive shows "Connect with Google"; `githubUser` shows "Connect with GitHub" beside "Paste a token".
 - **A custom integration** that names a family may list `integrationFamily` to use the family's auth.
 
@@ -110,12 +111,14 @@ No settings for this in the MVP (Aron, 2026-11-26: "For MVP, we do not need it")
 - **Hard cut, no compatibility.** Kingdom's `familyIntegrationId` and the family `Integration` rows go. Prod is pre-users: reseed, or a one-off step that keeps the Google rows.
 - `isFamilyManaged` and `familyManagedCredentialMessage` go, with every refusal that calls them (`integrationCreateCredential`, `credentialUpdate`, `credentialRevoke`, `integrationSchemas`, and the web filters in `AddIntegrationForm`, `IntegrationSetup`, `IntegrationMaintenance`, `integrationProviders`). `authMethods` is the gate.
 - `credentialAccessWhere` and `eligibleCredential` read the product's credentials, then the family's when the product lists `integrationFamily`, in place of `familyIntegrationId`.
+- Kingdom moves to integrations `^0.3.0` in this build, not before (RELEASE-QUEUE row): `authMethods.includes(...)` checks become `acceptedCredentialMethods` (`eligibleCredential`, `accessDescribe`, `credentialUpdate`, `integrationCreateCredential`, `IntegrationSetup` never offers `integrationFamily` as a pasted method); `claimRefreshToken`'s jira/confluence → `atlassian` map and `accessDescribe`'s `providerFamily` read `integrationFamily`; `.family` → `.integrationFamily` (`googleSchemas`, `renewCredential`); `familyProducts` → `providersInIntegrationFamily` (`GoogleSection`).
 - Products are refused while their family is down. That replaces `familyIsLive`.
 
 ## Open
 
 - **Chorus and Oracle under `inixiative`.** This means one consent flow for our own products. Kingdom hosts them, and the model capacity is the customer's own API key, so the family may hold no credential: it would be a grouping plus a shared off switch. Agreed in principle; confirm when the catalog entry lands.
-- **Atlassian.** Jira and Confluence share one OAuth app and site (`cloudId`), so a family fits as it does for Google.
+- **Atlassian.** Jira and Confluence share one OAuth app and site (`cloudId`), so a family fits as it does for Google. integrations 0.3.0 puts them in `atlassian` for grouping and settings only; they list `integrationFamily` once the package supports Atlassian consent (an authorize URL, the JSON code exchange, and reading the account from `accessible-resources`). Until then `isAccountSuppliedByHost` stays false for them, so a Jira with a pasted token keeps its typed account.
+- **Account supplied by host is decided per provider, but depends on the credential.** `githubUser` takes the family consent or a pasted bearer; with a pasted token the host supplies no account. Decide in the Kingdom build whether the account comes from the credential path.
 
 ## Existing primitives used
 
@@ -127,6 +130,6 @@ No settings for this in the MVP (Aron, 2026-11-26: "For MVP, we do not need it")
 | Owner match | the tenant-boundary hook pattern (`projectIntegrationOwner`) |
 | Settings | `SETTING_TREES`, `settingResourceKindsOf` |
 | Permissions | `db:Integration` rules in `packages/permissions/src/rebac/schema.ts` |
-| Catalog | `@inixiative/integrations` (`findProvider`, `familyProducts`) |
+| Catalog | `@inixiative/integrations` 0.3.0 (integrations #4): `integrationFamilies`, `integrationFamilyDefinition`, `providersInIntegrationFamily`, `acceptedCredentialMethods`, `providerAuthenticatesThroughIntegrationFamily`, `refreshProviderCredential({ integrationFamily })`, `exchangeOauthCode({ integrationFamily })` |
 | Which credentials an integration takes | `ProviderDefinition.authMethods`, already checked in `integrationCreateCredential` and `credentialUpdate`; extended with `integrationFamily` |
 | Which credential a call uses | Kingdom `eligibleCredential` / `credentialAccessWhere` |
