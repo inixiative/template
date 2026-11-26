@@ -12,8 +12,10 @@ import {
 import {
   cleanupTouchedTables,
   createAccount,
+  createArtifactPermission,
   createAuditLog,
   createContact,
+  createCustomerRelationship,
   createInquiry,
   createOrganization,
   createOrganizationUser,
@@ -391,13 +393,11 @@ describe('handler: mergeUser', () => {
   });
 
   it('removes a customer relationship between the two users', async () => {
-    const relationship = await db.customerRelationship.create({
-      data: {
-        customerModel: 'User',
-        customerUserId: source.id,
-        providerModel: 'User',
-        providerUserId: target.id,
-      },
+    const { entity: relationship } = await createCustomerRelationship({
+      customerModel: 'User',
+      customerUserId: source.id,
+      providerModel: 'User',
+      providerUserId: target.id,
     });
     const inquiry = await createMergeInquiry();
 
@@ -415,13 +415,11 @@ describe('handler: mergeUser', () => {
     const rootOf = (user: User) =>
       db.artifact.findFirstOrThrow({ where: { userId: user.id, kind: 'root' } });
     const [sourceRoot, targetRoot] = [await rootOf(source), await rootOf(target)];
-    await db.artifactPermission.create({
-      data: {
-        artifactId: sourceRoot.id,
-        granteeModel: 'User',
-        granteeUserId: grantee.id,
-        role: Role.member,
-      },
+    await createArtifactPermission({
+      artifactId: sourceRoot.id,
+      granteeModel: 'User',
+      granteeUserId: grantee.id,
+      role: Role.member,
     });
     const inquiry = await createMergeInquiry();
 
