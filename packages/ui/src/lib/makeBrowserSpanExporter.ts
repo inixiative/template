@@ -23,15 +23,18 @@ export const makeBrowserSpanExporter = ({
   onExportsStopped,
 }: BrowserSpanExporterOptions): SpanExporter => {
   let consecutiveExportFailures = 0;
-  const exportsStopped = () => consecutiveExportFailures >= maxConsecutiveExportFailures;
+  let exportsStopped = false;
 
   return {
     export(spans, callback) {
-      if (exportsStopped()) return callback({ code: ExportResultCode.FAILED });
+      if (exportsStopped) return callback({ code: ExportResultCode.FAILED });
       const settleExport = (succeeded: boolean) => {
-        consecutiveExportFailures = succeeded ? 0 : consecutiveExportFailures + 1;
-        if (exportsStopped()) onExportsStopped();
         callback({ code: succeeded ? ExportResultCode.SUCCESS : ExportResultCode.FAILED });
+        if (exportsStopped) return;
+        consecutiveExportFailures = succeeded ? 0 : consecutiveExportFailures + 1;
+        if (consecutiveExportFailures < maxConsecutiveExportFailures) return;
+        exportsStopped = true;
+        onExportsStopped();
       };
       const data: BrowserTelemetry = {
         app,

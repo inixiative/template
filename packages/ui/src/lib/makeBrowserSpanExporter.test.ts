@@ -72,4 +72,24 @@ describe('makeBrowserSpanExporter', () => {
 
     expect(onExportsStopped).toHaveBeenCalledTimes(1);
   });
+
+  it('stays stopped when exports overlap and a late success arrives after the stop', async () => {
+    const responses = [503, 503, 503, 202, 503];
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response(null, { status: responses.shift() ?? 503 })) as unknown as typeof fetch,
+    );
+    const onExportsStopped = mock(() => {});
+    const exporter = makeBrowserSpanExporter({
+      app: 'web',
+      endpoint: 'https://api.example.test/api/telemetry/browser',
+      onExportsStopped,
+    });
+
+    await Promise.all(Array.from({ length: 5 }, () => exportOnce(exporter)));
+    expect(await exportOnce(exporter)).toBe(ExportResultCode.FAILED);
+
+    expect(onExportsStopped).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(5);
+  });
 });
