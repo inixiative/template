@@ -6,7 +6,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { meRead, meReadQueryKey } from '@template/sdk';
-import { Page } from '@template/ui/components';
+import { Page, Skeleton } from '@template/ui/components';
 import {
   ChangePasswordCard,
   ProfileFormCard,
@@ -29,7 +29,7 @@ export const UserProfilePage = () => {
   return (
     <Page title="Profile" description="Manage your user settings and preferences">
       {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-40 rounded-xl" />
       ) : (
         <div className="max-w-2xl space-y-6">
           <ProfileFormCard

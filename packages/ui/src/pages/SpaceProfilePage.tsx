@@ -11,7 +11,7 @@ import {
   spaceProtectedQueryKey,
   spaceUpdate,
 } from '@template/sdk';
-import { Page } from '@template/ui/components';
+import { Page, Skeleton } from '@template/ui/components';
 import { ProfileFormCard, ResourceSettingsSection } from '@template/ui/components/settings';
 import { useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -66,7 +66,7 @@ export const SpaceProfilePage = () => {
   return (
     <Page title="Profile" description="Manage your space settings and preferences">
       {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-40 rounded-xl" />
       ) : (
         <div className="max-w-2xl space-y-6">
           <ProfileFormCard

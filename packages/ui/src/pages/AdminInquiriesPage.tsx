@@ -11,7 +11,7 @@ import {
   adminInquiryReadManyQueryKey,
   type InquiryItem,
 } from '@template/sdk';
-import { EmptyState, Page, Table } from '@template/ui/components';
+import { EmptyState, Page, Skeleton, Table } from '@template/ui/components';
 import {
   InquirySourceControls,
   InquiryStatusBadge,
@@ -93,7 +93,7 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
       actions={statusDropdown}
     >
       {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-40 rounded-xl" />
       ) : view === 'all' ? (
         <AdminAllInquiryTable inquiries={inquiries} />
       ) : (

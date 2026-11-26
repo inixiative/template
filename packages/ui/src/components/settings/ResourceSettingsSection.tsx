@@ -12,6 +12,7 @@ import {
   diffSettingDrafts,
   SETTING_DEFINITIONS,
 } from '@template/shared/settings';
+import { Skeleton } from '@template/ui/components';
 import {
   Button,
   Card,
@@ -235,7 +236,7 @@ export const ResourceSettingsSection = ({
   });
 
   if (isCatalogLoading) {
-    return <div className="h-24 animate-pulse rounded-xl bg-muted/50" />;
+    return <Skeleton className="h-24 rounded-xl" />;
   }
 
   if (hideWhenEmpty && assembled.items.length === 0) {
@@ -255,7 +256,7 @@ export const ResourceSettingsSection = ({
       </CardHeader>
       <CardContent className="space-y-5">
         {settingsQuery.isLoading ? (
-          <div className="h-20 animate-pulse rounded-md bg-muted/50" />
+          <Skeleton className="h-20 rounded-md" />
         ) : (
           <>
             {assembled.items.map((item) => {

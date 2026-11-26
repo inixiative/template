@@ -6,7 +6,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import type { InquiryItem } from '@template/sdk';
-import { Page, Table } from '@template/ui/components';
+import { Page, Skeleton, Table } from '@template/ui/components';
 import {
   InquirySourceControls,
   InquiryStatusBadge,
@@ -170,7 +170,7 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
       }
     >
       {activeQuery.isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-40 rounded-xl" />
       ) : (
         <Table
           columns={columns}

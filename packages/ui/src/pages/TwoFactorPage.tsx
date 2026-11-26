@@ -7,6 +7,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
 import { meTwoFactor, meTwoFactorQueryKey } from '@template/sdk';
+import { Skeleton } from '@template/ui/components';
 import { TwoFactorVerifyForm } from '@template/ui/components/auth/TwoFactorVerifyForm';
 import { Button } from '@template/ui/components/primitives/Button';
 import {
@@ -76,7 +77,7 @@ export const TwoFactorPage = () => {
         {isEnroll ? (
           <TwoFactorSecurityCard onEnrolled={() => void returnToOrigin()} />
         ) : isLoadingTwoFactor || isReturning || !twoFactorData?.data ? (
-          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+          <Skeleton className="h-40 rounded-xl" />
         ) : (
           <Card className="w-full shadow-lg border-border/50">
             <CardHeader>

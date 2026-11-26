@@ -12,6 +12,7 @@ export * from './Pagination';
 export * from './PasswordInput';
 export * from './SearchableSelect';
 export * from './Select';
+export * from './Skeleton';
 export * from './SlugInput';
 export * from './Table';
 export * from './ThemeSelector';

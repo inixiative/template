@@ -7,6 +7,7 @@
 import { Icon } from '@iconify/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
+import { Skeleton } from '@template/ui/components';
 import { Page } from '@template/ui/components/layout/Page';
 import {
   Badge,
@@ -153,7 +154,7 @@ export const ProjectDetailPage = ({
   if (projectQuery.isLoading) {
     return (
       <Page title="Project">
-        <div className="h-32 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-32 rounded-xl" />
       </Page>
     );
   }

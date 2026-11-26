@@ -18,7 +18,7 @@ import {
   organizationReadAuthProvider,
   organizationReadAuthProviderQueryKey,
 } from '@template/sdk';
-import { Badge, Button, Page, Table } from '@template/ui/components';
+import { Badge, Button, Page, Skeleton, Table } from '@template/ui/components';
 import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -178,7 +178,7 @@ export const OrganizationAuthProvidersPage = () => {
         }
       >
         {isLoading ? (
-          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+          <Skeleton className="h-40 rounded-xl" />
         ) : (
           <Table
             columns={columns}

@@ -11,7 +11,15 @@ import {
   spaceSentManyInquiriesQueryKey,
 } from '@template/sdk';
 import type { UpdateSpaceContent } from '@template/shared/inquiry';
-import { Button, Card, CardContent, CardHeader, CardTitle, Page } from '@template/ui/components';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Page,
+  Skeleton,
+} from '@template/ui/components';
 import { InquirySourceControls, InquiryStatusBadge } from '@template/ui/components/inquiries';
 import { useCanActOnInquiry, useCreateInquiryMutation } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -86,7 +94,7 @@ export const SpaceUpdateInquiryPage = () => {
       description="Request a new name or slug for this space. Changes take effect once a platform admin approves them."
     >
       {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-40 rounded-xl" />
       ) : activeInquiry ? (
         <Card>
           <CardHeader>

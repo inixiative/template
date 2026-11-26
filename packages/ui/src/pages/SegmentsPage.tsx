@@ -13,7 +13,7 @@ import type {
   SpaceReadManySegmentMembershipsResponse,
   SpaceReadManySegmentsResponse,
 } from '@template/sdk';
-import { Page, Table } from '@template/ui/components';
+import { Page, Skeleton, Table } from '@template/ui/components';
 import { segmentContextQueries } from '@template/ui/lib/segmentContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
@@ -116,7 +116,7 @@ export const SegmentsPage = ({ view }: { view: 'owned' | 'memberships' }) => {
       }
     >
       {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-40 rounded-xl" />
       ) : view === 'owned' ? (
         <Table
           columns={ownedColumns}

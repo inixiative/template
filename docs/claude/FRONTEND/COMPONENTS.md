@@ -13,6 +13,7 @@
   - [Table](#table)
   - [Avatar](#avatar)
   - [EmptyState](#emptystate)
+  - [Skeleton](#skeleton)
   - [DropdownMenu](#dropdownmenu)
   - [Select and SearchableSelect](#select-and-searchableselect)
   - [Others](#others)
@@ -167,6 +168,16 @@ Composed: `Avatar` (frame, `show`), `AvatarImage` (renders nothing when `src` is
   action={{ label: 'Create Organization', onClick: () => setIsModalOpen(true) }}
 />
 ```
+
+### Skeleton
+
+The one placeholder for content that is still loading. Size it to the content it stands in for (the same height, a row's height in a list), so the page keeps its shape when the data lands. Never hand-roll an `animate-pulse` div.
+
+```typescript
+if (isPending) return <Skeleton className="h-40 rounded-xl" />;
+```
+
+Icons: every `lucide:` and `simple-icons:` name the apps use is bundled by `bun run generate:frontend` (`packages/ui/src/lib/icons/bundledIconCollections.gen.ts`, registered in each app's `main.tsx`), so icons render in the first frame instead of after a fetch to the Iconify API.
 
 ### DropdownMenu
 

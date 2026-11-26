@@ -18,7 +18,7 @@ import {
   organizationReadManyUsersQueryKey,
   organizationUserDelete,
 } from '@template/sdk';
-import { Button, Page, Table } from '@template/ui/components';
+import { Button, Page, Skeleton, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import {
   createOptimisticListTarget,
@@ -183,7 +183,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
         }
       >
         {isLoading ? (
-          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+          <Skeleton className="h-40 rounded-xl" />
         ) : (
           <Table
             columns={columns}

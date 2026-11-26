@@ -21,6 +21,7 @@ import {
   meTwoFactorTotpDisable,
   meTwoFactorTotpStart,
 } from '@template/sdk';
+import { Skeleton } from '@template/ui/components';
 import { BackupCodesRevealModal } from '@template/ui/components/auth/BackupCodesRevealModal';
 import type { TotpSetupState } from '@template/ui/components/auth/TotpEnrollForm';
 import { Badge } from '@template/ui/components/primitives/Badge';
@@ -140,7 +141,7 @@ export const TwoFactorSecurityCard = ({ onEnrolled }: { onEnrolled?: () => void 
       await finishEnrollment(res.data.jwt, res.data.backupCodes);
     });
 
-  if (isLoading || !status) return <div className="h-40 animate-pulse rounded-xl bg-muted/50" />;
+  if (isLoading || !status) return <Skeleton className="h-40 rounded-xl" />;
 
   return (
     <>

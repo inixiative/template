@@ -6,6 +6,7 @@
  */
 import { Icon } from '@iconify/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Skeleton } from '@template/ui/components';
 import { Modal } from '@template/ui/components/layout/Modal';
 import { Page } from '@template/ui/components/layout/Page';
 import {
@@ -197,7 +198,7 @@ const ProjectOwnerSection = ({
         </CardHeader>
         <CardContent>
           {projectsQuery.isLoading ? (
-            <div className="h-16 animate-pulse rounded-md bg-muted/50" />
+            <Skeleton className="h-16 rounded-md" />
           ) : projects.length === 0 ? (
             <p className="text-sm text-muted-foreground">No projects yet.</p>
           ) : (

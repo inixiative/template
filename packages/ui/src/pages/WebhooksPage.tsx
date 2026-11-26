@@ -13,7 +13,7 @@ import type {
   OrganizationReadManyWebhookSubscriptionsResponse,
   SpaceReadManyWebhookSubscriptionsResponse,
 } from '@template/sdk';
-import { Button, Page, Table } from '@template/ui/components';
+import { Button, Page, Skeleton, Table } from '@template/ui/components';
 import { CreateWebhookModal } from '@template/ui/components/settings/CreateWebhookModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { webhookContextQueries } from '@template/ui/lib/webhookContextQueries';
@@ -116,7 +116,7 @@ export const WebhooksPage = () => {
       }
     >
       {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-40 rounded-xl" />
       ) : (
         <Table
           columns={columns}

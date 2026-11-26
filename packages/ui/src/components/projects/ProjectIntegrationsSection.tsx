@@ -7,6 +7,7 @@
 import { Icon } from '@iconify/react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
+import { Skeleton } from '@template/ui/components';
 import {
   Badge,
   Button,
@@ -190,7 +191,7 @@ export const ProjectIntegrationsSection = ({
         </CardHeader>
         <CardContent>
           {connectedQuery.isLoading ? (
-            <div className="h-16 animate-pulse rounded-md bg-muted/50" />
+            <Skeleton className="h-16 rounded-md" />
           ) : connectedRows.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No integrations are connected to this project yet.
@@ -321,7 +322,7 @@ export const ProjectIntegrationsSection = ({
         </CardHeader>
         <CardContent className="space-y-5">
           {anyScopeLoading && !anyAvailable ? (
-            <div className="h-16 animate-pulse rounded-md bg-muted/50" />
+            <Skeleton className="h-16 rounded-md" />
           ) : !anyAvailable ? (
             <p className="text-sm text-muted-foreground">
               No additional integrations are available to connect to this project.

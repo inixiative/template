@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
   Page,
+  Skeleton,
   Table,
 } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
@@ -142,7 +143,7 @@ const TokenSection = ({
   );
 
   const table = isLoading ? (
-    <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+    <Skeleton className="h-40 rounded-xl" />
   ) : (
     <Table
       columns={columns}

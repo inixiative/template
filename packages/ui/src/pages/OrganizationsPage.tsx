@@ -17,7 +17,7 @@ import {
   organizationCreate,
   organizationDelete,
 } from '@template/sdk';
-import { Button, Page, Table } from '@template/ui/components';
+import { Button, Page, Skeleton, Table } from '@template/ui/components';
 import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -153,7 +153,7 @@ export const OrganizationsPage = () => {
         }
       >
         {isLoading ? (
-          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+          <Skeleton className="h-40 rounded-xl" />
         ) : (
           <Table
             columns={columns}

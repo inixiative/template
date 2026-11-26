@@ -10,7 +10,7 @@ import {
   organizationReadManySpaces,
   organizationReadManySpacesQueryKey,
 } from '@template/sdk';
-import { Page, Table } from '@template/ui/components';
+import { Page, Skeleton, Table } from '@template/ui/components';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
 
@@ -59,7 +59,7 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
       description="Spaces within this organization. Open one to work in its context."
     >
       {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-40 rounded-xl" />
       ) : (
         <Table
           columns={columns}
