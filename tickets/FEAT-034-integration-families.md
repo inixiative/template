@@ -58,8 +58,27 @@ export const families = [
 - **Owner:** any owner, under the same false polymorphism as `Integration`. The family's owner and its products' owner must match. The tenant-boundary hook checks that, as `projectIntegrationOwner` does for links.
 - **One per owner per family.** Connecting a product finds or creates the owner's family first, which is the one-per-owner revive path (`createIntegration`, R-2026-11-24-03).
 - **Lifecycle:** a family is a soft-delete parent of its products. Removing it removes them, and reviving it revives them.
-- **Settings:** `IntegrationFamily` joins `SettingResourceModel` with its own tree, for what the whole family shares (`atlassian.cloudId`, `inixiative.region`). Products keep their `integrationFamily:` / `provider:` branches on the Integration tree. `settingResourceKindsOf` reads `integrationFamily` from the product's catalog entry, as it does now; the kind branch is `integrationFamily:<key>`, labelled "Family" in the UI.
+- **Membership is a column on the product.** `Integration.integrationFamily` is an optional `IntegrationFamily` enum (`google`, `github`, `atlassian`, `inixiative`), mirrored from the catalog the way `Provider` is.
+  - On create it defaults to the catalog's family for the provider: Jira gets `atlassian`, Slack gets null. A custom integration (no provider) may name a family, or none.
+  - It can't change after create (immutable-fields registry, as `provider`). Settings stored under one family's branch would otherwise fall off the tree.
+  - It is a column, not a setting, because settings choose their branches by it.
+- **Settings:** `IntegrationFamily` joins `SettingResourceModel` with its own tree, for what the whole family shares (`atlassian.cloudId`, `inixiative.region`). Products keep their `integrationFamily:` / `provider:` branches on the Integration tree. `settingResourceKindsOf` reads the product's `integrationFamily` column; the kind branch is `integrationFamily:<key>`, labelled "Family" in the UI.
 - **Permissions:** `db:IntegrationFamily` follows `db:Integration`'s owner rules. Products reach their family upward (`IntegrationFamily → owner`), so a family's `manage` is its owner's.
+
+## MVP: a family product always connects through its family
+
+No settings control this for the MVP (Aron, 2026-11-26: "it should kind of be on by default… For MVP, we do not need it"). An integration with a family is connected by connecting the family, and direct credentials on it are refused.
+
+If more control is needed later, these are the settings that were sketched. They would go in an Integration tree `connection` branch:
+
+- **`connection.usesFamily`:**
+  - `off`: its own credentials, so direct credentials are allowed;
+  - `consent` (the default): connected through the family's consent, which covers this product's scopes and gives it a token of its own;
+  - `credential`: uses the family's credential as it is.
+- **`connection.directCredentials`** (boolean): allows entering a credential directly even under a family.
+- **A custom integration using another family's auth:** already expressible by setting `integrationFamily` on a custom integration at create.
+
+These are settings rather than columns because they only change which credential is used, not which settings exist.
 
 ## Credentials (Kingdom)
 
