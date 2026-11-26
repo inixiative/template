@@ -14,7 +14,7 @@ end
 return c
 `;
 
-export const incrementSessionKey = async (key: string, ttl: number): Promise<number> => {
+export const incrementSecondaryStorageKey = async (key: string, ttl: number): Promise<number> => {
   const fullKey = `${redisNamespace.session}:${key}`;
   const result = await redisClient().eval(INCREMENT_WITH_TTL_LUA, 1, fullKey, ttl);
   return Number(result);
