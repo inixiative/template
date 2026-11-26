@@ -34,13 +34,13 @@ export const settingResourceModelRule = (
   all: [isResourceModel(model), { rel: `resource${model}`, action }],
 });
 
-type Placement = { model: SettingResourceModelName; definition: SettingDefinition };
+type SettingOfModel = { model: SettingResourceModelName; definition: SettingDefinition };
 
 const perKey = (
-  placements: readonly Placement[],
+  settingsOfModels: readonly SettingOfModel[],
   actionOf: (definition: SettingDefinition) => SettingPermissionAction,
 ): ActionRule => ({
-  any: Object.entries(groupBy(placements, ({ definition }) => definition.key)).map(
+  any: Object.entries(groupBy(settingsOfModels, ({ definition }) => definition.key)).map(
     ([key, held]) => ({
       all: [
         isKey(key),
@@ -55,7 +55,7 @@ const perKey = (
 });
 
 export const settingResourcePermissionFromTrees = (trees: SettingTrees): ResourcePermission => {
-  const placements = SETTING_RESOURCE_MODELS.flatMap((model) =>
+  const settingsOfModels = SETTING_RESOURCE_MODELS.flatMap((model) =>
     uniqBy(settingsIn(trees[model], 'every'), 'key').map((definition) => ({
       model,
       definition,
@@ -63,8 +63,8 @@ export const settingResourcePermissionFromTrees = (trees: SettingTrees): Resourc
   );
   return {
     actions: {
-      manage: perKey(placements, (definition) => definition.manage),
-      read: { any: ['manage', perKey(placements, (definition) => definition.read)] },
+      manage: perKey(settingsOfModels, (definition) => definition.manage),
+      read: { any: ['manage', perKey(settingsOfModels, (definition) => definition.read)] },
     },
   };
 };

@@ -2,7 +2,7 @@
 
 **Status:** Agreed in principle (Aron, 2026-11-26: "integration family becomes first class model right?"; "sounds good make it so"). Design for review; not started.
 **Repos:** `inixiative/integrations` (the catalog), `inixiative/template`, then Kingdom.
-**Related:** FEAT-029 (settings pages and provider families), template#338 (setting trees, `integrationFamily:` kind branches).
+**Related:** FEAT-029 (settings pages and provider families), template#338 (setting trees).
 
 ## Why
 
@@ -13,7 +13,7 @@ A family is one consent and one credential shared by several products: Google fo
 - The family "integration" has no operations of its own.
 - Family rows need an `organizationId`, so a personal or space owner can't hold one, though Chorus is one per owner of any kind.
 
-Settings now branch on `integrationFamily:` (template#338), so the model they depend on belongs in template.
+Template has no family model, so family-wide settings have nowhere to live; it belongs in template.
 
 ## Shape
 
@@ -61,9 +61,21 @@ export const families = [
 - **Membership is a column on the product.** `Integration.integrationFamily` is an optional `IntegrationFamily` enum (`google`, `github`, `atlassian`, `inixiative`), mirrored from the catalog the way `Provider` is.
   - On create it defaults to the catalog's family for the provider: Jira gets `atlassian`, Slack gets null. A custom integration (no provider) may name a family, or none.
   - It can't change after create (immutable-fields registry, as `provider`). Settings stored under one family's branch would otherwise fall off the tree.
-  - It is a column, not a setting, because settings choose their branches by it.
-- **Settings:** `IntegrationFamily` joins `SettingResourceModel` with its own tree, for what the whole family shares (`atlassian.cloudId`, `inixiative.region`). Products keep their `integrationFamily:` / `provider:` branches on the Integration tree. `settingResourceKindsOf` reads the product's `integrationFamily` column; the kind branch is `integrationFamily:<key>`, labelled "Family" in the UI.
+- **Settings: two records, two trees, no nesting** (Aron, 2026-11-26: "integration and integration family are different tables in the tree now, and the nesting should just go away").
+  - `IntegrationFamily` joins `SettingResourceModel` with its own tree, for what the whole family shares (`atlassian.cloudId`, `inixiative.region`).
+  - The Integration tree keeps only `provider:` branches.
+  - No `integrationFamily:` kind: template#338 removed it.
 - **Permissions:** `db:IntegrationFamily` follows `db:Integration`'s owner rules. Products reach their family upward (`IntegrationFamily → owner`), so a family's `manage` is its owner's.
+
+## UI: the family has its own settings page
+
+An integration's settings page links to its family's ("Family settings"). That page is a route of its own, `/settings/integrations/families/:id`, and isn't in the nav. It renders the `IntegrationFamily` record's tree with `SettingTreeView`, so each page shows one resource.
+
+At the top of the family page, a strip shows every product of the family as an icon, so you can see what its settings touch:
+- active products in colour, the rest greyed out;
+- a small count badge on an icon when the owner has more than one of that product.
+
+The other option was to show the family's settings at the top of each integration's page. That puts two resources on one page.
 
 ## MVP: a family product always connects through its family
 

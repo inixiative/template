@@ -46,8 +46,6 @@ const tree: SettingTree = {
       },
     },
   },
-  'integrationFamily:google': { google: { a: boxes('A', 0) } },
-  'provider:drive': { google: { b: boxes('B', 0) } },
 };
 
 describe('settingAt', () => {
@@ -72,15 +70,6 @@ describe('settingAt', () => {
     expect(settingAt(tree, 'notifications.missing', {})).toBeUndefined();
     expect(settingAt(tree, 'linear.paused', { provider: 'slack' })).toBeUndefined();
     expect(settingAt(tree, 'notifications.enabled.deeper', {})).toBeUndefined();
-  });
-
-  it('merges branches of one name from every matching kind', () => {
-    const kinds = { provider: 'drive', integrationFamily: 'google' };
-    expect(settingAt(tree, 'google.a', kinds)).toBeDefined();
-    expect(settingAt(tree, 'google.b', kinds)).toBeDefined();
-    expect(
-      settingAt(tree, 'google.b', { provider: 'gmail', integrationFamily: 'google' }),
-    ).toBeUndefined();
   });
 
   it("keeps each branch's permissions on its own settings when kinds merge into a plain branch", () => {
@@ -111,27 +100,6 @@ describe('settingAt', () => {
       'general.l1.y',
     ]);
   });
-
-  it('holds a provider inside its family branch, matching only when both do', () => {
-    const families: SettingTree = {
-      __read: 'read',
-      __manage: 'manage',
-      'integrationFamily:inixiative': {
-        __manage: 'operate',
-        inixiative: { region: boxes('Region', 0) },
-        'provider:chorus': { chorus: { enabled: boxes('Enabled', 0) } },
-        'provider:oracle': { oracle: { enabled: boxes('Enabled', 0) } },
-      },
-    };
-    const view = (kinds: Record<string, string | null>) =>
-      settingsIn(families, kinds).map(({ key, manage }) => `${key}:${manage}`);
-    expect(view({ provider: 'chorus', integrationFamily: 'inixiative' })).toEqual([
-      'inixiative.region:operate',
-      'chorus.enabled:operate',
-    ]);
-    expect(view({ provider: 'inixiative', integrationFamily: null })).toEqual([]);
-    expect(view({ provider: 'chorus', integrationFamily: null })).toEqual([]);
-  });
 });
 
 describe('settingsIn', () => {
@@ -151,12 +119,12 @@ describe('settingsIn', () => {
 });
 
 describe('SETTING_TREES', () => {
-  const everyPlacement = SETTING_RESOURCE_MODELS.flatMap((model) =>
+  const everySettingOfModel = SETTING_RESOURCE_MODELS.flatMap((model) =>
     settingsIn(SETTING_TREES[model], 'every').map((setting) => ({ model, setting })),
   );
 
   it('names settings and branches plainly: no `:` inside a name, not integer-like', () => {
-    for (const { setting } of everyPlacement)
+    for (const { setting } of everySettingOfModel)
       for (const segment of setting.key.split('.')) {
         expect(segment.includes(':')).toBe(false);
         expect(/^\d+$/.test(segment)).toBe(false);
@@ -164,9 +132,9 @@ describe('SETTING_TREES', () => {
   });
 
   it('gives a key one meaning wherever it is placed', () => {
-    for (const { setting } of everyPlacement)
-      for (const other of everyPlacement.filter(
-        (placement) => placement.setting.key === setting.key,
+    for (const { setting } of everySettingOfModel)
+      for (const other of everySettingOfModel.filter(
+        (settingOfModel) => settingOfModel.setting.key === setting.key,
       )) {
         expect(other.setting.valueType).toBe(setting.valueType);
         expect(isEqual(other.setting.options, setting.options)).toBe(true);
@@ -176,9 +144,10 @@ describe('SETTING_TREES', () => {
   });
 
   it('gives a key one permission per model across its kinds', () => {
-    for (const { model, setting } of everyPlacement)
-      for (const other of everyPlacement.filter(
-        (placement) => placement.model === model && placement.setting.key === setting.key,
+    for (const { model, setting } of everySettingOfModel)
+      for (const other of everySettingOfModel.filter(
+        (settingOfModel) =>
+          settingOfModel.model === model && settingOfModel.setting.key === setting.key,
       )) {
         expect(other.setting.read).toBe(setting.read);
         expect(other.setting.manage).toBe(setting.manage);
@@ -186,7 +155,7 @@ describe('SETTING_TREES', () => {
   });
 
   it('holds a default that passes its own type, options and conditions', () => {
-    for (const { setting } of everyPlacement)
+    for (const { setting } of everySettingOfModel)
       if (setting.defaultValue !== null)
         expect(() =>
           validateAttributeValue(setting.valueType, setting.defaultValue, setting),

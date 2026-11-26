@@ -33,10 +33,6 @@ To do:
 
 ## Provider families in setting trees
 
-Integration and ProjectIntegration trees switch on two kind fields:
-- `provider:<key>`, the integration's own provider;
-- `integrationFamily:<key>` (labelled "Family"), the family the catalog declares for the provider, null when it declares none, so a family never matches an integration directly.
-
-A provider in a family is declared inside its family's branch: `'integrationFamily:atlassian': { atlassian: {…shared}, 'provider:jira': { jira: {…} } }`.
+Integration and ProjectIntegration trees switch on one kind field, `provider:<key>`. A family's shared settings live on the family's own record and tree, not nested in the Integration tree (FEAT-034).
 
 **Decided (Aron, 2026-11-26):** Atlassian becomes a family for Jira and Confluence, and inixiative one for Chorus and Oracle; families become a first-class model. See FEAT-034.
