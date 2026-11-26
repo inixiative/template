@@ -4,10 +4,9 @@
  * @partOf primitive:authz
  * @uses none
  */
-import type { Entitlement } from '@inixiative/permissions';
 import type { Action, Permix, StandardAction } from '@template/permissions/client';
 
-export const STANDARD_ACTIONS_IMPLYING: Record<StandardAction, readonly Action[]> = {
+const STANDARD_ACTIONS_IMPLYING: Record<StandardAction, readonly Action[]> = {
   own: ['own'],
   manage: ['own', 'manage'],
   operate: ['own', 'manage', 'operate'],
@@ -22,30 +21,6 @@ const safePermixTable = (permix: Permix): Record<string, Record<string, boolean>
   }
 };
 
-export const directEntitledIds = (
-  permix: Permix,
-  resource: string,
-  actions: readonly Action[],
-): { entitlements: Entitlement[]; directIds: string[]; hasBroadEntitlement: boolean } => {
-  const entitlements = actions.flatMap((action) => permix.entitlements(resource, action));
-  const directIds = [
-    ...new Set(
-      entitlements.flatMap((ent) =>
-        ent.anchor.resource === resource && ent.anchor.id ? [ent.anchor.id] : [],
-      ),
-    ),
-  ];
-  return {
-    entitlements,
-    directIds,
-    hasBroadEntitlement: entitlements.some(
-      (ent) => ent.anchor.resource !== resource || !ent.anchor.id,
-    ),
-  };
-};
-
-// Reads the caller's already-resolved effective permissions (covering users, full/capped/entitlement-only
-// tokens, member-seat tokens, integration tokens, and spoofing) without duplicating ownerPermissions.
 export const permixIdsWithAction = (
   permix: Permix,
   resource: string,
@@ -62,6 +37,10 @@ export const permixIdsWithAction = (
       }
     }
   }
-  for (const id of directEntitledIds(permix, resource, covering).directIds) ids.add(id);
+  for (const candidate of covering) {
+    for (const ent of permix.entitlements(resource, candidate)) {
+      if (ent.anchor.resource === resource && ent.anchor.id) ids.add(ent.anchor.id);
+    }
+  }
   return [...ids];
 };
