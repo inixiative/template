@@ -1,4 +1,4 @@
-import type { HookOptions, ManyAction, SingleAction } from '@template/db';
+import type { HookOptions } from '@template/db';
 import {
   DbAction,
   db,
@@ -11,8 +11,7 @@ import {
 import type { WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
-import { keyBy } from 'lodash-es';
-import { isManyAction } from '#/hooks/shared/hookRows';
+import { ALL_MUTATION_ACTIONS, changedPairs } from '#/hooks/shared/hookRows';
 import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
 import { fetchWebhookPartiesByRow, type WebhookRow } from '#/hooks/webhooks/parties';
 import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
@@ -94,38 +93,18 @@ const processSingleRecord = (
 };
 
 export const registerWebhookHook = () => {
-  const actions = [
-    DbAction.create,
-    DbAction.update,
-    DbAction.delete,
-    DbAction.upsert,
-    DbAction.createManyAndReturn,
-    DbAction.updateManyAndReturn,
-    DbAction.deleteMany,
-  ];
-
   registerDbHook(
     'webhookDelivery',
     '*',
     HookTiming.after,
-    actions,
+    ALL_MUTATION_ACTIONS,
     async (options: HookOptions) => {
       const { model, action: dbAction } = options;
 
-      const records: { resultData: WebhookRow; previousData?: Record<string, unknown> }[] = [];
-      if (isManyAction(dbAction)) {
-        const { result, previous } = options as HookOptions & { action: ManyAction };
-        const previousById = keyBy(previous, 'id');
-        for (const resultData of (result ?? []) as WebhookRow[]) {
-          records.push({ resultData, previousData: previousById[resultData.id] });
-        }
-      } else {
-        const { result, previous } = options as HookOptions & { action: SingleAction };
-        records.push({
-          resultData: result as WebhookRow,
-          previousData: previous as Record<string, unknown> | undefined,
-        });
-      }
+      const records = changedPairs(options).flatMap(({ result, previous }) =>
+        result ? [{ resultData: result as WebhookRow, previousData: previous }] : [],
+      );
+      if (records.length === 0) return;
 
       const audiences = await fetchWebhookPartiesByRow(
         model,

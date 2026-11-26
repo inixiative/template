@@ -11,7 +11,7 @@ import {
 } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
-import { castArray, keyBy } from 'lodash-es';
+import { castArray } from 'lodash-es';
 import {
   type ContextRow,
   fetchRowsCarryingTenantColumns,
@@ -23,6 +23,7 @@ import {
   computeDiff,
   omitNoopFieldsForAudit,
 } from '#/hooks/auditLog/utils';
+import { ALL_MUTATION_ACTIONS, changedPairs } from '#/hooks/shared/hookRows';
 import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
 
 const dbActionToAuditAction = (
@@ -120,13 +121,20 @@ const buildEntries = async (model: AuditSubjectModel, options: HookOptions) => {
     return entries;
   }
 
-  const { result, previous } = options;
-  const records = castArray(result ?? []) as (Record<string, unknown> & { id: string })[];
-  const previousById = keyBy(castArray(previous ?? []) as Record<string, unknown>[], 'id');
-  const contexts = await fetchRowsCarryingTenantColumns(model, records);
+  const pairs = changedPairs(options).filter(
+    (
+      pair,
+    ): pair is {
+      result: Record<string, unknown> & { id: string };
+      previous?: Record<string, unknown>;
+    } => Boolean(pair.result),
+  );
+  const contexts = await fetchRowsCarryingTenantColumns(
+    model,
+    pairs.map(({ result }) => result),
+  );
 
-  records.forEach((record, index) => {
-    const prev = previousById[record.id];
+  pairs.forEach(({ result: record, previous: prev }, index) => {
     const context = contexts[index]!;
     const entry = buildAuditEntry(
       model,
@@ -142,21 +150,11 @@ const buildEntries = async (model: AuditSubjectModel, options: HookOptions) => {
 };
 
 export const registerAuditLogHook = () => {
-  const actions = [
-    DbAction.create,
-    DbAction.update,
-    DbAction.delete,
-    DbAction.upsert,
-    DbAction.createManyAndReturn,
-    DbAction.updateManyAndReturn,
-    DbAction.deleteMany,
-  ];
-
   registerDbHook(
     'auditLog',
     AUDIT_ENABLED_MODELS,
     HookTiming.after,
-    actions,
+    ALL_MUTATION_ACTIONS,
     async (options: HookOptions) => {
       const entries = await buildEntries(options.model as AuditSubjectModel, options);
       if (entries.length === 0) return;

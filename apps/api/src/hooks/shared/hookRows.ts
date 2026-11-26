@@ -1,9 +1,16 @@
 /**
  * @atlas
  * @kind utils
- * @partOf feature:auditLogs, feature:webhooks
+ * @partOf feature:auditLogs, feature:webhooks, primitive:caching
  */
-import { DbAction, type HookOptions, type ManyAction, type SingleAction } from '@template/db';
+import {
+  DbAction,
+  type HookOptions,
+  isNoOpUpdate,
+  type ManyAction,
+  NOOP_FIELDS,
+  type SingleAction,
+} from '@template/db';
 import { castArray, isPlainObject, keyBy } from 'lodash-es';
 
 export type HookRow = Record<string, unknown>;
@@ -24,30 +31,42 @@ export const isManyAction = (action: DbAction): action is ManyAction =>
   action === DbAction.updateManyAndReturn ||
   action === DbAction.deleteMany;
 
+const isUpdateAction = (action: DbAction): boolean =>
+  action === DbAction.update || action === DbAction.updateManyAndReturn;
+
 // Pairs each post-write row with its matching pre-write row across single and bulk actions.
 export const changedPairs = (
   options: HookOptions,
+  { skipNoOp = false }: { skipNoOp?: boolean } = {},
 ): { result?: HookEntityRow; previous?: HookEntityRow }[] => {
+  let pairs: { result?: HookEntityRow; previous?: HookEntityRow }[];
+
   if (isManyAction(options.action)) {
     const { result, previous } = options as HookOptions & { action: ManyAction };
     const results = (result ?? []) as HookEntityRow[];
     const previousList = (previous ?? []) as HookEntityRow[];
     const previousById = keyBy(previousList, 'id');
-    if (results.length > 0) {
-      return results.map((row) => ({
-        result: row,
-        previous: row.id ? previousById[row.id] : undefined,
-      }));
-    }
-    return previousList.map((row) => ({ previous: row }));
+    pairs =
+      results.length > 0
+        ? results.map((row) => ({
+            result: row,
+            previous: row.id ? previousById[row.id] : undefined,
+          }))
+        : previousList.map((row) => ({ previous: row }));
+  } else {
+    const { result, previous } = options as HookOptions & { action: SingleAction };
+    const row = result as HookEntityRow | undefined;
+    const prev = previous as HookEntityRow | undefined;
+    pairs = row || prev ? [{ result: row, previous: prev }] : [];
   }
-  const { result, previous } = options as HookOptions & { action: SingleAction };
-  return [
-    {
-      result: result as HookEntityRow | undefined,
-      previous: previous as HookEntityRow | undefined,
-    },
-  ];
+
+  if (skipNoOp && isUpdateAction(options.action)) {
+    return pairs.filter(
+      ({ result, previous }) =>
+        !result || !isNoOpUpdate(options.model, result, previous, NOOP_FIELDS),
+    );
+  }
+  return pairs;
 };
 
 // The rows a write sets, coalesced: `data` for create and update (single or bulk), both arms of an upsert.
