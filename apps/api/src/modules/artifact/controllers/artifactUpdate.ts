@@ -17,7 +17,6 @@ export const artifactUpdateController = makeController(artifactUpdateRoute, asyn
   const data = c.req.valid('json');
   const updated = await withLockedArtifacts([artifact], async (locked) => {
     const target = locked.get(artifact.id)!;
-    validateNotRootArtifact(target, 'Root container cannot be updated');
     return db.artifact.update({ where: { id: target.id }, data });
   });
   return respond.ok(updated);

@@ -9,11 +9,11 @@ import { ArtifactKind } from '@template/db/generated/client/enums';
 import { isRootKind } from '@template/shared/artifact';
 import {
   artifactOwner,
+  fetchOwnerRootArtifactOrThrow,
   type OwnedArtifact,
   ownerColumns,
   sameArtifactOwner,
 } from '#/modules/artifact/services/artifactOwner';
-import { ensureOwnerRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
 
 export type RemovedPlacement = {
   artifactId: string;
@@ -75,15 +75,13 @@ export const reparentOrphanedArtifacts = async (
       const orphans = await db.artifact.findMany({
         where: {
           id: { in: [...candidateIds] },
-          ...ownerFields,
-          kind: { not: ArtifactKind.root },
           artifactPlacementsAsArtifact: { none: { containerArtifact: ownerFields } },
         },
         select: { id: true },
       });
       if (orphans.length === 0) continue;
 
-      const root = await ensureOwnerRootArtifact(ownerFields);
+      const root = await fetchOwnerRootArtifactOrThrow(ownerFields);
       const created = await db.artifactPlacement.createManyAndReturn({
         data: orphans.map(({ id }) => ({
           containerArtifactId: root.id,

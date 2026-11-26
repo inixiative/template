@@ -19,8 +19,10 @@ export const updateArtifactPlacement = async (
   placement: ArtifactPlacement,
   { access }: { access: ArtifactAccess },
 ): Promise<ArtifactPlacement> => {
-  const artifact = await fetchArtifactOrThrow(placement.artifactId);
-  const container = await fetchArtifactOrThrow(placement.containerArtifactId);
+  const [artifact, container] = await Promise.all([
+    fetchArtifactOrThrow(placement.artifactId),
+    fetchArtifactOrThrow(placement.containerArtifactId),
+  ]);
   await validateEdgeAuthority(permix, artifact, container, 'manage');
   validatePlacementAccess(container, access);
 
@@ -32,7 +34,6 @@ export const updateArtifactPlacement = async (
     const lockedArtifact = locked.get(current.artifactId)!;
     const lockedContainer = locked.get(current.containerArtifactId)!;
     await validateEdgeAuthority(permix, lockedArtifact, lockedContainer, 'manage');
-    validatePlacementAccess(lockedContainer, access);
     return db.artifactPlacement.update({
       where: { id: current.id },
       data: { access },

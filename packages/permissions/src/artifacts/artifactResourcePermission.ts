@@ -6,14 +6,13 @@
  */
 import { DateOperator, Operator } from '@inixiative/json-rules';
 import { makeKindRules } from '@inixiative/permissions';
-import { ArtifactKind, type Role } from '@template/db/generated/client/enums';
+import { type ArtifactAccess, ArtifactKind, type Role } from '@template/db/generated/client/enums';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import type { StandardAction } from '@template/permissions/client';
 import {
   actorMayPerformActionOnOwner,
-  actorOperatesOwnerUserOrManagesOwnerTenant,
+  integrationAdministering,
   isNull,
-  operatesAtItsMembersTenant,
   ownerModelIsOneOf,
   roleHeldVia,
   rowIsThereAnd,
@@ -46,9 +45,56 @@ const memberOwns = (
   ],
 });
 
-const granteeIs = (granteeModel: string, prefix = 'artifactPermission.'): ActionRule => ({
+const granteeIs = (granteeModel: string, prefix: string): ActionRule => ({
   rule: { field: `${prefix}granteeModel`, operator: Operator.equals, value: granteeModel },
 });
+
+const granteeWalk = (
+  actions: { user: StandardAction; tenant: StandardAction; member?: 'own' | 'operate' },
+  prefix = '',
+): ActionRule => {
+  const memberRule = (rel: 'granteeOrganizationUser' | 'granteeSpaceUser'): ActionRule =>
+    actions.member === 'own'
+      ? memberOwns(rel, prefix)
+      : { rel: `${prefix}${rel}`, action: 'operate' };
+  return {
+    any: [
+      { all: [granteeIs('User', prefix), { rel: `${prefix}granteeUser`, action: actions.user }] },
+      {
+        all: [
+          granteeIs('Organization', prefix),
+          { rel: `${prefix}granteeOrganization`, action: actions.tenant },
+        ],
+      },
+      {
+        all: [granteeIs('Space', prefix), { rel: `${prefix}granteeSpace`, action: actions.tenant }],
+      },
+      { all: [granteeIs('OrganizationUser', prefix), memberRule('granteeOrganizationUser')] },
+      { all: [granteeIs('SpaceUser', prefix), memberRule('granteeSpaceUser')] },
+      {
+        all: [
+          granteeIs('CustomerRelationship', prefix),
+          {
+            any: [
+              {
+                rel: `${prefix}granteeCustomerRelationship.customerUser`,
+                action: actions.user,
+              },
+              {
+                rel: `${prefix}granteeCustomerRelationship.customerOrganization`,
+                action: actions.tenant,
+              },
+              {
+                rel: `${prefix}granteeCustomerRelationship.customerSpace`,
+                action: actions.tenant,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+};
 
 const grantNotExpired: ActionRule = {
   any: [
@@ -81,49 +127,10 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
         },
       },
       grantNotExpired,
-      {
-        any: [
-          { all: [granteeIs('User'), { rel: 'artifactPermission.granteeUser', action }] },
-          {
-            all: [
-              granteeIs('Organization'),
-              { rel: 'artifactPermission.granteeOrganization', action },
-            ],
-          },
-          { all: [granteeIs('Space'), { rel: 'artifactPermission.granteeSpace', action }] },
-          {
-            all: [
-              granteeIs('OrganizationUser'),
-              action === 'own'
-                ? memberOwns('granteeOrganizationUser', 'artifactPermission.')
-                : { rel: 'artifactPermission.granteeOrganizationUser', action: 'operate' },
-            ],
-          },
-          {
-            all: [
-              granteeIs('SpaceUser'),
-              action === 'own'
-                ? memberOwns('granteeSpaceUser', 'artifactPermission.')
-                : { rel: 'artifactPermission.granteeSpaceUser', action: 'operate' },
-            ],
-          },
-          {
-            all: [
-              granteeIs('CustomerRelationship'),
-              {
-                any: [
-                  { rel: 'artifactPermission.granteeCustomerRelationship.customerUser', action },
-                  {
-                    rel: 'artifactPermission.granteeCustomerRelationship.customerOrganization',
-                    action,
-                  },
-                  { rel: 'artifactPermission.granteeCustomerRelationship.customerSpace', action },
-                ],
-              },
-            ],
-          },
-        ],
-      },
+      granteeWalk(
+        { user: action, tenant: action, member: action === 'own' ? 'own' : 'operate' },
+        'artifactPermission.',
+      ),
     ],
   },
 });
@@ -131,18 +138,22 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
 const ownerTenantRead = (at = ''): ActionRule => ({
   any: [
     {
-      all: [ownerModelIsOneOf(['Organization'], at), { rel: `${at}organization`, action: 'read' }],
-    },
-    { all: [ownerModelIsOneOf(['Space'], at), { rel: `${at}space`, action: 'read' }] },
-    {
       all: [
-        ownerModelIsOneOf(['OrganizationUser'], at),
-        { rel: `${at}organizationUser.organization`, action: 'read' },
+        ownerModelIsOneOf(['Organization', 'OrganizationUser'], at),
+        { rel: `${at}organization`, action: 'read' },
       ],
     },
     {
-      all: [ownerModelIsOneOf(['SpaceUser'], at), { rel: `${at}spaceUser.space`, action: 'read' }],
+      all: [ownerModelIsOneOf(['Space', 'SpaceUser'], at), { rel: `${at}space`, action: 'read' }],
     },
+  ],
+});
+
+export const ownerPrivateRead = (at = ''): ActionRule => ({
+  any: [
+    at ? { rel: at.slice(0, -1), action: 'manage' } : 'manage',
+    actorMayPerformActionOnOwner('read', at, ['User']),
+    actorMayPerformActionOnOwner('own', at, ['OrganizationUser', 'SpaceUser']),
   ],
 });
 
@@ -154,19 +165,6 @@ const artifactIsTenant: ActionRule = {
   all: [
     { rule: { field: 'effectiveAccess', operator: Operator.equals, value: 'tenant' } },
     ownerTenantRead(),
-  ],
-};
-
-const artifactOwnerOperate: ActionRule = {
-  any: [
-    actorOperatesOwnerUserOrManagesOwnerTenant,
-    {
-      all: [
-        ownerModelIsOneOf(['OrganizationUser', 'SpaceUser']),
-        actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
-        operatesAtItsMembersTenant,
-      ],
-    },
   ],
 };
 
@@ -183,14 +181,7 @@ export const artifactResourcePermission: ResourcePermission = {
     delete: {
       any: ['own', actorMayPerformActionOnOwner('own', '', ['OrganizationUser', 'SpaceUser'])],
     },
-    manage: {
-      any: [
-        'own',
-        actorMayPerformActionOnOwner('manage', '', ['User', 'Organization', 'Space']),
-        actorMayPerformActionOnOwner('operate', '', ['OrganizationUser', 'SpaceUser']),
-        effectiveGrant('manage'),
-      ],
-    },
+    manage: { any: ['own', integrationAdministering.manage, effectiveGrant('manage')] },
     operate: {
       any: [
         'manage',
@@ -208,7 +199,7 @@ export const artifactResourcePermission: ResourcePermission = {
         artifactIsTenant,
       ],
     },
-    create: artifactOwnerOperate,
+    create: integrationAdministering.create,
   },
 };
 
@@ -219,60 +210,6 @@ const artifactPermissionRoleWrite: ActionRule = {
   ],
 };
 
-const artifactPermissionGranteeLeave: ActionRule = {
-  any: [
-    { all: [granteeIs('User', ''), { rel: 'granteeUser', action: 'operate' }] },
-    { all: [granteeIs('Organization', ''), { rel: 'granteeOrganization', action: 'manage' }] },
-    { all: [granteeIs('Space', ''), { rel: 'granteeSpace', action: 'manage' }] },
-    {
-      all: [
-        granteeIs('OrganizationUser', ''),
-        { rel: 'granteeOrganizationUser', action: 'operate' },
-      ],
-    },
-    { all: [granteeIs('SpaceUser', ''), { rel: 'granteeSpaceUser', action: 'operate' }] },
-    {
-      all: [
-        granteeIs('CustomerRelationship', ''),
-        {
-          any: [
-            { rel: 'granteeCustomerRelationship.customerUser', action: 'operate' },
-            { rel: 'granteeCustomerRelationship.customerOrganization', action: 'manage' },
-            { rel: 'granteeCustomerRelationship.customerSpace', action: 'manage' },
-          ],
-        },
-      ],
-    },
-  ],
-};
-
-const artifactPermissionGranteeRead: ActionRule = {
-  any: [
-    { all: [granteeIs('User', ''), { rel: 'granteeUser', action: 'read' }] },
-    { all: [granteeIs('Organization', ''), { rel: 'granteeOrganization', action: 'read' }] },
-    { all: [granteeIs('Space', ''), { rel: 'granteeSpace', action: 'read' }] },
-    {
-      all: [
-        granteeIs('OrganizationUser', ''),
-        { rel: 'granteeOrganizationUser', action: 'operate' },
-      ],
-    },
-    { all: [granteeIs('SpaceUser', ''), { rel: 'granteeSpaceUser', action: 'operate' }] },
-    {
-      all: [
-        granteeIs('CustomerRelationship', ''),
-        {
-          any: [
-            { rel: 'granteeCustomerRelationship.customerUser', action: 'read' },
-            { rel: 'granteeCustomerRelationship.customerOrganization', action: 'read' },
-            { rel: 'granteeCustomerRelationship.customerSpace', action: 'read' },
-          ],
-        },
-      ],
-    },
-  ],
-};
-
 export const artifactPermissionResourcePermission: ResourcePermission = {
   actions: {
     manage: artifactPermissionRoleWrite,
@@ -280,15 +217,20 @@ export const artifactPermissionResourcePermission: ResourcePermission = {
       any: [
         'manage',
         'leave',
-        artifactPermissionGranteeRead,
+        granteeWalk({ user: 'read', tenant: 'read' }),
         { rel: 'artifact', action: 'manage' },
       ],
     },
     create: artifactPermissionRoleWrite,
-    leave: artifactPermissionGranteeLeave,
+    leave: granteeWalk({ user: 'operate', tenant: 'manage' }),
     delete: { any: ['leave', artifactPermissionRoleWrite] },
   },
 };
+
+const accessIs = (...values: ArtifactAccess[]): ActionRule =>
+  values.length === 1
+    ? { rule: { field: 'access', operator: Operator.equals, value: values[0] } }
+    : { rule: { field: 'access', operator: Operator.in, value: values } };
 
 const containerIsRoot: ActionRule = {
   rule: { field: 'containerArtifact.kind', operator: Operator.equals, value: ArtifactKind.root },
@@ -298,13 +240,13 @@ const containerIsNotRoot: ActionRule = {
   rule: { field: 'containerArtifact.kind', operator: Operator.in, value: nonRootArtifactKinds },
 };
 
-const containerOwnerRead: ActionRule = {
+const placementAccessRead = (allowInherit: boolean): ActionRule => ({
   any: [
-    { rel: 'containerArtifact', action: 'manage' },
-    actorMayPerformActionOnOwner('read', 'containerArtifact.', ['User']),
-    actorMayPerformActionOnOwner('own', 'containerArtifact.', ['OrganizationUser', 'SpaceUser']),
+    allowInherit ? accessIs('inherit', 'public') : accessIs('public'),
+    { all: [accessIs('tenant'), ownerTenantRead('containerArtifact.')] },
+    ownerPrivateRead('containerArtifact.'),
   ],
-};
+});
 
 export const artifactPlacementResourcePermission: ResourcePermission = {
   actions: {
@@ -322,32 +264,16 @@ export const artifactPlacementResourcePermission: ResourcePermission = {
     },
     delete: {
       any: [
+        { rel: 'containerArtifact', action: 'manage' },
         {
           all: [
-            { rule: { field: 'access', operator: Operator.in, value: ['inherit', 'public'] } },
             { rel: 'containerArtifact', action: 'operate' },
-          ],
-        },
-        {
-          all: [
-            { rule: { field: 'access', operator: Operator.equals, value: 'tenant' } },
             {
               any: [
-                { rel: 'containerArtifact', action: 'manage' },
-                {
-                  all: [
-                    { rel: 'containerArtifact', action: 'operate' },
-                    ownerTenantRead('containerArtifact.'),
-                  ],
-                },
+                accessIs('inherit', 'public'),
+                { all: [accessIs('tenant'), ownerTenantRead('containerArtifact.')] },
               ],
             },
-          ],
-        },
-        {
-          all: [
-            { rule: { field: 'access', operator: Operator.equals, value: 'private' } },
-            { rel: 'containerArtifact', action: 'manage' },
           ],
         },
       ],
@@ -360,62 +286,12 @@ export const artifactPlacementResourcePermission: ResourcePermission = {
             { rel: 'artifact', action: 'read' },
             {
               any: [
-                {
-                  all: [
-                    containerIsRoot,
-                    {
-                      any: [
-                        { rule: { field: 'access', operator: Operator.equals, value: 'public' } },
-                        {
-                          all: [
-                            {
-                              rule: { field: 'access', operator: Operator.equals, value: 'tenant' },
-                            },
-                            ownerTenantRead('containerArtifact.'),
-                          ],
-                        },
-                        containerOwnerRead,
-                      ],
-                    },
-                  ],
-                },
+                { all: [containerIsRoot, placementAccessRead(false)] },
                 {
                   all: [
                     containerIsNotRoot,
                     { rel: 'containerArtifact', action: 'read' },
-                    {
-                      any: [
-                        {
-                          rule: {
-                            field: 'access',
-                            operator: Operator.in,
-                            value: ['inherit', 'public'],
-                          },
-                        },
-                        {
-                          all: [
-                            {
-                              rule: { field: 'access', operator: Operator.equals, value: 'tenant' },
-                            },
-                            {
-                              any: [ownerTenantRead('containerArtifact.'), containerOwnerRead],
-                            },
-                          ],
-                        },
-                        {
-                          all: [
-                            {
-                              rule: {
-                                field: 'access',
-                                operator: Operator.equals,
-                                value: 'private',
-                              },
-                            },
-                            containerOwnerRead,
-                          ],
-                        },
-                      ],
-                    },
+                    placementAccessRead(true),
                   ],
                 },
               ],

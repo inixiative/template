@@ -18,7 +18,7 @@ import { createPermissions, installPermissions } from '@template/permissions/cli
 import { check, schemaMap } from '@template/permissions/rebac';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { ARTIFACT_MAX_DEPTH } from '@template/shared/artifact';
-import { ensureOwnerRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
+import { fetchOwnerRootArtifactOrThrow } from '#/modules/artifact/services/artifactOwner';
 
 const folderOf = async (organization: Organization, access?: ArtifactAccess): Promise<Artifact> => {
   const folder = (
@@ -29,7 +29,7 @@ const folderOf = async (organization: Organization, access?: ArtifactAccess): Pr
     })
   ).entity;
   if (access) {
-    const root = await ensureOwnerRootArtifact({
+    const root = await fetchOwnerRootArtifactOrThrow({
       ownerModel: 'Organization',
       organizationId: organization.id,
     });
@@ -476,7 +476,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     expect(nowPublic.effectiveAccess).toBe('public');
 
     // Cache invalidates on parent placement flipping tenant -> private
-    const orgRoot = await ensureOwnerRootArtifact({
+    const orgRoot = await fetchOwnerRootArtifactOrThrow({
       ownerModel: 'Organization',
       organizationId: organization.id,
     });
@@ -498,7 +498,7 @@ describe('artifact ReBAC & closure inheritance', () => {
 
     // OrganizationUser tenant placement is readable by org peers, not outsiders
     const { context: peerCtx } = await createOrganizationUser({ role: 'member' }, { organization });
-    const peerRoot = await ensureOwnerRootArtifact({
+    const peerRoot = await fetchOwnerRootArtifactOrThrow({
       ownerModel: 'OrganizationUser',
       organizationId: organization.id,
       userId: peerCtx.user.id,
@@ -523,7 +523,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     );
 
     // Space tenant placement is readable by space members, not non-space org members
-    const spaceRoot = await ensureOwnerRootArtifact({
+    const spaceRoot = await fetchOwnerRootArtifactOrThrow({
       ownerModel: 'Space',
       organizationId: organization.id,
       spaceId: space.id,
@@ -553,7 +553,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     );
 
     // User placement with access: 'tenant' has no tenant, so effectiveAccess resolves to 'private'
-    const userRoot = await ensureOwnerRootArtifact({
+    const userRoot = await fetchOwnerRootArtifactOrThrow({
       ownerModel: 'User',
       userId: peerCtx.user.id,
     });

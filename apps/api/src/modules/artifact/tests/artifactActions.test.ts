@@ -244,6 +244,12 @@ describe('artifact actions', () => {
     expect(copied.fileVersions.map((version) => [version.key, version.status])).toEqual([
       ['k-1', 'pending'],
     ]);
+
+    // Soft-deleting the source file (via artifact delete) must NOT cascade-delete the lazy copy (CASCADE_EXEMPT File.sourceFile).
+    await db.artifact.update({ where: { id: source.id }, data: { deletedAt: new Date() } });
+    const survivingCopy = await db.file.findUnique({ where: { id: copied.id } });
+    expect(survivingCopy).not.toBeNull();
+    expect(survivingCopy!.deletedAt).toBeNull();
   });
 
   it('cross-owner placement allows placing a file in another owner folder without inheriting permissions', async () => {

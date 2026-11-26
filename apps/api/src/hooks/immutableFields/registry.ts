@@ -42,12 +42,7 @@ const baseImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOve
     exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],
   },
   Artifact: {
-    include: [
-      ...(polymorphismImmutableFields.Artifact?.include ?? []).filter(
-        (field) => field !== 'ownerModel',
-      ),
-      'kind',
-    ],
+    include: ['kind'],
     exclude: ['userId', 'organizationId', 'spaceId'],
   },
   WebhookSubscription: {

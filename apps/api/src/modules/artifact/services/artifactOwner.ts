@@ -4,12 +4,23 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, mutex
  */
-import { db, emptySideKeyColumns, polymorphicAxis, polymorphicKeyColumns } from '@template/db';
+import {
+  db,
+  emptySideKeyColumns,
+  polymorphicAxis,
+  polymorphicKeyColumns,
+  toModelName,
+} from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
+import { ArtifactKind, type ArtifactOwnerModel } from '@template/db/generated/client/enums';
+import type { Context } from 'hono';
+import { actingUser } from '#/lib/context/actingUser';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
+import type { AppEnv } from '#/types/appEnv';
 
 export type OwnedArtifact = Pick<Artifact, 'ownerModel' | 'userId' | 'organizationId' | 'spaceId'>;
+export type OwnerRef = Pick<OwnedArtifact, 'ownerModel'> & Partial<OwnedArtifact>;
 
 export const artifactOwner = (
   artifact: OwnedArtifact,
@@ -24,6 +35,55 @@ export const sameArtifactOwner = (a: OwnedArtifact, b: OwnedArtifact): boolean =
   const left = artifactOwner(a);
   const right = artifactOwner(b);
   return left.ownerModel === right.ownerModel && left.ownerId === right.ownerId;
+};
+
+export const ownerRefForRow = (
+  model: ArtifactOwnerModel,
+  row: Record<string, unknown>,
+): OwnerRef | null => {
+  switch (model) {
+    case 'User':
+      return typeof row.id === 'string' ? { ownerModel: 'User', userId: row.id } : null;
+    case 'Organization':
+      return typeof row.id === 'string'
+        ? { ownerModel: 'Organization', organizationId: row.id }
+        : null;
+    case 'Space':
+      return typeof row.id === 'string' && typeof row.organizationId === 'string'
+        ? { ownerModel: 'Space', organizationId: row.organizationId, spaceId: row.id }
+        : null;
+    case 'OrganizationUser':
+      return typeof row.organizationId === 'string' && typeof row.userId === 'string'
+        ? {
+            ownerModel: 'OrganizationUser',
+            organizationId: row.organizationId,
+            userId: row.userId,
+          }
+        : null;
+    case 'SpaceUser':
+      return typeof row.organizationId === 'string' &&
+        typeof row.spaceId === 'string' &&
+        typeof row.userId === 'string'
+        ? {
+            ownerModel: 'SpaceUser',
+            organizationId: row.organizationId,
+            spaceId: row.spaceId,
+            userId: row.userId,
+          }
+        : null;
+  }
+};
+
+export const contextArtifactOwner = (c: Context<AppEnv>): OwnerRef => {
+  const resourceType = c.get('resourceType');
+  const resource = c.get('resource') as Record<string, unknown> | undefined;
+  if (resourceType && resource) {
+    const ref = ownerRefForRow(toModelName(resourceType) as ArtifactOwnerModel, resource);
+    if (ref) return ref;
+  }
+  const user = actingUser(c);
+  if (!user) throw makeError({ status: 401, message: 'Unauthorized' });
+  return { ownerModel: 'User', userId: user.id };
 };
 
 export const withArtifactOwnersLock = <T>(
@@ -75,8 +135,6 @@ export const withLockedArtifacts = <T>(
     }),
   );
 
-export type OwnerRef = Pick<OwnedArtifact, 'ownerModel'> & Partial<OwnedArtifact>;
-
 const emptyOwnerKeys = emptySideKeyColumns(polymorphicAxis('Artifact', 'ownerModel')) as Pick<
   OwnedArtifact,
   'userId' | 'organizationId' | 'spaceId'
@@ -93,4 +151,12 @@ export const ownerColumns = (artifact: OwnerRef): OwnedArtifact => {
       : {}),
     ...(allowed.has('spaceId') && artifact.spaceId != null ? { spaceId: artifact.spaceId } : {}),
   };
+};
+
+export const fetchOwnerRootArtifactOrThrow = async (owner: OwnerRef): Promise<Artifact> => {
+  const root = await db.artifact.findFirst({
+    where: { ...ownerColumns(owner), kind: ArtifactKind.root },
+  });
+  if (!root) throw makeError({ status: 404, message: 'Owner root container not found' });
+  return root;
 };

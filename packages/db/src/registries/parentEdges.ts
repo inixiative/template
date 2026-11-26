@@ -17,7 +17,6 @@ import type { ModelRow } from '@template/shared/utils/modelRow';
 export type ParentEdge = { axis: string } | { parent: ModelName; foreignKey: string };
 
 export const ParentEdgeRegistry = {
-  ArtifactAncestor: { parent: 'Artifact', foreignKey: 'artifactId' },
   ArtifactEffectivePermission: { parent: 'Artifact', foreignKey: 'artifactId' },
   ArtifactPermission: { parent: 'Artifact', foreignKey: 'artifactId' },
   ArtifactPlacement: { parent: 'Artifact', foreignKey: 'containerArtifactId' },

@@ -24,10 +24,11 @@ export const removeArtifactPlacement = async (
   permix: Permix,
   placement: ArtifactPlacement,
 ): Promise<void> => {
-  const artifact = await fetchArtifactOrThrow(placement.artifactId);
-  const container = await fetchArtifactOrThrow(placement.containerArtifactId);
+  const [artifact, container] = await Promise.all([
+    fetchArtifactOrThrow(placement.artifactId),
+    fetchArtifactOrThrow(placement.containerArtifactId),
+  ]);
   await validateEdgeAuthority(permix, artifact, container, 'remove');
-  await validatePlacementDeletable(permix, placement);
   await withLockedArtifacts([artifact, container], async (locked) => {
     const current = await db.artifactPlacement.findUnique({ where: { id: placement.id } });
     if (!current) {

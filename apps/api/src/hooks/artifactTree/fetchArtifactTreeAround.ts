@@ -12,15 +12,13 @@ export type AncestorEdge = { inherits: boolean; depth: number };
 
 type PlacementEdge = { containerArtifactId: string; access: ArtifactAccess };
 
-type ArtifactNode = OwnedArtifact & {
-  kind: ArtifactKind;
-  effectiveAccess: ArtifactAccess;
-  placements: PlacementEdge[];
-};
-
 type ExternalParentNode = OwnedArtifact & {
   kind: ArtifactKind;
   effectiveAccess: ArtifactAccess;
+};
+
+type ArtifactNode = ExternalParentNode & {
+  placements: PlacementEdge[];
 };
 
 export type TreeAround = {
@@ -64,15 +62,7 @@ export const fetchArtifactTreeAround = async (descendantIds: string[]): Promise<
   const externalParentIds = new Set<string>();
 
   for (const row of rows) {
-    artifacts.set(row.id, {
-      kind: row.kind,
-      effectiveAccess: row.effectiveAccess,
-      ownerModel: row.ownerModel,
-      userId: row.userId,
-      organizationId: row.organizationId,
-      spaceId: row.spaceId,
-      placements: row.artifactPlacementsAsArtifact,
-    });
+    artifacts.set(row.id, { ...row, placements: row.artifactPlacementsAsArtifact });
     if (row.artifactPermissions.length > 0) {
       directPermissions.set(
         row.id,

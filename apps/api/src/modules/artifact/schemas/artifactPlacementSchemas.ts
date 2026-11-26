@@ -11,6 +11,7 @@ import {
   ArtifactPlacementScalarSchema,
   ArtifactScalarInputSchema,
   ArtifactScalarSchema,
+  polymorphicAxis,
 } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { polymorphicBodyRefinement } from '#/lib/routeTemplates/polymorphicBodyRefinement';
@@ -30,7 +31,9 @@ export const artifactPlacementCreateBodySchema = ArtifactPlacementScalarInputSch
   );
 
 const ownerPlacementRefinement = polymorphicBodyRefinement('Artifact', 'ownerModel');
-const OWNER_FK_KEYS = ['userId', 'organizationId', 'spaceId'] as const;
+const OWNER_FK_KEYS = [
+  ...new Set(Object.values(polymorphicAxis('Artifact', 'ownerModel').fkMap).flat()),
+] as ('userId' | 'organizationId' | 'spaceId')[];
 
 export const artifactPlacementCreateBodyRefinement = (
   body: z.infer<typeof artifactPlacementCreateBodySchema>,

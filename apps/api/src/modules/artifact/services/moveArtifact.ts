@@ -10,15 +10,15 @@ import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
 import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import { sameArtifactOwner, withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
+import {
+  fetchOwnerRootArtifactOrThrow,
+  sameArtifactOwner,
+  withLockedArtifacts,
+} from '#/modules/artifact/services/artifactOwner';
 import {
   fetchArtifactOrThrow,
   writePlacement,
 } from '#/modules/artifact/services/artifactPlacementUtils';
-import {
-  ensureOwnerRootArtifact,
-  fetchOwnerRootArtifact,
-} from '#/modules/artifact/services/ownerRootArtifact';
 import { validateArtifactPermission } from '#/modules/artifact/validations/validateArtifactPermission';
 import {
   validateEdgeAuthority,
@@ -27,7 +27,7 @@ import {
 import { validateNotRootArtifact } from '#/modules/artifact/validations/validateNotRootArtifact';
 
 export type MoveArtifactInput = {
-  artifactId: string;
+  artifact: Artifact;
   sourceContainerArtifactId?: string;
   targetContainerArtifactId?: string;
   access?: ArtifactAccess;
@@ -77,9 +77,8 @@ const validateMovePair = (
 
 export const moveArtifact = async (
   permix: Permix,
-  { artifactId, sourceContainerArtifactId, targetContainerArtifactId, access }: MoveArtifactInput,
+  { artifact, sourceContainerArtifactId, targetContainerArtifactId, access }: MoveArtifactInput,
 ): Promise<Artifact> => {
-  const artifact = await fetchArtifactOrThrow(artifactId);
   validateNotRootArtifact(artifact, 'Root container cannot be moved');
 
   if (!sourceContainerArtifactId && !targetContainerArtifactId) {
@@ -87,49 +86,29 @@ export const moveArtifact = async (
     throw makeError({ status: 422, message: 'A move needs a different destination' });
   }
 
-  // Gate container lookups when the caller cannot even read the artifact (prevents container existence oracle).
-  if (
-    !(await holdsOnRecord(permix, 'artifact', artifact, 'read')) &&
-    (!sourceContainerArtifactId ||
-      !(await holdsOnRecord(
-        permix,
-        'artifact',
-        await fetchArtifactOrThrow(sourceContainerArtifactId),
-        'operate',
-      )))
-  ) {
-    throw makeError({ status: 403, message: 'Forbidden' });
-  }
-
   const sourceContainer = sourceContainerArtifactId
     ? await fetchArtifactOrThrow(sourceContainerArtifactId)
-    : await fetchOwnerRootArtifact(artifact);
-  if (!sourceContainer) {
-    await validateArtifactPermission(permix, artifact, 'manage');
-    throw makeError({ status: 404, message: 'The artifact is not in that container' });
-  }
+    : await fetchOwnerRootArtifactOrThrow(artifact);
+  // Authorize the source placement before fetching targetContainer (prevents target container existence oracle).
+  await fetchAuthorizedSourcePlacement(permix, artifact, sourceContainer);
 
   const targetContainer = targetContainerArtifactId
     ? await fetchArtifactOrThrow(targetContainerArtifactId)
-    : await ensureOwnerRootArtifact(artifact);
-
-  await fetchAuthorizedSourcePlacement(permix, artifact, sourceContainer);
+    : await fetchOwnerRootArtifactOrThrow(artifact);
   await validateEdgeAuthority(permix, artifact, targetContainer, 'create', access);
   validateMovePair(artifact, sourceContainer, targetContainer);
 
   return withLockedArtifacts([artifact, sourceContainer, targetContainer], async (locked) => {
-    const lockedArtifact = locked.get(artifactId)!;
+    const lockedArtifact = locked.get(artifact.id)!;
     const lockedSource = locked.get(sourceContainer.id)!;
     const lockedTarget = locked.get(targetContainer.id)!;
-    validateNotRootArtifact(lockedArtifact, 'Root container cannot be moved');
     const sourceEdge = await fetchAuthorizedSourcePlacement(permix, lockedArtifact, lockedSource);
     await validateEdgeAuthority(permix, lockedArtifact, lockedTarget, 'create', access);
-    validateMovePair(lockedArtifact, lockedSource, lockedTarget);
     await writePlacement(lockedArtifact, lockedTarget, access);
     await db.artifactPlacement.update({
       where: { id: sourceEdge.id },
       data: { deletedAt: new Date() },
     });
-    return db.artifact.findUniqueOrThrow({ where: { id: artifactId } });
+    return db.artifact.findUniqueOrThrow({ where: { id: artifact.id } });
   });
 };

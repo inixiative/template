@@ -16,12 +16,12 @@ export const artifactCreateArtifactPlacementController = makeController(
     const body = c.req.valid('json');
     const edge = body.containerArtifactId
       ? await placeArtifact(c.get('permix'), {
-          artifactId: artifact.id,
+          artifact,
           containerArtifactId: body.containerArtifactId,
           access: body.access,
         })
       : await placeArtifact(c.get('permix'), {
-          artifactId: artifact.id,
+          artifact,
           owner: {
             ownerModel: body.ownerModel!,
             userId: body.userId,

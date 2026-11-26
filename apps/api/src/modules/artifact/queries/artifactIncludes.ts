@@ -42,5 +42,6 @@ export const includeArtifactDetail = {
     },
   },
   artifactPermissions: { orderBy: { createdAt: 'asc' as const } },
+  artifactEffectivePermissions: { include: { artifactPermission: true } },
   resourceBindings: { orderBy: { createdAt: 'asc' as const } },
 } satisfies Prisma.ArtifactInclude;

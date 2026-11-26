@@ -1,13 +1,7 @@
 export { Role } from '@template/db/generated/client/enums';
 export { actorFromRecordOmittingSensitiveFields } from './actorFromRecordOmittingSensitiveFields';
-export {
-  type AccessibleArtifactGranteeIds,
-  type AccessibleArtifactOwnerIds,
-  type ArtifactAction,
-  accessibleArtifactGranteeIds,
-  accessibleArtifactOwnerIds,
-  artifactEffectiveRole,
-} from './artifacts/artifactAccess';
+export { type ArtifactAction, artifactEffectiveRole } from './artifacts/artifactAccess';
+export { ownerPrivateRead } from './artifacts/artifactResourcePermission';
 // Client
 export {
   type Action,

@@ -18,7 +18,6 @@ export const artifactDeleteController = makeController(artifactDeleteRoute, asyn
   validateNotRootArtifact(artifact, 'Root container cannot be deleted');
   await withLockedArtifacts([artifact], async (locked) => {
     const target = locked.get(artifact.id)!;
-    validateNotRootArtifact(target, 'Root container cannot be deleted');
     await validateArtifactPermission(permix, target, 'delete');
     await db.artifact.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
   });

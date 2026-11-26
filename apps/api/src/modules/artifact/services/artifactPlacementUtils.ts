@@ -6,18 +6,9 @@
  */
 import { db, type Prisma } from '@template/db';
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
-import { type ArtifactAccess, ArtifactKind } from '@template/db/generated/client/enums';
-import type { Permix } from '@template/permissions/client';
-import { ARTIFACT_MAX_CHILDREN, isContainerKind } from '@template/shared/artifact';
+import type { ArtifactAccess } from '@template/db/generated/client/enums';
+import { ARTIFACT_MAX_CHILDREN, isContainerKind, isRootKind } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
-import {
-  lockArtifactsInTxn,
-  ownerColumns,
-  sameArtifactOwner,
-} from '#/modules/artifact/services/artifactOwner';
-import { ensureOwnerRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
-import { validateArtifactCreateAtOwner } from '#/modules/artifact/validations/validateArtifactCreateAtOwner';
-import { validateArtifactPermission } from '#/modules/artifact/validations/validateArtifactPermission';
 import { validateContainable } from '#/modules/artifact/validations/validateContainable';
 import { validateNoContainerCycle } from '#/modules/artifact/validations/validateNoContainerCycle';
 import {
@@ -44,7 +35,9 @@ export const writePlacement = async (
   validateContainable(container, artifact);
   const resolvedAccess = access ?? defaultPlacementAccess(container);
   validatePlacementAccess(container, resolvedAccess);
-  if (isContainerKind(artifact.kind)) await validateNoContainerCycle(container.id, artifact.id);
+  if (isContainerKind(artifact.kind) && !isRootKind(container.kind)) {
+    await validateNoContainerCycle(container.id, artifact.id);
+  }
   const childCount = await db.artifactPlacement.count({
     where: { containerArtifactId: container.id },
   });
@@ -64,47 +57,13 @@ export const writePlacement = async (
 };
 
 export const insertArtifact = async (
-  { containerArtifactId, access, ...data }: CreateArtifactInput,
-  permix?: Permix,
-  prelockedContainer?: Artifact,
+  data: Omit<Prisma.ArtifactUncheckedCreateInput, 'effectiveAccess'>,
+  container: Artifact,
+  access?: ArtifactAccess,
 ): Promise<Artifact> => {
-  const candidateOwner = ownerColumns(data);
-  let container: Artifact;
-  let resolvedAccess: ArtifactAccess;
-  if (containerArtifactId) {
-    const locked = await lockArtifactsInTxn([containerArtifactId]);
-    container = locked.get(containerArtifactId)!;
-    if (prelockedContainer && !sameArtifactOwner(container, prelockedContainer)) {
-      throw makeError({
-        status: 409,
-        message: 'Artifact ownership changed while waiting for lock; please retry',
-      });
-    }
-    if (!sameArtifactOwner(container, candidateOwner)) {
-      throw makeError({
-        status: 422,
-        message: 'Cannot create an artifact directly inside another owner container',
-      });
-    }
-    resolvedAccess = access ?? defaultPlacementAccess(container);
-    validatePlacementAccess(container, resolvedAccess);
-    if (permix) {
-      const needsManage = resolvedAccess !== defaultPlacementAccess(container);
-      await validateArtifactPermission(permix, container, needsManage ? 'manage' : 'operate');
-    }
-    validateContainable(container, { id: '', kind: data.kind });
-  } else {
-    resolvedAccess = access ?? 'private';
-    validatePlacementAccess({ kind: ArtifactKind.root }, resolvedAccess);
-    if (permix && resolvedAccess !== 'private') {
-      await validateArtifactCreateAtOwner(permix, ArtifactKind.root, candidateOwner, 'manage');
-    }
-    container = await ensureOwnerRootArtifact(candidateOwner);
-  }
-
   const artifact = await db.artifact.create({
     data: { ...data, effectiveAccess: 'private' },
   });
-  await writePlacement(artifact, container, resolvedAccess);
+  await writePlacement(artifact, container, access);
   return db.artifact.findUniqueOrThrow({ where: { id: artifact.id } });
 };

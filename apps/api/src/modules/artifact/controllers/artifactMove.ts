@@ -11,7 +11,7 @@ import { moveArtifact } from '#/modules/artifact/services/moveArtifact';
 
 export const artifactMoveController = makeController(artifactMoveRoute, async (c, respond) => {
   const moved = await moveArtifact(c.get('permix'), {
-    artifactId: contextResource<'artifact'>(c).id,
+    artifact: contextResource<'artifact'>(c),
     ...c.req.valid('json'),
   });
   return respond.ok(moved);

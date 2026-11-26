@@ -23,7 +23,6 @@ export const artifactCreateArtifactPermissionController = makeController(
     const permix = c.get('permix');
     const permission = await withLockedArtifacts([artifact], async (locked) => {
       const target = locked.get(artifact.id)!;
-      validateNotRootArtifact(target, 'Permissions cannot be granted directly on a root container');
       const hydrated = await hydrate('artifact', target);
       if (
         !check(

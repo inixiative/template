@@ -6,6 +6,7 @@
  */
 import { db } from '@template/db';
 import type { AncestorEdge, TreeAround } from '#/hooks/artifactTree/fetchArtifactTreeAround';
+import { syncJoinRows } from '#/hooks/artifactTree/syncJoinRows';
 import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 
 export const ancestorsOf = ({ artifacts, externalParents, externalAncestors }: TreeAround) => {
@@ -72,39 +73,20 @@ export const syncAncestors = async (
   const existing = await db.artifactAncestor.findMany({
     where: { artifactId: { in: artifactIds } },
   });
-  const existingByKey = new Map(
-    existing.map((row) => [`${row.artifactId}:${row.ancestorArtifactId}`, row]),
+  const desired = [...desiredByArtifact.entries()].flatMap(([artifactId, ancestors]) =>
+    [...ancestors.entries()].map(([ancestorArtifactId, edge]) => ({
+      artifactId,
+      ancestorArtifactId,
+      ...edge,
+    })),
   );
-
-  const toDeleteIds: string[] = [];
-  const toCreate: {
-    artifactId: string;
-    ancestorArtifactId: string;
-    inherits: boolean;
-    depth: number;
-  }[] = [];
-
-  for (const [artifactId, ancestors] of desiredByArtifact) {
-    for (const [ancestorArtifactId, edge] of ancestors) {
-      const key = `${artifactId}:${ancestorArtifactId}`;
-      const current = existingByKey.get(key);
-      if (!current) {
-        toCreate.push({ artifactId, ancestorArtifactId, ...edge });
-      } else {
-        existingByKey.delete(key);
-        if (current.inherits !== edge.inherits || current.depth !== edge.depth) {
-          toDeleteIds.push(current.id);
-          toCreate.push({ artifactId, ancestorArtifactId, ...edge });
-        }
-      }
-    }
-  }
-  for (const stale of existingByKey.values()) toDeleteIds.push(stale.id);
-
-  if (toDeleteIds.length > 0) {
-    await db.artifactAncestor.deleteMany({ where: { id: { in: toDeleteIds } } });
-  }
-  if (toCreate.length > 0) {
-    await db.artifactAncestor.createManyAndReturn({ data: toCreate });
-  }
+  await syncJoinRows({
+    existing,
+    desired,
+    keyOfExisting: (row) => `${row.artifactId}:${row.ancestorArtifactId}`,
+    keyOfDesired: (row) => `${row.artifactId}:${row.ancestorArtifactId}`,
+    matches: (current, next) => current.inherits === next.inherits && current.depth === next.depth,
+    deleteIds: (ids) => db.artifactAncestor.deleteMany({ where: { id: { in: ids } } }),
+    createRows: (data) => db.artifactAncestor.createManyAndReturn({ data }),
+  });
 };

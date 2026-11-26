@@ -5,14 +5,14 @@
  * @uses infrastructure:prisma
  */
 import { DbAction, db, type HookOptions, HookTiming, registerDbHook } from '@template/db';
-import type { ArtifactOwnerModel } from '@template/db/generated/client/enums';
-import { changedPairs, type HookEntityRow } from '#/hooks/shared/hookRows';
+import { ArtifactKind, type ArtifactOwnerModel } from '@template/db/generated/client/enums';
+import { changedPairs } from '#/hooks/shared/hookRows';
 import {
   artifactOwner,
   type OwnerRef,
   ownerColumns,
+  ownerRefForRow,
 } from '#/modules/artifact/services/artifactOwner';
-import { ensureOwnerRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
 
 const OWNER_MODELS: readonly ArtifactOwnerModel[] = [
   'User',
@@ -21,40 +21,6 @@ const OWNER_MODELS: readonly ArtifactOwnerModel[] = [
   'OrganizationUser',
   'SpaceUser',
 ];
-
-const ownerRefForRow = (model: ArtifactOwnerModel, row: HookEntityRow): OwnerRef | null => {
-  switch (model) {
-    case 'User':
-      return typeof row.id === 'string' ? { ownerModel: 'User', userId: row.id } : null;
-    case 'Organization':
-      return typeof row.id === 'string'
-        ? { ownerModel: 'Organization', organizationId: row.id }
-        : null;
-    case 'Space':
-      return typeof row.id === 'string' && typeof row.organizationId === 'string'
-        ? { ownerModel: 'Space', organizationId: row.organizationId, spaceId: row.id }
-        : null;
-    case 'OrganizationUser':
-      return typeof row.organizationId === 'string' && typeof row.userId === 'string'
-        ? {
-            ownerModel: 'OrganizationUser',
-            organizationId: row.organizationId,
-            userId: row.userId,
-          }
-        : null;
-    case 'SpaceUser':
-      return typeof row.organizationId === 'string' &&
-        typeof row.spaceId === 'string' &&
-        typeof row.userId === 'string'
-        ? {
-            ownerModel: 'SpaceUser',
-            organizationId: row.organizationId,
-            spaceId: row.spaceId,
-            userId: row.userId,
-          }
-        : null;
-  }
-};
 
 export const registerOwnerRootArtifactHook = () => {
   for (const model of OWNER_MODELS) {
@@ -86,11 +52,16 @@ export const registerOwnerRootArtifactHook = () => {
         const sortedOwners = [...ownersByKey.entries()]
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([, ref]) => ref);
-        await db.withoutDeleted(async () => {
-          for (const owner of sortedOwners) {
-            await ensureOwnerRootArtifact(owner);
-          }
-        });
+        await db.withoutDeleted(() =>
+          db.artifact.createManyAndReturn({
+            data: sortedOwners.map((owner) => ({
+              ...ownerColumns(owner),
+              kind: ArtifactKind.root,
+              name: 'Root',
+            })),
+            skipDuplicates: true,
+          }),
+        );
       },
     );
   }

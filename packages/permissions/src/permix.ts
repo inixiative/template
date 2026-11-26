@@ -68,10 +68,6 @@ export const permixIdsWithAction = (
       }
     }
   }
-  for (const entitlement of entitlementsCovering(permix, resource, covering)) {
-    if (entitlement.anchor.resource === resource && entitlement.anchor.id) {
-      ids.add(entitlement.anchor.id);
-    }
-  }
+  for (const id of directEntitledIds(permix, resource, covering).directIds) ids.add(id);
   return [...ids];
 };

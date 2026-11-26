@@ -14,10 +14,9 @@ import {
   transferArtifactContentSchema,
   transferArtifactResolutionInputSchema,
 } from '@template/shared/inquiry';
-import type { ResourceBindingType } from '@template/shared/resourceBinding';
-import { syncArtifactAncestors } from '#/hooks/artifactTree/syncArtifactAncestors';
 import { makeError } from '#/lib/errors';
 import {
+  fetchOwnerRootArtifactOrThrow,
   type OwnedArtifact,
   ownerColumns,
   sameArtifactOwner,
@@ -25,7 +24,6 @@ import {
 } from '#/modules/artifact/services/artifactOwner';
 import { writePlacement } from '#/modules/artifact/services/artifactPlacementUtils';
 import { copyArtifactInto } from '#/modules/artifact/services/copyArtifact';
-import { ensureOwnerRootArtifact } from '#/modules/artifact/services/ownerRootArtifact';
 import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
 import { openInquiryWhere } from '#/modules/inquiry/validations/validateInquiryStatus';
 
@@ -60,10 +58,11 @@ const fetchOwnerOf = async ({ model, id }: Party): Promise<OwnedArtifact> => {
   });
 };
 
-const fetchOwnedObject = async (artifactId: string, source: Party): Promise<Artifact> => {
-  const artifact = await db.artifact.findUnique({ where: { id: artifactId } });
-  const expectedOwner = await fetchOwnerOf(source);
-  if (!artifact || !sameArtifactOwner(artifact, expectedOwner)) {
+const validateTransferableArtifact = (
+  artifact: Artifact | null | undefined,
+  expectedOwner: OwnedArtifact,
+): Artifact => {
+  if (!artifact || artifact.deletedAt || !sameArtifactOwner(artifact, expectedOwner)) {
     throw makeError({ status: 404, message: 'Artifact not found' });
   }
   if (isContainerKind(artifact.kind)) {
@@ -76,7 +75,7 @@ const fetchOwnedObject = async (artifactId: string, source: Party): Promise<Arti
 };
 
 const grantSourceRead = async (artifactId: string, source: Party) => {
-  const bindingType: ResourceBindingType = 'tracking';
+  const bindingType = 'tracking' as const;
   const resourceKey = polymorphicKeyColumnOrThrow('ResourceBinding', 'resourceModel', source.model);
   const existingBinding = await db.resourceBinding.findFirst({
     where: {
@@ -120,7 +119,11 @@ export const transferArtifactService: InquiryService<
 
   validate: async (inquiry, content) => {
     const source = party(inquiry, 'sourceModel');
-    await fetchOwnedObject(content.artifactId, source);
+    const [artifact, expectedOwner] = await Promise.all([
+      db.artifact.findUnique({ where: { id: content.artifactId } }),
+      fetchOwnerOf(source),
+    ]);
+    validateTransferableArtifact(artifact, expectedOwner);
     const open = await db.inquiry.count({
       where: {
         ...openInquiryWhere(),
@@ -165,21 +168,14 @@ export const transferArtifactService: InquiryService<
     ];
 
     await withArtifactOwnersLock(lockTargets, async () => {
-      const [artifact] = await db.findForUpdate<Artifact>('Artifact', { id: content.artifactId });
-      if (!artifact || artifact.deletedAt || !sameArtifactOwner(artifact, sourceOwner)) {
-        throw makeError({ status: 404, message: 'Artifact not found' });
-      }
-      if (isContainerKind(artifact.kind)) {
-        throw makeError({
-          status: 422,
-          message: 'Containers are not transferable yet; transfer what is inside them',
-        });
-      }
+      const [lockedRow] = await db.findForUpdate<Artifact>('Artifact', { id: content.artifactId });
+      const artifact = validateTransferableArtifact(lockedRow, sourceOwner);
       const allowTracking = response.allowTracking ?? content.allowTracking;
       const tracked = content.keepTracking && allowTracking !== false;
 
       if (content.keepTracking && allowTracking === false) {
-        await copyArtifactInto(artifact, sourceOwner, {});
+        const sourceRoot = await fetchOwnerRootArtifactOrThrow(sourceOwner);
+        await copyArtifactInto(artifact, sourceRoot);
       }
       await db.artifactPermission.updateManyAndReturn({
         where: { artifactId: artifact.id },
@@ -191,7 +187,7 @@ export const transferArtifactService: InquiryService<
         where: { id: artifact.id },
         data: { ...targetOwner, effectiveAccess: 'private' },
       });
-      const targetRoot = await ensureOwnerRootArtifact(targetOwner);
+      const targetRoot = await fetchOwnerRootArtifactOrThrow(targetOwner);
       const existingAtTargetRoot = await db.artifactPlacement.findFirst({
         where: { artifactId: transferred.id, containerArtifactId: targetRoot.id },
       });
@@ -201,13 +197,10 @@ export const transferArtifactService: InquiryService<
             data: { access: 'private' },
           })
         : await writePlacement(transferred, targetRoot, 'private');
-      const removedPlacements = await db.artifactPlacement.updateManyAndReturn({
+      await db.artifactPlacement.updateManyAndReturn({
         where: { artifactId: artifact.id, id: { not: targetPlacement.id } },
         data: { deletedAt: new Date() },
       });
-      if (existingAtTargetRoot && removedPlacements.length === 0) {
-        await syncArtifactAncestors([artifact.id]);
-      }
       if (tracked) await grantSourceRead(artifact.id, source);
     });
     return {};

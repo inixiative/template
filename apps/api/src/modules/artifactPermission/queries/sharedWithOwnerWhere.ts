@@ -4,13 +4,43 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
-import type { Prisma } from '@template/db';
+import {
+  BIND_NAME_BY_OWNER_MODEL,
+  isBindableOwnerModel,
+  type Prisma,
+  polymorphicKeyColumnOrThrow,
+  polymorphicKeyColumns,
+} from '@template/db';
 import type { Context } from 'hono';
-import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
+import type { ValidatedContext } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import type { OwnerRef } from '#/modules/artifact/services/artifactOwner';
+import { paginate } from '#/lib/prisma/paginate';
+import { defaultOrderBy } from '#/modules/artifact/queries/ownerArtifactsQuery';
+import {
+  contextArtifactOwner,
+  type OwnerRef,
+  ownerColumns,
+} from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
+
+const GRANTEE_KEY_TO_OWNER_FIELD = {
+  granteeUserId: 'userId',
+  granteeOrganizationId: 'organizationId',
+  granteeSpaceId: 'spaceId',
+} as const;
+
+const directGranteeWhere = (owner: OwnerRef): Prisma.ArtifactPermissionWhereInput => {
+  const columns = ownerColumns(owner);
+  const keys = polymorphicKeyColumns('ArtifactPermission', 'granteeModel', owner.ownerModel);
+  const fields = Object.fromEntries(
+    keys.map((key) => [
+      key,
+      columns[GRANTEE_KEY_TO_OWNER_FIELD[key as keyof typeof GRANTEE_KEY_TO_OWNER_FIELD]]!,
+    ]),
+  );
+  return { granteeModel: owner.ownerModel, ...fields } as Prisma.ArtifactPermissionWhereInput;
+};
 
 const granteeRecordForOwner = (owner: OwnerRef): Record<string, unknown> => ({
   id: '',
@@ -21,12 +51,7 @@ const granteeRecordForOwner = (owner: OwnerRef): Record<string, unknown> => ({
   granteeCustomerRelationshipId: null,
 });
 
-export const defaultSharedPermissionOrderBy = (
-  c: ValidatedContext<'query', { orderBy?: string[] }>,
-): Prisma.ArtifactPermissionOrderByWithRelationInput | undefined =>
-  validatedQuery(c).orderBy?.length ? undefined : { createdAt: 'desc' };
-
-export const validateCanReadSharedArtifactPermissions = async (
+const validateCanReadSharedArtifactPermissions = async (
   c: Context<AppEnv>,
   owner: OwnerRef,
 ): Promise<void> => {
@@ -39,57 +64,27 @@ export const validateCanReadSharedArtifactPermissions = async (
   if (!allowed) throw makeError({ status: 403, message: 'Forbidden' });
 };
 
-export const sharedWithOwnerWhere = (owner: OwnerRef): Prisma.ArtifactPermissionWhereInput => {
+const sharedWithOwnerWhere = (owner: OwnerRef): Prisma.ArtifactPermissionWhereInput => {
   const now = new Date();
-  const directGrantee: Prisma.ArtifactPermissionWhereInput =
-    owner.ownerModel === 'User'
-      ? { granteeModel: 'User', granteeUserId: owner.userId! }
-      : owner.ownerModel === 'Organization'
-        ? { granteeModel: 'Organization', granteeOrganizationId: owner.organizationId! }
-        : owner.ownerModel === 'Space'
-          ? { granteeModel: 'Space', granteeSpaceId: owner.spaceId! }
-          : owner.ownerModel === 'OrganizationUser'
-            ? {
-                granteeModel: 'OrganizationUser',
-                granteeOrganizationId: owner.organizationId!,
-                granteeUserId: owner.userId!,
-              }
-            : {
-                granteeModel: 'SpaceUser',
-                granteeOrganizationId: owner.organizationId!,
-                granteeSpaceId: owner.spaceId!,
-                granteeUserId: owner.userId!,
-              };
-
+  const directGrantee = directGranteeWhere(owner);
+  const ownerIdField = isBindableOwnerModel(owner.ownerModel)
+    ? BIND_NAME_BY_OWNER_MODEL[owner.ownerModel]
+    : null;
   const customerRelationshipGrantee: Prisma.ArtifactPermissionWhereInput | null =
-    owner.ownerModel === 'User'
+    isBindableOwnerModel(owner.ownerModel) && ownerIdField
       ? {
           granteeModel: 'CustomerRelationship',
           granteeCustomerRelationship: {
-            customerModel: 'User',
-            customerUserId: owner.userId!,
+            customerModel: owner.ownerModel,
+            [polymorphicKeyColumnOrThrow(
+              'CustomerRelationship',
+              'customerModel',
+              owner.ownerModel,
+            )]: ownerColumns(owner)[ownerIdField]!,
             deletedAt: null,
           },
         }
-      : owner.ownerModel === 'Organization'
-        ? {
-            granteeModel: 'CustomerRelationship',
-            granteeCustomerRelationship: {
-              customerModel: 'Organization',
-              customerOrganizationId: owner.organizationId!,
-              deletedAt: null,
-            },
-          }
-        : owner.ownerModel === 'Space'
-          ? {
-              granteeModel: 'CustomerRelationship',
-              granteeCustomerRelationship: {
-                customerModel: 'Space',
-                customerSpaceId: owner.spaceId!,
-                deletedAt: null,
-              },
-            }
-          : null;
+      : null;
 
   return {
     AND: [
@@ -103,4 +98,17 @@ export const sharedWithOwnerWhere = (owner: OwnerRef): Prisma.ArtifactPermission
       { artifact: { deletedAt: null } },
     ],
   };
+};
+
+export const paginateOwnerArtifactPermissions = async (
+  c: ValidatedContext<'query', { orderBy?: string[] }>,
+) => {
+  const db = c.get('db');
+  const owner = contextArtifactOwner(c);
+  await validateCanReadSharedArtifactPermissions(c, owner);
+  return paginate(c, db.artifactPermission, {
+    where: sharedWithOwnerWhere(owner),
+    include: { artifact: true },
+    orderBy: defaultOrderBy(c, { createdAt: 'desc' as const }),
+  });
 };

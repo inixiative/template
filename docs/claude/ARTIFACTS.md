@@ -38,7 +38,7 @@ Why one table: a grant, a placement, and an audit entry each have a single kind 
 | Share with a person, an org, a space, a member or a customer; time-limited share; leave a share | **`ArtifactPermission`** · model — materialized onto inheriting descendants via **`ArtifactEffectivePermission`**; grantees read shares via `GET /{owner}/artifactPermissions` and leave via `DELETE /artifactPermission/:id` | § Access | a per-feature share table; a shared-with JSON column |
 | Can this caller read / edit / manage / delete this artifact | **`validatePermission(action)`** · middleware + **`validateArtifactPermission`** / **`holdsOnRecord`** (`db:Artifact` and `db:ArtifactPlacement` in `packages/permissions/src/artifacts/artifactResourcePermission.ts`, backed by materialized `Artifact.effectiveAccess` and `ArtifactEffectivePermission`) | § Access | a custom permission walk outside `schemaMap`; skipping `db:ArtifactPlacement.read` when listing folder contents |
 | Give an artifact to another user, org or space | **`transferArtifact`** · Inquiry service `apps/api/src/modules/inquiry/services/transferArtifact/` | § Ownership | rewriting `organizationId` on the row; copying the file and deleting the original |
-| Read an artifact with its 1-step neighborhood (placements as artifact/container, permissions, effective permissions, bindings) | **`GET /artifact/:id`** (`artifactRead`, backed by `resourceContextArgs` `includeArtifactDetail` and `readArtifactDetail`, keeping Prisma relation names straight through) | § Navigating | joining placements, grants, and bindings by hand without the caller's view |
+| Read an artifact with its 1-step neighborhood (placements as artifact/container, permissions, effective permissions, bindings) | **`GET /artifact/:id`** (`artifactRead`, backed by `includeArtifactDetail` and `readArtifactDetail`, keeping Prisma relation names straight through) | § Navigating | joining placements, grants, and bindings by hand without the caller's view |
 | Delete a folder, or delete a folder and its exclusive contents | **`DELETE /artifact/:id`** (`artifactDelete`), `artifactPlacementsAsContainer[].artifact.exclusive` on **`GET /artifact/:id`**, **`/v1/batch`** | § Deleting | a delete that walks a container's members and removes them; a bespoke delete-many endpoint |
 
 ---
@@ -51,7 +51,7 @@ containerChildren = { folder: ['file', 'folder'] };
 plainArtifactKinds = ['folder'];
 ```
 
-`ArtifactKind.root` is the per-owner root container provisioned eagerly by `ownerRootArtifact` on owner create/revive (with `ensureOwnerRootArtifact` as an idempotent fallback), enforced unique per owner via partial unique indexes (`WHERE "kind" = 'root' AND "deletedAt" IS NULL`). A root container can hold any non-root kind, can never be placed inside another container, and cannot be deleted, renamed, moved, copied, or granted direct `ArtifactPermission`s via API (`422`). Owner soft-delete cascades still soft-delete the root container cleanly.
+`ArtifactKind.root` is the per-owner root container provisioned eagerly by `ownerRootArtifact` on owner create/upsert/revive, enforced unique per owner via partial unique indexes (`WHERE "kind" = 'root' AND "deletedAt" IS NULL`). A root container can hold any non-root kind, can never be placed inside another container, and cannot be deleted, renamed, moved, copied, or granted direct `ArtifactPermission`s via API (`422`). Owner soft-delete cascades still soft-delete the root container cleanly.
 
 A fork adds kinds below the template marker in both `enum ArtifactKind` (`packages/db/prisma/schema/artifact.prisma`) and `packages/shared/src/artifact/kinds.ts`. `kind` is immutable after creation (`immutableFields`). The plain create routes (`{me,organization,space,organizationUser,spaceUser}CreateArtifact`) only create `plainArtifactKinds` (kinds without a content table).
 
@@ -83,7 +83,7 @@ A placement is refused when the container's kind does not allow the child's kind
 
 ## Access
 
-Artifact and placement authorization lives in `schemaMap` (`packages/permissions/src/artifacts/artifactResourcePermission.ts`) using `@inixiative/permissions` `down` lists (`artifactEffectivePermissions`) plus `tenantPermissionRules`. Caller-reflected access helpers (`artifactEffectiveRole`, `accessibleArtifactGranteeIds`, `accessibleArtifactOwnerIds`) live alongside it in `packages/permissions/src/artifacts/artifactAccess.ts`.
+Artifact and placement authorization lives in `schemaMap` (`packages/permissions/src/artifacts/artifactResourcePermission.ts`) using `@inixiative/permissions` `down` lists (`artifactEffectivePermissions`) plus `tenantPermissionRules`. Caller-reflected access helpers (`artifactEffectiveRole`) live alongside it in `packages/permissions/src/artifacts/artifactAccess.ts`.
 
 **Visibility lives on `ArtifactPlacement.access`**, and **`Artifact.effectiveAccess`** (`private` | `tenant` | `public`, in `NOOP_FIELDS` with direct cache invalidation) is materialized by `syncArtifactAncestors` as the most permissive visibility (`public` > `tenant` > `private`) across the artifact's **same-owner** placements:
 
@@ -143,7 +143,7 @@ Artifacts are a flat table of nodes; navigating a workspace tree is reading plac
 | Shared with owner ("Shared with me": paginated active `ArtifactPermission` rows with each `artifact` inline, including `CustomerRelationship` shares) | `GET /me/artifactPermissions`, `/organization/:id/artifactPermissions`, `/space/:id/artifactPermissions`, `/organizationUser/:id/artifactPermissions`, `/spaceUser/:id/artifactPermissions` |
 | Single artifact + 1-step neighborhood (scalar `effectiveAccess`, `effectiveRole`, and exact Prisma relation names: `artifactPlacementsAsArtifact` with `containerArtifact` + `artifactPermissions` for managers, `artifactPlacementsAsContainer` with `artifact` + `exclusive` + `artifactPermissions` for managers, visible `resourceBindings`, and for managers `artifactPermissions` + `artifactEffectivePermissions`) | `GET /artifact/:id` |
 
-`GET /artifact/:id` loads its 1-step relations via `resourceContextArgs` (`includeArtifactDetail`) and filters them per-caller in `readArtifactDetail` (enforcing `db:ArtifactPlacement.read` on placements and ReBAC `db:User`/`db:Organization`/`db:Space` on bindings) without renaming Prisma relations.
+`GET /artifact/:id` loads its 1-step relations (`includeArtifactDetail`) and filters them per-caller in `readArtifactDetail` (enforcing `db:ArtifactPlacement.read` on placements and ReBAC `db:User`/`db:Organization`/`db:Space` on bindings) without renaming Prisma relations.
 
 No frontend is built yet (`tickets/FEAT-032-file-browser-ui.md`).
 
@@ -157,8 +157,8 @@ No frontend is built yet (`tickets/FEAT-032-file-browser-ui.md`).
 | Kind catalog & caps | `packages/shared/src/artifact/kinds.ts` |
 | ReBAC rules & access helpers | `packages/permissions/src/permix.ts`, `packages/permissions/src/artifacts/{artifactResourcePermission,artifactAccess}.ts` |
 | Validations | `apps/api/src/modules/artifact/validations/{validateArtifactPermission,validateNotRootArtifact,validateContainable,validatePlacementAccess,validateNoContainerCycle,validateEdgeAuthority,validateArtifactCreateAtOwner}.ts` |
-| Materialized tree & root hooks | `apps/api/src/hooks/ownerRootArtifact/hook.ts`, `apps/api/src/hooks/artifactTree/{hook,fetchArtifactTreeAround,syncAncestors,syncEffectivePermissions,syncEffectiveAccess,reparentOrphanedArtifacts,syncArtifactAncestors,syncPermissionDescendants}.ts` |
-| Placements & creation | `apps/api/src/modules/artifact/services/{createArtifact,ownerRootArtifact,placeArtifact,updateArtifactPlacement,moveArtifact,copyArtifact,removeArtifactPlacement,artifactPlacementUtils,artifactOwner}.ts` |
+| Materialized tree & root hooks | `apps/api/src/hooks/ownerRootArtifact/hook.ts`, `apps/api/src/hooks/artifactTree/{hook,fetchArtifactTreeAround,syncAncestors,syncEffectivePermissions,syncEffectiveAccess,syncJoinRows,reparentOrphanedArtifacts,syncArtifactAncestors,syncPermissionDescendants}.ts` |
+| Placements & creation | `apps/api/src/modules/artifact/services/{createArtifact,placeArtifact,updateArtifactPlacement,moveArtifact,copyArtifact,removeArtifactPlacement,artifactPlacementUtils,artifactOwner}.ts` |
 | Navigation & shared | `apps/api/src/modules/artifact/queries/{artifactIncludes,accessibleArtifactWhere,ownerArtifactsQuery}.ts`, `apps/api/src/modules/artifact/services/readArtifactDetail.ts`, `apps/api/src/modules/artifactPermission/queries/sharedWithOwnerWhere.ts`, `apps/api/src/modules/artifactPlacement/queries/ownerArtifactPlacementsQuery.ts` |
 | Ownership | `apps/api/src/modules/inquiry/services/transferArtifact/` |
 | Deleting | `apps/api/src/modules/artifact/controllers/artifactDelete.ts` |

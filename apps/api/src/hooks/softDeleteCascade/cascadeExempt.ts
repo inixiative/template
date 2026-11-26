@@ -24,7 +24,7 @@ export const CASCADE_EXEMPT: Record<string, readonly string[]> = {
   // the row (`sourceDeletedAt`), and the row dies only with its target.
   Entitlement: axisRelations('Entitlement', 'source'),
   // A lazy-copy snapshot outlives the source file it was copied from.
-  File: ['source'],
+  File: ['sourceFile'],
   // A binding belongs to its bound resource, not to the source artifact it points at.
   ResourceBinding: ['sourceArtifact'],
   // A rule names these rows; it does not own them. Tombstoning one stamps the edges that name it

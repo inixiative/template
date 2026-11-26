@@ -10,35 +10,44 @@ import { ArtifactKind } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
-import { accessibleArtifactWhereForOwner } from '#/modules/artifact/queries/accessibleArtifactWhere';
-import { type OwnerRef, ownerColumns } from '#/modules/artifact/services/artifactOwner';
+import { paginate } from '#/lib/prisma/paginate';
+import {
+  accessibleArtifactWhereForOwner,
+  type OwnerArtifactAccessProbe,
+} from '#/modules/artifact/queries/accessibleArtifactWhere';
+import {
+  contextArtifactOwner,
+  type OwnerRef,
+  ownerColumns,
+} from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
 export type ArtifactWithPermissions = Artifact & { artifactPermissions: ArtifactPermission[] };
 
-export const includeArtifactList = {
+const includeArtifactList = {
   artifactPermissions: { orderBy: { createdAt: 'asc' as const } },
 } satisfies Prisma.ArtifactInclude;
 
-export const defaultArtifactOrderBy = (
+export const defaultOrderBy = <T>(
   c: ValidatedContext<'query', { orderBy?: string[] }>,
-): Prisma.ArtifactOrderByWithRelationInput | undefined =>
-  validatedQuery(c).orderBy?.length ? undefined : { name: 'asc' };
+  fallback: T,
+): T | undefined => (validatedQuery(c).orderBy?.length ? undefined : fallback);
 
 export const ownerArtifactsWhere = async (
   c: Context<AppEnv>,
   owner: OwnerRef,
+  probed?: OwnerArtifactAccessProbe,
 ): Promise<Prisma.ArtifactWhereInput> => {
   const ownerWhere: Prisma.ArtifactWhereInput = {
     deletedAt: null,
     kind: { not: ArtifactKind.root },
     ...ownerColumns(owner),
   };
-  const accessWhere = await accessibleArtifactWhereForOwner(c, owner);
+  const accessWhere = await accessibleArtifactWhereForOwner(c, owner, probed);
   return accessWhere ? { AND: [ownerWhere, accessWhere] } : ownerWhere;
 };
 
-export const shapeAccessibleArtifacts = async (
+const shapeAccessibleArtifacts = async (
   c: Context<AppEnv>,
   rows: ArtifactWithPermissions[],
 ): Promise<ArtifactWithPermissions[]> => {
@@ -53,4 +62,17 @@ export const shapeAccessibleArtifacts = async (
     const canManage = check(permix, 'artifact', hydrated, 'manage');
     return [{ ...row, artifactPermissions: canManage ? row.artifactPermissions : [] }];
   });
+};
+
+export const paginateOwnerArtifacts = async (
+  c: ValidatedContext<'query', { orderBy?: string[] }>,
+) => {
+  const db = c.get('db');
+  const owner = contextArtifactOwner(c);
+  const { data, pagination } = await paginate(c, db.artifact, {
+    where: await ownerArtifactsWhere(c, owner),
+    include: includeArtifactList,
+    orderBy: defaultOrderBy(c, { name: 'asc' as const }),
+  });
+  return { data: await shapeAccessibleArtifacts(c, data), pagination };
 };

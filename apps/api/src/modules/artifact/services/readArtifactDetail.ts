@@ -4,12 +4,12 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
-import { columnsOf } from '@inixiative/field-map';
 import {
   type AccessorName,
   db,
   type HydratedRecord,
   hydrate,
+  isBindableOwnerModel,
   rowPolymorphicAxisPointsAt,
 } from '@template/db';
 import type {
@@ -19,7 +19,6 @@ import type {
   ArtifactPlacement,
   ResourceBinding,
 } from '@template/db/generated/client/client';
-import { prismaMap } from '@template/db/generated/prismaMap';
 import {
   artifactEffectiveRole,
   entitlementsCovering,
@@ -30,30 +29,15 @@ import { check } from '@template/permissions/rebac';
 import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
 import { isRootKind } from '@template/shared/artifact';
 import type { Context } from 'hono';
-import { pick } from 'lodash-es';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import type { ResourcePayloadMap } from '#/middleware/resources/resourceContextArgs';
+import { includeArtifactDetail } from '#/modules/artifact/queries/artifactIncludes';
 import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
-type BindingAccessor = Extract<AccessorName, 'user' | 'organization' | 'space'>;
-
-const bindingAccessorByModel: Partial<Record<ResourceBinding['resourceModel'], BindingAccessor>> = {
-  User: 'user',
-  Organization: 'organization',
-  Space: 'space',
-};
-
 const PLACEMENT_READ_ACTIONS = ['read', 'manage'] as const;
-const artifactPermissionColumns = columnsOf(prismaMap, 'ArtifactPermission');
-const artifactEffectivePermissionColumns = columnsOf(prismaMap, 'ArtifactEffectivePermission');
 
 type EffectivePermissionItem = ArtifactEffectivePermission & {
   artifactPermission?: ArtifactPermission | null;
-};
-
-type EffectivePermissionWithGrant = ArtifactEffectivePermission & {
-  artifactPermission: ArtifactPermission;
 };
 
 const visibleBindingToCaller = async (
@@ -65,78 +49,64 @@ const visibleBindingToCaller = async (
     'ResourceBinding',
     'resourceModel',
   );
-  if (!ref) return false;
-  const accessor = bindingAccessorByModel[ref.model as ResourceBinding['resourceModel']];
-  if (!accessor) return false;
+  if (!ref || !isBindableOwnerModel(ref.model)) return false;
+  const accessor = ref.model.toLowerCase() as Extract<
+    AccessorName,
+    'user' | 'organization' | 'space'
+  >;
   const record = await db.delegate(accessor).findUnique({ where: { id: ref.id } });
-  if (!record) return false;
-  return holdsOnRecord(permix, accessor, record as HydratedRecord, 'read');
+  return record ? holdsOnRecord(permix, accessor, record as HydratedRecord, 'read') : false;
 };
 
-const activeEffectivePermissions = (
-  items: EffectivePermissionItem[],
-): EffectivePermissionWithGrant[] => {
+const activeEffectivePermissions = (items: EffectivePermissionItem[]) => {
   const now = new Date();
-  const seen = new Set<string>();
-  const active: EffectivePermissionWithGrant[] = [];
-  for (const item of items) {
-    const { artifactPermission } = item;
-    if (!artifactPermission || artifactPermission.deletedAt || seen.has(artifactPermission.id)) {
-      continue;
-    }
-    if (artifactPermission.expiresAt && artifactPermission.expiresAt <= now) continue;
-    seen.add(artifactPermission.id);
-    active.push({
-      ...(pick(item, artifactEffectivePermissionColumns) as ArtifactEffectivePermission),
-      artifactPermission: pick(artifactPermission, artifactPermissionColumns) as ArtifactPermission,
-    });
-  }
-  return active;
+  return items.filter(
+    (item): item is ArtifactEffectivePermission & { artifactPermission: ArtifactPermission } =>
+      Boolean(item.artifactPermission) &&
+      !item.artifactPermission!.deletedAt &&
+      (!item.artifactPermission!.expiresAt || item.artifactPermission!.expiresAt > now),
+  );
 };
 
 const hasCustomArtifactRules = (permix: Permix, hydrated: HydratedRecord): boolean =>
-  [
-    ...tenantPermissionRulesAbove('db:Artifact', hydrated),
-    ...tenantPermissionRulesAbove('db:ArtifactPlacement', hydrated),
-  ].some((rules) => Boolean(rules) && Object.keys(rules!).length > 0) ||
+  tenantPermissionRulesAbove('db:Artifact', hydrated).some(
+    (rules) => Boolean(rules) && Object.keys(rules!).length > 0,
+  ) ||
   entitlementsCovering(permix, 'db:Artifact', STANDARD_ACTIONS_IMPLYING.read).length > 0 ||
   entitlementsCovering(permix, 'db:ArtifactPlacement', PLACEMENT_READ_ACTIONS).length > 0;
 
 const accessForPlacement = async (
   permix: Permix,
   placement: ArtifactPlacement,
-  targetArtifact: Artifact,
+  targetRel: 'artifact' | 'containerArtifact',
 ): Promise<{ canRead: boolean; canManageTarget: boolean }> => {
-  if (placement.deletedAt !== null || targetArtifact.deletedAt !== null) {
+  const hydratedPlacement = await hydrate('artifactPlacement', placement);
+  if (!check(permix, 'artifactPlacement', hydratedPlacement, 'read')) {
     return { canRead: false, canManageTarget: false };
   }
-  const [hydratedPlacement, hydratedTarget] = await Promise.all([
-    hydrate('artifactPlacement', placement),
-    hydrate('artifact', targetArtifact),
-  ]);
-  const canRead = check(permix, 'artifactPlacement', hydratedPlacement, 'read');
-  if (!canRead) return { canRead: false, canManageTarget: false };
+  const hydratedTarget = hydratedPlacement[targetRel] as HydratedRecord | undefined;
   return {
     canRead: true,
-    canManageTarget: check(permix, 'artifact', hydratedTarget, 'manage'),
+    canManageTarget: hydratedTarget ? check(permix, 'artifact', hydratedTarget, 'manage') : false,
   };
 };
 
-export const readArtifactDetail = async (
-  c: Context<AppEnv>,
-  loaded: ResourcePayloadMap['artifact'],
-) => {
+export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact) => {
   const permix = c.get('permix');
   const isAnonymous = !c.get('user') && !c.get('token');
+  const [loaded, hydrated] = await Promise.all([
+    db.artifact.findUniqueOrThrow({ where: { id: artifact.id }, include: includeArtifactDetail }),
+    hydrate('artifact', artifact),
+  ]);
   const {
     artifactPlacementsAsArtifact: rawPlacements,
     artifactPlacementsAsContainer: rawContents,
     artifactPermissions: rawPermissions,
+    artifactEffectivePermissions: rawEffectivePermissions,
     resourceBindings: rawBindings,
     ...scalarArtifact
   } = loaded;
 
-  const hydrated = await hydrate('artifact', scalarArtifact);
   const canManage = check(permix, 'artifact', hydrated, 'manage');
   const parentRole = artifactEffectiveRole(permix, hydrated);
   const parentIsRoot = isRootKind(scalarArtifact.kind);
@@ -146,9 +116,6 @@ export const readArtifactDetail = async (
   // avoiding N individual hydrations when the container already decides visibility & access.
   const accessForChildPlacement = async (content: (typeof rawContents)[number]) => {
     const { artifact: child, ...placement } = content;
-    if (placement.deletedAt !== null || child.deletedAt !== null) {
-      return { canRead: false, canManage: false };
-    }
     if (canShortCircuit && sameArtifactOwner(child, scalarArtifact)) {
       if (isAnonymous) {
         const placementVisible = parentIsRoot
@@ -168,14 +135,14 @@ export const readArtifactDetail = async (
         }
       }
     }
-    const { canRead, canManageTarget } = await accessForPlacement(permix, placement, child);
+    const { canRead, canManageTarget } = await accessForPlacement(permix, placement, 'artifact');
     return { canRead, canManage: canManageTarget };
   };
 
   const [parentAccess, childAccess, bindingFlags] = await Promise.all([
     Promise.all(
-      rawPlacements.map(({ containerArtifact, ...placement }) =>
-        accessForPlacement(permix, placement, containerArtifact),
+      rawPlacements.map(({ containerArtifact: _container, ...placement }) =>
+        accessForPlacement(permix, placement, 'containerArtifact'),
       ),
     ),
     Promise.all(rawContents.map((content) => accessForChildPlacement(content))),
@@ -200,16 +167,16 @@ export const readArtifactDetail = async (
     .sort((a, b) => a.containerArtifact.name.localeCompare(b.containerArtifact.name));
 
   const artifactPlacementsAsContainer = rawContents
-    .flatMap(({ artifact, ...placement }, index) => {
+    .flatMap(({ artifact: child, ...placement }, index) => {
       const access = childAccess[index]!;
       if (!access.canRead) return [];
       const {
         artifactPlacementsAsArtifact: childPlacements,
         artifactPermissions: childPermissions,
         ...childScalar
-      } = artifact;
+      } = child;
       const sameOwnerPlacementCount = childPlacements.filter((p) =>
-        sameArtifactOwner(p.containerArtifact, artifact),
+        sameArtifactOwner(p.containerArtifact, child),
       ).length;
       return [
         {
@@ -224,19 +191,15 @@ export const readArtifactDetail = async (
     })
     .sort((a, b) => a.artifact.name.localeCompare(b.artifact.name));
 
-  const artifactEffectivePermissions = canManage
-    ? activeEffectivePermissions(
-        (hydrated.artifactEffectivePermissions ?? []) as EffectivePermissionItem[],
-      )
-    : [];
-
   return {
     ...scalarArtifact,
     effectiveRole: parentRole,
     artifactPlacementsAsArtifact,
     artifactPlacementsAsContainer,
     artifactPermissions: canManage ? rawPermissions : [],
-    artifactEffectivePermissions,
+    artifactEffectivePermissions: canManage
+      ? activeEffectivePermissions(rawEffectivePermissions)
+      : [],
     resourceBindings: rawBindings.filter((_, index) => bindingFlags[index]),
   };
 };
