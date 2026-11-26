@@ -7,7 +7,6 @@
 import { createRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import {
-  ARTIFACT_CREATE_IMMUTABLE_FIELDS,
   artifactCreateBodySchema,
   artifactReadResponseSchema,
 } from '#/modules/artifact/schemas/artifactSchemas';
@@ -21,5 +20,4 @@ export const organizationUserCreateArtifactRoute = createRoute({
     'Creates a member-owned artifact inside an organization (private to the member, with org-owner break-glass).',
   bodySchema: artifactCreateBodySchema,
   responseSchema: artifactReadResponseSchema,
-  sanitizeKeys: ARTIFACT_CREATE_IMMUTABLE_FIELDS,
 });

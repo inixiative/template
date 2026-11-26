@@ -9,12 +9,11 @@ import type { ArtifactPlacement } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions/client';
 import { isRootKind } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
+import { ownerColumns, sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 import {
-  ownerColumns,
-  sameArtifactOwner,
-  withLockedArtifacts,
-} from '#/modules/artifact/services/artifactOwner';
-import { fetchArtifactOrThrow } from '#/modules/artifact/services/artifactPlacementUtils';
+  fetchArtifactOrThrow,
+  withLockedPlacement,
+} from '#/modules/artifact/services/artifactPlacementUtils';
 import {
   validateEdgeAuthority,
   validatePlacementDeletable,
@@ -29,32 +28,32 @@ export const removeArtifactPlacement = async (
     fetchArtifactOrThrow(placement.containerArtifactId),
   ]);
   await validateEdgeAuthority(permix, artifact, container, 'remove');
-  await withLockedArtifacts([artifact, container], async (locked) => {
-    const current = await db.artifactPlacement.findUnique({ where: { id: placement.id } });
-    if (!current) {
-      throw makeError({ status: 404, message: 'The artifact is not in that container' });
-    }
-    const lockedArtifact = locked.get(current.artifactId)!;
-    const lockedContainer = locked.get(current.containerArtifactId)!;
-    await validateEdgeAuthority(permix, lockedArtifact, lockedContainer, 'remove');
-    await validatePlacementDeletable(permix, current);
+  await withLockedPlacement(
+    placement,
+    artifact,
+    container,
+    [],
+    async ({ current, lockedArtifact, lockedContainer }) => {
+      await validateEdgeAuthority(permix, lockedArtifact, lockedContainer, 'remove');
+      await validatePlacementDeletable(permix, current);
 
-    if (sameArtifactOwner(lockedArtifact, lockedContainer) && isRootKind(lockedContainer.kind)) {
-      const otherSameOwnerPlacements = await db.artifactPlacement.count({
-        where: {
-          id: { not: current.id },
-          artifactId: lockedArtifact.id,
-          containerArtifact: ownerColumns(lockedArtifact),
-        },
-      });
-      if (otherSameOwnerPlacements === 0) {
-        throw makeError({
-          status: 422,
-          message: 'Cannot remove an artifact from its root unless it sits in another folder',
+      if (sameArtifactOwner(lockedArtifact, lockedContainer) && isRootKind(lockedContainer.kind)) {
+        const otherSameOwnerPlacements = await db.artifactPlacement.count({
+          where: {
+            id: { not: current.id },
+            artifactId: lockedArtifact.id,
+            containerArtifact: ownerColumns(lockedArtifact),
+          },
         });
+        if (otherSameOwnerPlacements === 0) {
+          throw makeError({
+            status: 422,
+            message: 'Cannot remove an artifact from its root unless it sits in another folder',
+          });
+        }
       }
-    }
 
-    await db.artifactPlacement.delete({ where: { id: current.id } });
-  });
+      await db.artifactPlacement.delete({ where: { id: current.id } });
+    },
+  );
 };

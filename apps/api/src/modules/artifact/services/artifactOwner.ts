@@ -9,12 +9,13 @@ import {
   db,
   emptySideKeyColumns,
   fetchThroughCache,
+  polymorphicArmKeys,
   polymorphicAxis,
   polymorphicKeyColumns,
   toModelName,
 } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
-import { ArtifactKind, type ArtifactOwnerModel } from '@template/db/generated/client/enums';
+import { ArtifactKind, ArtifactOwnerModel } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { actingUser } from '#/lib/context/actingUser';
 import { makeError } from '#/lib/errors';
@@ -43,37 +44,11 @@ export const ownerRefForRow = (
   model: ArtifactOwnerModel,
   row: Record<string, unknown>,
 ): OwnerRef | null => {
-  switch (model) {
-    case 'User':
-      return typeof row.id === 'string' ? { ownerModel: 'User', userId: row.id } : null;
-    case 'Organization':
-      return typeof row.id === 'string'
-        ? { ownerModel: 'Organization', organizationId: row.id }
-        : null;
-    case 'Space':
-      return typeof row.id === 'string' && typeof row.organizationId === 'string'
-        ? { ownerModel: 'Space', organizationId: row.organizationId, spaceId: row.id }
-        : null;
-    case 'OrganizationUser':
-      return typeof row.organizationId === 'string' && typeof row.userId === 'string'
-        ? {
-            ownerModel: 'OrganizationUser',
-            organizationId: row.organizationId,
-            userId: row.userId,
-          }
-        : null;
-    case 'SpaceUser':
-      return typeof row.organizationId === 'string' &&
-        typeof row.spaceId === 'string' &&
-        typeof row.userId === 'string'
-        ? {
-            ownerModel: 'SpaceUser',
-            organizationId: row.organizationId,
-            spaceId: row.spaceId,
-            userId: row.userId,
-          }
-        : null;
-  }
+  if (!(model in ArtifactOwnerModel)) return null;
+  const keys = polymorphicArmKeys('Artifact', 'ownerModel', model, row);
+  const values = Object.values(keys);
+  if (values.length === 0 || values.some((value) => typeof value !== 'string')) return null;
+  return { ownerModel: model, ...(keys as Partial<OwnedArtifact>) };
 };
 
 export const contextArtifactOwner = (c: Context<AppEnv>): OwnerRef => {
@@ -106,12 +81,11 @@ export const withArtifactOwnersLock = <T>(
   return acquire(0);
 };
 
-export const lockArtifactsInTxn = async (ids: string[]): Promise<Map<string, Artifact>> => {
-  const sorted = [...new Set(ids)].sort();
+const lockArtifactsInTxn = async (ids: string[]): Promise<Map<string, Artifact>> => {
   const locked = new Map<string, Artifact>();
-  for (const id of sorted) {
+  for (const id of [...new Set(ids)].sort()) {
     const [row] = await db.findForUpdate<Artifact>('Artifact', { id });
-    if (!row || row.deletedAt) throw makeError({ status: 404, message: 'Artifact not found' });
+    if (!row) throw makeError({ status: 404, message: 'Artifact not found' });
     locked.set(id, row);
   }
   return locked;
@@ -120,9 +94,8 @@ export const lockArtifactsInTxn = async (ids: string[]): Promise<Map<string, Art
 export const withLockedArtifacts = <T>(
   artifacts: Artifact[],
   fn: (locked: Map<string, Artifact>) => Promise<T>,
-  extraOwners: OwnedArtifact[] = [],
 ): Promise<T> =>
-  withArtifactOwnersLock([...artifacts, ...extraOwners], () =>
+  withArtifactOwnersLock(artifacts, () =>
     db.txn(async () => {
       const locked = await lockArtifactsInTxn(artifacts.map((artifact) => artifact.id));
       for (const prelocked of artifacts) {
@@ -143,35 +116,24 @@ const emptyOwnerKeys = emptySideKeyColumns(polymorphicAxis('Artifact', 'ownerMod
 >;
 
 export const ownerColumns = (artifact: OwnerRef): OwnedArtifact => {
-  const allowed = new Set(polymorphicKeyColumns('Artifact', 'ownerModel', artifact.ownerModel));
-  return {
-    ...emptyOwnerKeys,
-    ownerModel: artifact.ownerModel,
-    ...(allowed.has('userId') && artifact.userId != null ? { userId: artifact.userId } : {}),
-    ...(allowed.has('organizationId') && artifact.organizationId != null
-      ? { organizationId: artifact.organizationId }
-      : {}),
-    ...(allowed.has('spaceId') && artifact.spaceId != null ? { spaceId: artifact.spaceId } : {}),
-  };
+  const picked: Partial<OwnedArtifact> = {};
+  for (const column of polymorphicKeyColumns('Artifact', 'ownerModel', artifact.ownerModel)) {
+    const key = column as keyof Pick<OwnedArtifact, 'userId' | 'organizationId' | 'spaceId'>;
+    if (artifact[key] != null) picked[key] = artifact[key];
+  }
+  return { ...emptyOwnerKeys, ownerModel: artifact.ownerModel, ...picked };
 };
 
-export const ownerRootCacheKey = (owner: Partial<OwnedArtifact>): string | null => {
-  if (!owner.ownerModel) return null;
-  const columns = polymorphicKeyColumns('Artifact', 'ownerModel', owner.ownerModel);
-  const values: string[] = [];
-  for (const column of columns) {
-    const value = owner[column as keyof OwnedArtifact];
-    if (typeof value !== 'string' || value.length === 0) return null;
-    values.push(value);
-  }
-  return cacheKey('artifact', { root: `${owner.ownerModel}:${values.join(':')}` });
+export const ownerRootCacheKey = (owner: OwnedArtifact): string => {
+  const { ownerModel, ownerId } = artifactOwner(owner);
+  return cacheKey('artifact', { root: `${ownerModel}:${ownerId}` });
 };
 
 export const fetchOwnerRootArtifactOrThrow = async (owner: OwnerRef): Promise<Artifact> => {
   const columns = ownerColumns(owner);
-  const key = ownerRootCacheKey(columns);
-  const fetchRoot = () => db.artifact.findFirst({ where: { ...columns, kind: ArtifactKind.root } });
-  const root = key ? await fetchThroughCache(key, fetchRoot) : await fetchRoot();
+  const root = await fetchThroughCache(ownerRootCacheKey(columns), () =>
+    db.artifact.findFirst({ where: { ...columns, kind: ArtifactKind.root } }),
+  );
   if (!root) throw makeError({ status: 404, message: 'Owner root container not found' });
   return root;
 };

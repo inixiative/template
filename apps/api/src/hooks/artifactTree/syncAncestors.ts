@@ -12,7 +12,7 @@ import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 
 export type EffectiveAccess = 'private' | 'tenant' | 'public';
 
-export type ResolvedNodeState = {
+type ResolvedNodeState = {
   ancestors: Map<string, AncestorEdge>;
   effectiveAccess: EffectiveAccess;
 };

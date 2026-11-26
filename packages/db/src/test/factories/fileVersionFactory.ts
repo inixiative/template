@@ -23,4 +23,3 @@ const fileVersionFactory = registerFactory('FileVersion', {
 
 export const buildFileVersion = fileVersionFactory.build;
 export const createFileVersion = fileVersionFactory.create;
-export const upsertFileVersion = fileVersionFactory.upsert;

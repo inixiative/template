@@ -14,13 +14,12 @@ export const validateArtifactCreateAtOwner = async (
   permix: Permix,
   kind: ArtifactKind,
   owner: OwnerRef,
-  action: 'create' | 'manage' = 'create',
 ): Promise<void> => {
   const allowed = await holdsOnRecord(
     permix,
     'artifact',
     { id: '', kind, effectiveAccess: 'private', ...ownerColumns(owner) },
-    action,
+    'create',
   );
   if (!allowed) throw makeError({ status: 403, message: 'Forbidden' });
 };

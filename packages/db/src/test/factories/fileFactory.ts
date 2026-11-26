@@ -15,4 +15,3 @@ const fileFactory = registerFactory('File', {
 
 export const buildFile = fileFactory.build;
 export const createFile = fileFactory.create;
-export const upsertFile = fileFactory.upsert;

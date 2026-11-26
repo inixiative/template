@@ -21,17 +21,9 @@ import { validateArtifactCreateAtOwner } from '#/modules/artifact/validations/va
 import { validateArtifactPermission } from '#/modules/artifact/validations/validateArtifactPermission';
 import { validateNotRootArtifact } from '#/modules/artifact/validations/validateNotRootArtifact';
 
-export type CopyArtifactInput =
-  | {
-      source: Artifact;
-      targetContainerArtifactId: string;
-      name?: string;
-    }
-  | {
-      source: Artifact;
-      owner: OwnerRef;
-      name?: string;
-    };
+type CopyArtifactInput =
+  | { source: Artifact; targetContainerArtifactId: string; name?: string }
+  | { source: Artifact; owner: OwnerRef; name?: string };
 
 export const copyArtifactInto = async (
   source: Artifact,
@@ -49,16 +41,16 @@ export const copyArtifactInto = async (
     });
     if (file) {
       const copied = await db.file.create({ data: { artifactId: copy.id, sourceFileId: file.id } });
-      for (const version of file.fileVersions) {
-        await db.fileVersion.create({
-          data: {
+      if (file.fileVersions.length > 0) {
+        await db.fileVersion.createManyAndReturn({
+          data: file.fileVersions.map((v) => ({
             fileId: copied.id,
-            version: version.version,
-            key: version.key,
-            contentType: version.contentType,
-            size: version.size,
-            status: 'pending',
-          },
+            version: v.version,
+            key: v.key,
+            contentType: v.contentType,
+            size: v.size,
+            status: 'pending' as const,
+          })),
         });
       }
     }
@@ -70,15 +62,17 @@ export const copyArtifact = async (permix: Permix, input: CopyArtifactInput): Pr
   const { source, name } = input;
   validateNotRootArtifact(source, 'Root container cannot be copied');
   await validateArtifactPermission(permix, source, 'read');
+
   let targetContainer: Artifact;
   if ('owner' in input) {
     await validateArtifactCreateAtOwner(permix, source.kind, input.owner);
     targetContainer = await fetchOwnerRootArtifactOrThrow(input.owner);
   } else {
     targetContainer = await fetchArtifactOrThrow(input.targetContainerArtifactId);
+    await validateArtifactCreateAtOwner(permix, source.kind, targetContainer);
   }
   await validateArtifactPermission(permix, targetContainer, 'operate');
-  await validateArtifactCreateAtOwner(permix, source.kind, targetContainer);
+
   return withLockedArtifacts([source, targetContainer], async (locked) => {
     const lockedSource = locked.get(source.id)!;
     const lockedTarget = locked.get(targetContainer.id)!;

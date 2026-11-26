@@ -62,7 +62,7 @@ const validateTransferableArtifact = (
   artifact: Artifact | null | undefined,
   expectedOwner: OwnedArtifact,
 ): Artifact => {
-  if (!artifact || artifact.deletedAt || !sameArtifactOwner(artifact, expectedOwner)) {
+  if (!artifact || !sameArtifactOwner(artifact, expectedOwner)) {
     throw makeError({ status: 404, message: 'Artifact not found' });
   }
   if (isContainerKind(artifact.kind)) {

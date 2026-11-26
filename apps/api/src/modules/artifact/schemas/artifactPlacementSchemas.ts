@@ -12,11 +12,12 @@ import {
   ArtifactScalarInputSchema,
   ArtifactScalarSchema,
   polymorphicAxis,
+  sideKeyColumns,
 } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { polymorphicBodyRefinement } from '#/lib/routeTemplates/polymorphicBodyRefinement';
 
-const ownerTargetFields = ArtifactScalarInputSchema.pick({
+export const ownerTargetFields = ArtifactScalarInputSchema.pick({
   ownerModel: true,
   userId: true,
   organizationId: true,
@@ -24,9 +25,7 @@ const ownerTargetFields = ArtifactScalarInputSchema.pick({
 }).partial().shape;
 
 const ownerPlacementRefinement = polymorphicBodyRefinement('Artifact', 'ownerModel');
-const OWNER_FK_KEYS = [
-  ...new Set(Object.values(polymorphicAxis('Artifact', 'ownerModel').fkMap).flat()),
-] as ('userId' | 'organizationId' | 'spaceId')[];
+const OWNER_FK_KEYS = sideKeyColumns(polymorphicAxis('Artifact', 'ownerModel'));
 
 export const makeContainerOrOwnerRefinement =
   (containerField: 'containerArtifactId' | 'targetContainerArtifactId', allowEmpty = false) =>
@@ -40,38 +39,25 @@ export const makeContainerOrOwnerRefinement =
       });
       return;
     }
-    if (!hasContainer && !hasOwner) {
-      if (!allowEmpty) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `Provide either ${containerField} or ownerModel (not both)`,
-        });
-        return;
-      }
-      for (const column of OWNER_FK_KEYS) {
-        if (body[column] !== undefined && body[column] !== null) {
-          ctx.addIssue({
-            code: 'custom',
-            path: [column],
-            message: `${column} requires ownerModel`,
-          });
-        }
-      }
+    if (hasOwner) {
+      ownerPlacementRefinement(body, ctx);
       return;
     }
-    if (hasContainer) {
-      for (const column of OWNER_FK_KEYS) {
-        if (body[column] !== undefined && body[column] !== null) {
-          ctx.addIssue({
-            code: 'custom',
-            path: [column],
-            message: `${column} cannot be combined with ${containerField}`,
-          });
-        }
-      }
+    if (!hasContainer && !allowEmpty) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Provide either ${containerField} or ownerModel (not both)`,
+      });
       return;
     }
-    ownerPlacementRefinement(body, ctx);
+    const reason = hasContainer
+      ? `cannot be combined with ${containerField}`
+      : 'requires ownerModel';
+    for (const column of OWNER_FK_KEYS) {
+      if (body[column] !== undefined && body[column] !== null) {
+        ctx.addIssue({ code: 'custom', path: [column], message: `${column} ${reason}` });
+      }
+    }
   };
 
 export const artifactPlacementCreateBodySchema = ArtifactPlacementScalarInputSchema.pick({

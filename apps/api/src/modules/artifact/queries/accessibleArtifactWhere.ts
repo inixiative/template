@@ -21,20 +21,7 @@ import {
 } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
-type CallerPrincipalIds = {
-  readableUserIds: string[];
-  manageableUserIds: string[];
-  readableOrganizationIds: string[];
-  manageableOrganizationIds: string[];
-  ownedOrganizationIds: string[];
-  readableSpaceIds: string[];
-  manageableSpaceIds: string[];
-  ownedSpaceIds: string[];
-  operableOrganizationUserIds: string[];
-  operableSpaceUserIds: string[];
-};
-
-const callerPrincipalIds = (permix: Permix): CallerPrincipalIds => ({
+const callerPrincipalIds = (permix: Permix) => ({
   readableUserIds: permixIdsWithAction(permix, 'db:User', 'read'),
   manageableUserIds: permixIdsWithAction(permix, 'db:User', 'manage'),
   readableOrganizationIds: permixIdsWithAction(permix, 'db:Organization', 'read'),
@@ -47,66 +34,76 @@ const callerPrincipalIds = (permix: Permix): CallerPrincipalIds => ({
   operableSpaceUserIds: permixIdsWithAction(permix, 'db:SpaceUser', 'operate'),
 });
 
+type CallerPrincipalIds = ReturnType<typeof callerPrincipalIds>;
+
+const nonEmptyClauses = <T>(entries: [string[], T][]): T[] =>
+  entries.filter(([ids]) => ids.length > 0).map(([, clause]) => clause);
+
 const principalClauses = (
   prefix: 'grantee' | 'customer',
   ids: CallerPrincipalIds,
-): Record<string, unknown>[] => {
-  const clauses: Record<string, unknown>[] = [];
-  if (ids.readableUserIds.length > 0) {
-    clauses.push({ [`${prefix}Model`]: 'User', [`${prefix}UserId`]: { in: ids.readableUserIds } });
-  }
-  if (ids.readableOrganizationIds.length > 0) {
-    clauses.push({
-      [`${prefix}Model`]: 'Organization',
-      [`${prefix}OrganizationId`]: { in: ids.readableOrganizationIds },
-    });
-  }
-  if (ids.readableSpaceIds.length > 0) {
-    clauses.push({
-      [`${prefix}Model`]: 'Space',
-      [`${prefix}SpaceId`]: { in: ids.readableSpaceIds },
-    });
-  }
-  if (ids.ownedOrganizationIds.length > 0) {
-    clauses.push({
-      [`${prefix}Model`]: 'Space',
-      [`${prefix}Space`]: { organizationId: { in: ids.ownedOrganizationIds } },
-    });
-  }
-  return clauses;
-};
+): Record<string, unknown>[] =>
+  nonEmptyClauses<Record<string, unknown>>([
+    [
+      ids.readableUserIds,
+      { [`${prefix}Model`]: 'User', [`${prefix}UserId`]: { in: ids.readableUserIds } },
+    ],
+    [
+      ids.readableOrganizationIds,
+      {
+        [`${prefix}Model`]: 'Organization',
+        [`${prefix}OrganizationId`]: { in: ids.readableOrganizationIds },
+      },
+    ],
+    [
+      ids.readableSpaceIds,
+      { [`${prefix}Model`]: 'Space', [`${prefix}SpaceId`]: { in: ids.readableSpaceIds } },
+    ],
+    [
+      ids.ownedOrganizationIds,
+      {
+        [`${prefix}Model`]: 'Space',
+        [`${prefix}Space`]: { organizationId: { in: ids.ownedOrganizationIds } },
+      },
+    ],
+  ]);
 
 const callerGranteeClauses = (ids: CallerPrincipalIds): Prisma.ArtifactPermissionWhereInput[] => {
-  const clauses = principalClauses('grantee', ids) as Prisma.ArtifactPermissionWhereInput[];
-  if (ids.operableOrganizationUserIds.length > 0) {
-    clauses.push({
-      granteeModel: 'OrganizationUser',
-      granteeOrganizationUser: { id: { in: ids.operableOrganizationUserIds } },
-    });
-  }
-  if (ids.operableSpaceUserIds.length > 0) {
-    clauses.push({
-      granteeModel: 'SpaceUser',
-      granteeSpaceUser: { id: { in: ids.operableSpaceUserIds } },
-    });
-  }
-  if (ids.manageableUserIds.length > 0) {
-    clauses.push({
-      granteeModel: { in: ['OrganizationUser', 'SpaceUser'] },
-      granteeUserId: { in: ids.manageableUserIds },
-    });
-  }
   const customerClauses = principalClauses(
     'customer',
     ids,
   ) as Prisma.CustomerRelationshipWhereInput[];
-  if (customerClauses.length > 0) {
-    clauses.push({
-      granteeModel: 'CustomerRelationship',
-      granteeCustomerRelationship: { deletedAt: null, OR: customerClauses },
-    });
-  }
-  return clauses;
+  return [
+    ...(principalClauses('grantee', ids) as Prisma.ArtifactPermissionWhereInput[]),
+    ...nonEmptyClauses<Prisma.ArtifactPermissionWhereInput>([
+      [
+        ids.operableOrganizationUserIds,
+        {
+          granteeModel: 'OrganizationUser',
+          granteeOrganizationUser: { id: { in: ids.operableOrganizationUserIds } },
+        },
+      ],
+      [
+        ids.operableSpaceUserIds,
+        { granteeModel: 'SpaceUser', granteeSpaceUser: { id: { in: ids.operableSpaceUserIds } } },
+      ],
+      [
+        ids.manageableUserIds,
+        {
+          granteeModel: { in: ['OrganizationUser', 'SpaceUser'] },
+          granteeUserId: { in: ids.manageableUserIds },
+        },
+      ],
+    ]),
+    ...(customerClauses.length > 0
+      ? [
+          {
+            granteeModel: 'CustomerRelationship' as const,
+            granteeCustomerRelationship: { OR: customerClauses },
+          },
+        ]
+      : []),
+  ];
 };
 
 export const effectiveGrantWhere = (
@@ -121,7 +118,6 @@ export const effectiveGrantWhere = (
     artifactEffectivePermissions: {
       some: {
         artifactPermission: {
-          deletedAt: null,
           ...(roles ? { role: { in: roles } } : {}),
           AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }, { OR: granteeClauses }],
         },
@@ -140,25 +136,12 @@ export const probeOwnerArtifactAccess = async (
   permix: Permix,
   ownerFields: OwnedArtifact,
 ): Promise<OwnerArtifactAccessProbe> => {
+  const probe = (effectiveAccess: 'private' | 'public' | 'tenant') =>
+    holdsOnRecord(permix, 'artifact', { id: '', effectiveAccess, ...ownerFields }, 'read');
   const [canReadPrivate, canReadPublic, canReadTenant] = await Promise.all([
-    holdsOnRecord(
-      permix,
-      'artifact',
-      { id: '', effectiveAccess: 'private', ...ownerFields },
-      'read',
-    ),
-    holdsOnRecord(
-      permix,
-      'artifact',
-      { id: '', effectiveAccess: 'public', ...ownerFields },
-      'read',
-    ),
-    holdsOnRecord(
-      permix,
-      'artifact',
-      { id: '', effectiveAccess: 'tenant', ...ownerFields },
-      'read',
-    ),
+    probe('private'),
+    probe('public'),
+    probe('tenant'),
   ]);
   return { canReadPrivate, canReadPublic, canReadTenant };
 };
@@ -216,66 +199,62 @@ export const accessibleAnyArtifactWhere = async (
   if (!canReadPublic && artifactEntitlements.length === 0) return { id: { in: [] } };
 
   const ids = callerPrincipalIds(permix);
-  const orClauses: Prisma.ArtifactWhereInput[] = [];
-  if (canReadPublic) orClauses.push({ effectiveAccess: 'public' });
-  if (directArtifactIds.length > 0) orClauses.push({ id: { in: directArtifactIds } });
-
   const grantClause = effectiveGrantWhere(permix, undefined, ids);
-  if (grantClause) orClauses.push(grantClause);
-
-  if (ids.readableUserIds.length > 0) {
-    orClauses.push({ ownerModel: 'User', userId: { in: ids.readableUserIds } });
-  }
-  if (ids.manageableOrganizationIds.length > 0) {
-    orClauses.push({
-      ownerModel: 'Organization',
-      organizationId: { in: ids.manageableOrganizationIds },
-    });
-  }
-  if (ids.readableOrganizationIds.length > 0) {
-    orClauses.push({
-      ownerModel: { in: ['Organization', 'OrganizationUser'] },
-      organizationId: { in: ids.readableOrganizationIds },
-      effectiveAccess: 'tenant',
-    });
-  }
-  if (ids.ownedOrganizationIds.length > 0) {
-    orClauses.push({
-      ownerModel: { in: ['Space', 'OrganizationUser', 'SpaceUser'] },
-      organizationId: { in: ids.ownedOrganizationIds },
-    });
-  }
-  if (ids.manageableSpaceIds.length > 0) {
-    orClauses.push({ ownerModel: 'Space', spaceId: { in: ids.manageableSpaceIds } });
-  }
-  if (ids.readableSpaceIds.length > 0) {
-    orClauses.push({
-      ownerModel: { in: ['Space', 'SpaceUser'] },
-      spaceId: { in: ids.readableSpaceIds },
-      effectiveAccess: 'tenant',
-    });
-  }
-  if (ids.ownedSpaceIds.length > 0) {
-    orClauses.push({ ownerModel: 'SpaceUser', spaceId: { in: ids.ownedSpaceIds } });
-  }
-  if (ids.operableOrganizationUserIds.length > 0) {
-    orClauses.push({
-      ownerModel: 'OrganizationUser',
-      organizationUser: { id: { in: ids.operableOrganizationUserIds } },
-    });
-  }
-  if (ids.manageableUserIds.length > 0) {
-    orClauses.push({
-      ownerModel: { in: ['OrganizationUser', 'SpaceUser'] },
-      userId: { in: ids.manageableUserIds },
-    });
-  }
-  if (ids.operableSpaceUserIds.length > 0) {
-    orClauses.push({
-      ownerModel: 'SpaceUser',
-      spaceUser: { id: { in: ids.operableSpaceUserIds } },
-    });
-  }
+  const orClauses: Prisma.ArtifactWhereInput[] = [
+    ...(canReadPublic ? [{ effectiveAccess: 'public' as const }] : []),
+    ...(grantClause ? [grantClause] : []),
+    ...nonEmptyClauses<Prisma.ArtifactWhereInput>([
+      [directArtifactIds, { id: { in: directArtifactIds } }],
+      [ids.readableUserIds, { ownerModel: 'User', userId: { in: ids.readableUserIds } }],
+      [
+        ids.manageableOrganizationIds,
+        { ownerModel: 'Organization', organizationId: { in: ids.manageableOrganizationIds } },
+      ],
+      [
+        ids.readableOrganizationIds,
+        {
+          ownerModel: { in: ['Organization', 'OrganizationUser'] },
+          organizationId: { in: ids.readableOrganizationIds },
+          effectiveAccess: 'tenant',
+        },
+      ],
+      [
+        ids.ownedOrganizationIds,
+        {
+          ownerModel: { in: ['Space', 'OrganizationUser', 'SpaceUser'] },
+          organizationId: { in: ids.ownedOrganizationIds },
+        },
+      ],
+      [ids.manageableSpaceIds, { ownerModel: 'Space', spaceId: { in: ids.manageableSpaceIds } }],
+      [
+        ids.readableSpaceIds,
+        {
+          ownerModel: { in: ['Space', 'SpaceUser'] },
+          spaceId: { in: ids.readableSpaceIds },
+          effectiveAccess: 'tenant',
+        },
+      ],
+      [ids.ownedSpaceIds, { ownerModel: 'SpaceUser', spaceId: { in: ids.ownedSpaceIds } }],
+      [
+        ids.operableOrganizationUserIds,
+        {
+          ownerModel: 'OrganizationUser',
+          organizationUser: { id: { in: ids.operableOrganizationUserIds } },
+        },
+      ],
+      [
+        ids.manageableUserIds,
+        {
+          ownerModel: { in: ['OrganizationUser', 'SpaceUser'] },
+          userId: { in: ids.manageableUserIds },
+        },
+      ],
+      [
+        ids.operableSpaceUserIds,
+        { ownerModel: 'SpaceUser', spaceUser: { id: { in: ids.operableSpaceUserIds } } },
+      ],
+    ]),
+  ];
 
   return orClauses.length > 0 ? { OR: orClauses } : { id: { in: [] } };
 };

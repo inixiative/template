@@ -11,7 +11,7 @@ import {
   artifactPermissionResourcePermission,
   artifactPlacementResourcePermission,
   artifactResourcePermission,
-} from '@template/permissions/artifacts/artifactResourcePermission';
+} from '@template/permissions/rebac/artifactResourcePermission';
 import { inquiryResourcePermission } from '@template/permissions/rebac/inquiryResourcePermission';
 import {
   actionsForRecordOwnedByAnyOwnerModel,

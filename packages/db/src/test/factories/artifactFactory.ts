@@ -17,4 +17,3 @@ const artifactFactory = registerFactory('Artifact', {
 
 export const buildArtifact = artifactFactory.build;
 export const createArtifact = artifactFactory.create;
-export const upsertArtifact = artifactFactory.upsert;

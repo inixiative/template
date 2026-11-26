@@ -12,18 +12,18 @@ import { makeError } from '#/lib/errors';
 import {
   fetchOwnerRootArtifactOrThrow,
   sameArtifactOwner,
-  withLockedArtifacts,
 } from '#/modules/artifact/services/artifactOwner';
 import {
   fetchArtifactOrThrow,
   validatePlacementTarget,
+  withLockedPlacement,
 } from '#/modules/artifact/services/artifactPlacementUtils';
 import {
   validateEdgeAuthority,
   validatePlacementDeletable,
 } from '#/modules/artifact/validations/validateEdgeAuthority';
 
-export type MoveArtifactPlacementInput = {
+type MoveArtifactPlacementInput = {
   targetContainerArtifactId?: string;
   access?: ArtifactAccess;
 };
@@ -55,27 +55,21 @@ export const moveArtifactPlacement = async (
     });
   }
 
-  return withLockedArtifacts([artifact, sourceContainer, targetContainer], async (locked) => {
-    const current = await db.artifactPlacement.findUnique({ where: { id: placement.id } });
-    if (!current) {
-      throw makeError({ status: 404, message: 'Artifact placement not found' });
-    }
-    if (current.containerArtifactId !== sourceContainer.id) {
-      throw makeError({
-        status: 409,
-        message: 'Artifact placement changed while waiting for lock; please retry',
+  return withLockedPlacement(
+    placement,
+    artifact,
+    sourceContainer,
+    [targetContainer],
+    async ({ current, lockedArtifact, lockedContainer: lockedSource, locked }) => {
+      const lockedTarget = locked.get(targetContainer.id)!;
+      await validateEdgeAuthority(permix, lockedArtifact, lockedSource, 'remove');
+      await validatePlacementDeletable(permix, current);
+      await validateEdgeAuthority(permix, lockedArtifact, lockedTarget, 'create', access);
+      const resolvedAccess = await validatePlacementTarget(lockedArtifact, lockedTarget, access);
+      return db.artifactPlacement.update({
+        where: { id: current.id },
+        data: { containerArtifactId: lockedTarget.id, access: resolvedAccess },
       });
-    }
-    const lockedArtifact = locked.get(current.artifactId)!;
-    const lockedSource = locked.get(sourceContainer.id)!;
-    const lockedTarget = locked.get(targetContainer.id)!;
-    await validateEdgeAuthority(permix, lockedArtifact, lockedSource, 'remove');
-    await validatePlacementDeletable(permix, current);
-    await validateEdgeAuthority(permix, lockedArtifact, lockedTarget, 'create', access);
-    const resolvedAccess = await validatePlacementTarget(lockedArtifact, lockedTarget, access);
-    return db.artifactPlacement.update({
-      where: { id: current.id },
-      data: { containerArtifactId: lockedTarget.id, access: resolvedAccess },
-    });
-  });
+    },
+  );
 };

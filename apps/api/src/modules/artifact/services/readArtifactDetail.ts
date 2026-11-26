@@ -5,17 +5,15 @@
  * @uses infrastructure:prisma, primitive:authz
  */
 import {
-  type AccessorName,
   db,
   type HydratedRecord,
   hydrate,
   isBindableOwnerModel,
   rowPolymorphicAxisPointsAt,
+  toAccessor,
 } from '@template/db';
 import type {
   Artifact,
-  ArtifactEffectivePermission,
-  ArtifactPermission,
   ArtifactPlacement,
   ResourceBinding,
 } from '@template/db/generated/client/client';
@@ -36,10 +34,6 @@ import type { AppEnv } from '#/types/appEnv';
 
 const PLACEMENT_READ_ACTIONS = ['read', 'manage'] as const;
 
-type EffectivePermissionItem = ArtifactEffectivePermission & {
-  artifactPermission?: ArtifactPermission | null;
-};
-
 const visibleBindingToCaller = async (
   permix: Permix,
   binding: ResourceBinding,
@@ -50,22 +44,9 @@ const visibleBindingToCaller = async (
     'resourceModel',
   );
   if (!ref || !isBindableOwnerModel(ref.model)) return false;
-  const accessor = ref.model.toLowerCase() as Extract<
-    AccessorName,
-    'user' | 'organization' | 'space'
-  >;
+  const accessor = toAccessor(ref.model);
   const record = await db.delegate(accessor).findUnique({ where: { id: ref.id } });
   return record ? holdsOnRecord(permix, accessor, record as HydratedRecord, 'read') : false;
-};
-
-const activeEffectivePermissions = (items: EffectivePermissionItem[]) => {
-  const now = new Date();
-  return items.filter(
-    (item): item is ArtifactEffectivePermission & { artifactPermission: ArtifactPermission } =>
-      Boolean(item.artifactPermission) &&
-      !item.artifactPermission!.deletedAt &&
-      (!item.artifactPermission!.expiresAt || item.artifactPermission!.expiresAt > now),
-  );
 };
 
 const hasCustomArtifactRules = (permix: Permix, hydrated: HydratedRecord): boolean =>
@@ -79,15 +60,15 @@ const accessForPlacement = async (
   permix: Permix,
   placement: ArtifactPlacement,
   targetRel: 'artifact' | 'containerArtifact',
-): Promise<{ canRead: boolean; canManageTarget: boolean }> => {
+): Promise<{ canRead: boolean; canManage: boolean }> => {
   const hydratedPlacement = await hydrate('artifactPlacement', placement);
   if (!check(permix, 'artifactPlacement', hydratedPlacement, 'read')) {
-    return { canRead: false, canManageTarget: false };
+    return { canRead: false, canManage: false };
   }
   const hydratedTarget = hydratedPlacement[targetRel] as HydratedRecord | undefined;
   return {
     canRead: true,
-    canManageTarget: hydratedTarget ? check(permix, 'artifact', hydratedTarget, 'manage') : false,
+    canManage: hydratedTarget ? check(permix, 'artifact', hydratedTarget, 'manage') : false,
   };
 };
 
@@ -118,11 +99,10 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
     const { artifact: child, ...placement } = content;
     if (canShortCircuit && sameArtifactOwner(child, scalarArtifact)) {
       if (isAnonymous) {
-        const placementVisible = parentIsRoot
+        const visible = parentIsRoot
           ? placement.access === 'public'
           : placement.access === 'inherit' || placement.access === 'public';
-        if (!placementVisible) return { canRead: false, canManage: false };
-        return { canRead: child.effectiveAccess === 'public', canManage: false };
+        return { canRead: visible && child.effectiveAccess === 'public', canManage: false };
       }
       if (!parentIsRoot && (placement.access === 'inherit' || placement.access === 'public')) {
         if (canManage) return { canRead: true, canManage: true };
@@ -135,8 +115,7 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
         }
       }
     }
-    const { canRead, canManageTarget } = await accessForPlacement(permix, placement, 'artifact');
-    return { canRead, canManage: canManageTarget };
+    return accessForPlacement(permix, placement, 'artifact');
   };
 
   const [parentAccess, childAccess, bindingFlags] = await Promise.all([
@@ -159,7 +138,7 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
           ...placement,
           containerArtifact: {
             ...containerScalar,
-            artifactPermissions: access.canManageTarget ? artifactPermissions : [],
+            artifactPermissions: access.canManage ? artifactPermissions : [],
           },
         },
       ];
@@ -191,6 +170,7 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
     })
     .sort((a, b) => a.artifact.name.localeCompare(b.artifact.name));
 
+  const now = new Date();
   return {
     ...scalarArtifact,
     effectiveRole: parentRole,
@@ -198,7 +178,10 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
     artifactPlacementsAsContainer,
     artifactPermissions: canManage ? rawPermissions : [],
     artifactEffectivePermissions: canManage
-      ? activeEffectivePermissions(rawEffectivePermissions)
+      ? rawEffectivePermissions.filter(
+          ({ artifactPermission }) =>
+            !artifactPermission.expiresAt || artifactPermission.expiresAt > now,
+        )
       : [],
     resourceBindings: rawBindings.filter((_, index) => bindingFlags[index]),
   };

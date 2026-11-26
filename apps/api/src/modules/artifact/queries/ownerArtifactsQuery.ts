@@ -22,7 +22,7 @@ import {
 } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
-export type ArtifactWithPermissions = Artifact & { artifactPermissions: ArtifactPermission[] };
+type ArtifactWithPermissions = Artifact & { artifactPermissions: ArtifactPermission[] };
 
 const includeArtifactList = {
   artifactPermissions: { orderBy: { createdAt: 'asc' as const } },
@@ -39,7 +39,6 @@ export const ownerArtifactsWhere = async (
   probed?: OwnerArtifactAccessProbe,
 ): Promise<Prisma.ArtifactWhereInput> => {
   const ownerWhere: Prisma.ArtifactWhereInput = {
-    deletedAt: null,
     kind: { not: ArtifactKind.root },
     ...ownerColumns(owner),
   };

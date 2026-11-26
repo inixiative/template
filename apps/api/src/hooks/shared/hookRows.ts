@@ -7,7 +7,7 @@ import { DbAction, type HookOptions, type ManyAction, type SingleAction } from '
 import { castArray, isPlainObject, keyBy } from 'lodash-es';
 
 export type HookRow = Record<string, unknown>;
-export type HookEntityRow = HookRow & { id?: string; deletedAt?: Date | null };
+type HookEntityRow = HookRow & { id?: string; deletedAt?: Date | null };
 
 export const ALL_MUTATION_ACTIONS: DbAction[] = [
   DbAction.create,

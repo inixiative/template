@@ -22,19 +22,17 @@ export const clearSpaceRowCaches = async (spaceId: string, organizationId: strin
       ]);
     }
   }
-  const sharedArtifacts = await db.withDeleted(() =>
-    db.artifactEffectivePermission.findMany({
-      where: {
-        artifactPermission: {
-          OR: [
-            { granteeSpaceId: spaceId },
-            { granteeCustomerRelationship: { customerSpaceId: spaceId } },
-          ],
-        },
+  const sharedArtifacts = await db.artifactEffectivePermission.findMany({
+    where: {
+      artifactPermission: {
+        OR: [
+          { granteeSpaceId: spaceId },
+          { granteeCustomerRelationship: { customerSpaceId: spaceId } },
+        ],
       },
-      select: { artifactId: true },
-    }),
-  );
+    },
+    select: { artifactId: true },
+  });
   if (sharedArtifacts.length > 0) {
     await queueCacheClear(
       'Artifact',

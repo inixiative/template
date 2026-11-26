@@ -64,10 +64,10 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 | Account | - | - | - | - | - | - | - | sensitive | - | - | - | - | - |
 | AppEvent | - | - | - | - | - | - | - | - | - | - | - | - | - |
 | Artifact | soft | yes | ownerModel | - | - | - | - | noop, immutable-override | yes | - | yes | - | yes |
-| ArtifactAncestor | hard-on-tombstone | - | - | Artifact (artifactId) | - | - | - | - | - | - | - | - | - |
+| ArtifactAncestor | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | - |
 | ArtifactEffectivePermission | hard-on-tombstone | - | - | Artifact (artifactId) | - | - | - | - | - | - | - | - | - |
 | ArtifactPermission | soft | yes | granteeModel | Artifact (artifactId) | - | - | - | immutable-override | yes | - | - | - | yes |
-| ArtifactPlacement | soft | yes | - | Artifact (containerArtifactId) | - | - | - | - | - | - | - | - | yes |
+| ArtifactPlacement | hard-on-tombstone, regen-on-revive | yes | - | Artifact (containerArtifactId) | - | - | - | immutable-override | - | - | - | - | yes |
 | AuditLog | - | - | subjectModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | AuthProvider | soft | yes | - | - | - | yes | - | sensitive | - | - | - | - | yes |
 | CommunicationComponentVersion | - | - | - | - | - | - | - | - | - | - | - | - | - |

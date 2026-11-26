@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { DbAction, db, type HookOptions, HookTiming, registerDbHook } from '@template/db';
-import { ArtifactKind, type ArtifactOwnerModel } from '@template/db/generated/client/enums';
+import { ArtifactKind, ArtifactOwnerModel } from '@template/db/generated/client/enums';
 import { changedPairs } from '#/hooks/shared/hookRows';
 import {
   artifactOwner,
@@ -14,16 +14,8 @@ import {
   ownerRefForRow,
 } from '#/modules/artifact/services/artifactOwner';
 
-const OWNER_MODELS: readonly ArtifactOwnerModel[] = [
-  'User',
-  'Organization',
-  'Space',
-  'OrganizationUser',
-  'SpaceUser',
-];
-
 export const registerOwnerRootArtifactHook = () => {
-  for (const model of OWNER_MODELS) {
+  for (const model of Object.values(ArtifactOwnerModel)) {
     registerDbHook(
       `ownerRootArtifact:${model}`,
       model,

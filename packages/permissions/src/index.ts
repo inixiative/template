@@ -1,7 +1,5 @@
 export { Role } from '@template/db/generated/client/enums';
 export { actorFromRecordOmittingSensitiveFields } from './actorFromRecordOmittingSensitiveFields';
-export { type ArtifactAction, artifactEffectiveRole } from './artifacts/artifactAccess';
-export { ownerPrivateRead } from './artifacts/artifactResourcePermission';
 // Client
 export {
   type Action,
@@ -32,8 +30,9 @@ export {
   permixIdsWithAction,
   STANDARD_ACTIONS_IMPLYING,
 } from './permix';
+export { ownerPrivateRead } from './rebac/artifactResourcePermission';
 // ReBAC
-export { check as rebacCheck } from './rebac/check';
+export { artifactEffectiveRole, check as rebacCheck } from './rebac/check';
 export { INQUIRY_TYPES, type InquiryParty, type InquiryTypeParties } from './rebac/inquiryTypes';
 export { schemaMap } from './rebac/schema';
 export type { ActionRule } from './rebac/types';

@@ -11,7 +11,6 @@
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
     "./permix": "./src/permix.ts",
-    "./artifacts/*": "./src/artifacts/*",
     "./actorFromRecordOmittingSensitiveFields": "./src/actorFromRecordOmittingSensitiveFields.ts",
     "./entitlementRows": "./src/entitlementRows.ts",
     "./lens/mergeProjections": "./src/lens/mergeProjections.ts",

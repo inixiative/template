@@ -17,28 +17,20 @@ import {
 } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { lensFor } from '@template/db/lens';
-import { type ArtifactKind, plainArtifactKinds } from '@template/shared/artifact';
-import { makeContainerOrOwnerRefinement } from '#/modules/artifact/schemas/artifactPlacementSchemas';
-
-export const ARTIFACT_CREATE_IMMUTABLE_FIELDS = [
-  'ownerModel',
-  'userId',
-  'organizationId',
-  'spaceId',
-] as const;
+import { plainArtifactKinds } from '@template/shared/artifact';
+import {
+  makeContainerOrOwnerRefinement,
+  ownerTargetFields,
+} from '#/modules/artifact/schemas/artifactPlacementSchemas';
 
 export const artifactCreateBodySchema = ArtifactScalarInputSchema.pick({ name: true })
-  .extend({
-    kind: z.enum(plainArtifactKinds as [ArtifactKind, ...ArtifactKind[]]),
-  })
+  .extend({ kind: z.enum(plainArtifactKinds) })
   .extend(
     ArtifactPlacementScalarInputSchema.pick({ containerArtifactId: true, access: true }).partial()
       .shape,
   );
 
-export const artifactUpdateBodySchema = ArtifactScalarInputSchema.pick({
-  name: true,
-}).partial();
+export const artifactUpdateBodySchema = ArtifactScalarInputSchema.pick({ name: true }).partial();
 
 export const artifactReadResponseSchema = ArtifactScalarSchema;
 
@@ -51,9 +43,7 @@ const artifactPlacementAsArtifactSchema = ArtifactPlacementScalarSchema.extend({
 });
 
 const artifactPlacementAsContainerSchema = ArtifactPlacementScalarSchema.extend({
-  artifact: artifactWithPermissionsSchema.extend({
-    exclusive: z.boolean(),
-  }),
+  artifact: artifactWithPermissionsSchema.extend({ exclusive: z.boolean() }),
 });
 
 const artifactEffectivePermissionWithGrantSchema = ArtifactEffectivePermissionScalarSchema.extend({
@@ -71,19 +61,12 @@ export const artifactDetailResponseSchema = ArtifactScalarSchema.extend({
 
 export const artifactListFilterLens: LensNarrowing = {
   parent: lensFor('Artifact'),
-  root: {
-    omits: ['deletedAt'],
-  },
+  root: { omits: ['deletedAt'] },
 };
 
-export const artifactCopyBodySchema = ArtifactScalarInputSchema.pick({
-  ownerModel: true,
-  userId: true,
-  organizationId: true,
-  spaceId: true,
-  name: true,
-})
+export const artifactCopyBodySchema = ArtifactScalarInputSchema.pick({ name: true })
   .partial()
+  .extend(ownerTargetFields)
   .extend({
     targetContainerArtifactId: ArtifactPlacementScalarInputSchema.shape.containerArtifactId
       .min(1)

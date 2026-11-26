@@ -41,4 +41,3 @@ const resourceBindingFactory = registerFactory('ResourceBinding', {
 
 export const buildResourceBinding = resourceBindingFactory.build;
 export const createResourceBinding = resourceBindingFactory.create;
-export const upsertResourceBinding = resourceBindingFactory.upsert;

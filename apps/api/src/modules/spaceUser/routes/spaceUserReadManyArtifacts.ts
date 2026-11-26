@@ -2,7 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:files, feature:tenancy
- * @uses primitive:routeTemplates, primitive:authz
+ * @uses primitive:routeTemplates
  */
 import { readRoute } from '#/lib/routeTemplates';
 import {

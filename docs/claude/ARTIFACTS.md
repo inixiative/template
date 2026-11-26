@@ -20,7 +20,7 @@
 
 ## What an artifact is
 
-An **artifact** is anything that is owned, placed in containers, shared and made public: a file, a folder, a workspace root, and in forks other kinds. There is one table, `Artifact`, with an immutable `kind` (`ArtifactKind` Prisma enum). Whether a kind can hold children is determined from `packages/shared/src/artifact/kinds.ts` (`containerChildren`, `isContainerKind`, `isRootKind`, `canContain`). A kind with content of its own keeps its own tables (`file` → `File`, `FileVersion`).
+An **artifact** is anything that is owned, placed in containers, shared and made public: a file, a folder, a workspace root, and in forks other kinds. There is one table, `Artifact`, with an immutable `kind` (`ArtifactKind` Prisma enum). Whether a kind can hold children is determined from `packages/shared/src/artifact/index.ts` (`isContainerKind`, `isRootKind`, `canContain`). A kind with content of its own keeps its own tables (`file` → `File`, `FileVersion`).
 
 Why one table: a grant, a placement, and an audit entry each have a single kind of target, and the same access rules serve folders, files and anything a fork adds. Follow-up tickets cover file storage/uploads (`tickets/FEAT-029-file-storage-and-versioning.md`), bindings/lazy-copy sweeper (`tickets/FEAT-030-resource-bindings-and-lazy-copy.md`), webhooks (`tickets/FEAT-031-artifact-webhooks.md`), and the browser UI (`tickets/FEAT-032-file-browser-ui.md`).
 
@@ -33,10 +33,10 @@ Why one table: a grant, a placement, and an audit entry each have a single kind 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
 | A thing users own and share: "a file", "a folder", "a document", "something inside a workspace" | **`Artifact`** · model `packages/db/prisma/schema/artifact.prisma` — one row per thing, `kind` from `ArtifactKind` enum (`root`, `file`, `folder`) | § Kinds; `tickets/FEAT-009-file-management.md` | a new folder or document table with its own owner columns and its own permission table |
-| What a kind may contain: "can a folder hold a folder" | **`containerChildren`** · `packages/shared/src/artifact/kinds.ts` — `isContainerKind`, `isRootKind`, `canContain`, `plainArtifactKinds`, `ARTIFACT_MAX_DEPTH`, `ARTIFACT_MAX_CHILDREN` | § Kinds | `if (artifact.kind === 'folder')` checks spread through services |
+| What a kind may contain: "can a folder hold a folder" | **`canContain`** · `packages/shared/src/artifact/index.ts` — `isContainerKind`, `isRootKind`, `canContain`, `plainArtifactKinds`, `containerArtifactKinds`, `ARTIFACT_MAX_DEPTH`, `ARTIFACT_MAX_CHILDREN` | § Kinds | `if (artifact.kind === 'folder')` checks spread through services |
 | Put something in a folder or at an owner's root, change placement visibility, move placement, copy artifact | **`ArtifactPlacement`** · model — written only through **`placeArtifact`**, **`updateArtifactPlacement`**, **`moveArtifactPlacement`**, **`copyArtifact`**, **`createArtifact`**, **`removeArtifactPlacement`** · services `apps/api/src/modules/artifact/services/` | § Placements | a `parentId` or materialized `path` column; `db.artifactPlacement.create` from a controller |
 | Share with a person, an org, a space, a member or a customer; time-limited share; leave a share | **`ArtifactPermission`** · model — materialized onto inheriting descendants via **`ArtifactEffectivePermission`**; grantees read shares via `GET /{owner}/artifactPermissions` and leave via `DELETE /artifactPermission/:id` | § Access | a per-feature share table; a shared-with JSON column |
-| Can this caller read / edit / manage / delete this artifact | **`validatePermission(action)`** · middleware + **`validateArtifactPermission`** / **`holdsOnRecord`** (`db:Artifact` and `db:ArtifactPlacement` in `packages/permissions/src/artifacts/artifactResourcePermission.ts`, backed by materialized `Artifact.effectiveAccess` and `ArtifactEffectivePermission`) | § Access | a custom permission walk outside `schemaMap`; skipping `db:ArtifactPlacement.read` when listing folder contents |
+| Can this caller read / edit / manage / delete this artifact | **`validatePermission(action)`** · middleware + **`validateArtifactPermission`** / **`holdsOnRecord`** (`db:Artifact` and `db:ArtifactPlacement` in `packages/permissions/src/rebac/artifactResourcePermission.ts`, backed by materialized `Artifact.effectiveAccess` and `ArtifactEffectivePermission`) | § Access | a custom permission walk outside `schemaMap`; skipping `db:ArtifactPlacement.read` when listing folder contents |
 | Give an artifact to another user, org or space | **`transferArtifact`** · Inquiry service `apps/api/src/modules/inquiry/services/transferArtifact/` | § Ownership | rewriting `organizationId` on the row; copying the file and deleting the original |
 | Read an artifact with its 1-step neighborhood (placements as artifact/container, permissions, effective permissions, bindings) | **`GET /artifact/:id`** (`artifactRead`, backed by `includeArtifactDetail` and `readArtifactDetail`, keeping Prisma relation names straight through) | § Navigating | joining placements, grants, and bindings by hand without the caller's view |
 | Delete a folder, or delete a folder and its exclusive contents | **`DELETE /artifact/:id`** (`artifactDelete`), `artifactPlacementsAsContainer[].artifact.exclusive` on **`GET /artifact/:id`**, **`/v1/batch`** | § Deleting | a delete that walks a container's members and removes them; a bespoke delete-many endpoint |
@@ -46,14 +46,14 @@ Why one table: a grant, a placement, and an audit entry each have a single kind 
 ## Kinds
 
 ```ts
-// packages/shared/src/artifact/kinds.ts (mirrors enum ArtifactKind in artifact.prisma)
+// packages/shared/src/artifact/index.ts (mirrors enum ArtifactKind in artifact.prisma)
 containerChildren = { folder: ['file', 'folder'] };
 plainArtifactKinds = ['folder'];
 ```
 
 `ArtifactKind.root` is the per-owner root container provisioned eagerly by `ownerRootArtifact` on owner create/upsert/revive, enforced unique per owner via partial unique indexes (`WHERE "kind" = 'root' AND "deletedAt" IS NULL`). A root container can hold any non-root kind, can never be placed inside another container, and cannot be deleted, renamed, moved, copied, or granted direct `ArtifactPermission`s via API (`422`). Owner soft-delete cascades still soft-delete the root container cleanly.
 
-A fork adds kinds below the template marker in both `enum ArtifactKind` (`packages/db/prisma/schema/artifact.prisma`) and `packages/shared/src/artifact/kinds.ts`. `kind` is immutable after creation (`immutableFields`). The plain create routes (`{me,organization,space,organizationUser,spaceUser}CreateArtifact`) only create `plainArtifactKinds` (kinds without a content table).
+A fork adds kinds below the template marker in both `enum ArtifactKind` (`packages/db/prisma/schema/artifact.prisma`) and `packages/shared/src/artifact/index.ts`. `kind` is immutable after creation (`immutableFields`). The plain create routes (`{me,organization,space,organizationUser,spaceUser}CreateArtifact`) only create `plainArtifactKinds` (kinds without a content table).
 
 **No versions on artifacts.** An artifact's history is its audit log (`Artifact`, `ArtifactPlacement` and `ArtifactPermission` are audit-enabled). Only a kind whose content is versioned keeps versions, on its own side table: today that is `file` → `FileVersion`.
 
@@ -83,7 +83,7 @@ A placement is refused when the container's kind does not allow the child's kind
 
 ## Access
 
-Artifact and placement authorization lives in `schemaMap` (`packages/permissions/src/artifacts/artifactResourcePermission.ts`) using `@inixiative/permissions` `down` lists (`artifactEffectivePermissions`) plus `tenantPermissionRules`. Caller-reflected access helpers (`artifactEffectiveRole`) live alongside it in `packages/permissions/src/artifacts/artifactAccess.ts`.
+Artifact and placement authorization lives in `schemaMap` (`packages/permissions/src/rebac/artifactResourcePermission.ts`) using `@inixiative/permissions` `down` lists (`artifactEffectivePermissions`) plus `tenantPermissionRules`. Caller-reflected access (`artifactEffectiveRole`) lives in `packages/permissions/src/rebac/check.ts`.
 
 **Visibility lives on `ArtifactPlacement.access`**, and **`Artifact.effectiveAccess`** (`private` | `tenant` | `public`, in `NOOP_FIELDS` with direct cache invalidation) is materialized by `syncArtifactAncestors` as the most permissive visibility (`public` > `tenant` > `private`) across the artifact's **same-owner** placements:
 
@@ -116,7 +116,7 @@ Not in this cut: per-placement explicit user grants, row-level `permissionRules`
 ## Ownership
 
 Ownership never changes as a side effect. **`transferArtifact`** is an Inquiry from the current owner (a user, organization or space) to the receiver; whoever manages the owner it is leaving may send it.
-- The receiver accepts or declines. On accept, under `withArtifactOwnersLock`, the artifact's owner changes, the artifact is placed in the receiver's `root` container with `access: 'private'`, and all old placements and grants are soft-deleted, so the receiver starts clean. Every step is in the audit log.
+- The receiver accepts or declines. On accept, under `withArtifactOwnersLock`, the artifact's owner changes, the artifact is placed in the receiver's `root` container with `access: 'private'`, all old placements are hard-deleted, and all old grants are soft-deleted, so the receiver starts clean. Every step is in the audit log.
 - If the sender asked to keep tracking it (`keepTracking`), the sender keeps a pointer: a `tracking` `ResourceBinding` on the sender plus a `viewer` grant. If the receiver refuses the pointer (`allowTracking: false`), the sender keeps a copy instead. Copies happen only then.
 - Auto-approve is off for now (the receiver explicitly approves or declines).
 - Only non-container artifacts transfer for now.
@@ -154,10 +154,10 @@ No frontend is built yet (`tickets/FEAT-032-file-browser-ui.md`).
 | Concern | Path |
 |---|---|
 | Schema | `packages/db/prisma/schema/{artifact,artifactAncestor,artifactEffectivePermission,artifactPlacement,artifactPermission,file,fileVersion,resourceBinding}.prisma` |
-| Kind catalog & caps | `packages/shared/src/artifact/kinds.ts` |
-| ReBAC rules & access helpers | `packages/permissions/src/permix.ts`, `packages/permissions/src/artifacts/{artifactResourcePermission,artifactAccess}.ts` |
+| Kind catalog & caps | `packages/shared/src/artifact/index.ts` |
+| ReBAC rules & access helpers | `packages/permissions/src/permix.ts`, `packages/permissions/src/rebac/{artifactResourcePermission,check}.ts` |
 | Validations | `apps/api/src/modules/artifact/validations/{validateArtifactPermission,validateNotRootArtifact,validateContainable,validatePlacementAccess,validateNoContainerCycle,validateEdgeAuthority,validateArtifactCreateAtOwner}.ts` |
-| Materialized tree & root hooks | `apps/api/src/hooks/ownerRootArtifact/hook.ts`, `apps/api/src/hooks/artifactTree/{hook,fetchArtifactTreeAround,syncAncestors,syncEffectivePermissions,syncEffectiveAccess,syncJoinRows,reparentOrphanedArtifacts,syncArtifactAncestors,syncPermissionDescendants}.ts` |
+| Materialized tree & root hooks | `apps/api/src/hooks/ownerRootArtifact/hook.ts`, `apps/api/src/hooks/artifactTree/{hook,fetchArtifactTreeAround,syncAncestors,syncJoinRows,reparentOrphanedArtifacts,syncArtifactAncestors,syncPermissionDescendants}.ts` |
 | Placements & creation | `apps/api/src/modules/artifact/services/{createArtifact,placeArtifact,updateArtifactPlacement,moveArtifactPlacement,copyArtifact,removeArtifactPlacement,artifactPlacementUtils,artifactOwner}.ts` |
 | Navigation & shared | `apps/api/src/modules/artifact/queries/{artifactIncludes,accessibleArtifactWhere,ownerArtifactsQuery}.ts`, `apps/api/src/modules/artifact/services/readArtifactDetail.ts`, `apps/api/src/modules/artifactPermission/queries/sharedWithOwnerWhere.ts`, `apps/api/src/modules/artifactPlacement/queries/ownerArtifactPlacementsQuery.ts` |
 | Ownership | `apps/api/src/modules/inquiry/services/transferArtifact/` |

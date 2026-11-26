@@ -17,14 +17,10 @@ export const cacheKeysByModel: CacheKeysByModel = {
 
   Integration: (r) => [cacheKey('integration', r.id)],
 
-  Artifact: (r) => {
-    const keys = [cacheKey('artifact', r.id)];
-    if (r.kind === 'root') {
-      const rootKey = ownerRootCacheKey(r);
-      if (rootKey) keys.push(rootKey);
-    }
-    return keys;
-  },
+  Artifact: (r) => [
+    cacheKey('artifact', r.id),
+    ...(r.kind === 'root' ? [ownerRootCacheKey(r)] : []),
+  ],
 
   Setting: (r) => [
     cacheKey('setting', r.id),

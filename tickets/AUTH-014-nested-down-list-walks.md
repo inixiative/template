@@ -4,7 +4,7 @@
 
 ## Context
 
-In `FEAT-009`, every `Artifact` already owns its direct `permissions: ArtifactPermission[]`, and `ArtifactAncestor` already flattens container hierarchy into one list (`ancestors: ArtifactAncestor[]`). Ideally, `db:artifact` ReBAC rules would evaluate inherited permissions by walking `ancestors → ancestorArtifact → permissions` directly without materializing a second derived table (`ArtifactEffectivePermission`).
+In `FEAT-009`, every `Artifact` already owns its direct `artifactPermissions: ArtifactPermission[]`, and `ArtifactAncestor` already flattens container hierarchy into one list (`artifactAncestorsAsDescendant: ArtifactAncestor[]`). Ideally, `db:Artifact` ReBAC rules would evaluate inherited permissions by walking `artifactAncestorsAsDescendant → ancestorArtifact → artifactPermissions` directly without materializing a second derived table (`ArtifactEffectivePermission`).
 
 Today `@inixiative/permissions` strictly forbids crossing a second list under a `down` list (`packages/permissions/src/core/evaluate.ts`: `if (walk.under) return algebra.none`) so `down` hydration never performs an unbounded list × list fan-out. Because of that 1-list cap, PR #72 introduced `ArtifactEffectivePermission` to flatten `ancestors × permissions` into a single `down` list on `Artifact`.
 

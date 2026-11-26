@@ -25,7 +25,7 @@ export const validateEdgeAuthority = async (
   const isCustomAccess =
     mode === 'create' && access !== undefined && access !== defaultPlacementAccess(container);
   if (mode === 'create' && isRootKind(container.kind)) {
-    await validateArtifactCreateAtOwner(permix, ArtifactKind.root, container, 'create');
+    await validateArtifactCreateAtOwner(permix, ArtifactKind.root, container);
   }
   const containerAction = mode === 'manage' || isCustomAccess ? 'manage' : 'operate';
   await validateArtifactPermission(permix, container, containerAction);

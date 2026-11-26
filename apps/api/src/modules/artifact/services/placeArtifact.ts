@@ -20,17 +20,9 @@ import { validateArtifactCreateAtOwner } from '#/modules/artifact/validations/va
 import { validateEdgeAuthority } from '#/modules/artifact/validations/validateEdgeAuthority';
 import { validateNotRootArtifact } from '#/modules/artifact/validations/validateNotRootArtifact';
 
-export type PlaceArtifactInput =
-  | {
-      artifact: Artifact;
-      containerArtifactId: string;
-      access?: ArtifactAccess;
-    }
-  | {
-      artifact: Artifact;
-      owner: OwnerRef;
-      access?: ArtifactAccess;
-    };
+type PlaceArtifactInput =
+  | { artifact: Artifact; containerArtifactId: string; access?: ArtifactAccess }
+  | { artifact: Artifact; owner: OwnerRef; access?: ArtifactAccess };
 
 export const placeArtifact = async (
   permix: Permix,
@@ -40,7 +32,7 @@ export const placeArtifact = async (
   validateNotRootArtifact(artifact, 'Root container cannot be placed inside another container');
   let container: Artifact;
   if ('owner' in input) {
-    await validateArtifactCreateAtOwner(permix, ArtifactKind.root, input.owner, 'create');
+    await validateArtifactCreateAtOwner(permix, ArtifactKind.root, input.owner);
     container = await fetchOwnerRootArtifactOrThrow(input.owner);
   } else {
     container = await fetchArtifactOrThrow(input.containerArtifactId);

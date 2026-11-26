@@ -9,6 +9,7 @@ import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/
 import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import { ARTIFACT_MAX_CHILDREN, isContainerKind, isRootKind } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
+import { withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
 import { validateContainable } from '#/modules/artifact/validations/validateContainable';
 import { validateNoContainerCycle } from '#/modules/artifact/validations/validateNoContainerCycle';
 import {
@@ -16,16 +17,40 @@ import {
   validatePlacementAccess,
 } from '#/modules/artifact/validations/validatePlacementAccess';
 
-export type CreateArtifactInput = Omit<Prisma.ArtifactUncheckedCreateInput, 'effectiveAccess'> & {
-  access?: ArtifactAccess;
-  containerArtifactId?: string;
-};
-
 export const fetchArtifactOrThrow = async (artifactId: string): Promise<Artifact> => {
   const artifact = await db.artifact.findUnique({ where: { id: artifactId } });
   if (!artifact) throw makeError({ status: 404, message: 'Artifact not found' });
   return artifact;
 };
+
+export const withLockedPlacement = <T>(
+  placement: ArtifactPlacement,
+  artifact: Artifact,
+  container: Artifact,
+  extraArtifacts: Artifact[],
+  fn: (ctx: {
+    current: ArtifactPlacement;
+    lockedArtifact: Artifact;
+    lockedContainer: Artifact;
+    locked: Map<string, Artifact>;
+  }) => Promise<T>,
+): Promise<T> =>
+  withLockedArtifacts([artifact, container, ...extraArtifacts], async (locked) => {
+    const current = await db.artifactPlacement.findUnique({ where: { id: placement.id } });
+    if (!current) throw makeError({ status: 404, message: 'Artifact placement not found' });
+    if (current.containerArtifactId !== container.id) {
+      throw makeError({
+        status: 409,
+        message: 'Artifact placement changed while waiting for lock; please retry',
+      });
+    }
+    return fn({
+      current,
+      lockedArtifact: locked.get(current.artifactId)!,
+      lockedContainer: locked.get(container.id)!,
+      locked,
+    });
+  });
 
 export const validatePlacementTarget = async (
   artifact: Artifact,

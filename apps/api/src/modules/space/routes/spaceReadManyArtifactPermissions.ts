@@ -2,10 +2,9 @@
  * @atlas
  * @kind route
  * @partOf feature:files
- * @uses primitive:routeTemplates, primitive:authz
+ * @uses primitive:routeTemplates
  */
 import { readRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   artifactPermissionListFilterLens,
   artifactPermissionSharedResponseSchema,
@@ -18,7 +17,6 @@ export const spaceReadManyArtifactPermissionsRoute = readRoute({
   many: true,
   paginate: true,
   filterLens: artifactPermissionListFilterLens,
-  middleware: [validatePermission('read')],
   description:
     'Lists active artifact permissions granted to the space (including via customer relationships), with each shared artifact inline.',
   responseSchema: artifactPermissionSharedResponseSchema,
