@@ -10,7 +10,7 @@ import {
   organizationReadManySpaces,
   organizationReadManySpacesQueryKey,
 } from '@template/sdk';
-import { Page, Skeleton, Table } from '@template/ui/components';
+import { Page, Table } from '@template/ui/components';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
 
@@ -58,21 +58,18 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
       title="Spaces"
       description="Spaces within this organization. Open one to work in its context."
     >
-      {isLoading ? (
-        <Skeleton className="h-40 rounded-xl" />
-      ) : (
-        <Table
-          columns={columns}
-          data={spaces}
-          keyExtractor={(space) => space.id}
-          onRowClick={(space: Space) => tenant.switchToSpaceContext(space.id)}
-          emptyMessage="No spaces in this organization yet"
-          empty={{
-            icon: 'lucide:layout-grid',
-            description: 'Spaces created in this organization will appear here.',
-          }}
-        />
-      )}
+      <Table
+        columns={columns}
+        data={spaces}
+        keyExtractor={(space) => space.id}
+        onRowClick={(space: Space) => tenant.switchToSpaceContext(space.id)}
+        emptyMessage="No spaces in this organization yet"
+        empty={{
+          icon: 'lucide:layout-grid',
+          description: 'Spaces created in this organization will appear here.',
+        }}
+        isPending={isLoading}
+      />
     </Page>
   );
 };

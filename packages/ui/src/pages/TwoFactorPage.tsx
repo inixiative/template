@@ -7,7 +7,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
 import { meTwoFactor, meTwoFactorQueryKey } from '@template/sdk';
-import { Skeleton } from '@template/ui/components';
+import {} from '@template/ui/components';
 import { TwoFactorVerifyForm } from '@template/ui/components/auth/TwoFactorVerifyForm';
 import { Button } from '@template/ui/components/primitives/Button';
 import {
@@ -76,8 +76,6 @@ export const TwoFactorPage = () => {
 
         {isEnroll ? (
           <TwoFactorSecurityCard onEnrolled={() => void returnToOrigin()} />
-        ) : isLoadingTwoFactor || isReturning || !twoFactorData?.data ? (
-          <Skeleton className="h-40 rounded-xl" />
         ) : (
           <Card className="w-full shadow-lg border-border/50">
             <CardHeader>
@@ -86,9 +84,9 @@ export const TwoFactorPage = () => {
                 Confirm your identity with a passkey, authenticator app, or backup code.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent isPending={isLoadingTwoFactor || isReturning || !twoFactorData?.data}>
               <TwoFactorVerifyForm
-                methods={twoFactorData.data.methods}
+                methods={twoFactorData?.data?.methods ?? []}
                 onVerified={(jwt) => {
                   applyUpgradedJwt(jwt, false);
                   void returnToOrigin();

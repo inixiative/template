@@ -10,15 +10,7 @@ import {
   spaceSentManyInquiries,
   spaceSentManyInquiriesQueryKey,
 } from '@template/sdk';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Page,
-  Skeleton,
-} from '@template/ui/components';
+import { Button, Card, CardContent, CardHeader, CardTitle, Page } from '@template/ui/components';
 import { InquirySourceControls, InquiryStatusBadge } from '@template/ui/components/inquiries';
 import { useCanActOnInquiry, useCreateInquiryMutation } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -85,9 +77,7 @@ export const SpaceTransferInquiryPage = () => {
       title="Transfer space"
       description="Request to transfer this space to another organization. The target organization must approve the transfer."
     >
-      {isLoading ? (
-        <Skeleton className="h-40 rounded-xl" />
-      ) : activeInquiry ? (
+      {activeInquiry ? (
         <Card>
           <CardHeader>
             <CardTitle>Transfer in progress</CardTitle>
@@ -111,7 +101,7 @@ export const SpaceTransferInquiryPage = () => {
           <CardHeader>
             <CardTitle>New transfer request</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4" isPending={isLoading}>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="target-org-slug">
                 Target organization slug

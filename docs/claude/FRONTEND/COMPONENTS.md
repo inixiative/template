@@ -142,6 +142,8 @@ type TableProps<T> = {
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   sectionId?: string;
   className?: string;
+  isPending?: boolean;          // header + placeholder rows instead of data or the empty state
+  placeholderRows?: number;     // default 5
 };
 ```
 
@@ -171,11 +173,22 @@ Composed: `Avatar` (frame, `show`), `AvatarImage` (renders nothing when `src` is
 
 ### Skeleton
 
-The one placeholder for content that is still loading. Size it to the content it stands in for (the same height, a row's height in a list), so the page keeps its shape when the data lands. Never hand-roll an `animate-pulse` div.
+**Pages never place skeletons.** A page renders its layout at once and passes each data component its query's `isPending`; the component draws its own loading state in its own shape, so nothing moves when the data lands:
+
+| Component | While `isPending` |
+|-----------|-------------------|
+| `Table` | its real header and `placeholderRows` (default 5) pulsing rows of real row height; never the empty state |
+| `List` | `placeholderRows` (default 3) pulsing rows in the bordered list; never `emptyMessage` |
+| `CardContent` | a few pulsing lines in place of its children; the card's header stays |
+| `ProfileFormCard` | its fields masked, its title visible |
 
 ```typescript
-if (isPending) return <Skeleton className="h-40 rounded-xl" />;
+<Table columns={columns} data={query.data?.data ?? []} keyExtractor={(row) => row.id} isPending={query.isPending} />
+
+<List items={projects} isPending={projectsQuery.isPending} emptyMessage="No projects yet." renderItem={(project) => <li key={project.id}>…</li>} />
 ```
+
+`Skeleton` is what those components are built from. Bare, it is one pulsing box sized by `className`. Wrapping content, `<Skeleton loaded={!isPending}>…</Skeleton>` renders the real content masked (text, inputs, buttons and icons become pulsing bars of their own size, clicks blocked) until it loads; a data component uses that to keep its exact shape. Children are still built while masked, so they must not dereference data that is not there yet. A table with hand-built rows uses `TablePlaceholderRows` for its pending body.
 
 Icons: every `lucide:` and `simple-icons:` name the apps use is bundled by `bun run generate:frontend` (`packages/ui/src/lib/icons/bundledIconCollections.gen.ts`, registered in each app's `main.tsx`), so icons render in the first frame instead of after a fetch to the Iconify API.
 

@@ -18,7 +18,7 @@ import {
   organizationReadAuthProvider,
   organizationReadAuthProviderQueryKey,
 } from '@template/sdk';
-import { Badge, Button, Page, Skeleton, Table } from '@template/ui/components';
+import { Badge, Button, Page, Table } from '@template/ui/components';
 import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -177,22 +177,19 @@ export const OrganizationAuthProvidersPage = () => {
           </Button>
         }
       >
-        {isLoading ? (
-          <Skeleton className="h-40 rounded-xl" />
-        ) : (
-          <Table
-            columns={columns}
-            data={providers}
-            keyExtractor={(item) => item.id}
-            emptyMessage="No custom auth providers configured"
-            empty={{
-              icon: 'lucide:shield-check',
-              description:
-                'Platform email/password authentication is enabled by default. Add SSO or OAuth for your members.',
-              action: { label: 'Add provider', onClick: () => setIsModalOpen(true) },
-            }}
-          />
-        )}
+        <Table
+          columns={columns}
+          data={providers}
+          keyExtractor={(item) => item.id}
+          emptyMessage="No custom auth providers configured"
+          empty={{
+            icon: 'lucide:shield-check',
+            description:
+              'Platform email/password authentication is enabled by default. Add SSO or OAuth for your members.',
+            action: { label: 'Add provider', onClick: () => setIsModalOpen(true) },
+          }}
+          isPending={isLoading}
+        />
       </Page>
 
       <AuthProviderModal

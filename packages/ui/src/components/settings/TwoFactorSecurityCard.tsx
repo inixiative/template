@@ -21,7 +21,7 @@ import {
   meTwoFactorTotpDisable,
   meTwoFactorTotpStart,
 } from '@template/sdk';
-import { Skeleton } from '@template/ui/components';
+import {} from '@template/ui/components';
 import { BackupCodesRevealModal } from '@template/ui/components/auth/BackupCodesRevealModal';
 import type { TotpSetupState } from '@template/ui/components/auth/TotpEnrollForm';
 import { Badge } from '@template/ui/components/primitives/Badge';
@@ -141,8 +141,6 @@ export const TwoFactorSecurityCard = ({ onEnrolled }: { onEnrolled?: () => void 
       await finishEnrollment(res.data.jwt, res.data.backupCodes);
     });
 
-  if (isLoading || !status) return <Skeleton className="h-40 rounded-xl" />;
-
   return (
     <>
       <Card>
@@ -154,96 +152,102 @@ export const TwoFactorSecurityCard = ({ onEnrolled }: { onEnrolled?: () => void 
                 Protect your account with passkeys and an authenticator app.
               </CardDescription>
             </div>
-            <Badge variant={status.enabled ? 'default' : 'secondary'}>
-              {status.enabled ? 'Enabled' : status.required ? 'Required' : 'Off'}
-            </Badge>
+            {status && (
+              <Badge variant={status.enabled ? 'default' : 'secondary'}>
+                {status.enabled ? 'Enabled' : status.required ? 'Required' : 'Off'}
+              </Badge>
+            )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {errorMessage && (
-            <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              <span>{errorMessage}</span>
-              {isTwoFactorReverifyError(actionMutation.error) && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigateToTwoFactorReverify(useAppStore.getState)}
-                >
-                  Verify 2FA
-                </Button>
+        <CardContent className="space-y-4" isPending={isLoading || !status}>
+          {status && (
+            <>
+              {errorMessage && (
+                <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  <span>{errorMessage}</span>
+                  {isTwoFactorReverifyError(actionMutation.error) && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigateToTwoFactorReverify(useAppStore.getState)}
+                    >
+                      Verify 2FA
+                    </Button>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-          {needsPassword && (
-            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-              <Label htmlFor="two-factor-current-password">
-                Current password (required for initial setup)
-              </Label>
-              <Input
-                id="two-factor-current-password"
-                type="password"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                disabled={actionMutation.isPending}
+              {needsPassword && (
+                <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                  <Label htmlFor="two-factor-current-password">
+                    Current password (required for initial setup)
+                  </Label>
+                  <Input
+                    id="two-factor-current-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    disabled={actionMutation.isPending}
+                  />
+                </div>
+              )}
+              <TotpSettingsSection
+                totpEnabled={status.totpEnabled}
+                canDisableTotp={!status.required || status.passkeys.length > 0}
+                totpSetup={totpSetup}
+                isBusy={actionMutation.isPending}
+                onStart={handleStartTotp}
+                onConfirm={handleConfirmTotp}
+                onCancelSetup={() => setTotpSetup(null)}
+                onDisable={() =>
+                  actionMutation.mutate(async () => {
+                    await apiMutation((opts: Parameters<typeof meTwoFactorTotpDisable>[0]) =>
+                      meTwoFactorTotpDisable(opts),
+                    )();
+                    await refreshStatus();
+                  })
+                }
               />
-            </div>
+              <PasskeyListSection
+                passkeys={status.passkeys}
+                canDeleteLastPasskey={!status.required || status.totpEnabled}
+                isBusy={actionMutation.isPending}
+                onAdd={handleAddPasskey}
+                onRename={(passkeyId, name) =>
+                  actionMutation.mutateAsync(async () => {
+                    await apiMutation((opts: Parameters<typeof meTwoFactorPasskeyRename>[0]) =>
+                      meTwoFactorPasskeyRename({ ...opts, body: { passkeyId, name } }),
+                    )();
+                    await refreshStatus();
+                  })
+                }
+                onDelete={(passkeyId) =>
+                  actionMutation.mutateAsync(async () => {
+                    await apiMutation((opts: Parameters<typeof meTwoFactorPasskeyDelete>[0]) =>
+                      meTwoFactorPasskeyDelete({ ...opts, body: { passkeyId } }),
+                    )();
+                    await refreshStatus();
+                  })
+                }
+              />
+              <BackupCodesSection
+                remaining={status.backupCodesRemaining}
+                enabled={status.enabled}
+                isBusy={actionMutation.isPending}
+                onRegenerate={() =>
+                  actionMutation.mutateAsync(async () => {
+                    const res = await apiMutation(
+                      (opts: Parameters<typeof meTwoFactorBackupCodesRegenerate>[0]) =>
+                        meTwoFactorBackupCodesRegenerate({ ...opts, throwOnError: true }),
+                    )();
+                    if (res.data.backupCodes.length) setRevealedCodes(res.data.backupCodes);
+                    await refreshStatus();
+                  })
+                }
+              />
+            </>
           )}
-          <TotpSettingsSection
-            totpEnabled={status.totpEnabled}
-            canDisableTotp={!status.required || status.passkeys.length > 0}
-            totpSetup={totpSetup}
-            isBusy={actionMutation.isPending}
-            onStart={handleStartTotp}
-            onConfirm={handleConfirmTotp}
-            onCancelSetup={() => setTotpSetup(null)}
-            onDisable={() =>
-              actionMutation.mutate(async () => {
-                await apiMutation((opts: Parameters<typeof meTwoFactorTotpDisable>[0]) =>
-                  meTwoFactorTotpDisable(opts),
-                )();
-                await refreshStatus();
-              })
-            }
-          />
-          <PasskeyListSection
-            passkeys={status.passkeys}
-            canDeleteLastPasskey={!status.required || status.totpEnabled}
-            isBusy={actionMutation.isPending}
-            onAdd={handleAddPasskey}
-            onRename={(passkeyId, name) =>
-              actionMutation.mutateAsync(async () => {
-                await apiMutation((opts: Parameters<typeof meTwoFactorPasskeyRename>[0]) =>
-                  meTwoFactorPasskeyRename({ ...opts, body: { passkeyId, name } }),
-                )();
-                await refreshStatus();
-              })
-            }
-            onDelete={(passkeyId) =>
-              actionMutation.mutateAsync(async () => {
-                await apiMutation((opts: Parameters<typeof meTwoFactorPasskeyDelete>[0]) =>
-                  meTwoFactorPasskeyDelete({ ...opts, body: { passkeyId } }),
-                )();
-                await refreshStatus();
-              })
-            }
-          />
-          <BackupCodesSection
-            remaining={status.backupCodesRemaining}
-            enabled={status.enabled}
-            isBusy={actionMutation.isPending}
-            onRegenerate={() =>
-              actionMutation.mutateAsync(async () => {
-                const res = await apiMutation(
-                  (opts: Parameters<typeof meTwoFactorBackupCodesRegenerate>[0]) =>
-                    meTwoFactorBackupCodesRegenerate({ ...opts, throwOnError: true }),
-                )();
-                if (res.data.backupCodes.length) setRevealedCodes(res.data.backupCodes);
-                await refreshStatus();
-              })
-            }
-          />
         </CardContent>
       </Card>
       {revealedCodes && (

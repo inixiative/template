@@ -12,6 +12,7 @@ import {
   CardTitle,
   Input,
   Label,
+  Skeleton,
   SlugInput,
   ThemeSelector,
 } from '@template/ui/components';
@@ -27,6 +28,7 @@ type ProfileFormCardProps = {
   isSaving?: boolean;
   readOnlyMessage?: string;
   showThemeSelector?: boolean;
+  isPending?: boolean;
 };
 
 export const ProfileFormCard = ({
@@ -40,6 +42,7 @@ export const ProfileFormCard = ({
   isSaving = false,
   readOnlyMessage,
   showThemeSelector = false,
+  isPending = false,
 }: ProfileFormCardProps) => {
   return (
     <div className="max-w-2xl space-y-6">
@@ -47,33 +50,35 @@ export const ProfileFormCard = ({
         <CardHeader>
           <CardTitle>Profile Information</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => onNameChange?.(e.target.value)}
-              placeholder="Name"
-              disabled={!canEditName}
-            />
-          </div>
-
-          {showSlug && (
+        <Skeleton loaded={!isPending}>
+          <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="slug">Slug</Label>
-              <SlugInput id="slug" value={slug} onChange={onSlugChange} placeholder="my-slug" />
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => onNameChange?.(e.target.value)}
+                placeholder="Name"
+                disabled={!canEditName}
+              />
             </div>
-          )}
 
-          {onSave && (
-            <Button onClick={onSave} disabled={isSaving}>
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          )}
+            {showSlug && (
+              <div className="space-y-2">
+                <Label htmlFor="slug">Slug</Label>
+                <SlugInput id="slug" value={slug} onChange={onSlugChange} placeholder="my-slug" />
+              </div>
+            )}
 
-          {readOnlyMessage && <p className="text-sm text-muted-foreground">{readOnlyMessage}</p>}
-        </CardContent>
+            {onSave && (
+              <Button onClick={onSave} disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            )}
+
+            {readOnlyMessage && <p className="text-sm text-muted-foreground">{readOnlyMessage}</p>}
+          </CardContent>
+        </Skeleton>
       </Card>
 
       {showThemeSelector && (

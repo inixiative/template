@@ -16,7 +16,6 @@ import {
   CardHeader,
   CardTitle,
   Page,
-  Skeleton,
   Table,
 } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
@@ -142,9 +141,7 @@ const TokenSection = ({
     </Button>
   );
 
-  const table = isLoading ? (
-    <Skeleton className="h-40 rounded-xl" />
-  ) : (
+  const table = (
     <Table
       columns={columns}
       data={tokens}
@@ -155,6 +152,7 @@ const TokenSection = ({
         description: 'Tokens let scripts and integrations call the API on your behalf.',
         action: { label: 'Create token', onClick: () => setIsModalOpen(true) },
       }}
+      isPending={isLoading}
     />
   );
 

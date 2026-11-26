@@ -13,7 +13,7 @@ import type {
   OrganizationReadManyWebhookSubscriptionsResponse,
   SpaceReadManyWebhookSubscriptionsResponse,
 } from '@template/sdk';
-import { Button, Page, Skeleton, Table } from '@template/ui/components';
+import { Button, Page, Table } from '@template/ui/components';
 import { CreateWebhookModal } from '@template/ui/components/settings/CreateWebhookModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { webhookContextQueries } from '@template/ui/lib/webhookContextQueries';
@@ -115,22 +115,19 @@ export const WebhooksPage = () => {
         </Button>
       }
     >
-      {isLoading ? (
-        <Skeleton className="h-40 rounded-xl" />
-      ) : (
-        <Table
-          columns={columns}
-          data={webhooks}
-          keyExtractor={(item) => item.id}
-          emptyMessage="No webhooks configured yet"
-          empty={{
-            icon: 'lucide:webhook',
-            description:
-              'Webhooks send an HTTP request to your URL whenever a subscribed model changes.',
-            action: { label: 'Create webhook', onClick: () => setIsModalOpen(true) },
-          }}
-        />
-      )}
+      <Table
+        columns={columns}
+        data={webhooks}
+        keyExtractor={(item) => item.id}
+        emptyMessage="No webhooks configured yet"
+        empty={{
+          icon: 'lucide:webhook',
+          description:
+            'Webhooks send an HTTP request to your URL whenever a subscribed model changes.',
+          action: { label: 'Create webhook', onClick: () => setIsModalOpen(true) },
+        }}
+        isPending={isLoading}
+      />
       <CreateWebhookModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

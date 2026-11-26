@@ -6,7 +6,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import type { InquiryItem } from '@template/sdk';
-import { Page, Skeleton, Table } from '@template/ui/components';
+import { Page, Table } from '@template/ui/components';
 import {
   InquirySourceControls,
   InquiryStatusBadge,
@@ -169,23 +169,20 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
         </>
       }
     >
-      {activeQuery.isLoading ? (
-        <Skeleton className="h-40 rounded-xl" />
-      ) : (
-        <Table
-          columns={columns}
-          data={inquiries}
-          keyExtractor={(inq) => inq.id}
-          emptyMessage={emptyMessage ?? defaultEmptyMessage}
-          empty={{
-            icon: direction === 'sent' ? 'lucide:send' : 'lucide:inbox',
-            description:
-              direction === 'sent'
-                ? 'Requests you send will be tracked here until they are resolved.'
-                : 'Requests addressed to you will appear here for review.',
-          }}
-        />
-      )}
+      <Table
+        columns={columns}
+        data={inquiries}
+        keyExtractor={(inq) => inq.id}
+        emptyMessage={emptyMessage ?? defaultEmptyMessage}
+        empty={{
+          icon: direction === 'sent' ? 'lucide:send' : 'lucide:inbox',
+          description:
+            direction === 'sent'
+              ? 'Requests you send will be tracked here until they are resolved.'
+              : 'Requests addressed to you will appear here for review.',
+        }}
+        isPending={activeQuery.isLoading}
+      />
     </Page>
   );
 };

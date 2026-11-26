@@ -7,7 +7,7 @@
 import { Icon } from '@iconify/react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
-import { Skeleton } from '@template/ui/components';
+import { List } from '@template/ui/components';
 import {
   Badge,
   Button,
@@ -173,6 +173,41 @@ export const ProjectIntegrationsSection = ({
   const anyAvailable = availableGroups.some((group) => group.integrations.length > 0);
   const anyScopeLoading = availableGroups.some((group) => group.isLoading);
 
+  const renderConnectableIntegration = (
+    integration: (typeof availableGroups)[number]['integrations'][number],
+  ) => {
+    const canConnect = canConnectIntegration(integration);
+    return (
+      <li key={integration.id} className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">{integration.name}</span>
+            {integration.provider ? (
+              <Badge variant="outline" className="text-[11px]">
+                {integration.provider}
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+        {canConnect ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={connectMutation.isPending && connectMutation.variables === integration.id}
+            aria-label={`Connect ${integration.name}`}
+            onClick={() => connectMutation.mutate(integration.id)}
+          >
+            <Icon icon="lucide:link" className="mr-1.5 h-4 w-4" />
+            Connect
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">Read-only</span>
+        )}
+      </li>
+    );
+  };
+
   return (
     <div className="space-y-6" data-testid="project-integrations-section">
       {errorMessage ? (
@@ -190,126 +225,118 @@ export const ProjectIntegrationsSection = ({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {connectedQuery.isLoading ? (
-            <Skeleton className="h-16 rounded-md" />
-          ) : connectedRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No integrations are connected to this project yet.
-            </p>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {connectedRows.map((pi) => {
-                const integration = integrationsById.get(pi.integrationId);
-                const displayName = integration?.name ?? pi.integrationId;
-                const isExpanded = expandedId === pi.id;
-                const canDisconnect = canDisconnectProjectIntegration(pi, integration);
-                const piRecordForPermissions = {
-                  ...pi,
-                  project,
-                  ...(integration ? { integration } : {}),
-                } as unknown as HydratedRecord;
+          <List
+            items={connectedRows}
+            isPending={connectedQuery.isLoading}
+            emptyMessage="No integrations are connected to this project yet."
+            renderItem={(pi) => {
+              const integration = integrationsById.get(pi.integrationId);
+              const displayName = integration?.name ?? pi.integrationId;
+              const isExpanded = expandedId === pi.id;
+              const canDisconnect = canDisconnectProjectIntegration(pi, integration);
+              const piRecordForPermissions = {
+                ...pi,
+                project,
+                ...(integration ? { integration } : {}),
+              } as unknown as HydratedRecord;
 
-                return (
-                  <li
-                    key={pi.id}
-                    className="p-4"
-                    data-testid={`connected-project-integration-${pi.id}`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium">{displayName}</span>
-                          {integration?.provider ? (
-                            <Badge variant="outline" className="text-[11px]">
-                              {integration.provider}
-                            </Badge>
-                          ) : null}
-                          {integration?.ownerModel ? (
-                            <Badge variant="secondary" className="text-[11px]">
-                              {integration.ownerModel}
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </div>
+              return (
+                <li
+                  key={pi.id}
+                  className="p-4"
+                  data-testid={`connected-project-integration-${pi.id}`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          aria-expanded={isExpanded}
-                          aria-label={`Configure ${displayName}`}
-                          onClick={() =>
-                            setExpandedId((current) => (current === pi.id ? null : pi.id))
-                          }
-                        >
-                          <Icon icon="lucide:settings-2" className="mr-1.5 h-4 w-4" />
-                          {isExpanded ? 'Hide details' : 'Settings & resources'}
-                        </Button>
-                        {canDisconnect ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={
-                              disconnectMutation.isPending && disconnectMutation.variables === pi.id
-                            }
-                            aria-label={`Disconnect ${displayName}`}
-                            onClick={() => disconnectMutation.mutate(pi.id)}
-                          >
-                            <Icon
-                              icon="lucide:unlink"
-                              className="mr-1.5 h-4 w-4 text-destructive"
-                            />
-                            Disconnect
-                          </Button>
+                        <span className="truncate text-sm font-medium">{displayName}</span>
+                        {integration?.provider ? (
+                          <Badge variant="outline" className="text-[11px]">
+                            {integration.provider}
+                          </Badge>
+                        ) : null}
+                        {integration?.ownerModel ? (
+                          <Badge variant="secondary" className="text-[11px]">
+                            {integration.ownerModel}
+                          </Badge>
                         ) : null}
                       </div>
                     </div>
-
-                    {isExpanded ? (
-                      <div
-                        className="mt-4 space-y-4 border-t pt-4"
-                        data-testid={`project-integration-details-${pi.id}`}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-expanded={isExpanded}
+                        aria-label={`Configure ${displayName}`}
+                        onClick={() =>
+                          setExpandedId((current) => (current === pi.id ? null : pi.id))
+                        }
                       >
-                        <ResourceSettingsSection
-                          target={{
-                            model: 'ProjectIntegration',
-                            id: pi.id,
-                            record: piRecordForPermissions,
-                          }}
-                          title={`${displayName} settings`}
-                        />
+                        <Icon icon="lucide:settings-2" className="mr-1.5 h-4 w-4" />
+                        {isExpanded ? 'Hide details' : 'Settings & resources'}
+                      </Button>
+                      {canDisconnect ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={
+                            disconnectMutation.isPending && disconnectMutation.variables === pi.id
+                          }
+                          aria-label={`Disconnect ${displayName}`}
+                          onClick={() => disconnectMutation.mutate(pi.id)}
+                        >
+                          <Icon icon="lucide:unlink" className="mr-1.5 h-4 w-4 text-destructive" />
+                          Disconnect
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
 
-                        {renderProjectIntegrationResources ? (
-                          <div data-testid={`project-integration-resources-${pi.id}`}>
-                            {renderProjectIntegrationResources({
-                              project,
-                              projectIntegration: pi,
-                              integration,
-                            })}
-                          </div>
-                        ) : (
-                          <Card data-testid={`project-integration-resources-${pi.id}`}>
-                            <CardHeader>
-                              <CardTitle className="text-base">Resources</CardTitle>
-                              <CardDescription>
-                                Integration resources attached to {project.name}.
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-sm text-muted-foreground">
-                                No resources configured for this integration yet.
-                              </p>
-                            </CardContent>
-                          </Card>
-                        )}
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                  {isExpanded ? (
+                    <div
+                      className="mt-4 space-y-4 border-t pt-4"
+                      data-testid={`project-integration-details-${pi.id}`}
+                    >
+                      <ResourceSettingsSection
+                        target={{
+                          model: 'ProjectIntegration',
+                          id: pi.id,
+                          record: piRecordForPermissions,
+                        }}
+                        title={`${displayName} settings`}
+                      />
+
+                      {renderProjectIntegrationResources ? (
+                        <div data-testid={`project-integration-resources-${pi.id}`}>
+                          {renderProjectIntegrationResources({
+                            project,
+                            projectIntegration: pi,
+                            integration,
+                          })}
+                        </div>
+                      ) : (
+                        <Card data-testid={`project-integration-resources-${pi.id}`}>
+                          <CardHeader>
+                            <CardTitle className="text-base">Resources</CardTitle>
+                            <CardDescription>
+                              Integration resources attached to {project.name}.
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-muted-foreground">
+                              No resources configured for this integration yet.
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  ) : null}
+                </li>
+              );
+            }}
+          />
         </CardContent>
       </Card>
 
@@ -321,13 +348,7 @@ export const ProjectIntegrationsSection = ({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          {anyScopeLoading && !anyAvailable ? (
-            <Skeleton className="h-16 rounded-md" />
-          ) : !anyAvailable ? (
-            <p className="text-sm text-muted-foreground">
-              No additional integrations are available to connect to this project.
-            </p>
-          ) : (
+          {anyAvailable ? (
             availableGroups
               .filter((group) => group.integrations.length > 0)
               .map(({ scope, integrations }) => (
@@ -339,50 +360,20 @@ export const ProjectIntegrationsSection = ({
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {scope.label}
                   </h3>
-                  <ul className="divide-y rounded-md border">
-                    {integrations.map((integration) => {
-                      const canConnect = canConnectIntegration(integration);
-                      return (
-                        <li
-                          key={integration.id}
-                          className="flex items-center justify-between gap-3 px-4 py-3"
-                        >
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="truncate text-sm font-medium">
-                                {integration.name}
-                              </span>
-                              {integration.provider ? (
-                                <Badge variant="outline" className="text-[11px]">
-                                  {integration.provider}
-                                </Badge>
-                              ) : null}
-                            </div>
-                          </div>
-                          {canConnect ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={
-                                connectMutation.isPending &&
-                                connectMutation.variables === integration.id
-                              }
-                              aria-label={`Connect ${integration.name}`}
-                              onClick={() => connectMutation.mutate(integration.id)}
-                            >
-                              <Icon icon="lucide:link" className="mr-1.5 h-4 w-4" />
-                              Connect
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Read-only</span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <List
+                    items={integrations}
+                    emptyMessage=""
+                    renderItem={renderConnectableIntegration}
+                  />
                 </div>
               ))
+          ) : (
+            <List
+              items={[]}
+              isPending={anyScopeLoading}
+              emptyMessage="No additional integrations are available to connect to this project."
+              renderItem={renderConnectableIntegration}
+            />
           )}
         </CardContent>
       </Card>

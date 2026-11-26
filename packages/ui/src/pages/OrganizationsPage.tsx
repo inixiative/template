@@ -17,7 +17,7 @@ import {
   organizationCreate,
   organizationDelete,
 } from '@template/sdk';
-import { Button, Page, Skeleton, Table } from '@template/ui/components';
+import { Button, Page, Table } from '@template/ui/components';
 import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -152,24 +152,21 @@ export const OrganizationsPage = () => {
           </Button>
         }
       >
-        {isLoading ? (
-          <Skeleton className="h-40 rounded-xl" />
-        ) : (
-          <Table
-            columns={columns}
-            data={organizations}
-            keyExtractor={(org) => org.id}
-            onRowClick={(org: Organization) =>
-              navigateKeepingSearchParams(`/dashboard?org=${org.id}`, 'spoof')
-            }
-            emptyMessage="You don't belong to any organizations yet"
-            empty={{
-              icon: 'lucide:building-2',
-              description: 'Create one to share members, spaces and settings with other people.',
-              action: { label: 'Create organization', onClick: () => setIsCreateModalOpen(true) },
-            }}
-          />
-        )}
+        <Table
+          columns={columns}
+          data={organizations}
+          keyExtractor={(org) => org.id}
+          onRowClick={(org: Organization) =>
+            navigateKeepingSearchParams(`/dashboard?org=${org.id}`, 'spoof')
+          }
+          emptyMessage="You don't belong to any organizations yet"
+          empty={{
+            icon: 'lucide:building-2',
+            description: 'Create one to share members, spaces and settings with other people.',
+            action: { label: 'Create organization', onClick: () => setIsCreateModalOpen(true) },
+          }}
+          isPending={isLoading}
+        />
       </Page>
 
       <CreateOrganizationModal

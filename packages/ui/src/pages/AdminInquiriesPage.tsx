@@ -11,7 +11,7 @@ import {
   adminInquiryReadManyQueryKey,
   type InquiryItem,
 } from '@template/sdk';
-import { EmptyState, Page, Skeleton, Table } from '@template/ui/components';
+import { EmptyState, Page, Table, TablePlaceholderRows } from '@template/ui/components';
 import {
   InquirySourceControls,
   InquiryStatusBadge,
@@ -92,10 +92,8 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
       }
       actions={statusDropdown}
     >
-      {isLoading ? (
-        <Skeleton className="h-40 rounded-xl" />
-      ) : view === 'all' ? (
-        <AdminAllInquiryTable inquiries={inquiries} />
+      {view === 'all' ? (
+        <AdminAllInquiryTable inquiries={inquiries} isPending={isLoading} />
       ) : (
         <Table
           columns={[
@@ -135,14 +133,23 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
             icon: 'lucide:inbox',
             description: 'Requests that need platform approval will show up here.',
           }}
+          isPending={isLoading}
         />
       )}
     </Page>
   );
 };
 
-const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
-  if (inquiries.length === 0) {
+const adminAllInquiryHeadings = ['Type', 'Status', 'Actor', 'Sent', 'Expires', ''];
+
+const AdminAllInquiryTable = ({
+  inquiries,
+  isPending,
+}: {
+  inquiries: Inquiry[];
+  isPending: boolean;
+}) => {
+  if (!isPending && inquiries.length === 0) {
     return (
       <EmptyState
         icon="lucide:inbox"
@@ -158,7 +165,7 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
       <table className="w-full">
         <thead className="bg-muted/60 border-b">
           <tr>
-            {['Type', 'Status', 'Actor', 'Sent', 'Expires', ''].map((h) => (
+            {adminAllInquiryHeadings.map((h) => (
               <th
                 key={h}
                 className="text-left px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground"
@@ -168,6 +175,11 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
             ))}
           </tr>
         </thead>
+        {isPending && (
+          <tbody>
+            <TablePlaceholderRows columnCount={adminAllInquiryHeadings.length} rows={5} />
+          </tbody>
+        )}
         {inquiries.map((inq) => {
           const entry = inquiryTypeComponentsFor(inq.type);
           const SourceSummary = entry?.source?.summary;

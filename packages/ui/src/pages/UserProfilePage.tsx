@@ -6,7 +6,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { meRead, meReadQueryKey } from '@template/sdk';
-import { Page, Skeleton } from '@template/ui/components';
+import { Page } from '@template/ui/components';
 import {
   ChangePasswordCard,
   ProfileFormCard,
@@ -28,21 +28,18 @@ export const UserProfilePage = () => {
 
   return (
     <Page title="Profile" description="Manage your user settings and preferences">
-      {isLoading ? (
-        <Skeleton className="h-40 rounded-xl" />
-      ) : (
-        <div className="max-w-2xl space-y-6">
-          <ProfileFormCard
-            name={profile?.name ?? ''}
-            canEditName={false}
-            readOnlyMessage="User profile editing coming soon"
-            showThemeSelector
-          />
-          <ResourceSettingsSection context={personalContext} category="general" />
-          <ChangePasswordCard />
-          <TwoFactorSecurityCard />
-        </div>
-      )}
+      <div className="max-w-2xl space-y-6">
+        <ProfileFormCard
+          isPending={isLoading}
+          name={profile?.name ?? ''}
+          canEditName={false}
+          readOnlyMessage="User profile editing coming soon"
+          showThemeSelector
+        />
+        <ResourceSettingsSection context={personalContext} category="general" />
+        <ChangePasswordCard />
+        <TwoFactorSecurityCard />
+      </div>
     </Page>
   );
 };

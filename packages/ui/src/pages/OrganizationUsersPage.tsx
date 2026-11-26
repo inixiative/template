@@ -18,7 +18,7 @@ import {
   organizationReadManyUsersQueryKey,
   organizationUserDelete,
 } from '@template/sdk';
-import { Button, Page, Skeleton, Table } from '@template/ui/components';
+import { Button, Page, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import {
   createOptimisticListTarget,
@@ -182,24 +182,21 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
           </Button>
         }
       >
-        {isLoading ? (
-          <Skeleton className="h-40 rounded-xl" />
-        ) : (
-          <Table
-            columns={columns}
-            data={users}
-            keyExtractor={(user) => user.id}
-            emptyMessage="No users in this organization yet"
-            empty={{
-              icon: 'lucide:users',
-              description: 'Invite people to collaborate in this organization.',
-              action:
-                inviteRoles.length > 0
-                  ? { label: 'Invite member', onClick: () => setIsInviteModalOpen(true) }
-                  : undefined,
-            }}
-          />
-        )}
+        <Table
+          columns={columns}
+          data={users}
+          keyExtractor={(user) => user.id}
+          emptyMessage="No users in this organization yet"
+          empty={{
+            icon: 'lucide:users',
+            description: 'Invite people to collaborate in this organization.',
+            action:
+              inviteRoles.length > 0
+                ? { label: 'Invite member', onClick: () => setIsInviteModalOpen(true) }
+                : undefined,
+          }}
+          isPending={isLoading}
+        />
       </Page>
 
       <InviteUserModal

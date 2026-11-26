@@ -13,7 +13,7 @@ import type {
   SpaceReadManySegmentMembershipsResponse,
   SpaceReadManySegmentsResponse,
 } from '@template/sdk';
-import { Page, Skeleton, Table } from '@template/ui/components';
+import { Page, Table } from '@template/ui/components';
 import { segmentContextQueries } from '@template/ui/lib/segmentContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
@@ -115,9 +115,7 @@ export const SegmentsPage = ({ view }: { view: 'owned' | 'memberships' }) => {
           : 'Where a provider has placed you as their customer'
       }
     >
-      {isLoading ? (
-        <Skeleton className="h-40 rounded-xl" />
-      ) : view === 'owned' ? (
+      {view === 'owned' ? (
         <Table
           columns={ownedColumns}
           data={owned.data?.data ?? []}
@@ -127,6 +125,7 @@ export const SegmentsPage = ({ view }: { view: 'owned' | 'memberships' }) => {
             icon: 'lucide:filter',
             description: 'Segments you define will be listed here along with their rule status.',
           }}
+          isPending={isLoading}
         />
       ) : (
         <Table
@@ -138,6 +137,7 @@ export const SegmentsPage = ({ view }: { view: 'owned' | 'memberships' }) => {
             icon: 'lucide:users-round',
             description: 'When a provider adds you to one of their segments, it will show up here.',
           }}
+          isPending={isLoading}
         />
       )}
     </Page>

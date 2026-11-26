@@ -12,7 +12,7 @@ import {
   diffSettingDrafts,
   SETTING_DEFINITIONS,
 } from '@template/shared/settings';
-import { Skeleton } from '@template/ui/components';
+import {} from '@template/ui/components';
 import {
   Button,
   Card,
@@ -235,11 +235,7 @@ export const ResourceSettingsSection = ({
     },
   });
 
-  if (isCatalogLoading) {
-    return <Skeleton className="h-24 rounded-xl" />;
-  }
-
-  if (hideWhenEmpty && assembled.items.length === 0) {
+  if (hideWhenEmpty && !isCatalogLoading && assembled.items.length === 0) {
     return null;
   }
 
@@ -254,80 +250,74 @@ export const ResourceSettingsSection = ({
         <CardTitle>{resolvedTitle}</CardTitle>
         {resolvedDescription ? <CardDescription>{resolvedDescription}</CardDescription> : null}
       </CardHeader>
-      <CardContent className="space-y-5">
-        {settingsQuery.isLoading ? (
-          <Skeleton className="h-20 rounded-md" />
-        ) : (
-          <>
-            {assembled.items.map((item) => {
-              const editable = canManageItem(item);
-              const currentValue = item.key in drafts ? drafts[item.key] : item.value;
-              const storedId = item.settingId;
-              return (
-                <SettingField
-                  key={item.key}
-                  item={item}
-                  value={currentValue}
-                  resetVersion={resetVersion}
-                  disabled={!editable}
-                  disabledText={!editable ? readOnlyMessage : undefined}
-                  isResetting={resetMutation.isPending && resetMutation.variables?.key === item.key}
-                  onValidityChange={(isValid) => handleFieldValidityChange(item.key, isValid)}
-                  onChange={(nextValue) => {
-                    setStatusMessage(null);
-                    setErrorMessage(null);
-                    setDrafts((previous) => ({ ...previous, [item.key]: nextValue }));
-                  }}
-                  onReset={
-                    storedId
-                      ? () => resetMutation.mutate({ id: storedId, key: item.key })
-                      : undefined
-                  }
-                />
-              );
-            })}
+      <CardContent className="space-y-5" isPending={isCatalogLoading || settingsQuery.isLoading}>
+        <>
+          {assembled.items.map((item) => {
+            const editable = canManageItem(item);
+            const currentValue = item.key in drafts ? drafts[item.key] : item.value;
+            const storedId = item.settingId;
+            return (
+              <SettingField
+                key={item.key}
+                item={item}
+                value={currentValue}
+                resetVersion={resetVersion}
+                disabled={!editable}
+                disabledText={!editable ? readOnlyMessage : undefined}
+                isResetting={resetMutation.isPending && resetMutation.variables?.key === item.key}
+                onValidityChange={(isValid) => handleFieldValidityChange(item.key, isValid)}
+                onChange={(nextValue) => {
+                  setStatusMessage(null);
+                  setErrorMessage(null);
+                  setDrafts((previous) => ({ ...previous, [item.key]: nextValue }));
+                }}
+                onReset={
+                  storedId ? () => resetMutation.mutate({ id: storedId, key: item.key }) : undefined
+                }
+              />
+            );
+          })}
 
-            {errorMessage ? (
-              <p role="alert" className="text-sm text-destructive">
-                {errorMessage}
-              </p>
-            ) : null}
-            {statusMessage ? (
-              <p role="status" className="text-sm text-muted-foreground">
-                {statusMessage}
-              </p>
-            ) : null}
+          {errorMessage ? (
+            <p role="alert" className="text-sm text-destructive">
+              {errorMessage}
+            </p>
+          ) : null}
+          {statusMessage ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              {statusMessage}
+            </p>
+          ) : null}
 
-            {anyEditable ? (
-              <div className="flex items-center justify-end gap-2 pt-2">
-                {dirtyItems.length > 0 || hasInvalidFields ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={saveMutation.isPending}
-                    onClick={() => {
-                      setDrafts({});
-                      setInvalidKeys({});
-                      setResetVersion((version) => version + 1);
-                      setErrorMessage(null);
-                    }}
-                  >
-                    Discard
-                  </Button>
-                ) : null}
+          {anyEditable ? (
+            <div className="flex items-center justify-end gap-2 pt-2">
+              {dirtyItems.length > 0 || hasInvalidFields ? (
                 <Button
                   type="button"
+                  variant="ghost"
                   size="sm"
-                  disabled={dirtyItems.length === 0 || hasInvalidFields || saveMutation.isPending}
-                  onClick={() => saveMutation.mutate(dirtyItems)}
+                  disabled={saveMutation.isPending}
+                  onClick={() => {
+                    setDrafts({});
+                    setInvalidKeys({});
+                    setResetVersion((version) => version + 1);
+                    setErrorMessage(null);
+                  }}
                 >
-                  {saveMutation.isPending ? 'Saving…' : 'Save settings'}
+                  Discard
                 </Button>
-              </div>
-            ) : null}
-          </>
-        )}
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                disabled={dirtyItems.length === 0 || hasInvalidFields || saveMutation.isPending}
+                onClick={() => saveMutation.mutate(dirtyItems)}
+              >
+                {saveMutation.isPending ? 'Saving…' : 'Save settings'}
+              </Button>
+            </div>
+          ) : null}
+        </>
       </CardContent>
     </Card>
   );
