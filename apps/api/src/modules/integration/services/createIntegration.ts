@@ -5,13 +5,15 @@
  * @uses primitive:authz, infrastructure:prisma, infrastructure:redis
  */
 import { db, type EntitlementInput, type Prisma } from '@template/db';
+import type { Integration } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions';
 import { isIntegrationOnePer } from '@template/shared/integrations/integrationOnePer';
-import { omit, pickBy } from 'lodash-es';
+import { omit, orderBy, pickBy } from 'lodash-es';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
-import { integrationOwnerKey } from '#/modules/integration/services/integrationOwnerKey';
+import { integrationProviderOwnerWhere } from '#/modules/integration/services/integrationProviderOwnerWhere';
 import { validateIntegrationConfiguration } from '#/modules/integration/validations/validateIntegrationConfiguration';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
+import { validateRevivedProjectLinks } from '#/modules/integration/validations/validateRevivedProjectLinks';
 
 type IntegrationCreate = Prisma.IntegrationUncheckedCreateInput & {
   entitlements?: EntitlementInput[];
@@ -25,25 +27,22 @@ export const createIntegration = (
     validateIntegrationConfiguration(row);
     await validateIntegrationRole(writer, row);
 
-    const owner = integrationOwnerKey(row);
-    const onePerOwner = isIntegrationOnePer(row.provider, 'owner');
-    if (onePerOwner)
-      await db.findForUpdate(
-        'Integration',
-        pickBy(owner, (value) => value !== null),
-        {
-          upserting: true,
-        },
-      );
-    const existing = onePerOwner
+    const owner = integrationProviderOwnerWhere(row);
+    const locked = isIntegrationOnePer(row.provider, 'owner')
       ? await db.withDeleted(() =>
-          db.integration.findFirst({
-            where: owner,
-            orderBy: { deletedAt: { sort: 'desc', nulls: 'first' } },
-            select: { id: true, deletedAt: true },
-          }),
+          db.findForUpdate<Pick<Integration, 'id' | 'provider' | 'deletedAt'>>(
+            'Integration',
+            pickBy(owner, (value) => value !== null),
+            { upserting: true },
+          ),
         )
-      : null;
+      : [];
+    const [existing] = orderBy(
+      locked,
+      [(found) => found.deletedAt !== null, 'deletedAt'],
+      ['asc', 'desc'],
+    );
+    if (existing?.deletedAt) await validateRevivedProjectLinks(existing);
 
     const integration = existing
       ? await db.withDeleted(() =>

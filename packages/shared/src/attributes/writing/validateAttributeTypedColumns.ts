@@ -11,14 +11,14 @@ import {
   AttributeValidationError,
   type AttributeValidationIssue,
 } from '@template/shared/attributes/typing/columns';
-import type { AttributeValueRules } from '@template/shared/attributes/typing/definition';
+import type { AttributeValueConstraints } from '@template/shared/attributes/typing/definition';
 import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 import { validateAttributeValue } from '@template/shared/attributes/writing/validateAttributeValue';
 
 export const validateAttributeTypedColumns = (
   valueType: AttributeValueType,
   row: Partial<AttributeTypedColumns>,
-  rules?: AttributeValueRules,
+  constraints?: AttributeValueConstraints,
 ): unknown => {
   const targetColumn = attributeColumnForValueType(valueType);
   const issues: AttributeValidationIssue[] = [];
@@ -45,7 +45,7 @@ export const validateAttributeTypedColumns = (
 
   if (issues.length > 0) throw new AttributeValidationError(issues);
 
-  return validateAttributeValue(valueType, rawValue, rules, {
+  return validateAttributeValue(valueType, rawValue, constraints, {
     context: `Column '${targetColumn}'`,
     pathPrefix: [targetColumn],
   });

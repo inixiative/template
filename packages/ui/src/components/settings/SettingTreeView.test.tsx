@@ -175,7 +175,7 @@ const installRealSession = async (opts: {
   await useAppStore.getState().permissions.installPermissionsForUser(me);
 };
 
-const renderSection = (props: SettingTreeViewProps) =>
+const renderSettingTreeView = (props: SettingTreeViewProps) =>
   render(
     <QueryClientProvider client={client}>
       <SettingTreeView {...props} />
@@ -270,7 +270,7 @@ describe('SettingTreeView & SettingField', () => {
       disabledTzRow.__serialize() as unknown as RawSettingRow,
     ];
 
-    renderSection({ context: orgContext, path: 'general' });
+    renderSettingTreeView({ context: orgContext, path: 'general' });
     await screen.findByTestId('setting-field-general.defaultTimezone');
 
     // SearchableSelect (> 12 enum options) with disabled row falling back to default 'UTC'
@@ -365,7 +365,7 @@ describe('SettingTreeView & SettingField', () => {
       localeRow.__serialize() as unknown as RawSettingRow,
     ];
 
-    renderSection({ context: orgContext, path: 'general' });
+    renderSettingTreeView({ context: orgContext, path: 'general' });
     await screen.findByTestId('setting-field-general.displayLocale');
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset Display Locale to default' }));
@@ -388,7 +388,7 @@ describe('SettingTreeView & SettingField', () => {
     // 1. User context: own settings editable via real db:Setting:manage
     const userContext = { type: 'user' } as AuthenticatedContext;
     await installRealSession({ user: serializedUser, context: userContext });
-    renderSection({ context: userContext, path: 'general' });
+    renderSettingTreeView({ context: userContext, path: 'general' });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(false);
     cleanup();
@@ -421,7 +421,7 @@ describe('SettingTreeView & SettingField', () => {
       context: orgContext,
     });
 
-    renderSection({ context: orgContext, path: 'general', readOnlyMessage: 'Admins only' });
+    renderSettingTreeView({ context: orgContext, path: 'general', readOnlyMessage: 'Admins only' });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(true);
     expect(screen.queryByRole('button', { name: 'Save settings' })).toBeNull();
@@ -431,7 +431,7 @@ describe('SettingTreeView & SettingField', () => {
 
     // 3. OrganizationUser (ownedByMyMembership): member CAN edit operate-gated displayLocale,
     //    CANNOT edit manage-gated memberAdminOnly (proves no hardcoded membership bypass!)
-    renderSection({
+    renderSettingTreeView({
       context: orgContext,
       ownership: { ownedByMyMembership: true },
       path: 'general',
@@ -460,7 +460,7 @@ describe('SettingTreeView & SettingField', () => {
       context: spaceContext,
     });
 
-    renderSection({ context: spaceContext, path: 'general' });
+    renderSettingTreeView({ context: spaceContext, path: 'general' });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(false);
     expect(screen.getByRole('button', { name: 'Save settings' })).toBeDefined();
@@ -485,12 +485,12 @@ describe('SettingTreeView & SettingField', () => {
       context: spaceContext,
     });
 
-    renderSection({ context: spaceContext, path: 'general' });
+    renderSettingTreeView({ context: spaceContext, path: 'general' });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(true);
     cleanup();
 
-    renderSection({
+    renderSettingTreeView({
       context: spaceContext,
       ownership: { ownedByMyMembership: true },
       path: 'general',
@@ -505,7 +505,7 @@ describe('SettingTreeView & SettingField', () => {
       ownerModel: 'User',
       userId: user.id,
     });
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Integration',
         id: personalIntegration.id,
@@ -522,7 +522,7 @@ describe('SettingTreeView & SettingField', () => {
       ownerModel: 'Organization',
       organizationId: org.id,
     });
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Integration',
         id: orgIntegration.id,
@@ -542,7 +542,7 @@ describe('SettingTreeView & SettingField', () => {
       spaces: [serializedSpace],
       context: orgContext,
     });
-    renderSection({
+    renderSettingTreeView({
       target: { model: 'Integration', id: orgIntegration.id },
       path: 'general',
     });
@@ -551,7 +551,7 @@ describe('SettingTreeView & SettingField', () => {
     cleanup();
 
     //    d) Org owner with hydrated flat orgIntegration -> editable; personal integration of another user -> read-only
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Integration',
         id: orgIntegration.id,
@@ -567,7 +567,7 @@ describe('SettingTreeView & SettingField', () => {
       ownerModel: 'User',
       userId: otherUser.id,
     });
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Integration',
         id: otherUserIntegration.id,
@@ -590,7 +590,7 @@ describe('SettingTreeView & SettingField', () => {
       { project: spaceProject, integration: orgIntegration },
     );
 
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Project',
         id: spaceProject.id,
@@ -608,7 +608,7 @@ describe('SettingTreeView & SettingField', () => {
     ).toBe(false);
     cleanup();
 
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'ProjectIntegration',
         id: pi.id,

@@ -94,21 +94,17 @@ const row = (
 describe('assembleResourceSettings', () => {
   it('lists the tree in declaration order and merges rows with defaults, respecting disabled', () => {
     const snoozeIso = '2026-12-31T23:59:00.000Z';
-    const items = assembleResourceSettings(
-      catalog,
-      [
-        row({
-          id: 'set-tz',
-          key: 'general.defaultTimezone',
-          disabled: true,
-          valueText: 'America/New_York',
-          updatedAt: '2026-11-22T00:00:00.000Z',
-        }),
-        row({ id: 'set-snooze', key: 'advanced.snoozeUntil', valueDate: snoozeIso }),
-        row({ id: 'set-topics', key: 'advanced.topics', valueJson: ['c', 'a'] }),
-      ],
-      'Organization',
-    );
+    const items = assembleResourceSettings(catalog.trees.Organization, [
+      row({
+        id: 'set-tz',
+        key: 'general.defaultTimezone',
+        disabled: true,
+        valueText: 'America/New_York',
+        updatedAt: '2026-11-22T00:00:00.000Z',
+      }),
+      row({ id: 'set-snooze', key: 'advanced.snoozeUntil', valueDate: snoozeIso }),
+      row({ id: 'set-topics', key: 'advanced.topics', valueJson: ['c', 'a'] }),
+    ]);
 
     expect(items.map((item) => item.key)).toEqual([
       'general.defaultTimezone',
@@ -137,16 +133,16 @@ describe('assembleResourceSettings', () => {
   });
 
   it('takes permissions from the resource tree and filters by path and keys', () => {
-    expect(assembleResourceSettings(catalog, [], 'OrganizationUser')).toEqual([
+    expect(assembleResourceSettings(catalog.trees.OrganizationUser, [])).toEqual([
       expect.objectContaining({ key: 'general.displayLocale', read: 'operate', manage: 'operate' }),
     ]);
     expect(
-      assembleResourceSettings(catalog, [], 'Organization', { path: 'advanced' }).map(
+      assembleResourceSettings(catalog.trees.Organization, [], { path: 'advanced' }).map(
         (item) => item.key,
       ),
     ).toEqual(['advanced.topics', 'advanced.snoozeUntil']);
     expect(
-      assembleResourceSettings(catalog, [], 'Organization', { keys: ['advanced.topics'] }).map(
+      assembleResourceSettings(catalog.trees.Organization, [], { path: 'advanced.topics' }).map(
         (item) => item.key,
       ),
     ).toEqual(['advanced.topics']);
@@ -154,12 +150,12 @@ describe('assembleResourceSettings', () => {
 
   it('holds a kind branch only for a resource of that kind', () => {
     expect(
-      assembleResourceSettings(catalog, [], 'Integration', { kinds: { provider: 'linear' } }).map(
-        (item) => item.key,
-      ),
+      assembleResourceSettings(catalog.trees.Integration, [], {
+        kinds: { provider: 'linear' },
+      }).map((item) => item.key),
     ).toEqual(['linear.paused']);
     expect(
-      assembleResourceSettings(catalog, [], 'Integration', { kinds: { provider: 'slack' } }),
+      assembleResourceSettings(catalog.trees.Integration, [], { kinds: { provider: 'slack' } }),
     ).toEqual([]);
   });
 });
@@ -167,11 +163,9 @@ describe('assembleResourceSettings', () => {
 describe('diffSettingDrafts', () => {
   it('emits only dirty keys, comparing multiSelect canonically and dates by instant', () => {
     const snoozeIso = '2026-12-31T23:59:00.000Z';
-    const items = assembleResourceSettings(
-      catalog,
-      [row({ id: 'set-snooze', key: 'advanced.snoozeUntil', valueDate: snoozeIso })],
-      'Organization',
-    );
+    const items = assembleResourceSettings(catalog.trees.Organization, [
+      row({ id: 'set-snooze', key: 'advanced.snoozeUntil', valueDate: snoozeIso }),
+    ]);
 
     expect(
       diffSettingDrafts(items, {
@@ -194,18 +188,14 @@ describe('diffSettingDrafts', () => {
   });
 
   it('re-enables a disabled row when a value is saved over it', () => {
-    const items = assembleResourceSettings(
-      catalog,
-      [
-        row({
-          id: 'set-disabled-tz',
-          key: 'general.defaultTimezone',
-          disabled: true,
-          valueText: 'America/New_York',
-        }),
-      ],
-      'Organization',
-    );
+    const items = assembleResourceSettings(catalog.trees.Organization, [
+      row({
+        id: 'set-disabled-tz',
+        key: 'general.defaultTimezone',
+        disabled: true,
+        valueText: 'America/New_York',
+      }),
+    ]);
     expect(diffSettingDrafts(items, { 'general.defaultTimezone': 'America/New_York' })).toEqual([
       { key: 'general.defaultTimezone', value: 'America/New_York', disabled: false },
     ]);

@@ -145,7 +145,7 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
     ).rejects.toThrow(/deduplicated and canonically sorted/);
   });
 
-  it('evaluates Prisma numeric atomic ops (increment) accurately against Zod bounds on update', async () => {
+  it('evaluates Prisma numeric atomic ops (increment) accurately against the conditions on update', async () => {
     const { entity: member, context } = await createOrganizationUser();
     const { entity: setting } = await createSetting({
       resourceModel: 'OrganizationUser',

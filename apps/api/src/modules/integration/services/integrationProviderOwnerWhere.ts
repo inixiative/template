@@ -10,7 +10,7 @@ import { pick } from 'lodash-es';
 
 const ownerAxis = polymorphicAxis('Integration', 'ownerModel');
 
-export const integrationOwnerKey = (
+export const integrationProviderOwnerWhere = (
   row: Partial<
     Pick<Integration, 'provider' | 'ownerModel' | 'organizationId' | 'spaceId' | 'userId'>
   >,

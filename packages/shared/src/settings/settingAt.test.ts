@@ -80,6 +80,34 @@ describe('settingAt', () => {
     expect(settingAt(tree, 'google.b', kinds)).toBeDefined();
     expect(settingAt(tree, 'google.b', { provider: 'gmail', family: 'google' })).toBeUndefined();
   });
+
+  it("keeps each branch's permissions on its own settings when kinds merge into a plain branch", () => {
+    const merging: SettingTree = {
+      __read: 'read',
+      __manage: 'manage',
+      general: { __manage: 'own', a: boxes('A', 0) },
+      'provider:chorus': { __manage: 'operate', general: { b: boxes('B', 0) } },
+    };
+    const kinds = { provider: 'chorus' };
+    expect(settingAt(merging, 'general.a', kinds)?.manage).toBe('own');
+    expect(settingAt(merging, 'general.b', kinds)?.manage).toBe('operate');
+    expect(settingsIn(merging, 'every').map(({ key, manage }) => `${key}:${manage}`)).toEqual([
+      'general.a:own',
+      'general.b:operate',
+    ]);
+  });
+
+  it('merges same-named branches at every depth', () => {
+    const deep: SettingTree = {
+      __read: 'read',
+      __manage: 'manage',
+      'provider:chorus': { chorus: { l1: { x: boxes('X', 0) } } },
+      'family:chorus': { chorus: { l1: { y: boxes('Y', 0) } } },
+    };
+    expect(
+      settingsIn(deep, { provider: 'chorus', family: 'chorus' }).map(({ key }) => key),
+    ).toEqual(['chorus.l1.x', 'chorus.l1.y']);
+  });
 });
 
 describe('settingsIn', () => {

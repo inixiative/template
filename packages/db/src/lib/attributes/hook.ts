@@ -79,7 +79,7 @@ export const registerAttributeValidationHook = (
     const resourceModel = config.resourceModelField ? row[config.resourceModelField] : undefined;
     throw new AttributeValidationError([
       {
-        code: 'attribute_locator_not_on_resource',
+        code: 'attribute_locator_not_held_by_resource',
         message: `${model} ${config.locatorField} '${locator}' is not defined on this ${String(resourceModel ?? 'resource')}`,
         path: [config.locatorField],
       },

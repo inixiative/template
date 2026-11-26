@@ -13,7 +13,7 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
-import { settingKindsOfProvider, settingsIn } from '@template/shared/settings';
+import { settingResourceKindsOf, settingsIn } from '@template/shared/settings';
 import {
   Badge,
   Button,
@@ -284,7 +284,9 @@ const IntegrationOwnerSection = ({
   const { catalog } = useSettingCatalog();
   const hasIntegrationSettings = (provider: IntegrationProvider | null) =>
     Boolean(
-      catalog && settingsIn(catalog.trees.Integration, settingKindsOfProvider(provider)).length > 0,
+      catalog &&
+        settingsIn(catalog.trees.Integration, settingResourceKindsOf('Integration', provider))
+          .length > 0,
     );
   const integrationQueries = integrationContextQueries(context, ownership);
   const canManage =

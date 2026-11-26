@@ -11,14 +11,14 @@ import { parseAttributeValue } from '@template/shared/attributes/parsing/parseAt
 import { AttributeValidationError } from '@template/shared/attributes/typing/columns';
 import type {
   AttributeOption,
-  AttributeValueRules,
+  AttributeValueConstraints,
 } from '@template/shared/attributes/typing/definition';
 import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 import { castArray } from 'lodash-es';
 
-const notAnOption = (rules: AttributeValueRules, value: unknown): unknown[] => {
-  if (!rules.options) return [];
-  const allowed = new Set(rules.options.map((option) => option.value));
+const notAnOption = (constraints: AttributeValueConstraints, value: unknown): unknown[] => {
+  if (!constraints.options) return [];
+  const allowed = new Set(constraints.options.map((option) => option.value));
   return castArray(value).filter((entry) => !allowed.has(entry as AttributeOption['value']));
 };
 
@@ -26,7 +26,7 @@ const notAnOption = (rules: AttributeValueRules, value: unknown): unknown[] => {
 export const validateAttributeValue = (
   valueType: AttributeValueType,
   raw: unknown,
-  rules: AttributeValueRules = {},
+  constraints: AttributeValueConstraints = {},
   options?: { context?: string; pathPrefix?: string[] },
 ): unknown => {
   const path = options?.pathPrefix ?? [];
@@ -40,13 +40,13 @@ export const validateAttributeValue = (
   const value =
     valueType === 'multiSelect' && isStringArray(parsed) ? deduplicateMultiSelect(parsed) : parsed;
 
-  const strays = notAnOption(rules, value);
+  const strays = notAnOption(constraints, value);
   if (strays.length > 0)
     throw new AttributeValidationError([
       { code: 'not_an_option', message: `${prefix}not an option: ${strays.join(', ')}`, path },
     ]);
 
-  const verdict = rules.conditions ? check(rules.conditions, { value }) : true;
+  const verdict = constraints.conditions ? check(constraints.conditions, { value }) : true;
   if (verdict !== true)
     throw new AttributeValidationError([
       { code: 'condition_failed', message: `${prefix}${String(verdict)}`, path },

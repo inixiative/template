@@ -6,28 +6,28 @@
  */
 import { db } from '@template/db/client';
 import type { Setting } from '@template/db/generated/client/client';
-import { type SettingResourceKinds, settingKindsOfProvider } from '@template/shared/settings';
+import { type SettingResourceKinds, settingResourceKindsOf } from '@template/shared/settings';
 
-export type SettingResourceRef = Partial<
+export type SettingResourceKeys = Partial<
   Pick<Setting, 'resourceModel' | 'resourceIntegrationId' | 'resourceProjectIntegrationId'>
 >;
 
 export const fetchSettingResourceKinds = async (
-  resource: SettingResourceRef,
+  resource: SettingResourceKeys,
 ): Promise<SettingResourceKinds> => {
   if (resource.resourceModel === 'Integration' && resource.resourceIntegrationId) {
     const integration = await db.integration.findUniqueOrThrow({
       where: { id: resource.resourceIntegrationId },
       select: { provider: true },
     });
-    return settingKindsOfProvider(integration.provider);
+    return settingResourceKindsOf('Integration', integration.provider);
   }
   if (resource.resourceModel === 'ProjectIntegration' && resource.resourceProjectIntegrationId) {
     const link = await db.projectIntegration.findUniqueOrThrow({
       where: { id: resource.resourceProjectIntegrationId },
       select: { integration: { select: { provider: true } } },
     });
-    return settingKindsOfProvider(link.integration.provider);
+    return settingResourceKindsOf('ProjectIntegration', link.integration.provider);
   }
   return {};
 };

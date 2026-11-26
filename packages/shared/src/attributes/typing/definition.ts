@@ -9,12 +9,12 @@ import type { AttributeValueType } from '@template/shared/attributes/typing/valu
 
 export type AttributeOption = { readonly value: string | number; readonly label: string };
 
-export type AttributeValueRules = {
+export type AttributeValueConstraints = {
   readonly options?: readonly AttributeOption[];
   readonly conditions?: Condition;
 };
 
-export type AttributeFieldDefinition<TKey extends string = string> = AttributeValueRules & {
+export type AttributeFieldDefinition<TKey extends string = string> = AttributeValueConstraints & {
   readonly key: TKey;
   readonly valueType: AttributeValueType;
   readonly defaultValue?: unknown;

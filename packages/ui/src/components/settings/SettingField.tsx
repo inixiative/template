@@ -47,7 +47,7 @@ const formatDateTimeLocal = (value: unknown): string => {
 const formatNumberText = (value: unknown): string =>
   typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
 
-const ruleError = (item: AssembledSettingItem, value: unknown): string | null => {
+const constraintError = (item: AssembledSettingItem, value: unknown): string | null => {
   if (value === null || value === undefined) return null;
   try {
     validateAttributeValue(item.valueType, value, item);
@@ -91,7 +91,7 @@ export const SettingField = ({
     onValidityChangeRef.current?.(true);
   }, [item.valueType, value, resetVersion]);
 
-  const valueError = ruleError(item, value);
+  const valueError = constraintError(item, value);
   useEffect(() => {
     onValidityChangeRef.current?.(!valueError);
   }, [valueError]);

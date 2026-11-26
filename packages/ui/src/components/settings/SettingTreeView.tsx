@@ -10,11 +10,14 @@ import {
   type AssembledSettingItem,
   assembleResourceSettings,
   diffSettingDrafts,
+  isSettingLeaf,
   type SettingBranch,
   type SettingNode,
   type SettingResourceKinds,
   settingChildrenFor,
-  settingKindsOfProvider,
+  settingNodesAlongKey,
+  settingResourceKindsOf,
+  settingsIn,
 } from '@template/shared/settings';
 import {
   Button,
@@ -38,9 +41,6 @@ import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { lowerFirst } from 'lodash-es';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
-
-const isBranch = (node: SettingNode | undefined): node is SettingBranch =>
-  Boolean(node) && !('valueType' in (node as SettingNode));
 
 export type SettingTreeViewProps = (
   | { context: AuthenticatedContext; ownership?: MyMembershipOwnership; target?: undefined }
@@ -78,47 +78,36 @@ export const SettingTreeView = ({
   );
 
   const kinds = useMemo<SettingResourceKinds>(
-    () =>
-      target?.model === 'Integration' || target?.model === 'ProjectIntegration'
-        ? settingKindsOfProvider(target.integrationProvider)
-        : {},
-    [target?.model, target?.integrationProvider],
+    () => settingResourceKindsOf(queries.resourceModel, target?.integrationProvider),
+    [queries.resourceModel, target?.integrationProvider],
   );
 
   const listQueryParams = useMemo(() => (path ? { path } : undefined), [path]);
   const queryKey = queries.readManyQueryKey(listQueryParams);
 
-  const heldItems = useMemo(
-    () =>
-      catalog ? assembleResourceSettings(catalog, [], queries.resourceModel, { kinds, path }) : [],
-    [catalog, queries.resourceModel, kinds, path],
+  const tree = catalog?.trees[queries.resourceModel];
+  const definedItems = useMemo(
+    () => (tree ? settingsIn(tree, kinds, path) : []),
+    [tree, kinds, path],
   );
 
   const settingsQuery = useQuery({
     queryKey,
     queryFn: queries.readManyQueryFn,
-    enabled: heldItems.length > 0,
+    enabled: definedItems.length > 0,
   });
 
   const items = useMemo(
     () =>
-      catalog
-        ? assembleResourceSettings(catalog, settingsQuery.data?.data ?? [], queries.resourceModel, {
-            kinds,
-            path,
-          })
-        : [],
-    [catalog, settingsQuery.data?.data, queries.resourceModel, kinds, path],
+      tree ? assembleResourceSettings(tree, settingsQuery.data?.data ?? [], { kinds, path }) : [],
+    [tree, settingsQuery.data?.data, kinds, path],
   );
   const itemsByKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items]);
   const pathSegments = useMemo(() => (path ? path.split('.') : []), [path]);
-  const root = useMemo<SettingNode | undefined>(() => {
-    if (!catalog) return undefined;
-    let node: SettingNode | undefined = catalog.trees[queries.resourceModel];
-    for (const segment of pathSegments)
-      node = isBranch(node) ? settingChildrenFor(node, kinds)[segment] : undefined;
-    return node;
-  }, [catalog, queries.resourceModel, pathSegments, kinds]);
+  const root = useMemo(() => {
+    const node = tree && settingNodesAlongKey(tree, path ?? '', kinds)?.at(-1);
+    return node && !isSettingLeaf(node) ? node : undefined;
+  }, [tree, path, kinds]);
 
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const [invalidKeys, setInvalidKeys] = useState<Record<string, boolean>>({});
@@ -259,7 +248,7 @@ export const SettingTreeView = ({
     return null;
   }
 
-  const rootLabel = isBranch(root) && path ? root.__label : undefined;
+  const rootLabel = root && path ? root.__label : undefined;
   const resolvedTitle = title ?? rootLabel ?? 'Settings';
   const anyEditable = items.some(canManageItem);
 
@@ -289,7 +278,7 @@ export const SettingTreeView = ({
   const renderBranch = (branch: SettingBranch, segments: readonly string[]): ReactNode[] =>
     Object.entries(settingChildrenFor(branch, kinds)).flatMap(([name, node]): ReactNode[] => {
       const childSegments = [...segments, name];
-      if (!isBranch(node)) {
+      if (isSettingLeaf(node)) {
         const item = itemsByKey.get(childSegments.join('.'));
         return item ? [renderField(item)] : [];
       }
@@ -320,7 +309,7 @@ export const SettingTreeView = ({
           <div className="h-20 animate-pulse rounded-md bg-muted/50" />
         ) : (
           <>
-            {isBranch(root)
+            {root
               ? renderBranch(root, pathSegments)
               : itemsByKey.has(pathSegments.join('.'))
                 ? renderField(itemsByKey.get(pathSegments.join('.')) as AssembledSettingItem)

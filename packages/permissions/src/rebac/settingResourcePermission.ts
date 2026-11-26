@@ -10,7 +10,7 @@ import type { ActionRule, ResourcePermission } from '@template/permissions/rebac
 import {
   SETTING_RESOURCE_MODELS,
   SETTING_TREES,
-  type Setting,
+  type SettingDefinition,
   type SettingPermissionAction,
   type SettingResourceModelName,
   type SettingTrees,
@@ -34,11 +34,11 @@ export const settingResourceModelRule = (
   all: [isResourceModel(model), { rel: `resource${model}`, action }],
 });
 
-type Placement = { model: SettingResourceModelName; definition: Setting };
+type Placement = { model: SettingResourceModelName; definition: SettingDefinition };
 
 const perKey = (
   placements: readonly Placement[],
-  actionOf: (definition: Setting) => SettingPermissionAction,
+  actionOf: (definition: SettingDefinition) => SettingPermissionAction,
 ): ActionRule => ({
   any: Object.entries(groupBy(placements, ({ definition }) => definition.key)).map(
     ([key, held]) => ({

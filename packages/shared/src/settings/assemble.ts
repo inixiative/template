@@ -11,15 +11,13 @@ import {
   isStringArray,
   parseAttributeDate,
 } from '@template/shared/attributes';
-import { isSettingKeyUnderPath } from '@template/shared/settings/isSettingKeyUnderPath';
-import type { SettingResourceModelName } from '@template/shared/settings/resourceModels';
 import { settingsIn } from '@template/shared/settings/settingsIn';
-import type { Setting, SettingResourceKinds, SettingTrees } from '@template/shared/settings/types';
+import type {
+  SettingDefinition,
+  SettingResourceKinds,
+  SettingTree,
+} from '@template/shared/settings/types';
 import { isEqual } from 'lodash-es';
-
-export type SettingCatalog = {
-  readonly trees: SettingTrees;
-};
 
 export type RawSettingRow = {
   readonly id: string;
@@ -33,7 +31,7 @@ export type RawSettingRow = {
   readonly updatedAt?: Date | string | null;
 };
 
-export type AssembledSettingItem = Setting & {
+export type AssembledSettingItem = SettingDefinition & {
   value: unknown;
   storedValue: unknown;
   disabled: boolean;
@@ -45,7 +43,6 @@ export type AssembledSettingItem = Setting & {
 export type AssembleResourceSettingsOptions = {
   kinds?: SettingResourceKinds;
   path?: string;
-  keys?: readonly string[];
 };
 
 export type SettingUpsertDraftItem = {
@@ -55,37 +52,29 @@ export type SettingUpsertDraftItem = {
 };
 
 export const assembleResourceSettings = (
-  catalog: SettingCatalog,
+  tree: SettingTree,
   rawRows: readonly RawSettingRow[],
-  resourceModel: SettingResourceModelName,
   options: AssembleResourceSettingsOptions = {},
 ): AssembledSettingItem[] => {
   const rowByKey = new Map(rawRows.map((row) => [row.key, row]));
-  const keyFilter = options.keys ? new Set(options.keys) : null;
 
-  return settingsIn(catalog.trees[resourceModel], options.kinds ?? {})
-    .filter((definition) => {
-      if (options.path && !isSettingKeyUnderPath(definition.key, options.path)) return false;
-      if (keyFilter && !keyFilter.has(definition.key)) return false;
-      return true;
-    })
-    .map((definition) => {
-      const row = rowByKey.get(definition.key);
-      const disabled = Boolean(row?.disabled);
-      const storedValue = row ? decodeAttributeColumnValue(definition.valueType, row) : null;
-      const defaultValue = definition.defaultValue ?? null;
-      const isDefault = !row || disabled || storedValue === null;
-      return {
-        ...definition,
-        defaultValue,
-        value: isDefault ? defaultValue : storedValue,
-        storedValue,
-        disabled,
-        isDefault,
-        settingId: row?.id ?? null,
-        updatedAt: row?.updatedAt ? parseAttributeDate(row.updatedAt) : null,
-      };
-    });
+  return settingsIn(tree, options.kinds ?? {}, options.path).map((definition) => {
+    const row = rowByKey.get(definition.key);
+    const disabled = Boolean(row?.disabled);
+    const storedValue = row ? decodeAttributeColumnValue(definition.valueType, row) : null;
+    const defaultValue = definition.defaultValue ?? null;
+    const isDefault = !row || disabled || storedValue === null;
+    return {
+      ...definition,
+      defaultValue,
+      value: isDefault ? defaultValue : storedValue,
+      storedValue,
+      disabled,
+      isDefault,
+      settingId: row?.id ?? null,
+      updatedAt: row?.updatedAt ? parseAttributeDate(row.updatedAt) : null,
+    };
+  });
 };
 
 const normalizeForDiff = (valueType: AttributeValueType, value: unknown): unknown => {

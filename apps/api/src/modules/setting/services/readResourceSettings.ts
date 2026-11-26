@@ -15,7 +15,7 @@ import {
 import type { Setting } from '@template/db/generated/client/client';
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
-import { isSettingKeyUnderPath, SETTING_TREES, settingsIn } from '@template/shared/settings';
+import { SETTING_TREES, settingsIn } from '@template/shared/settings';
 import type { Context } from 'hono';
 import type { SettingListQuery } from '#/modules/setting/schemas/settingSchemas';
 import type { AppEnv } from '#/types/appEnv';
@@ -42,11 +42,8 @@ export const readResourceSettings = async (
   const definitions = settingsIn(
     SETTING_TREES[resourceModel],
     await fetchSettingResourceKinds({ resourceModel, ...targetFks }),
-  ).filter((definition) => {
-    if (query.path && !isSettingKeyUnderPath(definition.key, query.path)) return false;
-    if (query.key && definition.key !== query.key) return false;
-    return true;
-  });
+    query.path,
+  ).filter((definition) => !query.key || definition.key === query.key);
 
   if (definitions.length === 0) return [];
 

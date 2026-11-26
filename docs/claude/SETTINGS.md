@@ -85,10 +85,10 @@ ProjectIntegration: {
 ### The rules
 
 - **A key is the leaf's full path** from the top of the tree (`general.defaultTimezone`, `chorus.l1.boxesMax`), skipping `__` and `field:value` keys. It is stored as is in `Setting.key`.
-- **`settingAt(tree, key, kinds)`** reads the path down to the leaf, then walks back up: the nearest `__read` / `__manage` wins (`read ??= node.__read`). Every root sets both, so every leaf has both. A kind branch's own `__read` / `__manage` count for the settings under it.
-- **`settingsIn(tree, kinds)`** lists every setting a resource holds, in declaration order. `'every'` as kinds includes every kind branch: what a tree can ever hold.
-- **`settingChildrenFor(branch, kinds)`** is the one place kinds are handled: a branch's own children plus those of its matching kind branches, branches of one name merged.
-- **Kinds of an integration or link** are `settingKindsOfProvider(provider)`: `provider`, and `family` from `providerFamily` in `@inixiative/integrations` (`google` for `drive`, the provider itself otherwise). The server reads them with `fetchSettingResourceKinds`.
+- **`settingAt(tree, key, kinds)`** reads the path down to the leaf, then walks back up: the nearest `__read` / `__manage` wins (`read ??= node.__read`). Every root sets both, so every leaf has both. A kind branch's own `__read` / `__manage` count only for the settings declared under it, never for a plain branch of the same name it merges into.
+- **`settingsIn(tree, kinds, path?)`** lists every setting a resource holds, in declaration order, or only those at or under `path`. `'every'` as kinds includes every kind branch: what a tree can ever hold.
+- **`settingChildrenFor(branch, kinds)`** is the one place kinds are handled: a branch's own children plus those of its matching kind branches, branches of one name merged at every depth.
+- **Kinds of an integration or link** are `settingResourceKindsOf(resourceModel, provider)` (`{}` for every other model): `provider`, and `family` from `providerFamily` in `@inixiative/integrations` (`google` for `drive`, the provider itself otherwise). The server reads them with `fetchSettingResourceKinds`.
 - **Order is declaration order.** JavaScript keeps string keys in insertion order through JSON; integer-like names are refused.
 - **One meaning per key:** wherever a key is placed it has the same type, options, conditions and default; permissions may differ by model, but not across one model's kinds.
 - **Shared pieces are plain consts** placed with spread or by reference.
@@ -98,7 +98,7 @@ ProjectIntegration: {
 
 - **Write check, once, in the attributes layer:** `ATTRIBUTE_MODELS.setting.fetchDefinitionForRow` (`fetchSettingDefinitionForRow`) reads the row's resource kinds and asks `settingAt`; nothing there refuses the write (`AttributeValidationError`, 422), otherwise the value is checked against it. Every writer meets it. A revive (`{ deletedAt: null }` only) skips it; a revived row whose key a tree has since dropped stays out of sight, since readers list only what the tree holds.
 - **`db:setting`** (`settingResourcePermissionFromTrees`): per key, per model holding it, the leaf's `manage` (and `read`, or `manage`) on `resource<Model>`. A batch `PATCH` key the tree doesn't hold has no rule; the service answers that denial with 422 after asking `fetchSettingDefinitionForRow`, and 403 otherwise.
-- **Reads:** the list route returns the stored settings the caller can read, limited to `settingsIn` for the resource's kinds (`?path=` narrows to a branch, `isSettingKeyUnderPath`). The frontend decides what it can manage from each leaf's `manage`.
+- **Reads:** the list route returns the stored settings the caller can read, limited to `settingsIn` for the resource's kinds (`?path=` narrows to a branch through `settingsIn`). The frontend decides what it can manage from each leaf's `manage`.
 - **UI:** `assembleResourceSettings` joins `settingsIn` with the rows; `SettingTreeView` renders the tree with `settingChildrenFor` (labelled branches as headings, leaves as `SettingField`s), optionally one branch with `path`. `SettingField` offers `options` as a select or pills and shows a failing condition's message.
 
 ### Known holes

@@ -9,7 +9,7 @@ import type { Integration } from '@template/db/generated/client/client';
 import { isIntegrationOnePer } from '@template/shared/integrations/integrationOnePer';
 import { makeError } from '#/lib/errors';
 
-export const validateOnePerProjectLinkFree = async (
+export const validateNoOtherOnePerProjectLink = async (
   projectId: string,
   integration: Pick<Integration, 'id' | 'provider'>,
 ) => {

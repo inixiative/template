@@ -6,19 +6,19 @@
  */
 import {
   fetchSettingResourceKinds,
-  type SettingResourceRef,
+  type SettingResourceKeys,
 } from '@template/db/lib/settings/fetchSettingResourceKinds';
 import {
   SETTING_TREES,
-  type Setting,
+  type SettingDefinition,
   type SettingResourceModelName,
   settingAt,
 } from '@template/shared/settings';
 
 export const fetchSettingDefinitionForRow = async (
   row: Record<string, unknown>,
-): Promise<Setting | undefined> => {
-  const resource = row as SettingResourceRef;
+): Promise<SettingDefinition | undefined> => {
+  const resource = row as SettingResourceKeys;
   if (typeof row.key !== 'string' || !resource.resourceModel) return undefined;
   const tree = SETTING_TREES[resource.resourceModel as SettingResourceModelName];
   return settingAt(tree, row.key, await fetchSettingResourceKinds(resource));
