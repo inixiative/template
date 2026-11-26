@@ -21,7 +21,6 @@ const nodeWithJsonSchemas = (
   return settingTreeWithJsonSchemas(node);
 };
 
-/** The tree as `/setting/info` serves it: the same nodes, each leaf's zod schema as JSON Schema. */
 export const settingTreeWithJsonSchemas = (
   branch: SettingBranch,
 ): SettingBranch<SettingJsonSchema> =>

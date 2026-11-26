@@ -48,10 +48,6 @@ const collect = <TSchema>(
   }
 };
 
-/**
- * Every setting a tree defines for a resource whose kind fields are `kinds`, in declaration order.
- * `'every'` includes every `field:value` branch: what the tree can ever hold.
- */
 export const settingDefinitionsInTree = <TSchema>(
   tree: SettingTree<TSchema>,
   kinds: SettingResourceKinds | 'every',

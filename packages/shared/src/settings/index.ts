@@ -4,6 +4,7 @@ export * from './registry';
 export * from './resourceModels';
 export * from './settingDefinitionsInTree';
 export * from './settingKindsOfProvider';
+export * from './settingTreeChildrenForKinds';
 export * from './settingTreeNodes';
 export * from './trees';
 export * from './types';

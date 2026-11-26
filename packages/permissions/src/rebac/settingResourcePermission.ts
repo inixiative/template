@@ -54,11 +54,6 @@ const perKey = (
   ),
 });
 
-/**
- * Compiles `db:Setting` ReBAC rules from the setting trees: per key, per model that holds it.
- * - `manage`: the leaf's resolved `manage` action on `resource${model}`.
- * - `read`: anyone who can `manage` it, or holds the leaf's resolved `read` action.
- */
 export const settingResourcePermissionFromTrees = (
   trees: SettingTrees<unknown>,
 ): ResourcePermission => {

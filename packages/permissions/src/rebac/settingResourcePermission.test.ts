@@ -243,7 +243,7 @@ describe('settingResourcePermission & db:ProjectIntegration through the real che
     expect(can(other, record, 'manage')).toBe(false);
   });
 
-  it('own-gated setting with restricted readPermission: owner manages, admin reads only, member neither', async () => {
+  it('own-gated setting with a manage-only read: owner manages, admin reads only, member neither', async () => {
     const record = {
       key: 'synthetic.ownOnly',
       resourceModel: 'Organization',

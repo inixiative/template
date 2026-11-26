@@ -59,11 +59,6 @@ export type SettingUpsertDraftItem = {
   disabled?: boolean;
 };
 
-/**
- * Merges the served trees (`GET /api/v1/setting/info`) with raw `Setting[]` rows for one resource:
- * every setting its tree holds for its kinds, in declaration order, each with its effective value
- * (the stored one, or the default when absent or `disabled`).
- */
 export const assembleResourceSettings = (
   catalog: SettingCatalog,
   rawRows: readonly RawSettingRow[],

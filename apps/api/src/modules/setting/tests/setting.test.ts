@@ -313,7 +313,7 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
       expect((await parseSuccessBody<Setting[]>(adminList)).data.length).toBeGreaterThanOrEqual(5);
     });
 
-    it('rejects empty batch [], duplicate keys in batch, invalid keys, invalid values with 422, and a key the resource tree does not hold with 403', async () => {
+    it('rejects empty batch [], duplicate keys in batch, invalid keys, invalid values, and a key the resource tree does not hold with 422', async () => {
       // Empty batch
       expect((await ownerApp.fetch(patch('/api/v1/me/settings', []))).status).toBe(422);
 
@@ -359,7 +359,6 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
       expect(multiErrBody.fieldErrors?.['0.value']?.length).toBeGreaterThan(0);
       expect(multiErrBody.fieldErrors?.['1.value']?.length).toBeGreaterThan(0);
 
-      // A key Project's tree doesn't hold: db:setting has no rule for it there
       expect(
         (
           await ownerApp.fetch(
@@ -368,7 +367,7 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
             ]),
           )
         ).status,
-      ).toBe(403);
+      ).toBe(422);
     });
   });
 

@@ -13,8 +13,9 @@ import {
   type SettingBranch,
   type SettingJsonSchema,
   type SettingResourceKinds,
+  type SettingTreeChild,
   settingKindsOfProvider,
-  settingTreeEntries,
+  settingTreeChildrenForKinds,
 } from '@template/shared/settings';
 import {
   Button,
@@ -40,22 +41,17 @@ import { lowerFirst } from 'lodash-es';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
 type TreeBranch = SettingBranch<SettingJsonSchema>;
+type TreeChild = SettingTreeChild<SettingJsonSchema>;
 
-const branchAtPath = (
+const childAtPath = (
   branch: TreeBranch,
   segments: readonly string[],
   kinds: SettingResourceKinds,
-): TreeBranch | undefined => {
-  if (segments.length === 0) return branch;
-  for (const entry of settingTreeEntries(branch)) {
-    if (entry.kind === 'kind' && kinds[entry.field] === entry.value) {
-      const found = branchAtPath(entry.node, segments, kinds);
-      if (found) return found;
-    }
-    if (entry.kind === 'branch' && entry.name === segments[0])
-      return branchAtPath(entry.node, segments.slice(1), kinds);
-  }
-  return undefined;
+): TreeChild | undefined => {
+  const [name, ...rest] = segments;
+  const child = settingTreeChildrenForKinds(branch, kinds).find((entry) => entry.name === name);
+  if (!child || rest.length === 0) return child;
+  return child.kind === 'branch' ? childAtPath(child.node, rest, kinds) : undefined;
 };
 
 export type SettingTreeViewProps = (
@@ -127,13 +123,13 @@ export const SettingTreeView = ({
     [catalog, settingsQuery.data?.data, queries.resourceModel, kinds, path],
   );
   const itemsByKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items]);
-  const rootBranch = useMemo(
-    () =>
-      catalog
-        ? branchAtPath(catalog.trees[queries.resourceModel], path ? path.split('.') : [], kinds)
-        : undefined,
-    [catalog, queries.resourceModel, path, kinds],
-  );
+  const pathSegments = useMemo(() => (path ? path.split('.') : []), [path]);
+  const root = useMemo<TreeChild | undefined>(() => {
+    if (!catalog) return undefined;
+    const tree = catalog.trees[queries.resourceModel];
+    if (pathSegments.length === 0) return { kind: 'branch', name: '', node: tree };
+    return childAtPath(tree, pathSegments, kinds);
+  }, [catalog, queries.resourceModel, pathSegments, kinds]);
 
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const [invalidKeys, setInvalidKeys] = useState<Record<string, boolean>>({});
@@ -274,7 +270,8 @@ export const SettingTreeView = ({
     return null;
   }
 
-  const resolvedTitle = title ?? (path ? rootBranch?.__label : undefined) ?? 'Settings';
+  const rootLabel = root?.kind === 'branch' && path ? root.node.__label : undefined;
+  const resolvedTitle = title ?? rootLabel ?? 'Settings';
   const anyEditable = items.some(canManageItem);
 
   const renderField = (item: AssembledSettingItem) => {
@@ -301,10 +298,7 @@ export const SettingTreeView = ({
   };
 
   const renderBranch = (branch: TreeBranch, segments: readonly string[]): ReactNode[] =>
-    settingTreeEntries(branch).flatMap((entry): ReactNode[] => {
-      if (entry.kind === 'meta') return [];
-      if (entry.kind === 'kind')
-        return kinds[entry.field] === entry.value ? renderBranch(entry.node, segments) : [];
+    settingTreeChildrenForKinds(branch, kinds).flatMap((entry): ReactNode[] => {
       const childSegments = [...segments, entry.name];
       if (entry.kind === 'leaf') {
         const item = itemsByKey.get(childSegments.join('.'));
@@ -337,7 +331,10 @@ export const SettingTreeView = ({
           <div className="h-20 animate-pulse rounded-md bg-muted/50" />
         ) : (
           <>
-            {rootBranch ? renderBranch(rootBranch, path ? path.split('.') : []) : null}
+            {root?.kind === 'branch' ? renderBranch(root.node, pathSegments) : null}
+            {root?.kind === 'leaf' && itemsByKey.get(pathSegments.join('.'))
+              ? renderField(itemsByKey.get(pathSegments.join('.')) as AssembledSettingItem)
+              : null}
 
             {errorMessage ? (
               <p role="alert" className="text-sm text-destructive">

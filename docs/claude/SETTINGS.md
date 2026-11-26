@@ -75,20 +75,20 @@ export const displayLocale = { valueType: 'text', schema: LanguageCodeSchema, /*
 
 // packages/shared/src/settings/trees.ts
 export const SETTING_TREES = {
-  User:         { __read: 'read', __manage: 'manage', general: localization },
-  Organization: { __read: 'read', __manage: 'manage', general: localization },
-  Space:        { __read: 'read', __manage: 'manage', general: localization },
+  User:         { __read: 'read', __manage: 'manage', general: { __label: 'General', defaultTimezone, displayLocale } },
+  Organization: { __read: 'read', __manage: 'manage', general: { __label: 'General', defaultTimezone, displayLocale } },
+  Space:        { __read: 'read', __manage: 'manage', general: { __label: 'General', defaultTimezone, displayLocale } },
   OrganizationUser: {
     __read: 'operate', __manage: 'operate',            // a member sets their own
-    general: { displayLocale: localization.displayLocale },
+    general: { __label: 'General', displayLocale },
   },
   SpaceUser: {
     __read: 'operate', __manage: 'operate',
-    general: { displayLocale: localization.displayLocale },
+    general: { __label: 'General', displayLocale },
   },
   Project: {
     __read: 'read', __manage: 'manage',
-    general: { defaultTimezone: localization.defaultTimezone },
+    general: { __label: 'General', defaultTimezone },
   },
   Integration:        { __read: 'read', __manage: 'manage' },
   ProjectIntegration: { __read: 'read', __manage: 'manage' },
@@ -167,12 +167,12 @@ The order the tree is written in is the order everywhere: the compiled list, `/s
 A key may appear in many trees (`general.defaultTimezone` on User and on Organization; `chorus.l1.boxesMax` on an integration and on its links). Wherever it appears it has the same `valueType`, `schema` and `defaultValue`, so a reader that falls back from one resource to another reads one key with one meaning. Permissions may differ by tree. A test checks this across all trees.
 
 #### Shared pieces are just consts
-`localization`, `cacheBlock` and `chorusScaling` are exported objects placed with spread or by reference. There is no component registry: nothing looks them up by name. The same piece may be placed twice in one tree (`l2.keep` and `l2.full`); the keys differ by path.
+`defaultTimezone`, `displayLocale`, `cacheBlock` and `chorusScaling` are exported objects placed with spread or by reference. There is no component registry: nothing looks them up by name. The same piece may be placed twice in one tree (`l2.keep` and `l2.full`); the keys differ by path.
 
 ### How it is read
 
 ```
-SETTING_TREES ──compile at load──▶ settingDefinitionsFor(resourceModel, kinds)
+SETTING_TREES ──walked per resource──▶ settingDefinitionsForResource(resourceModel, kinds)
                                        │   Record<key, { valueType, schema, defaultValue,
                                        │                 label, description, read, manage }>
         ┌──────────────────────────────┼──────────────────────────────┐
@@ -181,10 +181,10 @@ attributes write check        db:setting ReBAC rules          /setting/info → 
 (packages/db attributes)      (packages/permissions)          (trees, rendered recursively)
 ```
 
-- **Write check: one, in the attributes layer.** `ATTRIBUTE_MODELS.setting.fetchDefinitionForRow` (`fetchSettingDefinitionForRow`) takes the row being written, reads its resource's kinds, and returns the definition that resource's tree holds for the key. The attributes hook (`registerAttributeValidationHook`) refuses the write when there is none (`AttributeValidationError`, 422) and otherwise checks type and schema against it. Every writer meets it: routes, services, seeds. `resolveDefinition(key)` stays for reading, which needs only what a key means.
-- **ReBAC.** `settingResourcePermissionFromTrees(SETTING_TREES)` builds `db:setting`: per key, per model holding it, the leaf's resolved `manage` (and `read`, or `manage`) on `resource<Model>`. A key a model's tree doesn't hold has no rule there, so the batch `PATCH` refuses it with 403 before anything is written.
-- **`/setting/info`** returns the trees, each leaf's zod schema as JSON Schema (`settingTreeWithJsonSchemas`). `assembleResourceSettings(catalog, rows, resourceModel, { kinds, path, keys })` lists a resource's settings with their values; `SettingTreeView` renders them by walking the tree with the resource's kinds: a branch with `__label` becomes a heading, a branch without one only groups, a leaf becomes the input for its `valueType`. It checks the leaf's `manage` action on the resource, the same check the `db:setting` rule makes. Depth doesn't matter.
-- **A page renders one branch** with `path` (`<SettingTreeView path="billing" />`, and `?path=` on the list route), replacing the category filter: `isSettingKeyUnderPath`.
+- **Write check: one, in the attributes layer.** `ATTRIBUTE_MODELS.setting.fetchDefinitionForRow` (`fetchSettingDefinitionForRow`) takes the row being written, reads its resource's kinds, and returns the definition that resource's tree holds for the key. The attributes hook (`registerAttributeValidationHook`) refuses the write when there is none (`AttributeValidationError`, 422) and otherwise checks type and schema against it. Every writer meets it: routes, services, seeds. A revive (`{ deletedAt: null }` only, as the soft-delete cascade writes) skips it, so a revived row whose key a tree has since dropped comes back; readers list only what the tree holds, so it stays out of sight. `resolveDefinition(key)` stays for reading, which needs only what a key means.
+- **ReBAC.** `settingResourcePermissionFromTrees(SETTING_TREES)` builds `db:setting`: per key, per model holding it, the leaf's resolved `manage` (and `read`, or `manage`) on `resource<Model>`. A key a model's tree doesn't hold has no rule there; the batch `PATCH` answers that denial with 422 (`fieldErrors['<n>.key']`) when the resource's tree doesn't hold the key, asking the same `fetchSettingDefinitionForRow` the hook uses, and 403 otherwise.
+- **`/setting/info`** returns the trees, each leaf's zod schema as JSON Schema (`settingTreeWithJsonSchemas`). `assembleResourceSettings(catalog, rows, resourceModel, { kinds, path, keys })` lists a resource's settings with their values; `SettingTreeView` renders them by walking the tree with the resource's kinds (`settingTreeChildrenForKinds`: matching kind branches inlined, branches of one name merged, so `provider:drive` and `family:google` can both add to `google`): a branch with `__label` becomes a heading, a branch without one only groups, a leaf becomes the input for its `valueType`. It checks the leaf's `manage` action on the resource, the same check the `db:setting` rule makes. Depth doesn't matter.
+- **A page renders one branch** with `path` (`<SettingTreeView path="billing" />`, and `?path=` on the list route), replacing the category filter: `isSettingKeyUnderPath`. A `path` naming a leaf shows that one field.
 
 ### What goes
 
@@ -213,7 +213,7 @@ attributes write check        db:setting ReBAC rules          /setting/info → 
 |---|---|---|
 | `GET` | `/api/v1/setting/info` | Public master-data discovery: `types.trees`, one setting tree per resource model, leaves' schemas as JSON Schema (`settingInfoRoute`). |
 | `GET` | `/api/v1/{me\|organization/:id\|organizationUser/:id\|space/:id\|spaceUser/:id\|project/:id\|integration/:id\|projectIntegration/:id}/settings` | Returns **raw `Setting[]`** (`SettingScalarSchema`) for the parent resource, gated by `validatePermission('read')` on the parent, backed by Redis `fetchThroughCache` on `cacheKey('setting', { resourceModel, resourceId })` (automatically invalidated by `cacheKeysByModel.Setting`), and limited to what the resource's tree holds for its kinds, and filtered in memory per key via `readResourceSettings()` (`db:Setting:read`). Filterable by `path` (a key-path prefix) and `key`. |
-| `PATCH` | `/api/v1/{me\|organization/:id\|organizationUser/:id\|space/:id\|spaceUser/:id\|project/:id\|integration/:id\|projectIntegration/:id}/settings` | Atomic batch upsert (`Array<{ key, value, disabled? }>`) via `upsertResourceSettings()`: rejects empty arrays and duplicate keys (422), authorizes all keys upfront (`db:Setting:manage`; a key the resource's tree doesn't hold is 403), sorts keys lexicographically, locks via `db.findForUpdate(..., { upserting: true })` inside `db.txn`, and returns **raw `Setting[]`**. |
+| `PATCH` | `/api/v1/{me\|organization/:id\|organizationUser/:id\|space/:id\|spaceUser/:id\|project/:id\|integration/:id\|projectIntegration/:id}/settings` | Atomic batch upsert (`Array<{ key, value, disabled? }>`) via `upsertResourceSettings()`: rejects empty arrays and duplicate keys (422), authorizes all keys upfront (`db:Setting:manage`, 403; a key the resource's tree doesn't hold is 422), sorts keys lexicographically, locks via `db.findForUpdate(..., { upserting: true })` inside `db.txn`, and returns **raw `Setting[]`**. |
 | `GET` | `/api/v1/setting/{id}` | Read a single raw stored setting row (`settingReadRoute`, `validatePermission('read')`). |
 | `DELETE` | `/api/v1/setting/{id}` | Soft-delete a stored setting row to reset it to its default (`settingDeleteRoute`, `validatePermission('manage')`). |
 | `GET` | `/api/admin/setting` | Superadmin paginated listing of all stored setting rows (`adminSettingReadManyRoute`). |

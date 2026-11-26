@@ -8,10 +8,10 @@ import {
   type SettingResourceKinds,
   type SettingTree,
   settingDefinitionForKey,
-  settingDefinitionForResource,
   settingDefinitionsForResource,
   settingDefinitionsHeldByModel,
   settingDefinitionsInTree,
+  settingTreeChildrenForKinds,
   settingTreeEntries,
 } from '@template/shared/settings';
 import { isEqual } from 'lodash-es';
@@ -233,8 +233,46 @@ describe('template trees', () => {
     ]);
   });
 
-  it('finds a definition only on a resource whose tree holds it', () => {
-    expect(settingDefinitionForResource('Organization', {}, 'general.displayLocale')).toBeDefined();
-    expect(settingDefinitionForResource('Project', {}, 'general.displayLocale')).toBeUndefined();
+  it('holds a key only on a resource whose tree places it', () => {
+    const keysOn = (model: 'Organization' | 'Project') =>
+      settingDefinitionsForResource(model, {}).map(({ key }) => key);
+    expect(keysOn('Organization')).toContain('general.displayLocale');
+    expect(keysOn('Project')).not.toContain('general.displayLocale');
+  });
+});
+
+describe('settingTreeChildrenForKinds', () => {
+  const leaf = (label: string) => ({
+    valueType: 'boolean' as const,
+    schema: z.boolean(),
+    defaultValue: false,
+    label,
+    description: label,
+  });
+  const tree: SettingTree = {
+    __read: 'read',
+    __manage: 'manage',
+    general: { a: leaf('a') },
+    'provider:drive': { google: { __label: 'Google', fromProvider: leaf('provider') } },
+    'family:google': { google: { fromFamily: leaf('family') } },
+  };
+
+  it('inlines matching kinds and merges branches of one name, in declaration order', () => {
+    const children = settingTreeChildrenForKinds(tree, { provider: 'drive', family: 'google' });
+    expect(children.map(({ name }) => name)).toEqual(['general', 'google']);
+    const google = children[1];
+    expect(google?.kind === 'branch' && Object.keys(google.node)).toEqual([
+      '__label',
+      'fromProvider',
+      'fromFamily',
+    ]);
+  });
+
+  it('leaves out kinds that do not match', () => {
+    expect(
+      settingTreeChildrenForKinds(tree, { provider: 'linear', family: 'linear' }).map(
+        ({ name }) => name,
+      ),
+    ).toEqual(['general']);
   });
 });

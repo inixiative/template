@@ -12,7 +12,6 @@ export type SettingResourceRef = Partial<
   Pick<Setting, 'resourceModel' | 'resourceIntegrationId' | 'resourceProjectIntegrationId'>
 >;
 
-/** The kind fields a setting tree switches on, read from the resource the setting lives on. */
 export const fetchSettingResourceKinds = async (
   resource: SettingResourceRef,
 ): Promise<SettingResourceKinds> => {
