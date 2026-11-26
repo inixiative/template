@@ -12,9 +12,10 @@ model Project {
   updatedAt            DateTime        @updatedAt
   deletedAt            DateTime?
 
-  name        String
-  description String?
-  access      ProjectAccess @default(private)
+  name          String
+  description   String?
+  readAccess    ReadAccess    @default(private)
+  operateAccess OperateAccess @default(private)
 
   ownerModel     ProjectOwnerModel
   userId         String?           @db.VarChar(36)
@@ -44,16 +45,9 @@ model Project {
   @@unique([spaceId, name], where: raw("\"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "Project_space_name_key")
   @@unique([spaceId, userId, name], where: raw("\"ownerModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "Project_spaceuser_name_key")
   @@index([ownerModel])
-  @@index([access])
   @@index([userId])
   @@index([organizationId])
   @@index([spaceId])
-}
-
-enum ProjectAccess {
-  public
-  tenant
-  private
 }
 
 enum ProjectOwnerModel {

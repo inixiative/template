@@ -188,18 +188,25 @@ export const integrationAccess = {
   },
 } satisfies Record<string, ActionRule>;
 
-export const ownerTenantRead: ActionRule = {
+export const ownerTenant = (action: 'read' | 'operate', at = ''): ActionRule => ({
   any: [
-    actorMayPerformActionOnOwner('read', '', organizationOrSpace),
     {
       all: [
-        ownerModelIsOneOf(['OrganizationUser']),
-        { rel: 'organizationUser.organization', action: 'read' },
+        ownerModelIsOneOf(['Organization', 'OrganizationUser'], at),
+        { rel: `${at}organization`, action },
       ],
     },
-    { all: [ownerModelIsOneOf(['SpaceUser']), { rel: 'spaceUser.space', action: 'read' }] },
+    { all: [ownerModelIsOneOf(['Space', 'SpaceUser'], at), { rel: `${at}space`, action }] },
   ],
-};
+});
+
+export const ownerPrivateRead = (at = ''): ActionRule => ({
+  any: [
+    at ? { rel: at.slice(0, -1), action: 'manage' } : 'manage',
+    actorMayPerformActionOnOwner('read', at, ['User']),
+    actorMayPerformActionOnOwner('own', at, ['OrganizationUser', 'SpaceUser']),
+  ],
+});
 
 // Read on an integration row, whose owner is never another integration.
 export const integrationRoleWrite: ActionRule = {

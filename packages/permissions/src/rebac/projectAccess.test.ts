@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { HydratedRecord } from '@template/db';
-import { ProjectAccess, Role } from '@template/db/generated/client/enums';
+import { OperateAccess, ReadAccess, Role } from '@template/db/generated/client/enums';
 import {
   ActorModel,
   createPermissions,
@@ -14,17 +14,18 @@ import {
   permissionsOfUser,
 } from '@template/permissions/roles/permissionsOfUser';
 
-const org = { id: 'o1' };
-const otherOrg = { id: 'o2' };
-const space = { id: 's1', organizationId: org.id, organization: org };
-const otherSpace = { id: 's2', organizationId: org.id, organization: org };
+const org = { id: 'org-1' };
+const otherOrg = { id: 'org-2' };
+const space = { id: 'space-1', organizationId: org.id, organization: org };
+const otherSpace = { id: 'space-2', organizationId: org.id, organization: org };
+
 const uOwner = { id: 'u-owner' };
 const uMember = { id: 'u-member' };
 const uCoworker = { id: 'u-coworker' };
 const uOutsider = { id: 'u-outsider' };
 
 const orgMemberRow = {
-  id: 'ou1',
+  id: 'ou-member',
   organizationId: org.id,
   userId: uMember.id,
   organization: org,
@@ -32,7 +33,7 @@ const orgMemberRow = {
 };
 
 const spaceMemberRow = {
-  id: 'su1',
+  id: 'su-member',
   organizationId: org.id,
   spaceId: space.id,
   userId: uMember.id,
@@ -42,61 +43,61 @@ const spaceMemberRow = {
   organizationUser: orgMemberRow,
 };
 
-type Seat = {
+type PrincipalSpec = {
   userId?: string;
   organizationRole?: Role;
-  otherOrganizationRole?: Role;
   spaceRole?: Role;
-  entitlements?: EntitlementEntry[];
+  otherOrganizationRole?: Role;
   asToken?: boolean;
+  entitlements?: EntitlementEntry[];
 };
 
-const principal = async (seat: Seat = {}): Promise<Permix> => {
+const principal = async (spec: PrincipalSpec = {}): Promise<Permix> => {
   const permix = createPermissions();
   const entries = permissionsOfUser(
-    seat.userId ?? null,
+    spec.asToken ? null : (spec.userId ?? null),
     [
-      ...(seat.organizationRole
+      ...(spec.organizationRole
         ? [
             {
-              id: `ou-${seat.userId ?? 'anon'}`,
+              id: `ou-${spec.userId ?? 'anon'}`,
               organizationId: org.id,
-              role: seat.organizationRole,
+              role: spec.organizationRole,
             },
           ]
         : []),
-      ...(seat.otherOrganizationRole
+      ...(spec.otherOrganizationRole
         ? [
             {
-              id: `ou-other-${seat.userId ?? 'anon'}`,
+              id: `ou-other-${spec.userId ?? 'anon'}`,
               organizationId: otherOrg.id,
-              role: seat.otherOrganizationRole,
+              role: spec.otherOrganizationRole,
             },
           ]
         : []),
     ],
-    seat.spaceRole
-      ? [{ id: `su-${seat.userId ?? 'anon'}`, spaceId: space.id, role: seat.spaceRole }]
+    spec.spaceRole
+      ? [{ id: `su-${spec.userId ?? 'anon'}`, spaceId: space.id, role: spec.spaceRole }]
       : [],
   );
   await installPermissions(permix, [
     ...entries,
-    ...(seat.entitlements?.length
-      ? [{ entries: seat.entitlements, owner: organizationOwnerPermissions(org.id) }]
+    ...(spec.entitlements?.length
+      ? [{ entries: spec.entitlements, owner: organizationOwnerPermissions(org.id) }]
       : []),
   ]);
-  if (seat.asToken) {
+  if (spec.asToken) {
     permix.setActor({
       model: ActorModel.Token,
-      record: { id: 'tok1', ownerModel: 'Organization', organizationId: otherOrg.id },
+      record: { id: 'tok-1', ownerModel: 'Organization', organizationId: otherOrg.id },
     });
-  } else if (seat.userId) {
-    permix.setActor({ model: ActorModel.User, record: { id: seat.userId } });
+  } else if (spec.userId) {
+    permix.setActor({ model: ActorModel.User, record: { id: spec.userId } });
   }
   return permix;
 };
 
-const actionsFor = (permix: Permix, record: object) => ({
+const actionsFor = (permix: Permix, record: Record<string, unknown>) => ({
   read: check(permix, 'project', record as HydratedRecord, 'read'),
   operate: check(permix, 'project', record as HydratedRecord, 'operate'),
   manage: check(permix, 'project', record as HydratedRecord, 'manage'),
@@ -105,23 +106,34 @@ const actionsFor = (permix: Permix, record: object) => ({
 
 const projectOf = (
   ownerModel: 'User' | 'Organization' | 'Space' | 'OrganizationUser' | 'SpaceUser',
-  access: ProjectAccess,
+  readAccess: ReadAccess,
+  operateAccess: OperateAccess = OperateAccess.private,
 ) => {
+  const tag = `${readAccess}-${operateAccess}`;
   switch (ownerModel) {
     case 'User':
-      return { id: `p-user-${access}`, access, ownerModel, userId: uOwner.id, user: uOwner };
+      return {
+        id: `p-user-${tag}`,
+        readAccess,
+        operateAccess,
+        ownerModel,
+        userId: uOwner.id,
+        user: uOwner,
+      };
     case 'Organization':
       return {
-        id: `p-org-${access}`,
-        access,
+        id: `p-org-${tag}`,
+        readAccess,
+        operateAccess,
         ownerModel,
         organizationId: org.id,
         organization: org,
       };
     case 'Space':
       return {
-        id: `p-space-${access}`,
-        access,
+        id: `p-space-${tag}`,
+        readAccess,
+        operateAccess,
         ownerModel,
         organizationId: org.id,
         spaceId: space.id,
@@ -130,8 +142,9 @@ const projectOf = (
       };
     case 'OrganizationUser':
       return {
-        id: `p-ou-${access}`,
-        access,
+        id: `p-ou-${tag}`,
+        readAccess,
+        operateAccess,
         ownerModel,
         organizationId: org.id,
         userId: uMember.id,
@@ -141,8 +154,9 @@ const projectOf = (
       };
     case 'SpaceUser':
       return {
-        id: `p-su-${access}`,
-        access,
+        id: `p-su-${tag}`,
+        readAccess,
+        operateAccess,
         ownerModel,
         organizationId: org.id,
         spaceId: space.id,
@@ -156,8 +170,8 @@ const projectOf = (
   }
 };
 
-describe('db:Project visibility (ProjectAccess: public | tenant | private)', () => {
-  it('Organization projects: private is admin/owner only; tenant adds member operate + viewer read; public adds universal read only', async () => {
+describe('db:Project access (ReadAccess × OperateAccess)', () => {
+  it('Organization projects support all combinations independently: private, internal read-only, team workspace, member-only, public showcase, and public team workspace', async () => {
     const anon = await principal();
     const outsider = await principal({ userId: uOutsider.id, otherOrganizationRole: Role.owner });
     const foreignToken = await principal({ otherOrganizationRole: Role.owner, asToken: true });
@@ -165,7 +179,7 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
     const member = await principal({ userId: uMember.id, organizationRole: Role.member });
     const admin = await principal({ userId: uOwner.id, organizationRole: Role.admin });
 
-    const priv = projectOf('Organization', ProjectAccess.private);
+    const priv = projectOf('Organization', ReadAccess.private, OperateAccess.private);
     expect(actionsFor(anon, priv)).toEqual({
       read: false,
       operate: false,
@@ -197,48 +211,102 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
       delete: true,
     });
 
-    const tenant = projectOf('Organization', ProjectAccess.tenant);
-    expect(actionsFor(anon, tenant).read).toBe(false);
-    expect(actionsFor(outsider, tenant).read).toBe(false);
-    expect(actionsFor(viewer, tenant)).toEqual({
+    const tenantReadOnly = projectOf('Organization', ReadAccess.tenant, OperateAccess.private);
+    expect(actionsFor(anon, tenantReadOnly).read).toBe(false);
+    expect(actionsFor(outsider, tenantReadOnly).read).toBe(false);
+    expect(actionsFor(viewer, tenantReadOnly)).toEqual({
       read: true,
       operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(member, tenant)).toEqual({
+    expect(actionsFor(member, tenantReadOnly)).toEqual({
       read: true,
-      operate: true,
+      operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(admin, tenant)).toEqual({
+    expect(actionsFor(admin, tenantReadOnly)).toEqual({
       read: true,
       operate: true,
       manage: true,
       delete: true,
     });
 
-    const pub = projectOf('Organization', ProjectAccess.public);
-    expect(actionsFor(anon, pub)).toEqual({
+    const teamWorkspace = projectOf('Organization', ReadAccess.tenant, OperateAccess.tenant);
+    expect(actionsFor(viewer, teamWorkspace)).toEqual({
       read: true,
       operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(outsider, pub)).toEqual({
+    expect(actionsFor(member, teamWorkspace)).toEqual({
+      read: true,
+      operate: true,
+      manage: false,
+      delete: false,
+    });
+
+    const membersOnly = projectOf('Organization', ReadAccess.private, OperateAccess.tenant);
+    expect(actionsFor(viewer, membersOnly)).toEqual({
+      read: false,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(member, membersOnly)).toEqual({
+      read: true,
+      operate: true,
+      manage: false,
+      delete: false,
+    });
+
+    const publicShowcase = projectOf('Organization', ReadAccess.public, OperateAccess.private);
+    expect(actionsFor(anon, publicShowcase)).toEqual({
       read: true,
       operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(foreignToken, pub)).toEqual({
+    expect(actionsFor(outsider, publicShowcase)).toEqual({
       read: true,
       operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(member, pub)).toEqual({
+    expect(actionsFor(foreignToken, publicShowcase)).toEqual({
+      read: true,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(member, publicShowcase)).toEqual({
+      read: true,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
+
+    const publicTeam = projectOf('Organization', ReadAccess.public, OperateAccess.tenant);
+    expect(actionsFor(anon, publicTeam)).toEqual({
+      read: true,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(foreignToken, publicTeam)).toEqual({
+      read: true,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(viewer, publicTeam)).toEqual({
+      read: true,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(member, publicTeam)).toEqual({
       read: true,
       operate: true,
       manage: false,
@@ -254,7 +322,7 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
     const spaceMember = await principal({ userId: uMember.id, spaceRole: Role.member });
     const spaceAdmin = await principal({ userId: uOwner.id, spaceRole: Role.admin });
 
-    const priv = projectOf('Space', ProjectAccess.private);
+    const priv = projectOf('Space', ReadAccess.private, OperateAccess.private);
     expect(actionsFor(orgAdmin, priv).read).toBe(false);
     expect(actionsFor(spaceMember, priv).read).toBe(false);
     expect(actionsFor(spaceViewer, priv).read).toBe(false);
@@ -271,16 +339,26 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
       delete: true,
     });
 
-    const tenant = projectOf('Space', ProjectAccess.tenant);
-    expect(actionsFor(orgViewer, tenant).read).toBe(false);
-    expect(actionsFor(orgAdmin, tenant).read).toBe(false);
-    expect(actionsFor(spaceViewer, tenant)).toEqual({
+    const spaceTenantRead = projectOf('Space', ReadAccess.tenant, OperateAccess.private);
+    expect(actionsFor(orgViewer, spaceTenantRead).read).toBe(false);
+    expect(actionsFor(orgAdmin, spaceTenantRead).read).toBe(false);
+    expect(actionsFor(spaceViewer, spaceTenantRead)).toEqual({
       read: true,
       operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(spaceMember, tenant)).toEqual({
+    expect(actionsFor(spaceMember, spaceTenantRead)).toEqual({
+      read: true,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
+
+    const spaceTenantOperate = projectOf('Space', ReadAccess.private, OperateAccess.tenant);
+    expect(actionsFor(orgAdmin, spaceTenantOperate).read).toBe(false);
+    expect(actionsFor(spaceViewer, spaceTenantOperate).read).toBe(false);
+    expect(actionsFor(spaceMember, spaceTenantOperate)).toEqual({
       read: true,
       operate: true,
       manage: false,
@@ -289,7 +367,8 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
 
     const siblingSpaceTenant = {
       id: 'p-space-sibling-tenant',
-      access: ProjectAccess.tenant,
+      readAccess: ReadAccess.tenant,
+      operateAccess: OperateAccess.tenant,
       ownerModel: 'Space',
       organizationId: org.id,
       spaceId: otherSpace.id,
@@ -301,14 +380,15 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
     expect(actionsFor(orgOwner, siblingSpaceTenant).read).toBe(true);
   });
 
-  it('OrganizationUser projects: private is member + org owner; tenant gives coworkers read only (never operate)', async () => {
+  it('OrganizationUser projects: readAccess=tenant opens coworker read; operateAccess=tenant lets member+ coworkers operate without granting manage/delete', async () => {
     const self = await principal({ userId: uMember.id, organizationRole: Role.member });
     const orgOwner = await principal({ userId: uOwner.id, organizationRole: Role.owner });
     const orgAdmin = await principal({ userId: uCoworker.id, organizationRole: Role.admin });
-    const coworker = await principal({ userId: uCoworker.id, organizationRole: Role.viewer });
+    const coworkerMember = await principal({ userId: uCoworker.id, organizationRole: Role.member });
+    const coworkerViewer = await principal({ userId: uCoworker.id, organizationRole: Role.viewer });
     const outsider = await principal({ userId: uOutsider.id });
 
-    const priv = projectOf('OrganizationUser', ProjectAccess.private);
+    const priv = projectOf('OrganizationUser', ReadAccess.private, OperateAccess.private);
     expect(actionsFor(self, priv)).toEqual({
       read: true,
       operate: true,
@@ -327,34 +407,61 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
       manage: false,
       delete: false,
     });
-    expect(actionsFor(coworker, priv).read).toBe(false);
+    expect(actionsFor(coworkerViewer, priv).read).toBe(false);
 
-    const tenant = projectOf('OrganizationUser', ProjectAccess.tenant);
-    expect(actionsFor(orgAdmin, tenant)).toEqual({
+    const tenantRead = projectOf('OrganizationUser', ReadAccess.tenant, OperateAccess.private);
+    expect(actionsFor(orgAdmin, tenantRead)).toEqual({
       read: true,
       operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(coworker, tenant)).toEqual({
+    expect(actionsFor(coworkerMember, tenantRead)).toEqual({
       read: true,
       operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(outsider, tenant).read).toBe(false);
+    expect(actionsFor(coworkerViewer, tenantRead)).toEqual({
+      read: true,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(outsider, tenantRead).read).toBe(false);
 
-    const pub = projectOf('OrganizationUser', ProjectAccess.public);
+    const tenantOperate = projectOf('OrganizationUser', ReadAccess.private, OperateAccess.tenant);
+    expect(actionsFor(coworkerViewer, tenantOperate)).toEqual({
+      read: false,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(coworkerMember, tenantOperate)).toEqual({
+      read: true,
+      operate: true,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(orgAdmin, tenantOperate)).toEqual({
+      read: true,
+      operate: true,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(outsider, tenantOperate).read).toBe(false);
+
+    const pub = projectOf('OrganizationUser', ReadAccess.public, OperateAccess.private);
     expect(actionsFor(outsider, pub)).toEqual({
       read: true,
       operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(coworker, pub).operate).toBe(false);
+    expect(actionsFor(coworkerMember, pub).operate).toBe(false);
   });
 
-  it('SpaceUser projects: tenant gives space coworkers read only, never non-space org members', async () => {
+  it('SpaceUser projects: tenant read/operate stay scoped to space coworkers, never non-space org members', async () => {
     const self = await principal({ userId: uMember.id, spaceRole: Role.member });
     const orgOwner = await principal({ userId: uOwner.id, organizationRole: Role.owner });
     const orgAdminNotInSpace = await principal({
@@ -362,9 +469,10 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
       organizationRole: Role.admin,
     });
     const spaceAdmin = await principal({ userId: uCoworker.id, spaceRole: Role.admin });
+    const spaceMember = await principal({ userId: uCoworker.id, spaceRole: Role.member });
     const spaceViewer = await principal({ userId: uCoworker.id, spaceRole: Role.viewer });
 
-    const priv = projectOf('SpaceUser', ProjectAccess.private);
+    const priv = projectOf('SpaceUser', ReadAccess.private, OperateAccess.private);
     expect(actionsFor(self, priv)).toEqual({
       read: true,
       operate: true,
@@ -379,23 +487,39 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
     });
     expect(actionsFor(spaceAdmin, priv).read).toBe(false);
 
-    const tenant = projectOf('SpaceUser', ProjectAccess.tenant);
-    expect(actionsFor(orgAdminNotInSpace, tenant).read).toBe(false);
-    expect(actionsFor(spaceAdmin, tenant)).toEqual({
+    const tenantRead = projectOf('SpaceUser', ReadAccess.tenant, OperateAccess.private);
+    expect(actionsFor(orgAdminNotInSpace, tenantRead).read).toBe(false);
+    expect(actionsFor(spaceAdmin, tenantRead)).toEqual({
       read: true,
       operate: false,
       manage: false,
       delete: false,
     });
-    expect(actionsFor(spaceViewer, tenant)).toEqual({
+    expect(actionsFor(spaceViewer, tenantRead)).toEqual({
       read: true,
       operate: false,
+      manage: false,
+      delete: false,
+    });
+
+    const tenantOperate = projectOf('SpaceUser', ReadAccess.private, OperateAccess.tenant);
+    expect(actionsFor(orgAdminNotInSpace, tenantOperate).read).toBe(false);
+    expect(actionsFor(spaceViewer, tenantOperate).read).toBe(false);
+    expect(actionsFor(spaceMember, tenantOperate)).toEqual({
+      read: true,
+      operate: true,
+      manage: false,
+      delete: false,
+    });
+    expect(actionsFor(spaceAdmin, tenantOperate)).toEqual({
+      read: true,
+      operate: true,
       manage: false,
       delete: false,
     });
   });
 
-  it('User projects: tenant behaves like private; public opens read; viewer user token reads private', async () => {
+  it('User projects: private is owner-only, public opens read only, viewer user token reads private', async () => {
     const owner = await principal({ userId: uOwner.id });
     const other = await principal({ userId: uOutsider.id });
     const viewerToken = createPermissions();
@@ -407,9 +531,9 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
       record: { id: 'tok-u', ownerModel: 'User', userId: uOwner.id },
     });
 
-    const priv = projectOf('User', ProjectAccess.private);
-    const tenant = projectOf('User', ProjectAccess.tenant);
-    const pub = projectOf('User', ProjectAccess.public);
+    const priv = projectOf('User', ReadAccess.private, OperateAccess.private);
+    const bypassedTenant = projectOf('User', ReadAccess.tenant, OperateAccess.tenant);
+    const pub = projectOf('User', ReadAccess.public, OperateAccess.private);
 
     expect(actionsFor(owner, priv)).toEqual({
       read: true,
@@ -424,7 +548,12 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
       delete: false,
     });
     expect(actionsFor(other, priv).read).toBe(false);
-    expect(actionsFor(other, tenant).read).toBe(false);
+    expect(actionsFor(other, bypassedTenant)).toEqual({
+      read: false,
+      operate: false,
+      manage: false,
+      delete: false,
+    });
     expect(actionsFor(other, pub)).toEqual({
       read: true,
       operate: false,
@@ -434,7 +563,7 @@ describe('db:Project visibility (ProjectAccess: public | tenant | private)', () 
   });
 
   it('explicit entitlements open a private project for read or operate', async () => {
-    const priv = projectOf('Organization', ProjectAccess.private);
+    const priv = projectOf('Organization', ReadAccess.private, OperateAccess.private);
     const granted = await principal({
       userId: uCoworker.id,
       organizationRole: Role.viewer,

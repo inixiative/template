@@ -8,7 +8,8 @@ import { Operator } from '@inixiative/json-rules';
 import {
   ContactSource,
   IntegrationResourceStatus,
-  ProjectAccess,
+  OperateAccess,
+  ReadAccess,
 } from '@template/db/generated/client/enums';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import { inquiryResourcePermission } from '@template/permissions/rebac/inquiryResourcePermission';
@@ -24,21 +25,14 @@ import {
   isNull,
   memberRowActions,
   ownerActions,
-  ownerTenantRead,
+  ownerPrivateRead,
+  ownerTenant,
   rowIsThereAnd,
   tokenAdministering,
 } from '@template/permissions/rebac/rebacSchemaRules';
 import { settingResourcePermission } from '@template/permissions/rebac/settingResourcePermission';
 import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
 import { omit } from 'lodash-es';
-
-const projectAccessIsTenantOrPublic: ActionRule = {
-  rule: {
-    field: 'access',
-    operator: Operator.in,
-    value: [ProjectAccess.public, ProjectAccess.tenant],
-  },
-};
 
 export const schemaMap: SchemaMap = {
   ...schemaMapWithoutPermissions,
@@ -142,8 +136,14 @@ export const schemaMap: SchemaMap = {
             actorMayPerformActionOnOwner('operate', '', ['User']),
             {
               all: [
-                projectAccessIsTenantOrPublic,
-                actorMayPerformActionOnOwner('operate', '', ['Organization', 'Space']),
+                {
+                  rule: {
+                    field: 'operateAccess',
+                    operator: Operator.equals,
+                    value: OperateAccess.tenant,
+                  },
+                },
+                ownerTenant('operate'),
               ],
             },
           ],
@@ -151,15 +151,18 @@ export const schemaMap: SchemaMap = {
         read: {
           any: [
             'operate',
-            actorMayPerformActionOnOwner('read', '', ['User']),
-            actorMayPerformActionOnOwner('own', '', ['OrganizationUser', 'SpaceUser']),
-            { rule: { field: 'access', operator: Operator.equals, value: ProjectAccess.public } },
+            ownerPrivateRead(),
+            { rule: { field: 'readAccess', operator: Operator.equals, value: ReadAccess.public } },
             {
               all: [
                 {
-                  rule: { field: 'access', operator: Operator.equals, value: ProjectAccess.tenant },
+                  rule: {
+                    field: 'readAccess',
+                    operator: Operator.equals,
+                    value: ReadAccess.tenant,
+                  },
                 },
-                ownerTenantRead,
+                ownerTenant('read'),
               ],
             },
           ],

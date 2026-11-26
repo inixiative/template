@@ -203,7 +203,7 @@ describe('Project', () => {
       const { entity: tenantProject } = await createProject({
         ownerModel: 'Organization',
         organizationId: organization.id,
-        access: 'tenant',
+        readAccess: 'tenant',
       });
       expect((await member.app.fetch(get(`/api/v1/project/${tenantProject.id}`))).status).toBe(200);
       expect(
@@ -246,7 +246,7 @@ describe('Project', () => {
         ownerModel: 'OrganizationUser',
         organizationId: organization.id,
         userId: member.context.user.id,
-        access: 'tenant',
+        readAccess: 'tenant',
       });
       const response = await admin.app.fetch(
         get(`/api/v1/organizationUser/${member.entity.id}/projects`),
