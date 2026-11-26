@@ -10,10 +10,10 @@ import type { Permix } from '@template/permissions';
 import { isIntegrationOnePer } from '@template/shared/integrations/integrationOnePer';
 import { omit, orderBy, pickBy } from 'lodash-es';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
+import { fetchRevivedLinksOnTakenProjects } from '#/modules/integration/services/fetchRevivedLinksOnTakenProjects';
 import { integrationProviderOwnerWhere } from '#/modules/integration/services/integrationProviderOwnerWhere';
 import { validateIntegrationConfiguration } from '#/modules/integration/validations/validateIntegrationConfiguration';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
-import { validateRevivedProjectLinks } from '#/modules/integration/validations/validateRevivedProjectLinks';
 
 type IntegrationCreate = Prisma.IntegrationUncheckedCreateInput & {
   entitlements?: EntitlementInput[];
@@ -42,7 +42,9 @@ export const createIntegration = (
       [(found) => found.deletedAt !== null, 'deletedAt'],
       ['asc', 'desc'],
     );
-    if (existing?.deletedAt) await validateRevivedProjectLinks(existing);
+    const linksOnTakenProjects = existing?.deletedAt
+      ? await fetchRevivedLinksOnTakenProjects(existing)
+      : [];
 
     const integration = existing
       ? await db.withDeleted(() =>
@@ -55,6 +57,11 @@ export const createIntegration = (
           }),
         )
       : await db.integration.create({ data: row });
+    if (linksOnTakenProjects.length)
+      await db.projectIntegration.updateManyAndReturn({
+        where: { id: { in: linksOnTakenProjects } },
+        data: { deletedAt: new Date() },
+      });
     const targetEntitlements = await changeEntitlements(
       writer,
       { model: 'Integration', id: integration.id },

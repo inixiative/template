@@ -101,12 +101,34 @@ describe('settingAt', () => {
     const deep: SettingTree = {
       __read: 'read',
       __manage: 'manage',
-      'provider:chorus': { chorus: { l1: { x: boxes('X', 0) } } },
-      'family:chorus': { chorus: { l1: { y: boxes('Y', 0) } } },
+      general: { l1: { x: boxes('X', 0) } },
+      'provider:chorus': { general: { l1: { y: boxes('Y', 0) } } },
     };
-    expect(
-      settingsIn(deep, { provider: 'chorus', family: 'chorus' }).map(({ key }) => key),
-    ).toEqual(['chorus.l1.x', 'chorus.l1.y']);
+    expect(settingsIn(deep, { provider: 'chorus' }).map(({ key }) => key)).toEqual([
+      'general.l1.x',
+      'general.l1.y',
+    ]);
+  });
+
+  it('holds a provider inside its family branch, matching only when both do', () => {
+    const families: SettingTree = {
+      __read: 'read',
+      __manage: 'manage',
+      'family:inixiative': {
+        __manage: 'operate',
+        inixiative: { region: boxes('Region', 0) },
+        'provider:chorus': { chorus: { enabled: boxes('Enabled', 0) } },
+        'provider:oracle': { oracle: { enabled: boxes('Enabled', 0) } },
+      },
+    };
+    const view = (kinds: Record<string, string | null>) =>
+      settingsIn(families, kinds).map(({ key, manage }) => `${key}:${manage}`);
+    expect(view({ provider: 'chorus', family: 'inixiative' })).toEqual([
+      'inixiative.region:operate',
+      'chorus.enabled:operate',
+    ]);
+    expect(view({ provider: 'inixiative', family: null })).toEqual([]);
+    expect(view({ provider: 'chorus', family: null })).toEqual([]);
   });
 });
 

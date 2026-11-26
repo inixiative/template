@@ -108,7 +108,7 @@ describe('POST /api/v1/space/:id/integrations', () => {
     }
   });
 
-  it('refuses to revive a one-per-project integration whose project has since linked another of that provider', async () => {
+  it('reviving a one-per-project integration leaves removed the link onto a project another of that provider now holds', async () => {
     INTEGRATION_ONE_PER.linear = ['owner', 'project'];
     const connect = () =>
       fetch(
@@ -120,25 +120,41 @@ describe('POST /api/v1/space/:id/integrations', () => {
       );
     try {
       const { data: first } = await parseSuccessBody<Integration>(await connect());
-      const { entity: project } = await createProject({
-        ownerModel: 'Space',
-        organizationId: org.id,
-        spaceId: space.id,
-      });
-      await createProjectIntegration({}, { project, integration: first });
+      const projectFor = async () =>
+        (
+          await createProject({
+            ownerModel: 'Space',
+            organizationId: org.id,
+            spaceId: space.id,
+          })
+        ).entity;
+      const [taken, free] = [await projectFor(), await projectFor()];
+      const { entity: takenLink } = await createProjectIntegration(
+        {},
+        { project: taken, integration: first },
+      );
+      const { entity: freeLink } = await createProjectIntegration(
+        {},
+        { project: free, integration: first },
+      );
       await db.integration.update({ where: { id: first.id }, data: { deletedAt: new Date() } });
       const { entity: other } = await createIntegration({
         ownerModel: 'Organization',
         organizationId: org.id,
         provider: 'linear',
       });
-      await createProjectIntegration({}, { project, integration: other });
+      await createProjectIntegration({}, { project: taken, integration: other });
 
-      expect((await connect()).status).toBe(409);
-      const stillRemoved = await db.withDeleted(() =>
-        db.integration.findUniqueOrThrow({ where: { id: first.id } }),
-      );
-      expect(stillRemoved.deletedAt).not.toBeNull();
+      const again = await connect();
+      const { data: revived } = await parseSuccessBody<Integration>(again);
+      expect(again.status).toBe(201);
+      expect(revived).toMatchObject({ id: first.id, deletedAt: null });
+      const linkState = async (id: string) =>
+        (await db.withDeleted(() => db.projectIntegration.findUniqueOrThrow({ where: { id } })))
+          .deletedAt;
+      expect(await linkState(freeLink.id)).toBeNull();
+      expect(await linkState(takenLink.id)).not.toBeNull();
+      expect(await db.projectIntegration.count({ where: { projectId: taken.id } })).toBe(1);
     } finally {
       delete INTEGRATION_ONE_PER.linear;
     }

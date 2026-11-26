@@ -4,14 +4,18 @@
  * @partOf primitive:shared
  * @uses none
  */
-import { providerFamily } from '@inixiative/integrations/catalog/providerFamily';
+import { findProvider } from '@inixiative/integrations/catalog/findProvider';
+import type { Provider } from '@template/db/generated/client/enums';
 import type { SettingResourceModelName } from '@template/shared/settings/resourceModels';
 import type { SettingResourceKinds } from '@template/shared/settings/types';
 
 export const settingResourceKindsOf = (
   resourceModel: SettingResourceModelName,
-  integrationProvider: string | null | undefined,
+  integrationProvider: Provider | null | undefined,
 ): SettingResourceKinds =>
   resourceModel === 'Integration' || resourceModel === 'ProjectIntegration'
-    ? { provider: integrationProvider, family: providerFamily(integrationProvider) }
+    ? {
+        provider: integrationProvider,
+        family: findProvider(integrationProvider)?.family ?? null,
+      }
     : {};

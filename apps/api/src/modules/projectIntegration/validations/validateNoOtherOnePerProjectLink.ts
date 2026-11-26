@@ -4,25 +4,15 @@
  * @partOf feature:project
  * @uses infrastructure:prisma, infrastructure:redis, primitive:errors
  */
-import { db } from '@template/db';
 import type { Integration } from '@template/db/generated/client/client';
-import { isIntegrationOnePer } from '@template/shared/integrations/integrationOnePer';
 import { makeError } from '#/lib/errors';
+import { fetchOtherOnePerProjectLink } from '#/modules/projectIntegration/services/fetchOtherOnePerProjectLink';
 
 export const validateNoOtherOnePerProjectLink = async (
   projectId: string,
   integration: Pick<Integration, 'id' | 'provider'>,
 ) => {
-  if (!isIntegrationOnePer(integration.provider, 'project')) return;
-  await db.findForUpdate('ProjectIntegration', { projectId }, { upserting: true });
-  const existing = await db.projectIntegration.findFirst({
-    where: {
-      projectId,
-      integrationId: { not: integration.id },
-      integration: { provider: integration.provider, deletedAt: null },
-    },
-    select: { integrationId: true },
-  });
+  const existing = await fetchOtherOnePerProjectLink(projectId, integration);
   if (existing)
     throw makeError({
       status: 409,

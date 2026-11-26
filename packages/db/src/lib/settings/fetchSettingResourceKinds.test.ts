@@ -29,7 +29,7 @@ describe('fetchSettingResourceKinds', () => {
     ).toEqual({ provider: 'drive', family: 'google' });
   });
 
-  it('gives a provider with no family itself as its family, and null for a custom integration', async () => {
+  it('gives a provider with no family a null family, as it does a custom integration', async () => {
     const { entity: organization } = await createOrganization();
     const { entity: linear } = await createIntegration({
       ownerModel: 'Organization',
@@ -46,7 +46,7 @@ describe('fetchSettingResourceKinds', () => {
         resourceModel: 'Integration',
         resourceIntegrationId: linear.id,
       }),
-    ).toEqual({ provider: 'linear', family: 'linear' });
+    ).toEqual({ provider: 'linear', family: null });
     expect(
       await fetchSettingResourceKinds({
         resourceModel: 'Integration',

@@ -38,6 +38,7 @@ import {
 import type { SettingResourceModelName, SettingUpsertDraftItem } from '@template/shared/settings';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
+import type { IntegrationProvider } from '@template/ui/lib/integrationProviders';
 import type { ClientInjectedOptions } from '@template/ui/lib/makeAuthenticatedApiFetch';
 import { makeContextQueries, mutation } from '@template/ui/lib/makeContextQueries';
 import {
@@ -56,7 +57,7 @@ export type SettingExplicitTarget = {
   model: 'Project' | 'Integration' | 'ProjectIntegration';
   id: string;
   record?: HydratedRecord;
-  integrationProvider?: string;
+  integrationProvider?: IntegrationProvider;
 };
 
 const deleteSetting = mutation({
