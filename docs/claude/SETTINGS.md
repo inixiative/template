@@ -167,7 +167,7 @@ The order the tree is written in is the order everywhere: the compiled list, `/s
 A key may appear in many trees (`general.defaultTimezone` on User and on Organization; `chorus.l1.boxesMax` on an integration and on its links). Wherever it appears it has the same `valueType`, `schema` and `defaultValue`, so a reader that falls back from one resource to another reads one key with one meaning. Permissions may differ by tree. A test checks this across all trees.
 
 #### Shared pieces are just consts
-`defaultTimezone`, `displayLocale`, `cacheBlock` and `chorusScaling` are exported objects placed with spread or by reference. There is no component registry: nothing looks them up by name. The same piece may be placed twice in one tree (`l2.keep` and `l2.full`); the keys differ by path.
+`defaultTimezone`, `displayLocale` and the Chorus example's cache block and scaling pieces are exported objects placed with spread or by reference. There is no component registry: nothing looks them up by name. The same piece may be placed twice in one tree (`l2.keep` and `l2.full`); the keys differ by path.
 
 ### How it is read
 
@@ -188,7 +188,7 @@ attributes write check        db:setting ReBAC rules          /setting/info → 
 
 ### What goes
 
-`SETTING_DEFINITIONS`, `SETTING_CATEGORIES`, `defineSetting`, `defineSettingCategory`, the `category` field and filter; `resourceModels` and `integrationProviders` on definitions (and `resourceModels`, `category`, `order`, `permission`, `readPermission` on `AttributeFieldDefinition`); per-model permission maps (`{ default, OrganizationUser: 'operate' }`), `SettingPermissionSpec`, `AttributePermissionSpec`, `attributePermissionForModel` and `settingPermissionForModel`; `settingAppliesToIntegrationProvider`; the duplicate `key:` field; `order`; the route-level model check; `definitionsForResourceModel`; the `settingIntegrationProvider` hook and service. Storage does not change: a `Setting` row is still `(resource, key)` with typed value columns.
+The flat registry and everything that served it: the definitions and categories maps and their declare helpers, the category field and filter, per-definition model and provider tags (and the same tags, order and permissions on the attribute definition type), per-model permission maps and their resolvers, the provider applicability check, the duplicate key field, order, the route-level model check, the model-wide definition listing on the attribute config, and the provider hook and its service. Storage does not change: a `Setting` row is still `(resource, key)` with typed value columns.
 
 ### What it does not do
 
@@ -203,7 +203,7 @@ attributes write check        db:setting ReBAC rules          /setting/info → 
 4. No resource holds two leaves with one key, whatever its kinds (a kind branch can't redeclare a key outside it).
 5. A key placed under two kinds of one field gives each resource one definition (`provider:jira` and `provider:confluence` may share a key).
 6. Within one model, a key has one permission across its kinds (the `db:setting` rule doesn't switch on kinds).
-7. A write of a key not in the resource's tree, for its kinds, is refused (`settingTreeKinds.test.ts`, the attributes hook tests).
+7. A write of a key not in the resource's tree, for its kinds, is refused (`packages/db/src/lib/attributes/hook.test.ts`, `packages/db/src/lib/settings/fetchSettingResourceKinds.test.ts`), and a batch `PATCH` of one is 422 (`apps/api/src/modules/setting/tests/setting.test.ts`).
 
 ---
 
