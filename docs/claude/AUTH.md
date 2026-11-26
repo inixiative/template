@@ -580,6 +580,7 @@ apiRouter.use('*', apiRateLimit);
 
 A JWT-shaped bearer is the user's JWT; any other bearer is looked up as an API token.
 Spoof runs last so a superadmin can spoof through either credential.
+`auditActorMiddleware` starts each request with `userMerge: null`; only `db.withUserMerge` sets it, for a `mergeUser` approval ([INQUIRIES.md](./INQUIRIES.md#merging-users)).
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|

@@ -16,6 +16,7 @@ kanban
     FEAT-016-inquiry-lineage-and-nesting
     FEAT-026-settings-primitive
     FEAT-028-inquiry-lifecycle-as-transitions
+    FEAT-036-merge-organization-inquiry
     API-001-idempotency-and-safe-retries
     API-003-cursor-pagination-mode
     API-005-route-permission-tags
@@ -120,6 +121,7 @@ kanban
 
 **Inquiry System Extensions:**
 - [FEAT-016: Inquiry Lineage & Nesting](./FEAT-016-inquiry-lineage-and-nesting.md) - parentInquiryId, metadata JSON, migration-spawned inquiries, child inquiry resolution
+- [FEAT-036: mergeOrganization Inquiry](./FEAT-036-merge-organization-inquiry.md) - org → org merge on the `mergeUser` machinery: target wins collisions, spaces move through `transferSpace`, source hard-deleted
 
 **API Reliability:**
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
@@ -160,7 +162,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 37
+- **Total Backlog Items**: 38
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
@@ -193,4 +195,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-11-21_
+_Last Updated: 2026-11-26_

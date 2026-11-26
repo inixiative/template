@@ -2,6 +2,7 @@ import type { InquiryType } from '@template/db/generated/client/enums';
 import { changeEntitlementsService } from '#/modules/inquiry/services/changeEntitlements';
 import { createSpaceService } from '#/modules/inquiry/services/createSpace';
 import { inviteOrganizationUserService } from '#/modules/inquiry/services/inviteOrganizationUser';
+import { mergeUserService } from '#/modules/inquiry/services/mergeUser';
 import { transferArtifactService } from '#/modules/inquiry/services/transferArtifact';
 import { transferSpaceService } from '#/modules/inquiry/services/transferSpace';
 import type { InquiryService } from '#/modules/inquiry/services/types';
@@ -14,4 +15,5 @@ export const inquiryServices: Record<InquiryType, InquiryService> = {
   transferSpace: transferSpaceService,
   transferArtifact: transferArtifactService,
   changeEntitlements: changeEntitlementsService,
+  mergeUser: mergeUserService,
 };

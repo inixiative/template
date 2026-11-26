@@ -7,6 +7,7 @@
 
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { PrismaClient } from '@template/db/generated/client/client';
+import type { UserMerge } from '@template/db/lib/auditActorContext';
 import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
 import type { CacheOverlay } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
@@ -51,6 +52,7 @@ export type DbMethods = {
   };
   withDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
   withoutDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
+  withUserMerge: <T>(merge: UserMerge, fn: () => T | Promise<T>) => Promise<Awaited<T>>;
   currentScopeId: () => string | null;
   currentScopeContext: () => ScopeContext | null;
   isInTxn: () => boolean;

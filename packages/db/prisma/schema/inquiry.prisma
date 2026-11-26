@@ -87,6 +87,7 @@ enum InquiryType {
   transferSpace
   transferArtifact
   changeEntitlements
+  mergeUser
 }
 
 enum InquiryStatus {

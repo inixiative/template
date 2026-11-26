@@ -276,6 +276,24 @@ describe('inquiryResourcePermissionFromParties through the real check, per inqui
     expect(can(await principal({ organization: 'owner' }), transferSpace, 'resolve')).toBe(false);
   });
 
+  it('mergeUser: only the source user sends it, only the target user resolves it', async () => {
+    const mergeUser = {
+      type: 'mergeUser',
+      sourceModel: 'User',
+      sourceUserId: 'u1',
+      sourceUser: { id: 'u1' },
+      targetModel: 'User',
+      targetUserId: 'u9',
+      targetUser: { id: 'u9' },
+    };
+
+    expect(can(await principal({}, 'u1'), mergeUser, 'send')).toBe(true);
+    expect(can(await principal({}, 'u9'), mergeUser, 'send')).toBe(false);
+    expect(can(await principal({}, 'u9'), mergeUser, 'resolve')).toBe(true);
+    expect(can(await principal({}, 'u1'), mergeUser, 'resolve')).toBe(false);
+    expect(can(await principal({ organization: 'owner' }, 'u2'), mergeUser, 'resolve')).toBe(false);
+  });
+
   it("an organization reads what its token received after the token is deleted, and never a member's", async () => {
     const reads = async (seat: Seat, record: object) =>
       check(await principal(seat), 'inquiry', record as HydratedRecord, 'read');

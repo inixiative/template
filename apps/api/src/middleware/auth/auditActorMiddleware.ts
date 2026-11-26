@@ -30,6 +30,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     sourceInquiryId: null,
     integrationId: token?.integrationId ?? null,
     bypassSoftDeleteScope: false,
+    userMerge: null,
   };
 
   return auditActorContext.scope(actor, () => next());

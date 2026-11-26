@@ -392,7 +392,7 @@ every key sent to the client. The locks in each scanned page are cancelled in pa
 
 Cache keys defined in the cache reference map are marked on mutations by a db hook in the transaction's cache overlay and cleared when it commits (see [fetchThroughCache() inside a transaction](#fetchthroughcache-inside-a-transaction)). See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
 
-A write the hook never sees (a raw-SQL shift in the ordered-list helpers, rows a key change reaches by `ON UPDATE CASCADE` such as a space transfer) marks the same keys itself with `queueCacheClear(model, rows)` (`apps/api/src/hooks/cache/queueCacheClear.ts`), passing the rows as they were and as they are. It marks the keys in the transaction's cache overlay, so it must run inside `db.txn()` and the keys are cleared at commit. The hook calls it too.
+A write the hook never sees (a raw-SQL shift in the ordered-list helpers, rows a key change reaches by `ON UPDATE CASCADE` such as a space transfer or a user merge, both through `queueCacheClearForMovedRows`, `apps/api/src/hooks/cache/queueCacheClearForMovedRows.ts`) marks the same keys itself with `queueCacheClear(model, rows)` (`apps/api/src/hooks/cache/queueCacheClear.ts`), passing the rows as they were and as they are. It marks the keys in the transaction's cache overlay, so it must run inside `db.txn()` and the keys are cleared at commit. The hook calls it too.
 
 A child whose change is a change to its parent names that parent in the parent edge registry (`packages/db/src/registries/parentEdges.ts`): an `Entitlement` write loads the row's target (tombstones included) and clears that target's keys, so a token, integration or member reads its entitlements fresh on the very next request.
 

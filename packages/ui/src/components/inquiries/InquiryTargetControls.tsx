@@ -46,7 +46,7 @@ export const InquiryTargetControls = ({ inquiry, size = 'sm' }: InquiryTargetCon
       <Button
         variant="outline"
         size={size}
-        show={canResolve}
+        show={canResolve && !entry?.target?.approvesOnlyInReview}
         disabled={!isPersistedInquiry || !hasPermission}
         onClick={() => resolveMutation.mutate({ inquiry, status: 'approved' })}
       >

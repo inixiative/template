@@ -105,7 +105,9 @@ export * from './registries';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
 export { equalsSuppliedBind } from './registries/equalsSuppliedBind';
+export { MEMBER_MODELS, type MemberModel } from './registries/memberModels';
 export {
+  armIdColumn,
   BIND_NAME_BY_OWNER_MODEL,
   type BindableOwnerModel,
   conditionPolymorphicAxisPointsAtBoundRow,
@@ -217,6 +219,8 @@ export {
   tenantRowsAbove,
   tenantRowsOnSides,
 } from './utils/tenantRowsAbove';
+export { uniqueKeysOnColumn } from './utils/uniqueKeysOnColumn';
+export { userKeyColumns } from './utils/userKeyColumns';
 export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
 export { assertRuleReferencesExist } from './validations/assertRuleReferencesExist';
 export {
