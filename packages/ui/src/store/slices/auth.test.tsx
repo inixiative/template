@@ -13,6 +13,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { buildUser } from '@template/db/test';
+import { contactInfoQueryKey, organizationReadAuthProviderQueryKey } from '@template/sdk';
 import { SignUpForm } from '@template/ui/components/auth/SignUpForm';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
 import { completeOAuthSignIn } from '@template/ui/lib/auth/signIn';
@@ -240,4 +241,46 @@ test('the logout menu signs out on this device without a server call', async () 
   await waitFor(() => expect(fetchStoredTokenAndClearIfExpired()).toBeNull());
   expect(socketLogout).toHaveBeenCalledTimes(1);
   expect(requests).toEqual([]);
+});
+
+test('logout and setSpoof clear authenticated queries while keeping master data and public queries', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  store.getState().connectQueryClientToWebsocket(client);
+
+  const privateKey = [{ _id: 'organizationReadProtected', path: { id: 'org-1' } }];
+  const ownerScopedAuthProviderKey = organizationReadAuthProviderQueryKey({
+    path: { id: 'org-1' },
+  });
+  const masterKey = contactInfoQueryKey();
+  const publicMetaKey = ['custom-public'];
+
+  const seedCache = () => {
+    client.setQueryData(privateKey, { secret: true });
+    client.setQueryData(ownerScopedAuthProviderKey, [{ id: 'ap-disabled', enabled: false }]);
+    client.setQueryData(masterKey, { catalog: true });
+    client.getQueryCache().build(client, { queryKey: publicMetaKey, meta: { public: true } });
+    client.setQueryData(publicMetaKey, { banner: 'ok' });
+  };
+
+  seedCache();
+  await store.getState().auth.logout();
+  expect(client.getQueryData(privateKey)).toBeUndefined();
+  expect(client.getQueryData(ownerScopedAuthProviderKey)).toBeUndefined();
+  expect(client.getQueryData(masterKey)).toEqual({ catalog: true });
+  expect(client.getQueryData(publicMetaKey)).toEqual({ banner: 'ok' });
+
+  const { entity } = await buildUser({ email: 'target@example.test', emailVerified: true });
+  const targetUser = entity.__serialize();
+  setToken(token, new Date(Date.now() + 60_000));
+  respond = () =>
+    Response.json({
+      data: { ...targetUser, organizations: [], organizationUsers: [], spaces: [], spaceUsers: [] },
+    });
+
+  seedCache();
+  await store.getState().auth.setSpoof(targetUser.email);
+  expect(client.getQueryData(privateKey)).toBeUndefined();
+  expect(client.getQueryData(ownerScopedAuthProviderKey)).toBeUndefined();
+  expect(client.getQueryData(masterKey)).toEqual({ catalog: true });
+  expect(client.getQueryData(publicMetaKey)).toEqual({ banner: 'ok' });
 });
