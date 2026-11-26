@@ -32,7 +32,7 @@ import {
 } from '@template/ui/lib/settingContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-import { lowerFirst } from 'lodash-es';
+import { lowerFirst, omitBy } from 'lodash-es';
 import { useCallback, useMemo, useState } from 'react';
 
 export type ResourceSettingsSectionProps = (
@@ -194,11 +194,7 @@ export const ResourceSettingsSection = ({
   const handleFieldValidityChange = useCallback((key: string, isValid: boolean) => {
     setInvalidKeys((previous) => {
       if (Boolean(previous[key]) === !isValid) return previous;
-      if (isValid) {
-        const next = { ...previous };
-        delete next[key];
-        return next;
-      }
+      if (isValid) return omitBy(previous, (_v, k) => k === key);
       return { ...previous, [key]: true };
     });
   }, []);
@@ -225,16 +221,8 @@ export const ResourceSettingsSection = ({
     mutationFn: ({ id }: { id: string; key: string }) =>
       queries.delete.mutationFn({ path: { id } }),
     onSuccess: (_data, variables) => {
-      setDrafts((previous) => {
-        const next = { ...previous };
-        delete next[variables.key];
-        return next;
-      });
-      setInvalidKeys((previous) => {
-        const next = { ...previous };
-        delete next[variables.key];
-        return next;
-      });
+      setDrafts((previous) => omitBy(previous, (_v, k) => k === variables.key));
+      setInvalidKeys((previous) => omitBy(previous, (_v, k) => k === variables.key));
       setResetVersion((version) => version + 1);
       setErrorMessage(null);
       setStatusMessage('Setting reset to default');

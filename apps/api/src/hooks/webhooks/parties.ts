@@ -18,7 +18,7 @@ import {
 } from '@template/db';
 import type { WebhookModel } from '@template/db/generated/client/client';
 import type { ModelRow } from '@template/shared/utils/modelRow';
-import { groupBy, keyBy, mergeWith } from 'lodash-es';
+import { groupBy, keyBy, mapValues, mergeWith } from 'lodash-es';
 
 export type WebhookRow = Record<string, unknown> & { id: string };
 export type Party = ModelRow<BindableOwnerModel>;
@@ -73,15 +73,12 @@ export const fetchWebhookPartiesThroughRelation = async (
     },
   });
   const rowsById = keyBy(rows, 'id');
-  return Object.fromEntries(
-    Object.entries(groupBy(relations, (relation) => relation[column])).map(
-      ([rowId, rowRelations]) => [
-        rowId,
-        rowRelations
-          .filter((relation) => diedWith(relation, rowsById[rowId]))
-          .flatMap((relation) => counterparties(ref.model as WebhookModel, relation, ref.axis)),
-      ],
-    ),
+  return mapValues(
+    groupBy(relations, (relation) => relation[column]),
+    (rowRelations, rowId) =>
+      rowRelations
+        .filter((relation) => diedWith(relation, rowsById[rowId]))
+        .flatMap((relation) => counterparties(ref.model as WebhookModel, relation, ref.axis)),
   );
 };
 

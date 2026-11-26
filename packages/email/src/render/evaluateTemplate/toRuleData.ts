@@ -5,6 +5,6 @@
  * @uses primitive:shared
  */
 import type { Scope } from '@template/email/render/evaluateTemplate/types';
+import { isUndefined, omitBy } from 'lodash-es';
 
-export const toRuleData = (scope: Scope): Record<string, unknown> =>
-  Object.fromEntries(Object.entries(scope).filter(([, value]) => value !== undefined));
+export const toRuleData = (scope: Scope): Record<string, unknown> => omitBy(scope, isUndefined);

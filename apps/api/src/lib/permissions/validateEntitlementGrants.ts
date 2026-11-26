@@ -13,12 +13,29 @@ import {
   pseudoRecordsOfEntitlement,
   schemaMap,
 } from '@template/permissions/rebac';
+import { isPlainObject, mapValues, omit } from 'lodash-es';
 import { makeError } from '#/lib/errors';
+
+const ACCESS_FIELDS = [
+  'readAccess',
+  'operateAccess',
+  'effectiveReadAccess',
+  'effectiveOperateAccess',
+] as const;
+
+// why: access columns are mutable; an anchor-level grant must hold even if access later tightens to private.
+const withoutAccessFields = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(withoutAccessFields);
+  if (isPlainObject(value)) {
+    return mapValues(omit(value as Record<string, unknown>, ACCESS_FIELDS), withoutAccessFields);
+  }
+  return value;
+};
 
 const anchorRecord = async ({ resource, id }: EntitlementEntry['anchor']) => {
   const model = accessorOfResource(resource);
   const row = (await db.delegate(model).findFirst({ where: { id } })) as HydratedRecord | null;
-  return row ? hydrate(model, row) : null;
+  return row ? (withoutAccessFields(await hydrate(model, row)) as HydratedRecord) : null;
 };
 
 const pseudoRecordsOf = async (entry: EntitlementEntry) => {

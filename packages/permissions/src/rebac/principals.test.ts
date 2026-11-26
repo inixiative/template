@@ -9,6 +9,7 @@ import {
 import { check } from '@template/permissions/rebac/check';
 import { memberRemoval } from '@template/permissions/rebac/rebacSchemaRules';
 import { schemaMap } from '@template/permissions/rebac/schema';
+import { omit } from 'lodash-es';
 
 const o1 = { id: 'o1' };
 const o9 = { id: 'o9' };
@@ -233,7 +234,7 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
 
     it('a record without the relation loaded is denied, never guessed from the key', async () => {
       const me = await session(u1, 'operate');
-      const { user: _user, ...bare } = r1;
+      const bare = omit(r1, 'user');
       expect(can(me, 'organizationUser', bare, 'leave')).toBe(false);
     });
   });

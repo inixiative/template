@@ -6,6 +6,7 @@
  */
 import { buildFilterQuery, type FilterState } from '@template/ui/lib/buildFilterQuery';
 import type { ListQueryCapabilities } from '@template/ui/lib/queryCapabilitiesFromOpenApi';
+import { omitBy } from 'lodash-es';
 import { useMemo, useState } from 'react';
 
 export type ListSearchFilterAndOrderInitialState = {
@@ -45,8 +46,7 @@ export const useListSearchFilterAndOrderState = (
       // Clearing a filter is `null` (or an empty `in` list); a present scalar value stays even
       // when it is `false`/`0`/`null`, which are real filters (`null` = match IS NULL).
       if (!state || (Array.isArray(state.value) && state.value.length === 0)) {
-        const { [field]: _removed, ...rest } = prev;
-        return rest;
+        return omitBy(prev, (_value, key) => key === field);
       }
       return { ...prev, [field]: state };
     });

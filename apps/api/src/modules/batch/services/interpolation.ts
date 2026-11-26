@@ -12,6 +12,7 @@ import {
   decodePercentEncodedBatchReferences,
   tokenizeBatchInterpolation,
 } from '@template/shared/batchInterpolation';
+import { mapValues } from 'lodash-es';
 import { isValidPathNotation } from '#/lib/prisma/pathNotation';
 import { assertBatchable } from '#/modules/batch/services/assertBatchable';
 import type { BatchRequest } from '#/modules/batch/services/strategies/types';
@@ -124,10 +125,7 @@ const interpolatePath = (path: string, context: InterpolationContext): string =>
 const interpolateHeaders = (
   headers: Record<string, string>,
   context: InterpolationContext,
-): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries(headers).map(([key, value]) => [key, interpolateString(value, context)]),
-  );
+): Record<string, string> => mapValues(headers, (value) => interpolateString(value, context));
 
 export const interpolateValue = (value: unknown, context: InterpolationContext): unknown => {
   if (typeof value === 'string') {
@@ -143,11 +141,7 @@ export const interpolateValue = (value: unknown, context: InterpolationContext):
   }
 
   if (value !== null && typeof value === 'object') {
-    const result: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(value)) {
-      result[key] = interpolateValue(val, context);
-    }
-    return result;
+    return mapValues(value as Record<string, unknown>, (val) => interpolateValue(val, context));
   }
 
   return value;

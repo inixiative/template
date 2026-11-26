@@ -11,6 +11,7 @@ import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetch
 import type { ComponentNode, Node, SlotNode } from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import type { OwnerScope } from '@template/email/render/types';
+import { mapValues } from 'lodash-es';
 
 export type ResolveHydrateBodies = (slugs: string[]) => Promise<Record<string, string | undefined>>;
 
@@ -25,7 +26,7 @@ export const hydrateEmailComponentTagsFromOwnerCascade = (
 ): Promise<string> => {
   const resolve: ResolveHydrateBodies = async (slugs) => {
     const components = await fetchComponentsThroughOwnerCascade(slugs, ctx);
-    return Object.fromEntries(slugs.map((slug) => [slug, components[slug]?.mjml]));
+    return mapValues(components, (component) => component?.mjml);
   };
   return hydrateEmailComponentTags(mjml, resolve);
 };

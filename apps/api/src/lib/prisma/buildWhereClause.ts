@@ -18,6 +18,7 @@ import {
   isCombinator,
   isRelationOperator,
 } from '@template/shared/bracketQuery';
+import { mapValues, pickBy } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { buildSearchPath } from '#/lib/prisma/buildSearchPath';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
@@ -141,33 +142,23 @@ const transformOperatorValue = (
   fieldPath: string,
 ): Record<string, unknown> => {
   const validOps = validOperatorsForField(field);
-  const out: Record<string, unknown> = {};
-
-  for (const [op, opValue] of Object.entries(value)) {
+  const coerced = mapValues(value, (opValue, op) => {
     // Non-operator keys (like `mode`) pass through. Anything that looks
     // like an operator must be valid for the field's kind.
-    if (!(FIELD_OPERATORS as readonly string[]).includes(op)) {
-      out[op] = opValue;
-      continue;
-    }
+    if (!(FIELD_OPERATORS as readonly string[]).includes(op)) return opValue;
     if (!validOps.includes(op)) {
       throw makeError({
         status: 400,
         message: `Operator '${op}' is not valid for field '${fieldPath}' (${kindLabel(field)}). Valid: ${validOps.join(', ')}.`,
       });
     }
-    if (isArrayFieldOperator(op) && !Array.isArray(opValue)) {
-      out[op] = [coerceValueForField(field, opValue)];
-    } else {
-      out[op] = coerceValueForField(field, opValue);
-    }
-  }
+    return isArrayFieldOperator(op) && !Array.isArray(opValue)
+      ? [coerceValueForField(field, opValue)]
+      : coerceValueForField(field, opValue);
+  });
 
-  const insensitive = out.mode === 'insensitive';
-  for (const [op, opValue] of Object.entries(out)) {
-    out[op] = matchesLiterally(field, op, opValue, insensitive);
-  }
-  return out;
+  const insensitive = coerced.mode === 'insensitive';
+  return mapValues(coerced, (opValue, op) => matchesLiterally(field, op, opValue, insensitive));
 };
 
 type EnumValuesAt = (path: string) => readonly string[] | undefined;
@@ -306,10 +297,14 @@ const validateAndTransformSearchFields = (
           message: `Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
         });
       }
-      const relationValue: BracketQueryRecord = {};
-      for (const [opKey, opValue] of Object.entries(value)) {
-        if (isRelationOperator(opKey) && isRecord(opValue)) {
-          relationValue[opKey] = validateAndTransformSearchFields(
+      result[key] = mapValues(
+        pickBy(
+          value,
+          (opValue, opKey): opValue is BracketQueryRecord =>
+            isRelationOperator(opKey) && isRecord(opValue),
+        ),
+        (opValue) =>
+          validateAndTransformSearchFields(
             opValue,
             searchableFields,
             skipFieldValidation,
@@ -317,10 +312,8 @@ const validateAndTransformSearchFields = (
             enumValuesAt,
             currentPath,
             depth + 1,
-          ) as BracketQueryValue;
-        }
-      }
-      result[key] = relationValue;
+          ) as BracketQueryValue,
+      );
       continue;
     }
 

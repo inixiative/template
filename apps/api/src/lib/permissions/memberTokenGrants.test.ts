@@ -10,6 +10,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
+import { mapValues, pickBy } from 'lodash-es';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -28,14 +29,7 @@ const grantsFor = async (rawKey: string) => {
   });
   expect(response.status).toBe(200);
   const grants = (await response.json()) as Record<string, Record<string, boolean>>;
-  return Object.fromEntries(
-    Object.entries(grants).map(([key, actions]) => [
-      key,
-      Object.keys(actions)
-        .filter((action) => actions[action])
-        .sort(),
-    ]),
-  );
+  return mapValues(grants, (actions) => Object.keys(pickBy(actions)).sort());
 };
 
 let organization: Organization;
