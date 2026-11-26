@@ -10,6 +10,7 @@ import { omit } from 'lodash-es';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { fetchOnePerOwnerIntegrationForUpdate } from '#/modules/integration/services/fetchOnePerOwnerIntegrationForUpdate';
 import { integrationOwnerKey } from '#/modules/integration/services/integrationOwnerKey';
+import { validateIntegrationConfiguration } from '#/modules/integration/validations/validateIntegrationConfiguration';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
 
 type IntegrationCreate = Prisma.IntegrationUncheckedCreateInput & {
@@ -21,6 +22,7 @@ export const createIntegration = (
   { entitlements = [], ...row }: IntegrationCreate,
 ) =>
   db.txn(async () => {
+    validateIntegrationConfiguration(row);
     await validateIntegrationRole(writer, row);
     const existing = await fetchOnePerOwnerIntegrationForUpdate(row);
     const integration = existing
