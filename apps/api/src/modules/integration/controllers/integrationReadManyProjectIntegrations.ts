@@ -4,8 +4,10 @@
  * @partOf feature:integrations, feature:project
  * @uses primitive:routeTemplates, primitive:authz, infrastructure:prisma
  */
+import { type HydratedRecord, hydrateMany } from '@template/db';
+import { IntegrationResourceStatus } from '@template/db/generated/client/enums';
+import { check } from '@template/permissions/rebac';
 import { contextResource } from '#/lib/context/contextResource';
-import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationReadManyProjectIntegrationsRoute } from '#/modules/integration/routes/integrationReadManyProjectIntegrations';
@@ -18,18 +20,29 @@ export const integrationReadManyProjectIntegrationsController = makeController(
     const integration = contextResource<'integration'>(c);
 
     const candidates = await db.projectIntegration.findMany({
-      where: { integrationId: integration.id, project: { deletedAt: null } },
+      where: { integrationId: integration.id },
     });
-    const allowed = await Promise.all(
-      candidates.map((row) => holdsOnRecord(permix, 'projectIntegration', row, 'read')),
-    );
-    const readableIds = candidates.filter((_row, index) => allowed[index]).map((row) => row.id);
+    const hydrated = await hydrateMany('projectIntegration', candidates);
+    const readableIds = hydrated
+      .filter((row) => {
+        const project = (row as HydratedRecord & { project?: HydratedRecord }).project;
+        return (
+          Boolean(project) &&
+          check(permix, 'projectIntegration', row, 'read') &&
+          check(permix, 'project', project!, 'read')
+        );
+      })
+      .map((row) => row.id);
 
     const { data, pagination } = await paginate(c, db.projectIntegration, {
       where: { integrationId: integration.id, id: { in: readableIds } },
       include: {
         project: true,
-        projectIntegrationResources: { where: { deletedAt: null } },
+        projectIntegrationResources: {
+          where: {
+            integrationResource: { status: { not: IntegrationResourceStatus.untracked } },
+          },
+        },
       },
     });
     return respond.ok(data, { pagination });

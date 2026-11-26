@@ -1,12 +1,15 @@
 /**
  * @atlas
- * @kind router
- * @partOf feature:project
+ * @kind module
+ * @partOf feature:integrations, feature:project
+ * @uses primitive:routeTemplates
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { autoRegisterRoutes } from '#/lib/utils/autoRegisterRoutes';
 import type { AppEnv } from '#/types/appEnv';
 
-export const projectIntegrationResourceRouter = new OpenAPIHono<AppEnv>();
+const projectIntegrationResourceRouter = new OpenAPIHono<AppEnv>();
 
-await autoRegisterRoutes(projectIntegrationResourceRouter, import.meta.dirname);
+await autoRegisterRoutes(projectIntegrationResourceRouter, import.meta.dir);
+
+export { projectIntegrationResourceRouter };

@@ -4,25 +4,30 @@
  * @partOf feature:integrations, feature:project
  * @uses infrastructure:prisma, primitive:authz, primitive:errors
  */
-import { db } from '@template/db';
-import type { Integration } from '@template/db/generated/client/client';
-import type { ProjectOwnerModel } from '@template/db/generated/client/enums';
+import { db, TENANT_COLUMNS } from '@template/db';
+import type { Integration, ProjectIntegration } from '@template/db/generated/client/client';
+import {
+  IntegrationResourceStatus,
+  type ProjectOwnerModel,
+} from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
-import { pick } from 'lodash-es';
+import { keyBy, pick, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import type { IntegrationCreateProjectIntegrationItem } from '#/modules/integration/schemas/integrationProjectIntegrationSchemas';
 
 const MAX_ITEMS_PER_REQUEST = 200;
 
-const validateItems = (items: readonly IntegrationCreateProjectIntegrationItem[]): void => {
+const validateProjectIntegrationItems = (
+  items: readonly IntegrationCreateProjectIntegrationItem[],
+): void => {
   if (items.length === 0) {
-    throw makeError({ status: 422, message: 'At least one project integration item is required' });
+    throw makeError({ status: 422, message: 'At least one ProjectIntegration item is required' });
   }
   if (items.length > MAX_ITEMS_PER_REQUEST) {
     throw makeError({
       status: 422,
-      message: `At most ${MAX_ITEMS_PER_REQUEST} project integration items may be sent at once`,
+      message: `At most ${MAX_ITEMS_PER_REQUEST} ProjectIntegration items may be sent at once`,
     });
   }
 
@@ -46,18 +51,18 @@ const validateItems = (items: readonly IntegrationCreateProjectIntegrationItem[]
       seenProjectIds.add(item.projectId);
     }
 
-    const resources = item.resources ?? [];
-    const seenResourceIds = new Set<string>();
+    const resourceInputs = item.resources ?? [];
+    const seenIntegrationResourceIds = new Set<string>();
     let identityCount = 0;
-    for (const resource of resources) {
-      if (seenResourceIds.has(resource.integrationResourceId)) {
+    for (const resourceInput of resourceInputs) {
+      if (seenIntegrationResourceIds.has(resourceInput.integrationResourceId)) {
         throw makeError({
           status: 422,
-          message: `Duplicate integrationResourceId ${resource.integrationResourceId} in item ${index}`,
+          message: `Duplicate integrationResourceId ${resourceInput.integrationResourceId} in item ${index}`,
         });
       }
-      seenResourceIds.add(resource.integrationResourceId);
-      if (resource.isIdentity) identityCount += 1;
+      seenIntegrationResourceIds.add(resourceInput.integrationResourceId);
+      if (resourceInput.isIdentity) identityCount += 1;
     }
     if (identityCount > 1) {
       throw makeError({
@@ -68,12 +73,23 @@ const validateItems = (items: readonly IntegrationCreateProjectIntegrationItem[]
   }
 };
 
-const resolveProjectId = async (
+const fetchOrCreateProjectId = async (
   permix: Permix,
   integration: Integration,
   item: IntegrationCreateProjectIntegrationItem,
 ): Promise<string> => {
   if (item.projectId) {
+    // Check permission before existence so unreadable/foreign UUIDs return 403 uniformly.
+    const projectIntegrationCandidate = {
+      id: '',
+      projectId: item.projectId,
+      integrationId: integration.id,
+    };
+    if (
+      !(await holdsOnRecord(permix, 'projectIntegration', projectIntegrationCandidate, 'create'))
+    ) {
+      throw makeError({ status: 403, message: 'Access denied' });
+    }
     const existing = await db.project.findFirst({ where: { id: item.projectId } });
     if (!existing) throw makeError({ status: 404, message: `Project ${item.projectId} not found` });
     return existing.id;
@@ -81,14 +97,13 @@ const resolveProjectId = async (
 
   const ownerFields = {
     ownerModel: integration.ownerModel as ProjectOwnerModel,
-    ...pick(integration, ['userId', 'organizationId', 'spaceId']),
+    ...pick(integration, TENANT_COLUMNS),
   };
-  if (!(await holdsOnRecord(permix, 'project', { id: '', ...ownerFields }, 'create'))) {
+  const projectData = { ...item.project!, ...ownerFields };
+  if (!(await holdsOnRecord(permix, 'project', { id: '', ...projectData }, 'create'))) {
     throw makeError({ status: 403, message: 'Access denied' });
   }
-  const created = await db.project.create({
-    data: { ...ownerFields, ...item.project! },
-  });
+  const created = await db.project.create({ data: projectData });
   return created.id;
 };
 
@@ -97,37 +112,70 @@ export const createManyIntegrationProjectIntegrations = async (
   integrationId: string,
   items: readonly IntegrationCreateProjectIntegrationItem[],
 ) => {
-  validateItems(items);
+  validateProjectIntegrationItems(items);
 
   return await db.txn(async () => {
-    await db.findForUpdate('Integration', { id: integrationId });
-    const integration = await db.integration.findUniqueOrThrow({ where: { id: integrationId } });
+    const existingProjectIds = uniq(
+      items.map((item) => item.projectId).filter((id): id is string => typeof id === 'string'),
+    ).sort();
+    for (const existingProjectId of existingProjectIds) {
+      await db.findForUpdate('Project', { id: existingProjectId });
+    }
 
-    const createdLinkIds: string[] = [];
+    const [integration] = await db.findForUpdate<Integration>('Integration', { id: integrationId });
+    if (!integration) {
+      throw makeError({ status: 404, message: `Integration ${integrationId} not found` });
+    }
+
+    const projectIntegrationIds: string[] = [];
 
     for (const item of items) {
-      const projectId = await resolveProjectId(permix, integration, item);
-      const linkPair = { projectId, integrationId: integration.id };
+      const projectId = await fetchOrCreateProjectId(permix, integration, item);
+      const projectIntegrationPair = { projectId, integrationId: integration.id };
 
-      if (!(await holdsOnRecord(permix, 'projectIntegration', { id: '', ...linkPair }, 'create'))) {
+      if (
+        !item.projectId &&
+        !(await holdsOnRecord(
+          permix,
+          'projectIntegration',
+          { id: '', ...projectIntegrationPair },
+          'create',
+        ))
+      ) {
         throw makeError({ status: 403, message: 'Access denied' });
       }
 
+      const [priorProjectIntegration] = await db.withDeleted(() =>
+        db.findForUpdate<ProjectIntegration>('ProjectIntegration', projectIntegrationPair, {
+          upserting: true,
+        }),
+      );
+      const revivingDeletedLink = Boolean(priorProjectIntegration?.deletedAt);
+
       const projectIntegration = await db.withDeleted(() =>
         db.projectIntegration.upsert({
-          where: { projectId_integrationId: linkPair },
-          create: linkPair,
+          where: { projectId_integrationId: projectIntegrationPair },
+          create: projectIntegrationPair,
           update: { deletedAt: null },
         }),
       );
-      createdLinkIds.push(projectIntegration.id);
+      projectIntegrationIds.push(projectIntegration.id);
+
+      const resourceInputs = item.resources ?? [];
+      if (revivingDeletedLink && resourceInputs.some((input) => input.isIdentity === true)) {
+        // why: reviving a tombstoned ProjectIntegration also revives prior cascaded identity rows; clear stale identity before applying the request's identity.
+        await db.projectIntegrationResource.updateManyAndReturn({
+          where: { projectIntegrationId: projectIntegration.id, isIdentity: true },
+          data: { isIdentity: false },
+        });
+      }
 
       // why: process non-identity updates first so swapping identity within one item never trips the partial unique index
-      const orderedResources = [...(item.resources ?? [])].sort(
+      const orderedResourceInputs = [...resourceInputs].sort(
         (a, b) => Number(Boolean(a.isIdentity)) - Number(Boolean(b.isIdentity)),
       );
 
-      for (const resourceInput of orderedResources) {
+      for (const resourceInput of orderedResourceInputs) {
         const resource = await db.integrationResource.findFirst({
           where: { id: resourceInput.integrationResourceId, integrationId: integration.id },
         });
@@ -139,19 +187,24 @@ export const createManyIntegrationProjectIntegrations = async (
         }
 
         const resourcePair = { projectId, integrationResourceId: resource.id };
+        const candidateIsIdentity = resourceInput.isIdentity ?? false;
         if (
           !(await holdsOnRecord(
             permix,
             'projectIntegrationResource',
-            { id: '', ...resourcePair },
+            {
+              id: '',
+              ...resourcePair,
+              projectIntegrationId: projectIntegration.id,
+              isIdentity: candidateIsIdentity,
+            },
             'create',
           ))
         ) {
           throw makeError({ status: 403, message: 'Access denied' });
         }
 
-        const isIdentity = resourceInput.isIdentity ?? false;
-        if (isIdentity) {
+        if (resourceInput.isIdentity === true) {
           const conflictingIdentity = await db.projectIntegrationResource.findFirst({
             where: {
               projectIntegrationId: projectIntegration.id,
@@ -162,7 +215,7 @@ export const createManyIntegrationProjectIntegrations = async (
           if (conflictingIdentity) {
             throw makeError({
               status: 409,
-              message: 'Project already has an identity resource for this integration',
+              message: 'Project already has an identity resource for this Integration',
             });
           }
         }
@@ -173,12 +226,14 @@ export const createManyIntegrationProjectIntegrations = async (
             create: {
               ...resourcePair,
               projectIntegrationId: projectIntegration.id,
-              isIdentity,
+              isIdentity: candidateIsIdentity,
             },
             update: {
               deletedAt: null,
               projectIntegrationId: projectIntegration.id,
-              isIdentity,
+              ...(resourceInput.isIdentity !== undefined
+                ? { isIdentity: resourceInput.isIdentity }
+                : {}),
             },
           }),
         );
@@ -186,13 +241,17 @@ export const createManyIntegrationProjectIntegrations = async (
     }
 
     const rows = await db.projectIntegration.findMany({
-      where: { id: { in: createdLinkIds } },
+      where: { id: { in: projectIntegrationIds } },
       include: {
         project: true,
-        projectIntegrationResources: { where: { deletedAt: null } },
+        projectIntegrationResources: {
+          where: {
+            integrationResource: { status: { not: IntegrationResourceStatus.untracked } },
+          },
+        },
       },
     });
-    const byId = new Map(rows.map((row) => [row.id, row]));
-    return createdLinkIds.map((id) => byId.get(id)!);
+    const rowsById = keyBy(rows, 'id');
+    return projectIntegrationIds.map((id) => rowsById[id]!);
   });
 };

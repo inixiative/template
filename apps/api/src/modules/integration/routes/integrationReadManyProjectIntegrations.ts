@@ -19,5 +19,5 @@ export const integrationReadManyProjectIntegrationsRoute = readRoute({
   middleware: [validatePermission('read')],
   responseSchema: integrationProjectIntegrationResponseSchema,
   description:
-    'Lists ProjectIntegrations linked to this Integration that the caller can read, with each linked Project and its active ProjectIntegrationResources.',
+    'List ProjectIntegration records for an integration that the caller can read, including each Project and its not-deleted ProjectIntegrationResources',
 });

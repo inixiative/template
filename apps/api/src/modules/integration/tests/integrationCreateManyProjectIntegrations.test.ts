@@ -4,7 +4,6 @@ import type {
   Integration,
   IntegrationResource,
   Organization,
-  OrganizationUser,
   Project,
   Space,
   User,
@@ -29,7 +28,9 @@ import {
   createUser,
 } from '@template/db/test';
 import { app } from '#/app';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 
 type Headers = Record<string, string>;
 
@@ -49,15 +50,14 @@ const request = (method: string, path: string, headers: Headers, body?: unknown)
 
 describe('Integration project setup (POST/GET /integration/:id/projectIntegrations & ProjectIntegrationResource.isIdentity)', () => {
   let organization: Organization;
-  let otherOrg: Organization;
+  let otherOrganization: Organization;
   let space: Space;
-  let orgOwner: User;
-  let orgAdmin: User;
-  let orgMember: User;
-  let orgMemberSeat: OrganizationUser;
-  let orgViewer: User;
+  let organizationOwner: User;
+  let organizationAdmin: User;
+  let organizationMember: User;
+  let organizationViewer: User;
   let outsider: User;
-  let orgIntegration: Integration;
+  let organizationIntegration: Integration;
   let otherIntegration: Integration;
   let repoA: IntegrationResource;
   let repoB: IntegrationResource;
@@ -72,24 +72,23 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
   beforeEach(async () => {
     const ownerCreated = await createOrganizationUser({ role: Role.owner });
     organization = ownerCreated.context.organization;
-    orgOwner = ownerCreated.context.user;
+    organizationOwner = ownerCreated.context.user;
 
-    ({ entity: otherOrg } = await createOrganization());
+    ({ entity: otherOrganization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
 
     const adminCreated = await createOrganizationUser({ role: Role.admin }, { organization });
-    orgAdmin = adminCreated.context.user;
+    organizationAdmin = adminCreated.context.user;
 
     const memberCreated = await createOrganizationUser({ role: Role.member }, { organization });
-    orgMember = memberCreated.context.user;
-    orgMemberSeat = memberCreated.entity;
+    organizationMember = memberCreated.context.user;
 
     const viewerCreated = await createOrganizationUser({ role: Role.viewer }, { organization });
-    orgViewer = viewerCreated.context.user;
+    organizationViewer = viewerCreated.context.user;
 
     ({ entity: outsider } = await createUser());
 
-    ({ entity: orgIntegration } = await createIntegration({
+    ({ entity: organizationIntegration } = await createIntegration({
       ownerModel: 'Organization',
       organizationId: organization.id,
       role: Role.member,
@@ -102,11 +101,11 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
 
     ({ entity: repoA } = await createIntegrationResource(
       { kind: 'repository', name: 'inixiative/kingdom' },
-      { integration: orgIntegration },
+      { integration: organizationIntegration },
     ));
     ({ entity: repoB } = await createIntegrationResource(
       { kind: 'repository', name: 'inixiative/template' },
-      { integration: orgIntegration },
+      { integration: organizationIntegration },
     ));
     ({ entity: untrackedRepo } = await createIntegrationResource(
       {
@@ -114,17 +113,17 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
         name: 'inixiative/archived',
         status: IntegrationResourceStatus.untracked,
       },
-      { integration: orgIntegration },
+      { integration: organizationIntegration },
     ));
     ({ entity: otherRepo } = await createIntegrationResource(
       { kind: 'repository', name: 'inixiative/other' },
       { integration: otherIntegration },
     ));
 
-    ownerHeaders = await jwt(orgOwner);
-    adminHeaders = await jwt(orgAdmin);
-    memberHeaders = await jwt(orgMember);
-    viewerHeaders = await jwt(orgViewer);
+    ownerHeaders = await jwt(organizationOwner);
+    adminHeaders = await jwt(organizationAdmin);
+    memberHeaders = await jwt(organizationMember);
+    viewerHeaders = await jwt(organizationViewer);
     outsiderHeaders = await jwt(outsider);
   });
 
@@ -132,7 +131,7 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
     await cleanupTouchedTables(db);
   });
 
-  it('creates new projects inline and links existing projects with isIdentity and attached resources in one transaction', async () => {
+  it('creates new projects inline and links existing projects with identity and non-identity resources in one transaction', async () => {
     const { entity: existingProject } = await createProject({
       name: 'Existing Team Project',
       ownerModel: 'Organization',
@@ -141,7 +140,7 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
 
     const response = await request(
       'POST',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       adminHeaders,
       [
         {
@@ -172,68 +171,118 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
     };
     expect(data).toHaveLength(2);
 
-    const createdLink = data[0]!;
-    expect(createdLink.integrationId).toBe(orgIntegration.id);
-    expect(createdLink.project.name).toBe('kingdom');
-    expect(createdLink.project.ownerModel).toBe('Organization');
-    expect(createdLink.project.organizationId).toBe(organization.id);
-    expect(createdLink.project.readAccess).toBe(ReadAccess.private);
-    expect(createdLink.project.operateAccess).toBe(OperateAccess.private);
-    expect(createdLink.projectIntegrationResources).toHaveLength(1);
-    expect(createdLink.projectIntegrationResources[0]).toMatchObject({
+    const createdProjectIntegration = data[0]!;
+    expect(createdProjectIntegration.integrationId).toBe(organizationIntegration.id);
+    expect(createdProjectIntegration.project.name).toBe('kingdom');
+    expect(createdProjectIntegration.project.ownerModel).toBe('Organization');
+    expect(createdProjectIntegration.project.organizationId).toBe(organization.id);
+    expect(createdProjectIntegration.project.readAccess).toBe(ReadAccess.private);
+    expect(createdProjectIntegration.project.operateAccess).toBe(OperateAccess.private);
+    expect(createdProjectIntegration.projectIntegrationResources).toHaveLength(1);
+    expect(createdProjectIntegration.projectIntegrationResources[0]).toMatchObject({
       integrationResourceId: repoA.id,
-      projectIntegrationId: createdLink.id,
+      projectIntegrationId: createdProjectIntegration.id,
       isIdentity: true,
     });
 
-    const existingLink = data[1]!;
-    expect(existingLink.projectId).toBe(existingProject.id);
-    expect(existingLink.projectIntegrationResources).toHaveLength(1);
-    expect(existingLink.projectIntegrationResources[0]).toMatchObject({
+    const existingProjectIntegration = data[1]!;
+    expect(existingProjectIntegration.projectId).toBe(existingProject.id);
+    expect(existingProjectIntegration.projectIntegrationResources).toHaveLength(1);
+    expect(existingProjectIntegration.projectIntegrationResources[0]).toMatchObject({
       integrationResourceId: repoB.id,
-      projectIntegrationId: existingLink.id,
+      projectIntegrationId: existingProjectIntegration.id,
       isIdentity: false,
     });
 
     // Listing via GET /integration/:id/projectIntegrations returns both to admin
     const listedAdmin = await request(
       'GET',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       adminHeaders,
     );
     expect(listedAdmin.status).toBe(200);
     const adminBody = (await listedAdmin.json()) as { data: Array<{ id: string }> };
     expect(adminBody.data.map((r) => r.id).sort()).toEqual(
-      [createdLink.id, existingLink.id].sort(),
+      [createdProjectIntegration.id, existingProjectIntegration.id].sort(),
     );
 
-    // Org viewer can read the integration, but both projects are private -> sees 0 rows (no leak!)
+    // Organization viewer can read the integration, but both projects are private -> sees 0 rows
     const listedViewer = await request(
       'GET',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       viewerHeaders,
     );
     expect(listedViewer.status).toBe(200);
     expect(((await listedViewer.json()) as { data: unknown[] }).data).toEqual([]);
 
-    // Flipping existingProject to readAccess: tenant reveals only existingLink to viewer
+    // Direct db:ProjectIntegration read entitlement without db:Project:read must NOT leak embedded Project
+    const directEntitlementToken = await createKeyedToken(
+      {
+        ownerModel: 'Organization',
+        role: null,
+        entitlements: [
+          entitlementInputFor(
+            'db:Integration',
+            ['db:Integration', organizationIntegration.id],
+            ['read'],
+          ),
+          entitlementInputFor(
+            'db:ProjectIntegration',
+            ['db:ProjectIntegration', createdProjectIntegration.id],
+            ['read'],
+          ),
+        ],
+      },
+      { organization },
+    );
+    const listedWithDirectEntitlement = await request(
+      'GET',
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
+      { authorization: `Bearer ${directEntitlementToken.rawKey}` },
+    );
+    expect(listedWithDirectEntitlement.status).toBe(200);
+    expect(((await listedWithDirectEntitlement.json()) as { data: unknown[] }).data).toEqual([]);
+
+    // Flipping existingProject to readAccess: tenant reveals only existingProjectIntegration to viewer
     await db.project.update({
       where: { id: existingProject.id },
       data: { readAccess: ReadAccess.tenant },
     });
     const listedViewerAfter = await request(
       'GET',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       viewerHeaders,
     );
     expect(listedViewerAfter.status).toBe(200);
     expect(
       ((await listedViewerAfter.json()) as { data: Array<{ id: string }> }).data.map((r) => r.id),
-    ).toEqual([existingLink.id]);
+    ).toEqual([existingProjectIntegration.id]);
+
+    // Untracked resources linked to the project are hidden from GET /integration/:id/projectIntegrations
+    await createProjectIntegrationResource(
+      { projectIntegrationId: existingProjectIntegration.id, isIdentity: false },
+      { project: existingProject, integrationResource: untrackedRepo },
+    );
+    const listedAfterUntracked = await request(
+      'GET',
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
+      adminHeaders,
+    );
+    const listedExisting = (
+      (await listedAfterUntracked.json()) as {
+        data: Array<{
+          id: string;
+          projectIntegrationResources: Array<{ integrationResourceId: string }>;
+        }>;
+      }
+    ).data.find((row) => row.id === existingProjectIntegration.id);
+    expect(listedExisting?.projectIntegrationResources.map((r) => r.integrationResourceId)).toEqual(
+      [repoB.id],
+    );
   });
 
   it('enforces at most one isIdentity resource per ProjectIntegration while allowing the same resource to be identity on two different projects', async () => {
-    const { entity: orgProject } = await createProject({
+    const { entity: organizationProject } = await createProject({
       name: 'Org Kingdom',
       ownerModel: 'Organization',
       organizationId: organization.id,
@@ -242,59 +291,78 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       name: 'Member Sandbox',
       ownerModel: 'OrganizationUser',
       organizationId: organization.id,
-      userId: orgMember.id,
+      userId: organizationMember.id,
     });
 
-    // Admin links repoA as identity on orgProject
     const first = await request(
       'POST',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       adminHeaders,
       [
         {
-          projectId: orgProject.id,
+          projectId: organizationProject.id,
           resources: [{ integrationResourceId: repoA.id, isIdentity: true }],
         },
       ],
     );
     expect(first.status).toBe(201);
 
-    // Trying to add a second isIdentity resource on the same ProjectIntegration -> 409
-    const conflict = await request(
+    // Re-sending repoA without isIdentity preserves existing isIdentity: true
+    const preserved = await request(
       'POST',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       adminHeaders,
       [
         {
-          projectId: orgProject.id,
+          projectId: organizationProject.id,
+          resources: [{ integrationResourceId: repoA.id }],
+        },
+      ],
+    );
+    expect(preserved.status).toBe(201);
+    const preservedBody = (await preserved.json()) as {
+      data: Array<{
+        projectIntegrationResources: Array<{ integrationResourceId: string; isIdentity: boolean }>;
+      }>;
+    };
+    expect(preservedBody.data[0]!.projectIntegrationResources[0]!.isIdentity).toBe(true);
+
+    // Second isIdentity resource on the same ProjectIntegration -> 409
+    const conflict = await request(
+      'POST',
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
+      adminHeaders,
+      [
+        {
+          projectId: organizationProject.id,
           resources: [{ integrationResourceId: repoB.id, isIdentity: true }],
         },
       ],
     );
     expect(conflict.status).toBe(409);
 
-    // Adding repoB as non-identity (attached) on the same ProjectIntegration succeeds
-    const attached = await request(
+    // Adding repoB as non-identity on the same ProjectIntegration succeeds
+    const nonIdentity = await request(
       'POST',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       adminHeaders,
       [
         {
-          projectId: orgProject.id,
+          projectId: organizationProject.id,
           resources: [{ integrationResourceId: repoB.id, isIdentity: false }],
         },
       ],
     );
-    expect(attached.status).toBe(201);
+    expect(nonIdentity.status).toBe(201);
 
     // Swapping identity from repoA -> repoB in a single call succeeds regardless of array order
     const swapped = await request(
       'POST',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       adminHeaders,
       [
         {
-          projectId: orgProject.id,
+          projectId: organizationProject.id,
           resources: [
             { integrationResourceId: repoB.id, isIdentity: true },
             { integrationResourceId: repoA.id, isIdentity: false },
@@ -308,19 +376,19 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
         projectIntegrationResources: Array<{ integrationResourceId: string; isIdentity: boolean }>;
       }>;
     };
-    const byResId = new Map(
+    const isIdentityByIntegrationResourceId = new Map(
       swappedBody.data[0]!.projectIntegrationResources.map((r) => [
         r.integrationResourceId,
         r.isIdentity,
       ]),
     );
-    expect(byResId.get(repoB.id)).toBe(true);
-    expect(byResId.get(repoA.id)).toBe(false);
+    expect(isIdentityByIntegrationResourceId.get(repoB.id)).toBe(true);
+    expect(isIdentityByIntegrationResourceId.get(repoA.id)).toBe(false);
 
-    // Member links the SAME repoA as isIdentity on their OWN OrganizationUser project -> allowed (separate ProjectIntegration)
+    // Member links the SAME repoA as isIdentity on their OWN OrganizationUser project -> allowed
     const memberLink = await request(
       'POST',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       memberHeaders,
       [
         {
@@ -331,44 +399,38 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
     );
     expect(memberLink.status).toBe(201);
 
-    // Admin listing does NOT see member's private project link; org owner sees both
+    // Admin listing does NOT see member's private project; owner sees both
     const adminList = await request(
       'GET',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       adminHeaders,
     );
     expect(
       ((await adminList.json()) as { data: Array<{ projectId: string }> }).data.map(
         (r) => r.projectId,
       ),
-    ).toEqual([orgProject.id]);
+    ).toEqual([organizationProject.id]);
 
     const ownerList = await request(
       'GET',
-      `/integration/${orgIntegration.id}/projectIntegrations`,
+      `/integration/${organizationIntegration.id}/projectIntegrations`,
       ownerHeaders,
     );
     expect(
       ((await ownerList.json()) as { data: Array<{ projectId: string }> }).data
         .map((r) => r.projectId)
         .sort(),
-    ).toEqual([memberProject.id, orgProject.id].sort());
+    ).toEqual([memberProject.id, organizationProject.id].sort());
   });
 
   it('rejects invalid inputs, cross-tenant links, untracked resources, foreign resources, and unauthorized callers', async () => {
-    const { entity: otherOrgProject } = await createProject({
+    const { entity: otherOrganizationProject } = await createProject({
       ownerModel: 'Organization',
-      organizationId: otherOrg.id,
+      organizationId: otherOrganization.id,
     });
-    const { entity: orgProject } = await createProject({
+    const { entity: organizationProject } = await createProject({
       ownerModel: 'Organization',
       organizationId: organization.id,
-    });
-    const { entity: memberIntegration } = await createIntegration({
-      ownerModel: 'OrganizationUser',
-      organizationId: organization.id,
-      userId: orgMember.id,
-      role: Role.member,
     });
 
     // Empty array -> 422
@@ -376,7 +438,7 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       (
         await request(
           'POST',
-          `/integration/${orgIntegration.id}/projectIntegrations`,
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
           adminHeaders,
           [],
         )
@@ -388,7 +450,7 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       (
         await request(
           'POST',
-          `/integration/${orgIntegration.id}/projectIntegrations`,
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
           adminHeaders,
           [{}],
         )
@@ -400,9 +462,9 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       (
         await request(
           'POST',
-          `/integration/${orgIntegration.id}/projectIntegrations`,
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
           adminHeaders,
-          [{ projectId: orgProject.id, project: { name: 'Dup' } }],
+          [{ projectId: organizationProject.id, project: { name: 'Dup' } }],
         )
       ).status,
     ).toBe(422);
@@ -412,11 +474,11 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       (
         await request(
           'POST',
-          `/integration/${orgIntegration.id}/projectIntegrations`,
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
           adminHeaders,
           [
             {
-              projectId: orgProject.id,
+              projectId: organizationProject.id,
               resources: [
                 { integrationResourceId: repoA.id, isIdentity: true },
                 { integrationResourceId: repoB.id, isIdentity: true },
@@ -432,21 +494,31 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       (
         await request(
           'POST',
-          `/integration/${orgIntegration.id}/projectIntegrations`,
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
           adminHeaders,
-          [{ projectId: orgProject.id, resources: [{ integrationResourceId: otherRepo.id }] }],
+          [
+            {
+              projectId: organizationProject.id,
+              resources: [{ integrationResourceId: otherRepo.id }],
+            },
+          ],
         )
       ).status,
     ).toBe(404);
 
-    // Untracked resource -> 403 (ReBAC db:ProjectIntegrationResource.create requires tracked/missing)
+    // Untracked resource -> 403
     expect(
       (
         await request(
           'POST',
-          `/integration/${orgIntegration.id}/projectIntegrations`,
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
           adminHeaders,
-          [{ projectId: orgProject.id, resources: [{ integrationResourceId: untrackedRepo.id }] }],
+          [
+            {
+              projectId: organizationProject.id,
+              resources: [{ integrationResourceId: untrackedRepo.id }],
+            },
+          ],
         )
       ).status,
     ).toBe(403);
@@ -456,9 +528,21 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       (
         await request(
           'POST',
-          `/integration/${orgIntegration.id}/projectIntegrations`,
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
           memberHeaders,
           [{ project: { name: 'Unauthorized Org Project' } }],
+        )
+      ).status,
+    ).toBe(403);
+
+    // Cross-tenant projectId returns uniform 403 (no existence oracle)
+    expect(
+      (
+        await request(
+          'POST',
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
+          adminHeaders,
+          [{ projectId: otherOrganizationProject.id }],
         )
       ).status,
     ).toBe(403);
@@ -468,9 +552,9 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       (
         await request(
           'POST',
-          `/integration/${orgIntegration.id}/projectIntegrations`,
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
           outsiderHeaders,
-          [{ projectId: otherOrgProject.id }],
+          [{ projectId: otherOrganizationProject.id }],
         )
       ).status,
     ).toBe(403);
@@ -478,23 +562,21 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       (
         await request(
           'GET',
-          `/integration/${orgIntegration.id}/projectIntegrations`,
+          `/integration/${organizationIntegration.id}/projectIntegrations`,
           outsiderHeaders,
         )
       ).status,
     ).toBe(403);
 
-    // Member-owned integration cannot link to org-owned project (projectIntegrationOwner hook -> 422)
-    // Owner can operate/manage orgProject & memberIntegration? No, member owns memberIntegration, admin/owner can't operate memberIntegration (403);
-    // test with space-scoped integration on org-scoped project (admin manages both -> 422 from tenant boundary hook!)
+    // Space-scoped integration on org-scoped project -> 422 from tenant boundary hook
     const { entity: spaceUser } = await createSpaceUser(
       { role: Role.admin },
       {
         organization,
         space,
-        user: orgAdmin,
+        user: organizationAdmin,
         organizationUser: await db.organizationUser.findFirstOrThrow({
-          where: { organizationId: organization.id, userId: orgAdmin.id },
+          where: { organizationId: organization.id, userId: organizationAdmin.id },
         }),
       },
     );
@@ -511,17 +593,13 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
           'POST',
           `/integration/${spaceIntegration.id}/projectIntegrations`,
           adminHeaders,
-          [{ projectId: orgProject.id }],
+          [{ projectId: organizationProject.id }],
         )
       ).status,
     ).toBe(422);
-
-    // Suppress unused check
-    expect(memberIntegration.id).toBeTruthy();
-    expect(orgMemberSeat.id).toBeTruthy();
   });
 
-  it('enforces DB invariants on ProjectIntegrationResource (isIdentity requires projectIntegrationId, consistency hook, cascade & delete route)', async () => {
+  it('enforces DB invariants on ProjectIntegrationResource including diamond Integration revive, nested disconnect/connect guards, and delete route', async () => {
     const { entity: projectA } = await createProject({
       ownerModel: 'Organization',
       organizationId: organization.id,
@@ -530,11 +608,11 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
       ownerModel: 'Organization',
       organizationId: organization.id,
     });
-    const { entity: linkA } = await createProjectIntegration(
+    const { entity: projectIntegrationA } = await createProjectIntegration(
       {},
-      { project: projectA, integration: orgIntegration },
+      { project: projectA, integration: organizationIntegration },
     );
-    const { entity: linkOtherInt } = await createProjectIntegration(
+    const { entity: otherProjectIntegration } = await createProjectIntegration(
       {},
       { project: projectA, integration: otherIntegration },
     );
@@ -550,7 +628,7 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
     // Consistency hook: projectIntegrationId pointing to wrong project -> 422
     await expect(
       createProjectIntegrationResource(
-        { projectIntegrationId: linkA.id },
+        { projectIntegrationId: projectIntegrationA.id },
         { project: projectB, integrationResource: repoA },
       ),
     ).rejects.toThrow('projectId must match');
@@ -558,44 +636,81 @@ describe('Integration project setup (POST/GET /integration/:id/projectIntegratio
     // Consistency hook: projectIntegrationId pointing to wrong integration -> 422
     await expect(
       createProjectIntegrationResource(
-        { projectIntegrationId: linkOtherInt.id },
+        { projectIntegrationId: otherProjectIntegration.id },
         { project: projectA, integrationResource: repoA },
       ),
-    ).rejects.toThrow('must belong to its ProjectIntegration');
+    ).rejects.toThrow('must belong to the same Integration as its ProjectIntegration');
 
-    // Valid linked resource + DELETE /projectIntegrationResource/:id ReBAC
-    const { entity: resLink } = await createProjectIntegrationResource(
-      { projectIntegrationId: linkA.id, isIdentity: true },
+    // Valid linked resource + nested Prisma disconnect/connect guards + DELETE /projectIntegrationResource/:id
+    const { entity: projectIntegrationResource } = await createProjectIntegrationResource(
+      { projectIntegrationId: projectIntegrationA.id, isIdentity: true },
       { project: projectA, integrationResource: repoA },
     );
+
+    // Nested disconnect on isIdentity=true row -> 422
+    await expect(
+      db.projectIntegrationResource.update({
+        where: { id: projectIntegrationResource.id },
+        data: { projectIntegration: { disconnect: true } },
+      }),
+    ).rejects.toThrow('requires a ProjectIntegration');
+
+    // Nested connect mutating immutable projectId -> 422
+    await expect(
+      db.projectIntegrationResource.update({
+        where: { id: projectIntegrationResource.id },
+        data: { project: { connect: { id: projectB.id } } },
+      }),
+    ).rejects.toThrow('cannot be modified after creation');
+
+    // DELETE route ReBAC + clears isIdentity on soft delete
     expect(
-      (await request('DELETE', `/projectIntegrationResource/${resLink.id}`, memberHeaders)).status,
+      (
+        await request(
+          'DELETE',
+          `/projectIntegrationResource/${projectIntegrationResource.id}`,
+          memberHeaders,
+        )
+      ).status,
     ).toBe(403);
     expect(
-      (await request('DELETE', `/projectIntegrationResource/${resLink.id}`, adminHeaders)).status,
+      (
+        await request(
+          'DELETE',
+          `/projectIntegrationResource/${projectIntegrationResource.id}`,
+          adminHeaders,
+        )
+      ).status,
     ).toBe(204);
-    expect(
-      await db.projectIntegrationResource.findUnique({ where: { id: resLink.id } }),
-    ).toBeNull();
+    const deletedRow = await db.withDeleted(() =>
+      db.projectIntegrationResource.findUniqueOrThrow({
+        where: { id: projectIntegrationResource.id },
+      }),
+    );
+    expect(deletedRow.deletedAt).not.toBeNull();
+    expect(deletedRow.isIdentity).toBe(false);
 
-    // Soft-deleting ProjectIntegration cascades to its ProjectIntegrationResource, and reviving brings it back
-    const { entity: resLink2 } = await createProjectIntegrationResource(
-      { projectIntegrationId: linkA.id, isIdentity: true },
+    // Soft-deleting and reviving the parent Integration (diamond cascade across IntegrationResource + ProjectIntegration) succeeds
+    const { entity: secondProjectIntegrationResource } = await createProjectIntegrationResource(
+      { projectIntegrationId: projectIntegrationA.id, isIdentity: true },
       { project: projectA, integrationResource: repoB },
     );
-    const { deletedAt } = await db.projectIntegration.update({
-      where: { id: linkA.id },
+    const { deletedAt } = await db.integration.update({
+      where: { id: organizationIntegration.id },
       data: { deletedAt: new Date() },
     });
     const tombstoned = await db.withDeleted(() =>
-      db.projectIntegrationResource.findUniqueOrThrow({ where: { id: resLink2.id } }),
+      db.projectIntegrationResource.findUniqueOrThrow({
+        where: { id: secondProjectIntegrationResource.id },
+      }),
     );
     expect(tombstoned.deletedAt).toEqual(deletedAt);
 
-    await revive(db.projectIntegration, { id: linkA.id });
+    await revive(db.integration, { id: organizationIntegration.id });
     const revived = await db.projectIntegrationResource.findUniqueOrThrow({
-      where: { id: resLink2.id },
+      where: { id: secondProjectIntegrationResource.id },
     });
     expect(revived.deletedAt).toBeNull();
+    expect(revived.isIdentity).toBe(true);
   });
 });

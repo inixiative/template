@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind route
- * @partOf feature:project
+ * @partOf feature:integrations, feature:project
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { deleteRoute } from '#/lib/routeTemplates';

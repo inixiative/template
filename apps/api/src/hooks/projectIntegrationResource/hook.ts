@@ -1,211 +1,164 @@
 /**
  * @atlas
  * @kind hook
- * @partOf feature:project
+ * @partOf feature:integrations, feature:project
  * @uses infrastructure:prisma, primitive:errors
  */
-import {
-  DbAction,
-  db,
-  type HookOptions,
-  HookTiming,
-  registerDbHook,
-  type SingleAction,
-} from '@template/db';
+import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import type { ProjectIntegrationResource } from '@template/db/generated/client/client';
-import { castArray, chunk } from 'lodash-es';
+import { chunk, keyBy, uniq } from 'lodash-es';
+import { changedPairs } from '#/hooks/shared/hookRows';
 import { makeError } from '#/lib/errors';
 
 const VALIDATION_CHUNK_SIZE = 2_000;
 
-type RelationConnectInput = {
-  connect?: { id?: string };
-  create?: unknown;
-  connectOrCreate?: unknown;
-};
-
-type ResourceLinkRow = Partial<ProjectIntegrationResource> & {
-  project?: RelationConnectInput;
-  integrationResource?: RelationConnectInput;
-  projectIntegration?: RelationConnectInput;
-};
-
-type ValidatableRow = {
+type ProjectIntegrationResourceCheckRow = {
   projectId: string;
   integrationResourceId: string;
   projectIntegrationId: string;
+  revivedFromStampMs: number | null;
 };
 
-const extractRelationId = (
-  directId: string | null | undefined,
-  nested: RelationConnectInput | undefined,
-  fieldLabel: 'projectId' | 'integrationResourceId' | 'projectIntegrationId',
-): string | null | undefined => {
-  if (typeof directId === 'string' && directId.length > 0) return directId;
-  if (directId === null) return null;
-  if (!nested) return undefined;
-  if (nested.create !== undefined || nested.connectOrCreate !== undefined) {
-    throw makeError({
-      status: 422,
-      message: `ProjectIntegrationResource requires an existing ${fieldLabel}; nested create/connectOrCreate is not allowed`,
-    });
+type ParentRow<T> = T & { id: string; deletedAt: Date | null };
+
+const isParentAliveOrSiblingRevive = (
+  deletedAt: Date | null,
+  revivedFromStampMs: number | null,
+): boolean =>
+  deletedAt === null || (revivedFromStampMs !== null && deletedAt.getTime() === revivedFromStampMs);
+
+const fetchProjectIntegrationsById = async (ids: string[]) => {
+  const rows: ParentRow<{ projectId: string; integrationId: string }>[] = [];
+  for (const batch of chunk(ids, VALIDATION_CHUNK_SIZE)) {
+    rows.push(
+      ...(await db.withDeleted(() =>
+        db.projectIntegration.findMany({
+          where: { id: { in: batch } },
+          select: { id: true, projectId: true, integrationId: true, deletedAt: true },
+        }),
+      )),
+    );
   }
-  if (typeof nested.connect?.id === 'string' && nested.connect.id.length > 0) {
-    return nested.connect.id;
-  }
-  return undefined;
+  return keyBy(rows, 'id');
 };
 
-const validateProjectIntegrationResourceRows = async (rows: ValidatableRow[]): Promise<void> => {
-  if (!rows.length) return;
-
-  const projectIntegrationIds = [...new Set(rows.map((r) => r.projectIntegrationId))];
-  const integrationResourceIds = [...new Set(rows.map((r) => r.integrationResourceId))];
-
-  const linksById = new Map<string, { projectId: string; integrationId: string }>();
-  const resourcesById = new Map<string, { integrationId: string }>();
-
-  for (const batch of chunk(projectIntegrationIds, VALIDATION_CHUNK_SIZE)) {
-    const found = await db.projectIntegration.findMany({
-      where: { id: { in: batch }, deletedAt: null },
-      select: { id: true, projectId: true, integrationId: true },
-    });
-    for (const row of found) linksById.set(row.id, row);
+const fetchIntegrationResourcesById = async (ids: string[]) => {
+  const rows: ParentRow<{ integrationId: string }>[] = [];
+  for (const batch of chunk(ids, VALIDATION_CHUNK_SIZE)) {
+    rows.push(
+      ...(await db.withDeleted(() =>
+        db.integrationResource.findMany({
+          where: { id: { in: batch } },
+          select: { id: true, integrationId: true, deletedAt: true },
+        }),
+      )),
+    );
   }
+  return keyBy(rows, 'id');
+};
 
-  for (const batch of chunk(integrationResourceIds, VALIDATION_CHUNK_SIZE)) {
-    const found = await db.integrationResource.findMany({
-      where: { id: { in: batch }, deletedAt: null },
-      select: { id: true, integrationId: true },
-    });
-    for (const row of found) resourcesById.set(row.id, row);
-  }
+const validateProjectIntegrationResources = async (
+  rows: ProjectIntegrationResourceCheckRow[],
+): Promise<void> => {
+  if (rows.length === 0) return;
+
+  const projectIntegrationIds = uniq(rows.map((row) => row.projectIntegrationId));
+  const integrationResourceIds = uniq(rows.map((row) => row.integrationResourceId));
+  const [projectIntegrationsById, integrationResourcesById] = await Promise.all([
+    fetchProjectIntegrationsById(projectIntegrationIds),
+    fetchIntegrationResourcesById(integrationResourceIds),
+  ]);
 
   for (const row of rows) {
-    const link = linksById.get(row.projectIntegrationId);
-    if (!link) {
+    const projectIntegration = projectIntegrationsById[row.projectIntegrationId];
+    if (
+      !projectIntegration ||
+      !isParentAliveOrSiblingRevive(projectIntegration.deletedAt, row.revivedFromStampMs)
+    ) {
       throw makeError({
         status: 422,
         message: `ProjectIntegration ${row.projectIntegrationId} not found`,
       });
     }
-    if (link.projectId !== row.projectId) {
+    if (projectIntegration.projectId !== row.projectId) {
       throw makeError({
         status: 422,
         message: 'ProjectIntegrationResource projectId must match its ProjectIntegration',
       });
     }
-    const resource = resourcesById.get(row.integrationResourceId);
-    if (!resource) {
+    const integrationResource = integrationResourcesById[row.integrationResourceId];
+    if (
+      !integrationResource ||
+      !isParentAliveOrSiblingRevive(integrationResource.deletedAt, row.revivedFromStampMs)
+    ) {
       throw makeError({
         status: 422,
         message: `IntegrationResource ${row.integrationResourceId} not found`,
       });
     }
-    if (link.integrationId !== resource.integrationId) {
+    if (integrationResource.integrationId !== projectIntegration.integrationId) {
       throw makeError({
         status: 422,
         message:
-          'ProjectIntegrationResource integrationResource must belong to its ProjectIntegration',
+          'ProjectIntegrationResource integrationResource must belong to the same Integration as its ProjectIntegration',
       });
     }
   }
 };
 
-const toValidatable = (
-  row: ResourceLinkRow,
-  previous?: Partial<ProjectIntegrationResource>,
-): ValidatableRow | null => {
-  const projectIntegrationId = extractRelationId(
-    row.projectIntegrationId,
-    row.projectIntegration,
-    'projectIntegrationId',
-  );
-  const resolvedLinkId =
-    projectIntegrationId === undefined
-      ? (previous?.projectIntegrationId ?? null)
-      : projectIntegrationId;
-  if (!resolvedLinkId) return null;
-
-  const projectId =
-    extractRelationId(row.projectId, row.project, 'projectId') ?? previous?.projectId;
-  const integrationResourceId =
-    extractRelationId(
-      row.integrationResourceId,
-      row.integrationResource,
-      'integrationResourceId',
-    ) ?? previous?.integrationResourceId;
-
-  if (!projectId || !integrationResourceId) return null;
-  return { projectId, integrationResourceId, projectIntegrationId: resolvedLinkId };
-};
-
 export const registerProjectIntegrationResourceHook = () => {
   registerDbHook(
-    'projectIntegrationResource:create',
-    'ProjectIntegrationResource',
-    HookTiming.before,
-    [DbAction.create, DbAction.createManyAndReturn],
-    async ({ args }) => {
-      const pending = castArray((args as { data: ResourceLinkRow | ResourceLinkRow[] }).data)
-        .map((row) => toValidatable(row))
-        .filter((row): row is ValidatableRow => row !== null);
-      await validateProjectIntegrationResourceRows(pending);
-    },
-  );
-
-  registerDbHook(
-    'projectIntegrationResource:upsert',
-    'ProjectIntegrationResource',
-    HookTiming.before,
-    [DbAction.upsert],
-    async (options) => {
-      const { args, previous } = options as HookOptions & { action: SingleAction };
-      const a = args as { create?: ResourceLinkRow; update?: ResourceLinkRow };
-      const pending: ValidatableRow[] = [];
-      if (a.create) {
-        const created = toValidatable(a.create);
-        if (created) pending.push(created);
-      }
-      if (a.update && previous) {
-        const updated = toValidatable(a.update, previous as Partial<ProjectIntegrationResource>);
-        if (updated) pending.push(updated);
-      }
-      await validateProjectIntegrationResourceRows(pending);
-    },
-  );
-
-  registerDbHook(
-    'projectIntegrationResource:update',
-    'ProjectIntegrationResource',
-    HookTiming.before,
-    [DbAction.update],
-    async (options) => {
-      const { args, previous } = options as HookOptions & { action: SingleAction };
-      const data = (args as { data?: ResourceLinkRow }).data;
-      if (!data || data.deletedAt != null) return;
-      const updated = toValidatable(data, previous as Partial<ProjectIntegrationResource>);
-      if (updated) await validateProjectIntegrationResourceRows([updated]);
-    },
-  );
-
-  registerDbHook(
-    'projectIntegrationResource:updateManyAndReturn',
+    'projectIntegrationResource:consistency',
     'ProjectIntegrationResource',
     HookTiming.after,
-    [DbAction.updateManyAndReturn],
-    async ({ result }) => {
-      const pending = castArray(result as ProjectIntegrationResource[])
-        .filter(
-          (row): row is ProjectIntegrationResource & { projectIntegrationId: string } =>
-            row.deletedAt == null && typeof row.projectIntegrationId === 'string',
-        )
-        .map(({ projectId, integrationResourceId, projectIntegrationId }) => ({
-          projectId,
-          integrationResourceId,
-          projectIntegrationId,
-        }));
-      await validateProjectIntegrationResourceRows(pending);
+    [
+      DbAction.create,
+      DbAction.createManyAndReturn,
+      DbAction.update,
+      DbAction.updateManyAndReturn,
+      DbAction.upsert,
+    ],
+    async (options) => {
+      const toValidate: ProjectIntegrationResourceCheckRow[] = [];
+
+      for (const pair of changedPairs(options)) {
+        const written = pair.result as ProjectIntegrationResource | undefined;
+        const previous = pair.previous as ProjectIntegrationResource | undefined;
+        if (!written) continue;
+
+        if (
+          previous &&
+          (previous.projectId !== written.projectId ||
+            previous.integrationResourceId !== written.integrationResourceId)
+        ) {
+          throw makeError({
+            status: 422,
+            message:
+              'ProjectIntegrationResource projectId and integrationResourceId cannot be modified after creation',
+          });
+        }
+
+        if (written.deletedAt !== null) continue;
+
+        if (written.isIdentity && !written.projectIntegrationId) {
+          throw makeError({
+            status: 422,
+            message: 'ProjectIntegrationResource with isIdentity requires a ProjectIntegration',
+          });
+        }
+
+        if (written.projectIntegrationId) {
+          toValidate.push({
+            projectId: written.projectId,
+            integrationResourceId: written.integrationResourceId,
+            projectIntegrationId: written.projectIntegrationId,
+            revivedFromStampMs:
+              previous?.deletedAt instanceof Date ? previous.deletedAt.getTime() : null,
+          });
+        }
+      }
+
+      await validateProjectIntegrationResources(toValidate);
     },
   );
 };

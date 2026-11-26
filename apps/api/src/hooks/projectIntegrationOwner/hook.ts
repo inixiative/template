@@ -6,17 +6,16 @@
  */
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import type { ProjectIntegration } from '@template/db/generated/client/client';
+import {
+  type OwnerScopeBoundary,
+  projectIntegrationOwnerViolation,
+} from '@template/shared/integrations';
 import { castArray, chunk } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
 const VALIDATION_CHUNK_SIZE = 2_000;
 
-type OwnerBoundaryRow = {
-  id: string;
-  organizationId: string | null;
-  spaceId: string | null;
-  userId: string | null;
-};
+type OwnerBoundaryRow = OwnerScopeBoundary & { id: string };
 
 type RelationConnectInput = {
   connect?: { id?: string };
@@ -87,32 +86,9 @@ const validateProjectIntegrationPair = (
     throw makeError({ status: 422, message: `Integration ${integrationId} not found` });
   }
 
-  if (project.organizationId !== integration.organizationId) {
-    throw makeError({
-      status: 422,
-      message: 'Project and Integration must belong to the same organization',
-    });
-  }
-
-  if (integration.spaceId !== null && project.spaceId !== integration.spaceId) {
-    throw makeError({
-      status: 422,
-      message: 'Space-scoped Integration can only attach to a Project in the same space',
-    });
-  }
-
-  if (integration.userId !== null && project.userId !== integration.userId) {
-    throw makeError({
-      status: 422,
-      message: 'User-scoped Integration can only attach to a Project owned by the same user',
-    });
-  }
-
-  if (project.organizationId === null && project.userId !== integration.userId) {
-    throw makeError({
-      status: 422,
-      message: 'Personal Project and Integration must belong to the same user',
-    });
+  const violation = projectIntegrationOwnerViolation(project, integration);
+  if (violation) {
+    throw makeError({ status: 422, message: violation });
   }
 };
 

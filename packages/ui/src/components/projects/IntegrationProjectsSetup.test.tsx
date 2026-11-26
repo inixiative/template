@@ -24,7 +24,6 @@ type RecordedRequest = { method: string; url: string; body?: unknown };
 const repoSpecs: readonly ProjectResourceSpec[] = [
   {
     kind: 'repository',
-    singularLabel: 'Repository',
     pluralLabel: 'Repositories',
     defaultProjectName: (resource) => resource.name.split('/').pop() ?? resource.name,
   },
@@ -33,12 +32,6 @@ const repoSpecs: readonly ProjectResourceSpec[] = [
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
 let client: QueryClient;
 let requests: RecordedRequest[];
-
-const jsonResponse = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
 
 const stubFetch = (handler: (req: RecordedRequest) => Response | Promise<Response>) => {
   const intercept = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -73,11 +66,11 @@ afterEach(() => {
 });
 
 describe('IntegrationProjectsSetup', () => {
-  it('renders nothing when no resource specs apply', async () => {
-    const { entity: org } = await buildOrganization();
+  it('renders nothing when no project resource specs apply', async () => {
+    const { entity: organization } = await buildOrganization();
     const { entity: integration } = await buildIntegration(
-      { ownerModel: 'Organization', organizationId: org.id },
-      { organization: org },
+      { ownerModel: 'Organization', organizationId: organization.id },
+      { organization },
     );
 
     const { container } = render(
@@ -85,7 +78,7 @@ describe('IntegrationProjectsSetup', () => {
         <IntegrationProjectsSetup
           integration={integration.__serialize()}
           projects={[]}
-          resourceSpecs={[]}
+          projectResourceSpecs={[]}
         />
       </QueryClientProvider>,
     );
@@ -93,15 +86,15 @@ describe('IntegrationProjectsSetup', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('creates new projects with isIdentity, attaches existing projects, and unlinks skipped resources', async () => {
-    const { entity: org } = await buildOrganization();
+  it('creates new projects with isIdentity, links existing projects, and unlinks skipped resources', async () => {
+    const { entity: organization } = await buildOrganization();
     const { entity: integration } = await buildIntegration(
-      { ownerModel: 'Organization', organizationId: org.id, name: 'Acme GitHub' },
-      { organization: org },
+      { ownerModel: 'Organization', organizationId: organization.id, name: 'Acme GitHub' },
+      { organization },
     );
     const { entity: existingProject } = await buildProject(
-      { ownerModel: 'Organization', organizationId: org.id, name: 'Core Platform' },
-      { organization: org },
+      { ownerModel: 'Organization', organizationId: organization.id, name: 'Core Platform' },
+      { organization },
     );
     const { entity: repoNew } = await buildIntegrationResource(
       { kind: 'repository', name: 'acme/web-app', status: 'tracked' },
@@ -115,12 +108,12 @@ describe('IntegrationProjectsSetup', () => {
       { kind: 'account', name: 'acme', status: 'tracked' },
       { integration },
     );
-    const { entity: existingLink } = await buildProjectIntegration(
+    const { entity: existingProjectIntegration } = await buildProjectIntegration(
       {},
       { project: existingProject, integration },
     );
-    const { entity: existingResLink } = await buildProjectIntegrationResource(
-      { projectIntegrationId: existingLink.id, isIdentity: true },
+    const { entity: existingProjectIntegrationResource } = await buildProjectIntegrationResource(
+      { projectIntegrationId: existingProjectIntegration.id, isIdentity: true },
       { project: existingProject, integrationResource: repoLinked },
     );
 
@@ -131,37 +124,37 @@ describe('IntegrationProjectsSetup', () => {
       repoLinked.__serialize(),
       accountSingleton.__serialize(),
     ];
-    const serializedLinks = [
+    const serializedProjectIntegrations = [
       {
-        ...existingLink.__serialize(),
+        ...existingProjectIntegration.__serialize(),
         project: serializedProject,
-        projectIntegrationResources: [existingResLink.__serialize()],
+        projectIntegrationResources: [existingProjectIntegrationResource.__serialize()],
       },
     ];
 
     fetchSpy = stubFetch(({ method, url }) => {
       if (method === 'GET' && url.includes('/integrationResources')) {
-        return jsonResponse({
+        return Response.json({
           data: serializedResources,
           pagination: { total: 3, page: 1, pageSize: 100, totalPages: 1 },
         });
       }
       if (method === 'GET' && url.includes('/projectIntegrations')) {
-        return jsonResponse({
-          data: serializedLinks,
+        return Response.json({
+          data: serializedProjectIntegrations,
           pagination: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
         });
       }
       if (
         method === 'DELETE' &&
-        url.includes(`/projectIntegrationResource/${existingResLink.id}`)
+        url.includes(`/projectIntegrationResource/${existingProjectIntegrationResource.id}`)
       ) {
         return new Response(null, { status: 204 });
       }
       if (method === 'POST' && url.includes(`/integration/${integration.id}/projectIntegrations`)) {
-        return jsonResponse({ data: serializedLinks }, 201);
+        return Response.json({ data: serializedProjectIntegrations }, { status: 201 });
       }
-      return jsonResponse({ data: [] });
+      return Response.json({ data: [] });
     });
 
     render(
@@ -169,7 +162,7 @@ describe('IntegrationProjectsSetup', () => {
         <IntegrationProjectsSetup
           integration={serializedIntegration}
           projects={[serializedProject]}
-          resourceSpecs={repoSpecs}
+          projectResourceSpecs={repoSpecs}
         />
       </QueryClientProvider>,
     );
@@ -180,13 +173,10 @@ describe('IntegrationProjectsSetup', () => {
         existingProject.id,
       );
     });
-    // Non-translatable 'account' resource is filtered out
+    // Resource kinds absent from projectResourceSpecs are filtered out
     expect(screen.queryByText('acme')).toBeNull();
 
-    // Switch acme/legacy-app to Skip so it unlinks; leave acme/web-app as New project: web-app (isIdentity: true)
-    const legacySelect = screen.getByLabelText('acme/legacy-app');
-    fireEvent.change(legacySelect, { target: { value: '__skip__' } });
-
+    fireEvent.change(screen.getByLabelText('acme/legacy-app'), { target: { value: '__skip__' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save projects' }));
 
     await waitFor(() => {
@@ -197,7 +187,7 @@ describe('IntegrationProjectsSetup', () => {
       requests.some(
         (r) =>
           r.method === 'DELETE' &&
-          r.url.includes(`/projectIntegrationResource/${existingResLink.id}`),
+          r.url.includes(`/projectIntegrationResource/${existingProjectIntegrationResource.id}`),
       ),
     ).toBe(true);
 
@@ -214,14 +204,14 @@ describe('IntegrationProjectsSetup', () => {
   });
 
   it('enforces mutual exclusion of isIdentity when two resources target the same existing project', async () => {
-    const { entity: org } = await buildOrganization();
+    const { entity: organization } = await buildOrganization();
     const { entity: integration } = await buildIntegration(
-      { ownerModel: 'Organization', organizationId: org.id, name: 'Acme GitHub' },
-      { organization: org },
+      { ownerModel: 'Organization', organizationId: organization.id, name: 'Acme GitHub' },
+      { organization },
     );
     const { entity: existingProject } = await buildProject(
-      { ownerModel: 'Organization', organizationId: org.id, name: 'Core Platform' },
-      { organization: org },
+      { ownerModel: 'Organization', organizationId: organization.id, name: 'Core Platform' },
+      { organization },
     );
     const { entity: repoA } = await buildIntegrationResource(
       { kind: 'repository', name: 'acme/core-api', status: 'tracked' },
@@ -231,43 +221,43 @@ describe('IntegrationProjectsSetup', () => {
       { kind: 'repository', name: 'acme/core-web', status: 'tracked' },
       { integration },
     );
-    const { entity: existingLink } = await buildProjectIntegration(
+    const { entity: existingProjectIntegration } = await buildProjectIntegration(
       {},
       { project: existingProject, integration },
     );
-    const { entity: existingResLink } = await buildProjectIntegrationResource(
-      { projectIntegrationId: existingLink.id, isIdentity: true },
+    const { entity: existingProjectIntegrationResource } = await buildProjectIntegrationResource(
+      { projectIntegrationId: existingProjectIntegration.id, isIdentity: true },
       { project: existingProject, integrationResource: repoA },
     );
 
     const serializedIntegration = integration.__serialize();
     const serializedProject = existingProject.__serialize() as unknown as ProjectRecord;
     const serializedResources = [repoA.__serialize(), repoB.__serialize()];
-    const serializedLinks = [
+    const serializedProjectIntegrations = [
       {
-        ...existingLink.__serialize(),
+        ...existingProjectIntegration.__serialize(),
         project: serializedProject,
-        projectIntegrationResources: [existingResLink.__serialize()],
+        projectIntegrationResources: [existingProjectIntegrationResource.__serialize()],
       },
     ];
 
     fetchSpy = stubFetch(({ method, url }) => {
       if (method === 'GET' && url.includes('/integrationResources')) {
-        return jsonResponse({
+        return Response.json({
           data: serializedResources,
           pagination: { total: 2, page: 1, pageSize: 100, totalPages: 1 },
         });
       }
       if (method === 'GET' && url.includes('/projectIntegrations')) {
-        return jsonResponse({
-          data: serializedLinks,
+        return Response.json({
+          data: serializedProjectIntegrations,
           pagination: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
         });
       }
       if (method === 'POST' && url.includes(`/integration/${integration.id}/projectIntegrations`)) {
-        return jsonResponse({ data: serializedLinks }, 201);
+        return Response.json({ data: serializedProjectIntegrations }, { status: 201 });
       }
-      return jsonResponse({ data: [] });
+      return Response.json({ data: [] });
     });
 
     render(
@@ -275,7 +265,7 @@ describe('IntegrationProjectsSetup', () => {
         <IntegrationProjectsSetup
           integration={serializedIntegration}
           projects={[serializedProject]}
-          resourceSpecs={repoSpecs}
+          projectResourceSpecs={repoSpecs}
         />
       </QueryClientProvider>,
     );
@@ -286,7 +276,6 @@ describe('IntegrationProjectsSetup', () => {
       );
     });
 
-    // Attach repoB to existingProject -> defaults isIdentity to false since repoA already holds identity
     fireEvent.change(screen.getByLabelText('acme/core-web'), {
       target: { value: existingProject.id },
     });
@@ -294,7 +283,6 @@ describe('IntegrationProjectsSetup', () => {
     expect(checkboxes[0]!.checked).toBe(true);
     expect(checkboxes[1]!.checked).toBe(false);
 
-    // Promoting repoB to identity automatically unchecks repoA
     fireEvent.click(checkboxes[1]!);
     expect(checkboxes[0]!.checked).toBe(false);
     expect(checkboxes[1]!.checked).toBe(true);
@@ -317,5 +305,98 @@ describe('IntegrationProjectsSetup', () => {
         ],
       },
     ]);
+  });
+
+  it('preserves secondary project links on the same resource when skipping the displayed assignment', async () => {
+    const { entity: organization } = await buildOrganization();
+    const { entity: integration } = await buildIntegration(
+      { ownerModel: 'Organization', organizationId: organization.id, name: 'Acme GitHub' },
+      { organization },
+    );
+    const { entity: projectA } = await buildProject(
+      { ownerModel: 'Organization', organizationId: organization.id, name: 'Org Project' },
+      { organization },
+    );
+    const { entity: projectB } = await buildProject(
+      { ownerModel: 'Organization', organizationId: organization.id, name: 'Member Sandbox' },
+      { organization },
+    );
+    const { entity: sharedRepo } = await buildIntegrationResource(
+      { kind: 'repository', name: 'acme/shared', status: 'tracked' },
+      { integration },
+    );
+    const { entity: projectIntegrationA } = await buildProjectIntegration(
+      {},
+      { project: projectA, integration },
+    );
+    const { entity: projectIntegrationB } = await buildProjectIntegration(
+      {},
+      { project: projectB, integration },
+    );
+    const { entity: resourceLinkA } = await buildProjectIntegrationResource(
+      { projectIntegrationId: projectIntegrationA.id, isIdentity: true },
+      { project: projectA, integrationResource: sharedRepo },
+    );
+    const { entity: resourceLinkB } = await buildProjectIntegrationResource(
+      { projectIntegrationId: projectIntegrationB.id, isIdentity: true },
+      { project: projectB, integrationResource: sharedRepo },
+    );
+
+    const serializedProjectA = projectA.__serialize() as unknown as ProjectRecord;
+    const serializedProjectB = projectB.__serialize() as unknown as ProjectRecord;
+
+    fetchSpy = stubFetch(({ method, url }) => {
+      if (method === 'GET' && url.includes('/integrationResources')) {
+        return Response.json({
+          data: [sharedRepo.__serialize()],
+          pagination: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+        });
+      }
+      if (method === 'GET' && url.includes('/projectIntegrations')) {
+        return Response.json({
+          data: [
+            {
+              ...projectIntegrationA.__serialize(),
+              project: serializedProjectA,
+              projectIntegrationResources: [resourceLinkA.__serialize()],
+            },
+            {
+              ...projectIntegrationB.__serialize(),
+              project: serializedProjectB,
+              projectIntegrationResources: [resourceLinkB.__serialize()],
+            },
+          ],
+          pagination: { total: 2, page: 1, pageSize: 100, totalPages: 1 },
+        });
+      }
+      if (method === 'DELETE') return new Response(null, { status: 204 });
+      return Response.json({ data: [] });
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <IntegrationProjectsSetup
+          integration={integration.__serialize()}
+          projects={[serializedProjectA, serializedProjectB]}
+          projectResourceSpecs={repoSpecs}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Also linked to 1 other project.')).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText('acme/shared'), { target: { value: '__skip__' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save projects' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Projects saved.')).toBeTruthy();
+    });
+
+    const deleteUrls = requests.filter((r) => r.method === 'DELETE').map((r) => r.url);
+    expect(deleteUrls).toHaveLength(1);
+    expect(deleteUrls[0]).toContain(`/projectIntegrationResource/${resourceLinkA.id}`);
+    expect(deleteUrls[0]).not.toContain(resourceLinkB.id);
   });
 });
