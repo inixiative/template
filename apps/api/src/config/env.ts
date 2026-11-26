@@ -70,6 +70,7 @@ const baseEnvSchema = z
     WEB_URL: z.string().url().optional(),
     ADMIN_URL: z.string().optional(),
     SUPERADMIN_URL: z.string().optional(),
+    CORS_ALLOWED_ORIGIN_PATTERNS: z.string().optional(),
 
     // Auth
     GOOGLE_CLIENT_ID: z.string().optional(),

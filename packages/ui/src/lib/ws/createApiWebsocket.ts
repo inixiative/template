@@ -295,6 +295,7 @@ export const createApiWebsocket = (
       case 'subscribeRejected':
         console.error(`ws subscribe rejected: ${frame.channel}`);
         channels.delete(frame.channel as string);
+        sentSubscribes.delete(frame.channel as string);
         return void recordReconnectAck(frame.channel as string);
       case 'subscribed':
         return void recordReconnectAck(frame.channel as string);

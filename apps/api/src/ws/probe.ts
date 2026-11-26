@@ -6,9 +6,10 @@
  */
 import { WS_CHANNELS } from '@template/shared/ws';
 import { app } from '#/app';
-import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET } from '#/lib/utils/authProbe';
+import type { ResolvedOperation } from '#/lib/openapi/resolveOperation';
+import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET, SYSTEM_PROBE_SECRET } from '#/lib/utils/authProbe';
 import { resolveOperationRoute } from '#/ws/operationRoute';
-import { routeAccessOf } from '#/ws/routeAccess';
+import { type RouteAccess, routeAccessOf } from '#/ws/routeAccess';
 
 export type WSHeaders = Record<string, string>;
 
@@ -59,12 +60,35 @@ export const resolveIdentity = async (headers: WSHeaders): Promise<IdentityResol
   };
 };
 
-export const canSubscribe = async (headers: WSHeaders, channel: string): Promise<boolean> => {
-  const route = await resolveOperationRoute(channel);
-  if (!route || !Object.hasOwn(WS_CHANNELS, route.operationId)) return false;
+export const probeRouteAccess = async (
+  route: ResolvedOperation | null,
+  headers: WSHeaders,
+  secret: string,
+): Promise<RouteAccess> => {
+  if (!route) return 'rejected';
   const res = await app.request(route.path, {
     method: route.method,
-    headers: { ...headers, [AUTH_PROBE_HEADER]: AUTH_PROBE_SECRET },
+    headers: { ...headers, [AUTH_PROBE_HEADER]: secret },
   });
-  return res.ok;
+  return routeAccessOf(res.status);
 };
+
+const resolveChannelRoute = async (channel: string): Promise<ResolvedOperation | null> => {
+  const route = await resolveOperationRoute(channel);
+  return route && Object.hasOwn(WS_CHANNELS, route.operationId) ? route : null;
+};
+
+export const probeChannelAccess = async (
+  headers: WSHeaders,
+  channel: string,
+): Promise<RouteAccess> =>
+  probeRouteAccess(await resolveChannelRoute(channel), headers, AUTH_PROBE_SECRET);
+
+export const canSubscribe = async (headers: WSHeaders, channel: string): Promise<boolean> =>
+  (await probeChannelAccess(headers, channel)) === 'granted';
+
+export const reprobeChannelAccess = async (
+  headers: WSHeaders,
+  channel: string,
+): Promise<RouteAccess> =>
+  probeRouteAccess(await resolveChannelRoute(channel), headers, SYSTEM_PROBE_SECRET);

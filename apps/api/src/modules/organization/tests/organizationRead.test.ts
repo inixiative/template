@@ -68,4 +68,16 @@ describe('GET /api/v1/organization/:id', () => {
     const response = await otherHarness.fetch(get(`/api/v1/organization/${org.id}`));
     expect(response.status).toBe(200);
   });
+
+  it('omits tenantPermissionRules from the public response', async () => {
+    await db.organization.update({
+      where: { id: org.id },
+      data: { tenantPermissionRules: { 'db:Contact': { read: true } } },
+    });
+
+    const response = await fetch(get(`/api/v1/organization/${org.id}`));
+    expect(response.status).toBe(200);
+    const { data } = await parseSuccessBody<Record<string, unknown>>(response);
+    expect('tenantPermissionRules' in data).toBe(false);
+  });
 });

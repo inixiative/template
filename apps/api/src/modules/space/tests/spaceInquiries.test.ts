@@ -295,4 +295,19 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
       data.every((i) => i.status !== InquiryStatus.draft && i.status !== InquiryStatus.canceled),
     ).toBe(true);
   });
+
+  it('rejects non-manager callers creating a space inquiry at route middleware', async () => {
+    const { entity: outsider } = await createUser();
+    const outsiderFetch = createTestApp({ mockUser: outsider, mount }).fetch;
+
+    const response = await outsiderFetch(
+      post(`/api/v1/space/${space.id}/inquiries`, {
+        type: InquiryType.updateSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { name: 'Hijacked' },
+      }),
+    );
+
+    expect(response.status).toBe(403);
+  });
 });

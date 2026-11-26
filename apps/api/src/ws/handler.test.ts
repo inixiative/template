@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { db } from '@template/db';
 import {
   InquiryResourceModel,
@@ -13,8 +13,10 @@ import {
   createUser,
 } from '@template/db/test';
 import { WS_CHANNELS } from '@template/shared/ws';
+import { app } from '#/app';
 import { websocketHandler } from '#/ws/handler';
 import { meChannel } from '#/ws/meChannel';
+import { reauthorizeOpenStreams } from '#/ws/reauthorizeOpenStreams';
 import { clearRegistry, connectionIdsByChannel, connectionsById } from '#/ws/registry';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket, sentFrames } from '#tests/createTestSocket';
@@ -28,16 +30,16 @@ const createAdminBearer = async () => {
   return (await createBearerToken(superadmin)).authorization;
 };
 
-const createTestInquiry = async () => {
+const createTestInquiry = async (targetUserId?: string) => {
   const { entity: sourceOrganization } = await createOrganization();
-  const { entity: targetUser } = await createUser();
+  const resolvedTargetUserId = targetUserId ?? (await createUser()).entity.id;
   const { entity: inquiry } = await createInquiry({
     type: InquiryType.inviteOrganizationUser,
     status: InquiryStatus.sent,
     sourceModel: InquiryResourceModel.Organization,
     sourceOrganizationId: sourceOrganization.id,
     targetModel: InquiryResourceModel.User,
-    targetUserId: targetUser.id,
+    targetUserId: resolvedTargetUserId,
     content: { organizationId: sourceOrganization.id, role: 'member' },
   });
   return inquiry;
@@ -236,5 +238,69 @@ describe('websocketHandler', () => {
     const before = sent.length;
     await websocketHandler.message(socket, '{ not json');
     expect(sent.length).toBe(before);
+  });
+
+  it('reauthorizes subscribed channels and evicts revoked subscriptions including /me channels', async () => {
+    const { entity: user } = await createUser();
+    const { authorization, token } = await createBearerToken(user);
+    const inquiry = await createTestInquiry(user.id);
+    const inquiryChannel = WS_CHANNELS.inquiryRead.name(inquiry.id);
+    const meWireChannel = WS_CHANNELS.meReadManySegmentMemberships.name();
+
+    const { socket, sent } = createTestSocket({
+      connectionId: 'c1',
+      userId: user.id,
+      headers: { authorization },
+    });
+    websocketHandler.open(socket);
+    await websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'subscribe', channel: inquiryChannel }),
+    );
+    await websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'subscribe', channel: meWireChannel }),
+    );
+    sent.length = 0;
+
+    await reauthorizeOpenStreams();
+    expect(sentFrames(sent)).toEqual([]);
+    expect(connectionIdsByChannel.has(inquiryChannel)).toBe(true);
+    expect(connectionIdsByChannel.has(meChannel(meWireChannel, user.id))).toBe(true);
+
+    await db.token.update({ where: { id: token.id }, data: { isActive: false } });
+    await reauthorizeOpenStreams();
+
+    expect(connectionIdsByChannel.has(inquiryChannel)).toBe(false);
+    expect(connectionIdsByChannel.has(meChannel(meWireChannel, user.id))).toBe(false);
+    expect(socket.data.channels.size).toBe(0);
+    expect(sentFrames(sent)).toEqual([
+      { type: 'subscribeRejected', channel: inquiryChannel },
+      { type: 'subscribeRejected', channel: meWireChannel },
+    ]);
+  });
+
+  it('emits retryable subscribe error when a channel re-probe returns 503', async () => {
+    const inquiry = await createTestInquiry();
+    const channel = WS_CHANNELS.inquiryRead.name(inquiry.id);
+    const authorization = await createAdminBearer();
+
+    const { socket, sent } = createTestSocket({ connectionId: 'c1', headers: { authorization } });
+    websocketHandler.open(socket);
+    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
+    sent.length = 0;
+
+    const spy = spyOn(app, 'request').mockImplementationOnce((() =>
+      Promise.resolve(new Response('busy', { status: 503 }))) as never);
+    try {
+      await reauthorizeOpenStreams();
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(connectionIdsByChannel.has(channel)).toBe(false);
+    expect(sentFrames(sent)).toEqual([
+      { type: 'error', action: 'subscribe', channel, retryable: true },
+    ]);
   });
 });

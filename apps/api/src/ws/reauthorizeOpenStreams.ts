@@ -32,7 +32,7 @@ const reauthorizeQueued = async (ws: WSSocket): Promise<void> => {
 
 export const reauthorizeOpenStreams = async (): Promise<void> => {
   const sockets = [...connectionsById.values()].filter(
-    (ws) => ws.data.streams.size > 0 && !pending.has(ws),
+    (ws) => (ws.data.streams.size > 0 || ws.data.channels.size > 0) && !pending.has(ws),
   );
   await Promise.all(sockets.map(reauthorizeQueued));
 };
