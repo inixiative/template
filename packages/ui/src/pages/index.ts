@@ -1,5 +1,6 @@
 export * from './AdminInquiriesPage';
 export * from './AuthCallbackPage';
+export * from './ForgotPasswordPage';
 export * from './HomePage';
 export * from './InquiriesPage';
 export * from './IntegrationsPage';
@@ -15,6 +16,7 @@ export * from './OrganizationUsersPage';
 export * from './ProfilePage';
 export * from './ProjectDetailPage';
 export * from './ProjectsPage';
+export * from './ResetPasswordPage';
 export * from './SegmentsPage';
 export * from './SignUpPage';
 export * from './SpaceProfilePage';

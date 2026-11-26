@@ -32,9 +32,14 @@ const providerIcons: Record<string, string> = {
 export type LoginFormProps = {
   hideSignUp?: boolean;
   onSignUpClick?: () => void;
+  onForgotPasswordClick?: () => void;
 };
 
-export const LoginForm = ({ hideSignUp: _hideSignUp, onSignUpClick }: LoginFormProps) => {
+export const LoginForm = ({
+  hideSignUp: _hideSignUp,
+  onSignUpClick,
+  onForgotPasswordClick,
+}: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const search = useSearch({ strict: false }) as { redirectTo?: string; error?: string };
@@ -105,7 +110,7 @@ export const LoginForm = ({ hideSignUp: _hideSignUp, onSignUpClick }: LoginFormP
       <CardContent>
         <div className="space-y-4">
           {displayError && (
-            <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               {displayError.message}
               {displayError.detail && (
                 <div className="mt-1 text-xs opacity-80 break-all">{displayError.detail}</div>
@@ -162,7 +167,18 @@ export const LoginForm = ({ hideSignUp: _hideSignUp, onSignUpClick }: LoginFormP
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                {onForgotPasswordClick && (
+                  <button
+                    type="button"
+                    onClick={onForgotPasswordClick}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <Input
                 id="password"
                 type="password"

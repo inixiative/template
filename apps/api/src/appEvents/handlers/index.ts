@@ -79,6 +79,14 @@ import {
   tagAttachmentDeleted,
 } from '#/appEvents/handlers/tagAttachment/tagAttachmentDeleted';
 import { type UserCreatedPayload, userCreated } from '#/appEvents/handlers/user/userCreated';
+import {
+  type UserEmailVerifiedPayload,
+  userEmailVerified,
+} from '#/appEvents/handlers/user/userEmailVerified';
+import {
+  type UserPasswordResetRequestedPayload,
+  userPasswordResetRequested,
+} from '#/appEvents/handlers/user/userPasswordResetRequested';
 import { type UserRedactedPayload, userRedacted } from '#/appEvents/handlers/user/userRedacted';
 import { type UserUpdatedPayload, userUpdated } from '#/appEvents/handlers/user/userUpdated';
 import {
@@ -115,6 +123,8 @@ export type AppEventPayloads = {
   'user.updated': UserUpdatedPayload;
   'user.redacted': UserRedactedPayload;
   'user.verificationRequested': UserVerificationRequestedPayload;
+  'user.emailVerified': UserEmailVerifiedPayload;
+  'user.passwordResetRequested': UserPasswordResetRequestedPayload;
 };
 
 export const AppEventName = {
@@ -145,6 +155,8 @@ export const AppEventName = {
   userUpdated: 'user.updated',
   userRedacted: 'user.redacted',
   userVerificationRequested: 'user.verificationRequested',
+  userEmailVerified: 'user.emailVerified',
+  userPasswordResetRequested: 'user.passwordResetRequested',
 } as const;
 
 export type AppEventName = (typeof AppEventName)[keyof typeof AppEventName];
@@ -177,4 +189,6 @@ export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
   'user.updated': userUpdated,
   'user.redacted': userRedacted,
   'user.verificationRequested': userVerificationRequested,
+  'user.emailVerified': userEmailVerified,
+  'user.passwordResetRequested': userPasswordResetRequested,
 };

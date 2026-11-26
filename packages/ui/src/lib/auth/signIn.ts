@@ -4,6 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
+import { betterAuthClient } from '@template/ui/lib/auth/betterAuthClient';
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
 import type {
   AuthMethod,
@@ -12,13 +13,6 @@ import type {
   SamlAuthMethod,
   SignInResult,
 } from '@template/ui/lib/auth/types';
-import { createAuthClient } from 'better-auth/client';
-import { oneTimeTokenClient } from 'better-auth/client/plugins';
-
-const betterAuthClient = () => {
-  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-  return createAuthClient({ baseURL, plugins: [oneTimeTokenClient()] });
-};
 
 const signInWithEmail = async (method: EmailAuthMethod): Promise<SignInResult> => {
   const client = betterAuthClient();

@@ -125,7 +125,7 @@ export const SignUpForm = ({ onLoginClick }: SignUpFormProps) => {
       <CardContent>
         <div className="space-y-4">
           {displayError && (
-            <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               {displayError.message}
               {displayError.detail && (
                 <div className="mt-1 text-xs opacity-80 break-all">{displayError.detail}</div>

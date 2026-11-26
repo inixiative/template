@@ -48,10 +48,17 @@ describe('email seeds persist through the app save', () => {
     const templates = await db.emailTemplate.findMany({
       where: {
         ownerModel: 'default',
-        slug: { in: ['welcome', 'email-verification', 'inquiry-invite-organization-user'] },
+        slug: {
+          in: [
+            'welcome',
+            'email-verification',
+            'password-reset',
+            'inquiry-invite-organization-user',
+          ],
+        },
       },
     });
-    expect(templates).toHaveLength(3);
+    expect(templates).toHaveLength(4);
   });
 
   it('fails the seed run on a template the save refuses', async () => {

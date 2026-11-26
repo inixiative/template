@@ -4,18 +4,19 @@
  * @partOf feature:auth
  * @uses infrastructure:prisma, infrastructure:redis, primitive:appEvents
  */
-import { db, redisClient, redisNamespace } from '@template/db';
+import { redisClient, redisNamespace } from '@template/db';
 import { passwordLength } from '@template/shared/auth/passwordLength';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emitAppEvent } from '#/appEvents/emit';
 import { authPlugins } from '#/lib/auth/authPlugins';
+import { betterAuthDb } from '#/lib/auth/betterAuthDb';
 import { incrementSecondaryStorageKey } from '#/lib/auth/queries/incrementSecondaryStorageKey';
 import { allowedCorsOrigins } from '#/middleware/corsMiddleware';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
 export const auth = betterAuth({
-  database: prismaAdapter(db, {
+  database: prismaAdapter(betterAuthDb, {
     provider: 'postgresql',
   }),
 
@@ -27,12 +28,35 @@ export const auth = betterAuth({
     requireEmailVerification: true,
     minPasswordLength: passwordLength.min,
     maxPasswordLength: passwordLength.max,
+    resetPasswordTokenExpiresIn: 60 * 60,
+    sendResetPassword: async ({ user, token }) => {
+      const resetUrl = new URL('/reset-password', process.env.WEB_URL);
+      resetUrl.searchParams.set('token', token);
+      await emitAppEvent('user.passwordResetRequested', {
+        userId: user.id,
+        resetUrl: resetUrl.toString(),
+      });
+    },
     onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
   },
 
   emailVerification: {
     sendVerificationEmail: async ({ user, url }: { user: { id: string }; url: string }) => {
       await emitAppEvent('user.verificationRequested', { userId: user.id, verificationUrl: url });
+    },
+    afterEmailVerification: async (user) => {
+      await emitAppEvent('user.emailVerified', { userId: user.id });
+    },
+  },
+
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          await emitAppEvent('user.created', { userId: user.id, isGuest: false });
+          if (user.emailVerified) await emitAppEvent('user.emailVerified', { userId: user.id });
+        },
+      },
     },
   },
 

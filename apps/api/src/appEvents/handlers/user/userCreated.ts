@@ -11,11 +11,4 @@ export type UserCreatedPayload = {
   isGuest: boolean;
 };
 
-export const userCreated = makeAppEvent<UserCreatedPayload>({
-  email: (data) => [
-    {
-      template: 'welcome',
-      data: { userId: data.userId, isGuest: data.isGuest },
-    },
-  ],
-});
+export const userCreated = makeAppEvent<UserCreatedPayload>({});

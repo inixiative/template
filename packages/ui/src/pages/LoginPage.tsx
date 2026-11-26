@@ -5,14 +5,15 @@
  * @uses none
  */
 import { LoginForm } from '@template/ui/components/auth/LoginForm';
-import { navigateToSignUp } from '@template/ui/lib/routeRedirect';
+import { navigateToForgotPassword, navigateToSignUp } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
 
 type LoginPageProps = {
   hideSignUp?: boolean;
+  hideForgotPassword?: boolean;
 };
 
-export const LoginPage = ({ hideSignUp }: LoginPageProps) => {
+export const LoginPage = ({ hideSignUp, hideForgotPassword }: LoginPageProps) => {
   const currentAppStore = useAppStore.getState;
   const projectName = useAppStore((state) => state.ui.projectName);
   const appName = useAppStore((state) => state.ui.appName);
@@ -29,6 +30,9 @@ export const LoginPage = ({ hideSignUp }: LoginPageProps) => {
         <LoginForm
           hideSignUp={hideSignUp}
           onSignUpClick={hideSignUp ? undefined : () => navigateToSignUp(currentAppStore, true)}
+          onForgotPasswordClick={
+            hideForgotPassword ? undefined : () => navigateToForgotPassword(currentAppStore, true)
+          }
         />
       </div>
     </div>

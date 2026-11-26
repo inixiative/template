@@ -110,7 +110,7 @@ export const ChangePasswordCard = () => {
           </div>
 
           {status.kind === 'error' && (
-            <p role="alert" className="text-sm text-error-foreground">
+            <p role="alert" className="text-sm text-destructive">
               {status.message}
             </p>
           )}

@@ -76,6 +76,7 @@ Located in `packages/email` (`@template/email`).
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
 | Render issues | Done | Save refuses what the lens can decide; render records typed issues; the registry entry says `fail` (default), `degrade`, or names a `substitute` |
 | **Sending jobs** | Done | `planEmailDeliveries` BullMQ job (resolve → verify → compose → interpolate → render → send) |
+| Seeded system emails | Done | `email-verification`, `password-reset`, `inquiry-invite-organization-user`, `welcome`, sharing the `system-head` / `system-header` / `system-footer` components (`packages/db/prisma/seeds/email*.seed.ts`); the head holds the shared `mj-attributes` and `mj-class` styles (card, heading, note, link, and the header and footer's header, brand, footer, fine-print), so an app re-brands every email by editing `system-head` alone |
 | **Authoring layer** | Planned | Narrowed-lens rule builder + field selector (COMM-001 / INFRA-002 / INFRA-017) |
 | **Data hydration** | TODO | Pipe `{sender,recipient,data}` in; the lens is its schema |
 | **Preference management** | TODO | Unsubscribe, categories |
