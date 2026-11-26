@@ -12,8 +12,8 @@ import {
   fetchArtifactOrThrow,
   withLockedPlacement,
 } from '#/modules/artifact/services/artifactPlacementUtils';
-import { validateEdgeAuthority } from '#/modules/artifact/validations/validateEdgeAuthority';
 import { validatePlacementAccess } from '#/modules/artifact/validations/validatePlacementAccess';
+import { validatePlacementPermissions } from '#/modules/artifact/validations/validatePlacementPermissions';
 
 export const updateArtifactPlacement = async (
   permix: Permix,
@@ -24,7 +24,7 @@ export const updateArtifactPlacement = async (
     fetchArtifactOrThrow(placement.artifactId),
     fetchArtifactOrThrow(placement.containerArtifactId),
   ]);
-  await validateEdgeAuthority(permix, artifact, container, 'manage');
+  await validatePlacementPermissions(permix, artifact, container, 'manage');
   validatePlacementAccess(container, access);
 
   return withLockedPlacement(
@@ -33,7 +33,7 @@ export const updateArtifactPlacement = async (
     container,
     [],
     async ({ current, lockedArtifact, lockedContainer }) => {
-      await validateEdgeAuthority(permix, lockedArtifact, lockedContainer, 'manage');
+      await validatePlacementPermissions(permix, lockedArtifact, lockedContainer, 'manage');
       return db.artifactPlacement.update({ where: { id: current.id }, data: { access } });
     },
   );

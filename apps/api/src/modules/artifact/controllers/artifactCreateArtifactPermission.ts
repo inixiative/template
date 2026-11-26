@@ -4,13 +4,12 @@
  * @partOf feature:files
  * @uses primitive:routeTemplates, primitive:authz
  */
-import { hydrate, type Prisma } from '@template/db';
-import { check } from '@template/permissions/rebac';
+import type { Prisma } from '@template/db';
 import { contextResource } from '#/lib/context/contextResource';
-import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactCreateArtifactPermissionRoute } from '#/modules/artifact/routes/artifactCreateArtifactPermission';
 import { withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
+import { validateArtifactPermissionGrant } from '#/modules/artifact/validations/validateArtifactPermissionGrant';
 import { validateNotRootArtifact } from '#/modules/artifact/validations/validateNotRootArtifact';
 
 export const artifactCreateArtifactPermissionController = makeController(
@@ -23,17 +22,7 @@ export const artifactCreateArtifactPermissionController = makeController(
     const permix = c.get('permix');
     const permission = await withLockedArtifacts([artifact], async (locked) => {
       const target = locked.get(artifact.id)!;
-      const hydrated = await hydrate('artifact', target);
-      if (
-        !check(
-          permix,
-          'artifactPermission',
-          { id: '', artifactId: target.id, role: body.role, artifact: hydrated },
-          'create',
-        )
-      ) {
-        throw makeError({ status: 403, message: 'Forbidden' });
-      }
+      await validateArtifactPermissionGrant(permix, target, body.role);
       return db.artifactPermission.create({
         data: { ...body, artifactId: target.id } as Prisma.ArtifactPermissionUncheckedCreateInput,
       });

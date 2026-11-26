@@ -6,12 +6,12 @@
  */
 import { db } from '@template/db';
 import {
-  type AncestorEdge,
   fetchArtifactTreeAround,
   fetchDescendantIds,
   type TreeAround,
 } from '#/hooks/artifactTree/fetchArtifactTreeAround';
 import {
+  type AncestorEdge,
   type EffectiveAccess,
   resolveArtifactTree,
   syncAncestors,
@@ -23,23 +23,28 @@ const ACCESS_VALUES: readonly EffectiveAccess[] = ['private', 'tenant', 'public'
 
 const syncEffectivePermissions = async (
   artifactIds: string[],
-  { directPermissions, externalPermissions }: TreeAround,
+  { artifacts, externalParents }: TreeAround,
   desiredByArtifact: Map<string, Map<string, AncestorEdge>>,
 ): Promise<void> => {
   const existing = await db.artifactEffectivePermission.findMany({
     where: { artifactId: { in: artifactIds } },
   });
-  const insideTree = new Set(artifactIds);
   const desired: { artifactId: string; artifactPermissionId: string }[] = [];
 
   for (const artifactId of artifactIds) {
-    const permissionIds = new Set(directPermissions.get(artifactId) ?? []);
+    const permissionIds = new Set(
+      artifacts.get(artifactId)?.artifactPermissions.map((p) => p.id) ?? [],
+    );
     for (const [ancestorId, edge] of desiredByArtifact.get(artifactId) ?? []) {
       if (!edge.inherits) continue;
-      const source = insideTree.has(ancestorId)
-        ? directPermissions.get(ancestorId)
-        : externalPermissions.get(ancestorId);
-      for (const permissionId of source ?? []) permissionIds.add(permissionId);
+      const internal = artifacts.get(ancestorId);
+      if (internal) {
+        for (const p of internal.artifactPermissions) permissionIds.add(p.id);
+      } else {
+        for (const row of externalParents.get(ancestorId)?.artifactEffectivePermissions ?? []) {
+          permissionIds.add(row.artifactPermissionId);
+        }
+      }
     }
     for (const artifactPermissionId of permissionIds) {
       desired.push({ artifactId, artifactPermissionId });

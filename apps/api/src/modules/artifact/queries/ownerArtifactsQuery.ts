@@ -10,7 +10,6 @@ import { ArtifactKind } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
-import { paginate } from '#/lib/prisma/paginate';
 import {
   accessibleArtifactWhereForOwner,
   type OwnerArtifactAccessProbe,
@@ -46,7 +45,15 @@ export const ownerArtifactsWhere = async (
   return accessWhere ? { AND: [ownerWhere, accessWhere] } : ownerWhere;
 };
 
-const shapeAccessibleArtifacts = async (
+export const ownerArtifactsQuery = async (
+  c: ValidatedContext<'query', { orderBy?: string[] }>,
+) => ({
+  where: await ownerArtifactsWhere(c, contextArtifactOwner(c)),
+  include: includeArtifactList,
+  orderBy: defaultOrderBy(c, { name: 'asc' as const }),
+});
+
+export const shapeAccessibleArtifacts = async (
   c: Context<AppEnv>,
   rows: ArtifactWithPermissions[],
 ): Promise<ArtifactWithPermissions[]> => {
@@ -61,17 +68,4 @@ const shapeAccessibleArtifacts = async (
     const canManage = check(permix, 'artifact', hydrated, 'manage');
     return [{ ...row, artifactPermissions: canManage ? row.artifactPermissions : [] }];
   });
-};
-
-export const paginateOwnerArtifacts = async (
-  c: ValidatedContext<'query', { orderBy?: string[] }>,
-) => {
-  const db = c.get('db');
-  const owner = contextArtifactOwner(c);
-  const { data, pagination } = await paginate(c, db.artifact, {
-    where: await ownerArtifactsWhere(c, owner),
-    include: includeArtifactList,
-    orderBy: defaultOrderBy(c, { name: 'asc' as const }),
-  });
-  return { data: await shapeAccessibleArtifacts(c, data), pagination };
 };

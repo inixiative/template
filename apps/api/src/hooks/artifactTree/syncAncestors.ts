@@ -6,28 +6,22 @@
  */
 import { db } from '@template/db';
 import type { ArtifactAccess } from '@template/db/generated/client/enums';
-import type { AncestorEdge, TreeAround } from '#/hooks/artifactTree/fetchArtifactTreeAround';
+import type { TreeAround } from '#/hooks/artifactTree/fetchArtifactTreeAround';
 import { syncJoinRows } from '#/hooks/artifactTree/syncJoinRows';
 import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 
+export type AncestorEdge = { inherits: boolean; depth: number };
 export type EffectiveAccess = 'private' | 'tenant' | 'public';
 
-type ResolvedNodeState = {
-  ancestors: Map<string, AncestorEdge>;
-  effectiveAccess: EffectiveAccess;
+const ACCESS_RANK: Record<ArtifactAccess, number> = {
+  inherit: 0,
+  private: 0,
+  tenant: 1,
+  public: 2,
 };
-
-const ACCESS_RANK: Record<EffectiveAccess, number> = { private: 0, tenant: 1, public: 2 };
 const ACCESS_BY_RANK = ['private', 'tenant', 'public'] as const;
 
-const rankOf = (access: ArtifactAccess): number =>
-  access === 'public' ? ACCESS_RANK.public : access === 'tenant' ? ACCESS_RANK.tenant : 0;
-
-export const resolveArtifactTree = ({
-  artifacts,
-  externalParents,
-  externalAncestors,
-}: TreeAround) => {
+export const resolveArtifactTree = ({ artifacts, externalParents }: TreeAround) => {
   const memo = new Map<string, { ancestors: Map<string, AncestorEdge>; accessRank: number }>();
 
   const walk = (
@@ -47,27 +41,30 @@ export const resolveArtifactTree = ({
 
     const merge = (ancestorId: string, edge: AncestorEdge) => {
       const current = ancestors.get(ancestorId);
-      ancestors.set(
-        ancestorId,
-        current
-          ? {
-              inherits: current.inherits || edge.inherits,
-              depth: Math.max(current.depth, edge.depth),
-            }
-          : edge,
-      );
+      if (current) {
+        ancestors.set(ancestorId, {
+          inherits: current.inherits || edge.inherits,
+          depth: Math.max(current.depth, edge.depth),
+        });
+      } else {
+        ancestors.set(ancestorId, edge);
+      }
     };
 
-    for (const { containerArtifactId: parentId, access } of node.placements) {
+    for (const { containerArtifactId: parentId, access } of node.artifactPlacementsAsArtifact) {
       const internalParent = artifacts.get(parentId);
-      const parent = internalParent ?? externalParents.get(parentId);
+      const externalParent = internalParent ? undefined : externalParents.get(parentId);
+      const parent = internalParent ?? externalParent;
       if (!parent) continue;
 
       const parentState = internalParent ? walk(parentId, nextVisiting) : undefined;
-      const parentAncestors =
-        parentState?.ancestors ??
-        externalAncestors.get(parentId) ??
-        new Map<string, AncestorEdge>();
+      const parentAncestors: Iterable<[string, AncestorEdge]> = parentState
+        ? parentState.ancestors
+        : (externalParent?.artifactAncestorsAsDescendant.map(
+            (row) =>
+              [row.ancestorArtifactId, { inherits: row.inherits, depth: row.depth }] as const,
+          ) ?? []);
+
       // why: cross-owner placements never inherit across tenants; private and explicit tenant
       // placements stop explicit folder grants from cascading down from ancestors.
       const sameOwner = sameArtifactOwner(node, parent);
@@ -89,7 +86,7 @@ export const resolveArtifactTree = ({
         } else if (access === 'tenant') {
           contribution = hasTenant ? ACCESS_RANK.tenant : 0;
         } else if (access === 'inherit' && parent.kind !== 'root') {
-          contribution = parentState ? parentState.accessRank : rankOf(parent.effectiveAccess);
+          contribution = parentState ? parentState.accessRank : ACCESS_RANK[parent.effectiveAccess];
           if (!hasTenant && contribution === ACCESS_RANK.tenant) contribution = 0;
         }
         if (contribution > accessRank) accessRank = contribution;
@@ -101,9 +98,11 @@ export const resolveArtifactTree = ({
     return state;
   };
 
-  return (artifactId: string): ResolvedNodeState => {
+  return (
+    artifactId: string,
+  ): { ancestors: Map<string, AncestorEdge>; effectiveAccess: EffectiveAccess } => {
     const { ancestors, accessRank } = walk(artifactId, new Set());
-    return { ancestors, effectiveAccess: ACCESS_BY_RANK[accessRank]! };
+    return { ancestors, effectiveAccess: ACCESS_BY_RANK[accessRank] ?? 'private' };
   };
 };
 

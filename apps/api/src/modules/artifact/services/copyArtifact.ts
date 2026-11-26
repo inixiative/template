@@ -61,7 +61,6 @@ export const copyArtifactInto = async (
 export const copyArtifact = async (permix: Permix, input: CopyArtifactInput): Promise<Artifact> => {
   const { source, name } = input;
   validateNotRootArtifact(source, 'Root container cannot be copied');
-  await validateArtifactPermission(permix, source, 'read');
 
   let targetContainer: Artifact;
   if ('owner' in input) {

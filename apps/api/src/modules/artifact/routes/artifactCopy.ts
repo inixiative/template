@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { actionRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   artifactCopyBodyRefinement,
   artifactCopyBodySchema,
@@ -20,4 +21,5 @@ export const artifactCopyRoute = actionRoute({
   bodySchema: artifactCopyBodySchema,
   bodyRefinement: artifactCopyBodyRefinement,
   responseSchema: artifactReadResponseSchema,
+  middleware: [validatePermission('read')],
 });

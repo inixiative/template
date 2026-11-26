@@ -15,11 +15,11 @@ import {
   withLockedPlacement,
 } from '#/modules/artifact/services/artifactPlacementUtils';
 import {
-  validateEdgeAuthority,
   validatePlacementDeletable,
-} from '#/modules/artifact/validations/validateEdgeAuthority';
+  validatePlacementPermissions,
+} from '#/modules/artifact/validations/validatePlacementPermissions';
 
-export const removeArtifactPlacement = async (
+export const deleteArtifactPlacement = async (
   permix: Permix,
   placement: ArtifactPlacement,
 ): Promise<void> => {
@@ -27,14 +27,14 @@ export const removeArtifactPlacement = async (
     fetchArtifactOrThrow(placement.artifactId),
     fetchArtifactOrThrow(placement.containerArtifactId),
   ]);
-  await validateEdgeAuthority(permix, artifact, container, 'remove');
+  await validatePlacementPermissions(permix, artifact, container, 'delete');
   await withLockedPlacement(
     placement,
     artifact,
     container,
     [],
     async ({ current, lockedArtifact, lockedContainer }) => {
-      await validateEdgeAuthority(permix, lockedArtifact, lockedContainer, 'remove');
+      await validatePlacementPermissions(permix, lockedArtifact, lockedContainer, 'delete');
       await validatePlacementDeletable(permix, current);
 
       if (sameArtifactOwner(lockedArtifact, lockedContainer) && isRootKind(lockedContainer.kind)) {

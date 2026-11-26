@@ -19,9 +19,9 @@ import {
   withLockedPlacement,
 } from '#/modules/artifact/services/artifactPlacementUtils';
 import {
-  validateEdgeAuthority,
   validatePlacementDeletable,
-} from '#/modules/artifact/validations/validateEdgeAuthority';
+  validatePlacementPermissions,
+} from '#/modules/artifact/validations/validatePlacementPermissions';
 
 type MoveArtifactPlacementInput = {
   targetContainerArtifactId?: string;
@@ -37,14 +37,14 @@ export const moveArtifactPlacement = async (
     fetchArtifactOrThrow(placement.artifactId),
     fetchArtifactOrThrow(placement.containerArtifactId),
   ]);
-  await validateEdgeAuthority(permix, artifact, sourceContainer, 'remove');
+  await validatePlacementPermissions(permix, artifact, sourceContainer, 'delete');
   await validatePlacementDeletable(permix, placement);
 
   const targetContainer =
     targetContainerArtifactId !== undefined
       ? await fetchArtifactOrThrow(targetContainerArtifactId)
       : await fetchOwnerRootArtifactOrThrow(sourceContainer);
-  await validateEdgeAuthority(permix, artifact, targetContainer, 'create', access);
+  await validatePlacementPermissions(permix, artifact, targetContainer, 'create', access);
   if (sourceContainer.id === targetContainer.id) {
     throw makeError({ status: 422, message: 'A move needs a different destination' });
   }
@@ -62,9 +62,9 @@ export const moveArtifactPlacement = async (
     [targetContainer],
     async ({ current, lockedArtifact, lockedContainer: lockedSource, locked }) => {
       const lockedTarget = locked.get(targetContainer.id)!;
-      await validateEdgeAuthority(permix, lockedArtifact, lockedSource, 'remove');
+      await validatePlacementPermissions(permix, lockedArtifact, lockedSource, 'delete');
       await validatePlacementDeletable(permix, current);
-      await validateEdgeAuthority(permix, lockedArtifact, lockedTarget, 'create', access);
+      await validatePlacementPermissions(permix, lockedArtifact, lockedTarget, 'create', access);
       const resolvedAccess = await validatePlacementTarget(lockedArtifact, lockedTarget, access);
       return db.artifactPlacement.update({
         where: { id: current.id },

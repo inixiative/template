@@ -5,13 +5,13 @@
  * @uses infrastructure:prisma, primitive:authz
  */
 import type { Prisma } from '@template/db';
+import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
 import { type ArtifactAccess, ArtifactKind } from '@template/db/generated/client/enums';
 import { directEntitledIds, ownerPrivateRead } from '@template/permissions';
 import type { Context } from 'hono';
 import { isPlainObject } from 'lodash-es';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import { paginate } from '#/lib/prisma/paginate';
 import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 import {
   accessibleAnyArtifactWhere,
@@ -111,19 +111,23 @@ const ownerArtifactPlacementsWhere = async (
   return { ...artifactFilter, OR: rootWhere ? [nonRootWhere, rootWhere] : [nonRootWhere] };
 };
 
-export const paginateOwnerArtifactPlacements = async (
+export const ownerArtifactPlacementsQuery = async (
   c: ValidatedContext<'query', { orderBy?: string[] }>,
-) => {
-  const db = c.get('db');
+) => ({
+  where: await ownerArtifactPlacementsWhere(c, contextArtifactOwner(c)),
+  include: { artifact: true, containerArtifact: true },
+  orderBy: defaultOrderBy(c, { createdAt: 'desc' as const }),
+});
+
+export const filterAccessibleArtifactPlacements = async <
+  T extends ArtifactPlacement & { artifact: Artifact; containerArtifact: Artifact },
+>(
+  c: Context<AppEnv>,
+  rows: T[],
+): Promise<T[]> => {
   const permix = c.get('permix');
-  const owner = contextArtifactOwner(c);
-  const { data, pagination } = await paginate(c, db.artifactPlacement, {
-    where: await ownerArtifactPlacementsWhere(c, owner),
-    include: { artifact: true, containerArtifact: true },
-    orderBy: defaultOrderBy(c, { createdAt: 'desc' as const }),
-  });
   const checked = await Promise.all(
-    data.map((row) => holdsOnRecord(permix, 'artifactPlacement', row, 'read')),
+    rows.map((row) => holdsOnRecord(permix, 'artifactPlacement', row, 'read')),
   );
-  return { data: data.filter((_, index) => checked[index]), pagination };
+  return rows.filter((_, index) => checked[index]);
 };

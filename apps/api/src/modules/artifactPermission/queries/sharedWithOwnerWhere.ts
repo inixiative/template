@@ -14,7 +14,6 @@ import {
 import type { ValidatedContext } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
-import { paginate } from '#/lib/prisma/paginate';
 import { defaultOrderBy } from '#/modules/artifact/queries/ownerArtifactsQuery';
 import {
   contextArtifactOwner,
@@ -58,10 +57,9 @@ const sharedWithOwnerWhere = (owner: OwnerRef): Prisma.ArtifactPermissionWhereIn
   };
 };
 
-export const paginateOwnerArtifactPermissions = async (
+export const ownerArtifactPermissionsQuery = async (
   c: ValidatedContext<'query', { orderBy?: string[] }>,
 ) => {
-  const db = c.get('db');
   const owner = contextArtifactOwner(c);
   const allowed = await holdsOnRecord(
     c.get('permix'),
@@ -77,9 +75,9 @@ export const paginateOwnerArtifactPermissions = async (
     'read',
   );
   if (!allowed) throw makeError({ status: 403, message: 'Forbidden' });
-  return paginate(c, db.artifactPermission, {
+  return {
     where: sharedWithOwnerWhere(owner),
     include: { artifact: true },
     orderBy: defaultOrderBy(c, { createdAt: 'desc' as const }),
-  });
+  };
 };

@@ -63,6 +63,28 @@ export const contextArtifactOwner = (c: Context<AppEnv>): OwnerRef => {
   return { ownerModel: 'User', userId: user.id };
 };
 
+export const targetOwnerFromBody = (
+  body: Partial<OwnedArtifact>,
+  c?: Context<AppEnv>,
+): OwnerRef => {
+  if (body.ownerModel) {
+    return {
+      ownerModel: body.ownerModel,
+      userId: body.userId,
+      organizationId: body.organizationId,
+      spaceId: body.spaceId,
+    };
+  }
+  const user = c ? actingUser(c) : null;
+  if (!user) {
+    throw makeError({
+      status: 400,
+      message: 'Provide targetContainerArtifactId or ownerModel when acting without a user',
+    });
+  }
+  return { ownerModel: 'User', userId: user.id };
+};
+
 export const withArtifactOwnersLock = <T>(
   artifacts: OwnedArtifact[],
   fn: () => Promise<T>,

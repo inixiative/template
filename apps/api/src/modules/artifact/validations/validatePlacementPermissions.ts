@@ -15,11 +15,11 @@ import { validateArtifactCreateAtOwner } from '#/modules/artifact/validations/va
 import { validateArtifactPermission } from '#/modules/artifact/validations/validateArtifactPermission';
 import { defaultPlacementAccess } from '#/modules/artifact/validations/validatePlacementAccess';
 
-export const validateEdgeAuthority = async (
+export const validatePlacementPermissions = async (
   permix: Permix,
   artifact: Artifact,
   container: Artifact,
-  mode: 'create' | 'remove' | 'manage',
+  mode: 'create' | 'delete' | 'manage',
   access?: ArtifactAccess,
 ): Promise<void> => {
   const isCustomAccess =
@@ -30,7 +30,7 @@ export const validateEdgeAuthority = async (
   const containerAction = mode === 'manage' || isCustomAccess ? 'manage' : 'operate';
   await validateArtifactPermission(permix, container, containerAction);
   const sameOwner = sameArtifactOwner(artifact, container);
-  if (!sameOwner && mode === 'remove') return;
+  if (!sameOwner && mode === 'delete') return;
   await validateArtifactPermission(permix, artifact, sameOwner ? 'manage' : 'read');
 };
 

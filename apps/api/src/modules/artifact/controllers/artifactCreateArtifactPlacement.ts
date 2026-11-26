@@ -7,30 +7,22 @@
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactCreateArtifactPlacementRoute } from '#/modules/artifact/routes/artifactCreateArtifactPlacement';
-import { placeArtifact } from '#/modules/artifact/services/placeArtifact';
+import { targetOwnerFromBody } from '#/modules/artifact/services/artifactOwner';
+import { createArtifactPlacement } from '#/modules/artifact/services/createArtifactPlacement';
 
 export const artifactCreateArtifactPlacementController = makeController(
   artifactCreateArtifactPlacementRoute,
   async (c, respond) => {
-    const artifact = contextResource<'artifact'>(c);
     const body = c.req.valid('json');
-    const edge =
+    const target =
       body.containerArtifactId !== undefined
-        ? await placeArtifact(c.get('permix'), {
-            artifact,
-            containerArtifactId: body.containerArtifactId,
-            access: body.access,
-          })
-        : await placeArtifact(c.get('permix'), {
-            artifact,
-            owner: {
-              ownerModel: body.ownerModel!,
-              userId: body.userId,
-              organizationId: body.organizationId,
-              spaceId: body.spaceId,
-            },
-            access: body.access,
-          });
-    return respond.created(edge);
+        ? { containerArtifactId: body.containerArtifactId }
+        : { owner: targetOwnerFromBody(body) };
+    const placement = await createArtifactPlacement(c.get('permix'), {
+      artifact: contextResource<'artifact'>(c),
+      ...target,
+      access: body.access,
+    });
+    return respond.created(placement);
   },
 );
