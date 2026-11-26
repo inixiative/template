@@ -77,33 +77,28 @@ At the top of the family page, a strip shows every product of the family as an i
 
 The other option was to show the family's settings at the top of each integration's page. That puts two resources on one page.
 
-## MVP: a family product always connects through its family
+## Credentials: each provider's `authMethods` is the one gate
 
-No settings control this for the MVP (Aron, 2026-11-26: "it should kind of be on by default… For MVP, we do not need it"). An integration with a family is connected by connecting the family, and direct credentials on it are refused.
+Aron, 2026-11-26: "I don't know why we would refuse direct credentials. We have several credential modes, probably, and each integration should support its list of credentials. Then you could add any credential from that list."
 
-If more control is needed later, these are the settings that were sketched. They would go in an Integration tree `connection` branch:
+- **`ProviderDefinition.authMethods` decides which credentials an integration takes, family or not.** `integrationCreateCredential` and `credentialUpdate` already check it; the `isFamilyManaged` refusal in front of that check goes. `githubUser` lists `['oauth2', 'bearer']` today and is still refused a pasted bearer, which is the contradiction.
+- **How a method is added depends on the method, not on the family.** `bearer`, `apiKey` and `clientCredentials` are entered directly. `oauth2` comes from a consent flow: through the family's consent when the provider has a family (Drive through Google), the provider's own otherwise (Slack).
+- **The connect UI offers every listed method.** A family product shows "Connect with Google" for `oauth2` beside any method it can take directly.
 
-- **`connection.usesFamily`:**
-  - `off`: its own credentials, so direct credentials are allowed;
-  - `consent` (the default): connected through the family's consent, which covers this product's scopes and gives it a token of its own;
-  - `credential`: uses the family's credential as it is.
-- **`connection.directCredentials`** (boolean): allows entering a credential directly even under a family.
-- **A custom integration using another family's auth:** already expressible by setting `integrationFamily` on a custom integration at create.
-
-These are settings rather than columns because they only change which credential is used, not which settings exist.
+No settings for this in the MVP (Aron, 2026-11-26: "For MVP, we do not need it"). If an owner later needs to turn a method off, a `connection` branch in the Integration tree could hold it, for example `connection.directCredentials` (boolean). These would be settings rather than columns because they only change which credential is used, not which settings exist. A custom integration using another family's auth is already expressible by setting `integrationFamily` at create.
 
 ## Credentials (Kingdom)
 
-- **A family product's credential hangs off its `IntegrationFamily`.** Kingdom's `Credential` gets a polymorphic parent: `integration` or `integrationFamily`, with a dual id per R-2026-11-17-04. A product without a family keeps its own.
+- **The family's consent credential hangs off its `IntegrationFamily`.** Kingdom's `Credential` gets a polymorphic parent: `integration` or `integrationFamily`, with a dual id per R-2026-11-17-04. Credentials entered directly on a product stay on the product.
 - **One renewal path per family,** chosen from the catalog's family entry. It replaces the Google-only `renewFamilyCredential`.
-- **Direct credentials on a family product are refused** (today's `isFamilyManaged` check), and the 400 names where to go: `{ integrationFamily: 'atlassian', integrationFamilyId }`, so the UI can send you to connect the family.
+- **An `oauth2` credential on a family product comes from the family's consent.** Asking for one on the product returns a 400 that names where to go: `{ integrationFamily: 'atlassian', integrationFamilyId }`, so the UI can send you to connect the family. Other listed methods are entered on the product.
 - **A family with no credential is valid** (`inixiative`): it groups, shares settings, and turns its products off together.
 - **Entitlements:** whatever is anchored at a Kingdom family `Integration` today moves to the `IntegrationFamily`, for example a Signet granting `operate`.
 
 ## Cut-over
 
 - **Hard cut, no compatibility.** Kingdom's `familyIntegrationId` and the family `Integration` rows go. Prod is pre-users: reseed, or a one-off step that keeps the Google rows.
-- `isFamilyManaged` becomes "the provider names a family".
+- `isFamilyManaged` and `familyManagedCredentialMessage` go, with every refusal that calls them (`integrationCreateCredential`, `credentialUpdate`, `credentialRevoke`, `integrationSchemas`, and the web filters in `AddIntegrationForm`, `IntegrationSetup`, `IntegrationMaintenance`, `integrationProviders`). `authMethods` is the gate.
 - Products are refused while their family is down. That replaces `familyIsLive`.
 
 ## Open
@@ -121,4 +116,5 @@ These are settings rather than columns because they only change which credential
 | Owner match | the tenant-boundary hook pattern (`projectIntegrationOwner`) |
 | Settings | `SETTING_TREES`, `settingResourceKindsOf` |
 | Permissions | `db:Integration` rules in `packages/permissions/src/rebac/schema.ts` |
-| Catalog | `@inixiative/integrations` (`findProvider`, `isFamilyManaged`, `familyProducts`) |
+| Catalog | `@inixiative/integrations` (`findProvider`, `familyProducts`) |
+| Which credentials an integration takes | `ProviderDefinition.authMethods`, already checked in `integrationCreateCredential` and `credentialUpdate` |
