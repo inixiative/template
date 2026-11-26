@@ -147,7 +147,7 @@ See `docs/claude/FRONTEND.md` for detailed frontend patterns.
 
 **Location:** `packages/sdk/`
 
-API client generated from `openapi.gen.json` by hey-api: operations, types, schemas and TanStack Query helpers. See `docs/claude/FRONTEND/API_CLIENT.md`.
+API client generated from `packages/sdk/openapi.gen.json` by hey-api: operations, types, schemas and TanStack Query helpers. See `docs/claude/FRONTEND/API_CLIENT.md`.
 
 #### @template/permissions
 
@@ -262,7 +262,7 @@ Each package's `tsconfig.json` must map **all packages** to ensure consistent im
 
 **Generated file convention:**
 
-- Template-owned generated artifacts should include `.gen.` in the filename, for example `routeTree.gen.ts`, `prismaMap.gen.ts`, or `openapi.local.gen.json`.
+- Template-owned generated artifacts should include `.gen.` in the filename, for example `apps/web/app/routeTree.gen.ts`, `prismaMap.gen.ts`, or `apps/api/openapi.local.gen.json`.
 - These files should be ignored by git, search, and lint inputs via the repo-wide `*.gen.*` rules.
 - Prisma-owned generator internals under `packages/db/src/generated/**` are the exception; do not rename upstream Prisma outputs just to fit this convention.
 
