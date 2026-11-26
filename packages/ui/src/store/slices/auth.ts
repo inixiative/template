@@ -15,7 +15,6 @@ import type { AuthMethod } from '@template/ui/lib/auth/types';
 import { MASTER_DATA_ENTRIES } from '@template/ui/lib/masterData/registry';
 import type { AppStore } from '@template/ui/store/types';
 import type { AuthSlice } from '@template/ui/store/types/auth';
-import { createAuthClient } from 'better-auth/client';
 import type { StateCreator } from 'zustand';
 
 const MASTER_DATA_QUERY_IDS: ReadonlySet<string> = new Set(
@@ -37,9 +36,6 @@ const clearAuthenticatedQueries = (queryClient: QueryClient | null): void => {
 };
 
 export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, get) => {
-  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-  const client = createAuthClient({ baseURL });
-
   const syncWsAuth = () => {
     if (get().auth.twoFactorAction) return;
     const token = fetchStoredTokenAndClearIfExpired();
@@ -76,7 +72,6 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
 
   return {
     auth: {
-      client,
       user: null,
       organizations: null,
       organizationUsers: null,

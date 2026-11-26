@@ -12,6 +12,7 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { meTwoFactorVerify, meTwoFactorVerifyPasskeyOptions } from '@template/sdk';
 import type { TwoFactorMethod } from '@template/shared/auth/twoFactor';
+import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
 import { Button } from '@template/ui/components/primitives/Button';
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
@@ -128,11 +129,7 @@ export const TwoFactorVerifyForm = ({
         </div>
       )}
 
-      {errorMessage && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          {errorMessage}
-        </div>
-      )}
+      {errorMessage && <FormErrorAlert message={errorMessage} />}
 
       {activeMethod === 'passkey' ? (
         <Button

@@ -14,7 +14,7 @@ const systemEmail = ({ preview, body }: { preview: string; body: string[] }): st
   [
     '<mjml>',
     '  <mj-head>',
-    '    {{#component:system-head}}{{/component:system-head}}',
+    '    {{#component:system-styles}}{{/component:system-styles}}',
     `    <mj-preview>${preview}</mj-preview>`,
     '  </mj-head>',
     '  <mj-body background-color="#f3f4f6" width="560px">',
@@ -33,10 +33,10 @@ const systemEmail = ({ preview, body }: { preview: string; body: string[] }): st
 
 const fallbackLink = (url: string): string[] => [
   '<mj-text mj-class="note" padding="0 0 4px">If the button does not work, paste this link into your browser:</mj-text>',
-  `<mj-text mj-class="link" css-class="fallback-link" padding="0 0 16px"><a href="${url}">${url}</a></mj-text>`,
+  `<mj-text mj-class="fallback-link" css-class="fallback-link" padding="0 0 16px"><a href="${url}">${url}</a></mj-text>`,
 ];
 
-const componentSlugs = ['system-head', 'system-header', 'system-footer'];
+const componentSlugs = ['system-styles', 'system-header', 'system-footer'];
 
 export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
   model: 'emailTemplate',
@@ -51,14 +51,14 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
       kind: 'system',
       inheritToSpaces: true,
       componentSlugs,
-      subject: 'Confirm your email address',
+      subject: 'Verify your email address',
       mjml: systemEmail({
         preview: 'One click to finish setting up your {{system.platformName}} account.',
         body: [
-          '<mj-text mj-class="heading">Confirm your email</mj-text>',
+          '<mj-text mj-class="heading">Verify your email</mj-text>',
           `<mj-text>${greeting}</mj-text>`,
-          '<mj-text>Confirm that this is your email address to finish setting up your {{system.platformName}} account.</mj-text>',
-          '<mj-button href="{{data.verificationUrl}}">Confirm email address</mj-button>',
+          '<mj-text>Verify your email address to finish setting up your {{system.platformName}} account.</mj-text>',
+          '<mj-button href="{{data.verificationUrl}}">Verify email address</mj-button>',
           ...fallbackLink('{{data.verificationUrl}}'),
           '<mj-divider border-color="#e5e7eb" border-width="1px" padding="0 0 16px" />',
           '<mj-text mj-class="note">If you did not create an account, you can ignore this email.</mj-text>',
@@ -81,8 +81,8 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
           '<mj-text mj-class="heading">Reset your password</mj-text>',
           `<mj-text>${greeting}</mj-text>`,
           '<mj-text>We received a request to reset the password for <strong>{{recipient.email}}</strong>. Choose a new one with the button below.</mj-text>',
-          '<mj-button href="{{data.resetUrl}}">Choose a new password</mj-button>',
-          ...fallbackLink('{{data.resetUrl}}'),
+          '<mj-button href="{{data.passwordResetUrl}}">Choose a new password</mj-button>',
+          ...fallbackLink('{{data.passwordResetUrl}}'),
           '<mj-divider border-color="#e5e7eb" border-width="1px" padding="0 0 16px" />',
           '<mj-text mj-class="note">This link expires in one hour and works once. If you did not ask to reset your password, ignore this email; your password stays the same.</mj-text>',
         ],

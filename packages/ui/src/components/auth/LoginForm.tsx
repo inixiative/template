@@ -6,6 +6,7 @@
  */
 import { Icon } from '@iconify/react';
 import { useSearch } from '@tanstack/react-router';
+import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
 import { Button } from '@template/ui/components/primitives/Button';
 import {
   Card,
@@ -110,12 +111,7 @@ export const LoginForm = ({
       <CardContent>
         <div className="space-y-4">
           {displayError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {displayError.message}
-              {displayError.detail && (
-                <div className="mt-1 text-xs opacity-80 break-all">{displayError.detail}</div>
-              )}
-            </div>
+            <FormErrorAlert message={displayError.message} detail={displayError.detail} />
           )}
 
           {showProviders && (

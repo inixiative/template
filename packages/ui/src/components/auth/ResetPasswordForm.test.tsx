@@ -46,13 +46,17 @@ const submit = (view: ReturnType<typeof render>, password: string, confirm = pas
 describe('ResetPasswordForm', () => {
   test('sends the token and the new password, then hands back', async () => {
     respond = () => Response.json({ status: true });
-    const onReset = mock(() => {});
+    const onPasswordReset = mock(() => {});
     const view = render(
-      <ResetPasswordForm token="reset-token" onReset={onReset} onRequestNewLink={() => {}} />,
+      <ResetPasswordForm
+        token="reset-token"
+        onPasswordReset={onPasswordReset}
+        onRequestPasswordReset={() => {}}
+      />,
     );
     submit(view, 'brand-new-password');
 
-    await waitFor(() => expect(onReset).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onPasswordReset).toHaveBeenCalledTimes(1));
     expect(requests).toEqual([
       {
         method: 'POST',
@@ -63,40 +67,46 @@ describe('ResetPasswordForm', () => {
   });
 
   test('a confirmation that does not match calls no server', async () => {
-    const onReset = mock(() => {});
+    const onPasswordReset = mock(() => {});
     const view = render(
-      <ResetPasswordForm token="reset-token" onReset={onReset} onRequestNewLink={() => {}} />,
+      <ResetPasswordForm
+        token="reset-token"
+        onPasswordReset={onPasswordReset}
+        onRequestPasswordReset={() => {}}
+      />,
     );
     submit(view, 'brand-new-password', 'something-else');
 
     await waitFor(() => expect(view.getByRole('alert').textContent).toContain('do not match'));
     expect(requests).toEqual([]);
-    expect(onReset).not.toHaveBeenCalled();
+    expect(onPasswordReset).not.toHaveBeenCalled();
   });
 
   test('an expired token offers a new link instead of the form', async () => {
     respond = () =>
       Response.json({ code: 'INVALID_TOKEN', message: 'Invalid token' }, { status: 400 });
-    const onReset = mock(() => {});
-    const onRequestNewLink = mock(() => {});
+    const onPasswordReset = mock(() => {});
+    const onRequestPasswordReset = mock(() => {});
     const view = render(
       <ResetPasswordForm
         token="used-token"
-        onReset={onReset}
-        onRequestNewLink={onRequestNewLink}
+        onPasswordReset={onPasswordReset}
+        onRequestPasswordReset={onRequestPasswordReset}
       />,
     );
     submit(view, 'brand-new-password');
 
     await waitFor(() => expect(view.getByRole('alert').textContent).toContain('expired'));
     expect(view.queryByLabelText('New password')).toBeNull();
-    expect(onReset).not.toHaveBeenCalled();
+    expect(onPasswordReset).not.toHaveBeenCalled();
     fireEvent.click(view.getByRole('button', { name: 'Send a new link' }));
-    expect(onRequestNewLink).toHaveBeenCalledTimes(1);
+    expect(onRequestPasswordReset).toHaveBeenCalledTimes(1);
   });
 
   test('without a token the page goes straight to the new-link offer', () => {
-    const view = render(<ResetPasswordForm onReset={() => {}} onRequestNewLink={() => {}} />);
+    const view = render(
+      <ResetPasswordForm onPasswordReset={() => {}} onRequestPasswordReset={() => {}} />,
+    );
     expect(view.getByRole('button', { name: 'Send a new link' })).not.toBeNull();
     expect(view.queryByLabelText('New password')).toBeNull();
   });
@@ -105,7 +115,11 @@ describe('ResetPasswordForm', () => {
     respond = () =>
       Response.json({ code: 'PASSWORD_TOO_SHORT', message: 'Password too short' }, { status: 400 });
     const view = render(
-      <ResetPasswordForm token="reset-token" onReset={() => {}} onRequestNewLink={() => {}} />,
+      <ResetPasswordForm
+        token="reset-token"
+        onPasswordReset={() => {}}
+        onRequestPasswordReset={() => {}}
+      />,
     );
     submit(view, 'brand-new-password');
 

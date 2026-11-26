@@ -6,6 +6,8 @@
  */
 
 import { passwordLength } from '@template/shared/auth/passwordLength';
+import { AuthNoticeCard } from '@template/ui/components/auth/AuthNoticeCard';
+import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
 import { Button } from '@template/ui/components/primitives/Button';
 import {
   Card,
@@ -22,11 +24,15 @@ import { type FormEvent, useState } from 'react';
 
 export type ResetPasswordFormProps = {
   token?: string;
-  onReset: () => void;
-  onRequestNewLink: () => void;
+  onPasswordReset: () => void;
+  onRequestPasswordReset: () => void;
 };
 
-export const ResetPasswordForm = ({ token, onReset, onRequestNewLink }: ResetPasswordFormProps) => {
+export const ResetPasswordForm = ({
+  token,
+  onPasswordReset,
+  onRequestPasswordReset,
+}: ResetPasswordFormProps) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string>();
@@ -45,7 +51,7 @@ export const ResetPasswordForm = ({ token, onReset, onRequestNewLink }: ResetPas
     try {
       const outcome = await resetPassword({ token, newPassword });
       if (outcome === 'linkInvalid') setIsLinkInvalid(true);
-      else onReset();
+      else onPasswordReset();
     } catch (err) {
       setError(describeError(err).message);
     } finally {
@@ -55,19 +61,13 @@ export const ResetPasswordForm = ({ token, onReset, onRequestNewLink }: ResetPas
 
   if (isLinkInvalid) {
     return (
-      <Card className="w-full shadow-lg border-border/50">
-        <CardHeader>
-          <CardTitle className="text-xl">Link expired</CardTitle>
-          <CardDescription role="alert">
-            This reset link is invalid or has expired. Reset links work once, for one hour.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button type="button" className="w-full" onClick={onRequestNewLink}>
-            Send a new link
-          </Button>
-        </CardContent>
-      </Card>
+      <AuthNoticeCard
+        title="Link expired"
+        description="This reset link is invalid or has expired. Reset links work once, for one hour."
+        role="alert"
+        actionLabel="Send a new link"
+        onAction={onRequestPasswordReset}
+      />
     );
   }
 
@@ -76,20 +76,13 @@ export const ResetPasswordForm = ({ token, onReset, onRequestNewLink }: ResetPas
       <CardHeader className="pb-4">
         <CardTitle className="text-xl">Choose a new password</CardTitle>
         <CardDescription>
-          Use {passwordLength.min} or more characters. Every device signed in to this account will
-          be signed out.
+          Use {passwordLength.min} or more characters. Every device logged in to this account will
+          be logged out.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div
-              role="alert"
-              className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              {error}
-            </div>
-          )}
+          {error && <FormErrorAlert message={error} />}
 
           <div className="space-y-2">
             <Label htmlFor="new-password">New password</Label>

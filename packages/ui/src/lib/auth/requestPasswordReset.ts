@@ -5,9 +5,9 @@
  * @uses none
  */
 
-import { betterAuthClient } from '@template/ui/lib/auth/betterAuthClient';
+import { createBetterAuthClient } from '@template/ui/lib/auth/createBetterAuthClient';
 
 export const requestPasswordReset = async (email: string): Promise<void> => {
-  const { error } = await betterAuthClient().requestPasswordReset({ email });
+  const { error } = await createBetterAuthClient().requestPasswordReset({ email });
   if (error) throw new Error(error.message || error.statusText);
 };

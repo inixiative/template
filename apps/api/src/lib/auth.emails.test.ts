@@ -12,7 +12,7 @@ import { emailRegistry, emailVerifier } from '#/lib/email';
 const adapters = emailRegistry.names().map((name) => ({ name, client: emailRegistry.get(name) }));
 const sent: SendEmailOptions[] = [];
 const verificationEvent = spyOn(appEventHandlers, 'user.verificationRequested');
-const resetEvent = spyOn(appEventHandlers, 'user.passwordResetRequested');
+const passwordResetEvent = spyOn(appEventHandlers, 'user.passwordResetRequested');
 const verifier = spyOn(emailVerifier, 'verify').mockImplementation(async (email) => ({
   email,
   status: 'deliverable',
@@ -34,7 +34,7 @@ beforeEach(() => {
 afterEach(async () => {
   sent.length = 0;
   verificationEvent.mockClear();
-  resetEvent.mockClear();
+  passwordResetEvent.mockClear();
   emailRegistry.unregister('auth-email-recorder');
   for (const { name, client } of adapters) emailRegistry.register(name, client);
   await cleanupTouchedTables(db);
@@ -42,7 +42,7 @@ afterEach(async () => {
 
 afterAll(() => {
   verificationEvent.mockRestore();
-  resetEvent.mockRestore();
+  passwordResetEvent.mockRestore();
   verifier.mockRestore();
 });
 
@@ -143,22 +143,22 @@ test('requesting a password reset delivers the reset link and masks it in the re
     slug: 'password-reset',
     subject: 'Reset your password',
     kind: 'system',
-    mjml: '<mjml><mj-body><mj-section><mj-column><mj-text><a href="{{data.resetUrl}}">Reset</a></mj-text></mj-column></mj-section></mj-body></mjml>',
+    mjml: '<mjml><mj-body><mj-section><mj-column><mj-text><a href="{{data.passwordResetUrl}}">Reset</a></mj-text></mj-column></mj-section></mj-body></mjml>',
   });
   const { entity: user } = await createUser({ email: `reset-${Bun.randomUUIDv7()}@example.com` });
 
   await auth.api.requestPasswordReset({ body: { email: user.email } });
 
-  expect(resetEvent).toHaveBeenCalledTimes(1);
-  const event = resetEvent.mock.calls[0][0];
+  expect(passwordResetEvent).toHaveBeenCalledTimes(1);
+  const event = passwordResetEvent.mock.calls[0][0];
   const data = event.data as UserPasswordResetRequestedPayload;
   expect(data.userId).toBe(user.id);
-  const url = new URL(data.resetUrl);
+  const url = new URL(data.passwordResetUrl);
   expect(url.origin).toBe(new URL(process.env.WEB_URL!).origin);
   expect(url.pathname).toBe('/reset-password');
   const token = url.searchParams.get('token')!;
   const recordedEvent = await db.appEvent.findUniqueOrThrow({ where: { id: event.id } });
-  expect(recordedEvent.data).toEqual({ userId: user.id, resetUrl: '[MASKED]' });
+  expect(recordedEvent.data).toEqual({ userId: user.id, passwordResetUrl: '[MASKED]' });
   expect(JSON.stringify(recordedEvent.data)).not.toContain(token);
   expect(sent).toHaveLength(1);
   expect(sent[0].to).toBe(user.email);
@@ -184,7 +184,7 @@ test('resetting replaces the password of an account that already has one', async
     slug: 'password-reset',
     subject: 'Reset your password',
     kind: 'system',
-    mjml: '<mjml><mj-body><mj-section><mj-column><mj-text><a href="{{data.resetUrl}}">Reset</a></mj-text></mj-column></mj-section></mj-body></mjml>',
+    mjml: '<mjml><mj-body><mj-section><mj-column><mj-text><a href="{{data.passwordResetUrl}}">Reset</a></mj-text></mj-column></mj-section></mj-body></mjml>',
   });
   const email = `existing-password-${Bun.randomUUIDv7()}@example.com`;
   const oldPassword = 'synthetic-original-password';
@@ -194,8 +194,8 @@ test('resetting replaces the password of an account that already has one', async
   await db.user.update({ where: { id: user.id }, data: { emailVerified: true } });
 
   await auth.api.requestPasswordReset({ body: { email } });
-  const data = resetEvent.mock.calls[0][0].data as UserPasswordResetRequestedPayload;
-  const token = new URL(data.resetUrl).searchParams.get('token')!;
+  const data = passwordResetEvent.mock.calls[0][0].data as UserPasswordResetRequestedPayload;
+  const token = new URL(data.passwordResetUrl).searchParams.get('token')!;
   const newPassword = 'synthetic-replacement-password';
   await auth.api.resetPassword({ body: { token, newPassword } });
 
@@ -217,6 +217,6 @@ test('requesting a reset for an unknown address sends nothing', async () => {
     body: { email: `nobody-${Bun.randomUUIDv7()}@example.com` },
   });
 
-  expect(resetEvent).not.toHaveBeenCalled();
+  expect(passwordResetEvent).not.toHaveBeenCalled();
   expect(sent).toHaveLength(0);
 });

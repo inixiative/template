@@ -6,6 +6,8 @@
  */
 import { Icon } from '@iconify/react';
 import { useSearch } from '@tanstack/react-router';
+import { AuthNoticeCard } from '@template/ui/components/auth/AuthNoticeCard';
+import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
 import { Button } from '@template/ui/components/primitives/Button';
 import {
   Card,
@@ -96,21 +98,13 @@ export const SignUpForm = ({ onLoginClick }: SignUpFormProps) => {
 
   if (verificationEmail) {
     return (
-      <Card className="w-full shadow-lg border-border/50">
-        <CardHeader>
-          <CardTitle className="text-xl">Check your email</CardTitle>
-          <CardDescription role="status">
-            Open the verification link sent to {verificationEmail}, then log in to continue.
-          </CardDescription>
-        </CardHeader>
-        {onLoginClick && (
-          <CardContent>
-            <Button type="button" className="w-full" onClick={onLoginClick}>
-              Back to log in
-            </Button>
-          </CardContent>
-        )}
-      </Card>
+      <AuthNoticeCard
+        title="Check your email"
+        description={`Open the verification link sent to ${verificationEmail}, then log in to continue.`}
+        role="status"
+        actionLabel="Back to log in"
+        onAction={onLoginClick}
+      />
     );
   }
 
@@ -125,12 +119,7 @@ export const SignUpForm = ({ onLoginClick }: SignUpFormProps) => {
       <CardContent>
         <div className="space-y-4">
           {displayError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {displayError.message}
-              {displayError.detail && (
-                <div className="mt-1 text-xs opacity-80 break-all">{displayError.detail}</div>
-              )}
-            </div>
+            <FormErrorAlert message={displayError.message} detail={displayError.detail} />
           )}
 
           {showProviders && (

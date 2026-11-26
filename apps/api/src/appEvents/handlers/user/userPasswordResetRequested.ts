@@ -8,14 +8,14 @@ import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
 export type UserPasswordResetRequestedPayload = {
   userId: string;
-  resetUrl: string;
+  passwordResetUrl: string;
 };
 
 export const userPasswordResetRequested = makeAppEvent<UserPasswordResetRequestedPayload>({
   email: (data) => [
     {
       template: 'password-reset',
-      data: { userId: data.userId, resetUrl: data.resetUrl },
+      data: { userId: data.userId, passwordResetUrl: data.passwordResetUrl },
     },
   ],
 });

@@ -7,9 +7,6 @@
 import type { MeReadResponses } from '@template/sdk';
 import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
 import type { AuthMethod, SignInResult, SignUpResult } from '@template/ui/lib/auth/types';
-import type { createAuthClient } from 'better-auth/client';
-
-type BetterAuthClient = ReturnType<typeof createAuthClient>;
 
 type MeData = MeReadResponses[200]['data'];
 type User = Omit<
@@ -25,7 +22,6 @@ export type AuthStrategy = { type: 'login' } | { type: 'embed'; parentOrigin?: s
 
 export type AuthSlice = {
   auth: {
-    client: BetterAuthClient;
     user: User | null;
     organizations: Record<string, Organization> | null;
     organizationUsers: Record<string, OrganizationUser> | null;

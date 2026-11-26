@@ -5,6 +5,8 @@
  * @uses none
  */
 
+import { AuthNoticeCard } from '@template/ui/components/auth/AuthNoticeCard';
+import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
 import { Button } from '@template/ui/components/primitives/Button';
 import {
   Card,
@@ -46,22 +48,13 @@ export const ForgotPasswordForm = ({ onLoginClick }: ForgotPasswordFormProps) =>
 
   if (sentTo) {
     return (
-      <Card className="w-full shadow-lg border-border/50">
-        <CardHeader>
-          <CardTitle className="text-xl">Check your email</CardTitle>
-          <CardDescription role="status">
-            If an account exists for {sentTo}, a link to reset its password is on its way. The link
-            works for one hour.
-          </CardDescription>
-        </CardHeader>
-        {onLoginClick && (
-          <CardContent>
-            <Button type="button" className="w-full" onClick={onLoginClick}>
-              Back to log in
-            </Button>
-          </CardContent>
-        )}
-      </Card>
+      <AuthNoticeCard
+        title="Check your email"
+        description={`If an account exists for ${sentTo}, a link to reset its password is on its way. The link works for one hour.`}
+        role="status"
+        actionLabel="Back to log in"
+        onAction={onLoginClick}
+      />
     );
   }
 
@@ -75,14 +68,7 @@ export const ForgotPasswordForm = ({ onLoginClick }: ForgotPasswordFormProps) =>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div
-              role="alert"
-              className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              {error.message}
-            </div>
-          )}
+          {error && <FormErrorAlert message={error.message} />}
 
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>

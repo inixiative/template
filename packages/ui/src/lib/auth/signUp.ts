@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
-import { betterAuthClient } from '@template/ui/lib/auth/betterAuthClient';
+import { createBetterAuthClient } from '@template/ui/lib/auth/createBetterAuthClient';
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
 import { clearToken } from '@template/ui/lib/auth/token';
 import type {
@@ -20,7 +20,7 @@ const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> =
     throw new Error('Name is required for signup');
   }
 
-  const client = betterAuthClient();
+  const client = createBetterAuthClient();
 
   const { data, error } = await client.signUp.email({
     email: method.email,
@@ -45,7 +45,7 @@ const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> =
 };
 
 const signUpWithOAuth = async (method: OAuthAuthMethod): Promise<SignUpResult> => {
-  const client = betterAuthClient();
+  const client = createBetterAuthClient();
 
   const callbackURL = method.callbackURL || `${window.location.origin}/auth/callback`;
 

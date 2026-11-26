@@ -92,11 +92,18 @@ Pages are thin; the forms own their state and read the store directly (no prop d
 
 | File | Role |
 |------|------|
-| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignUp? })` renders `LoginForm`, links to signup with `navigateToSignUp(currentAppStore, true)` |
+| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignUp?, hideForgotPassword? })` renders `LoginForm`, links to signup with `navigateToSignUp(currentAppStore, true)` and to forgot-password with `navigateToForgotPassword(currentAppStore, true)` (superadmin passes `hideForgotPassword`) |
 | `packages/ui/src/pages/SignUpPage.tsx` | `SignUpPage` renders `SignUpForm`, links to login with `navigateToLogin(currentAppStore, true)` |
+| `packages/ui/src/pages/ForgotPasswordPage.tsx` | `/forgot-password` (web, admin): renders `ForgotPasswordForm`, links back to login |
+| `packages/ui/src/pages/ResetPasswordPage.tsx` | `/reset-password` (web only, where the email link lands): reads `?token=` and renders `ResetPasswordForm` |
+| `packages/ui/src/pages/TwoFactorPage.tsx` | `/two-factor`: enrollment and verification (see Two-factor above) |
 | `packages/ui/src/pages/AuthCallbackPage.tsx` | OAuth callback (`/auth/callback` in all three apps) |
-| `packages/ui/src/components/auth/LoginForm.tsx` | `LoginFormProps = { hideSignUp?, onSignUpClick? }` |
+| `packages/ui/src/components/auth/LoginForm.tsx` | `LoginFormProps = { hideSignUp?, onSignUpClick?, onForgotPasswordClick? }`; "Forgot password?" shows only when `onForgotPasswordClick` is set |
 | `packages/ui/src/components/auth/SignUpForm.tsx` | `SignUpFormProps = { onLoginClick? }` |
+| `packages/ui/src/components/auth/ForgotPasswordForm.tsx` | `ForgotPasswordFormProps = { onLoginClick }`; calls `requestPasswordReset` and always shows the same "check your email" notice, so the page never says whether an account exists |
+| `packages/ui/src/components/auth/ResetPasswordForm.tsx` | `ResetPasswordFormProps = { token?, onPasswordReset, onRequestPasswordReset }`; calls `resetPassword`; a missing token or `INVALID_TOKEN` shows the expired-link notice with a way to request a new one |
+
+The pages share `AuthPageShell` (`{ subtitle, wide?, children }`: the gradient background and app-name heading); the forms share `FormErrorAlert` (`{ message, detail? }`, a `role="alert"` box) and `AuthNoticeCard` (`{ title, description, role, actionLabel, onAction? }`, the success and expired-link cards).
 
 App routes only mount them:
 
@@ -118,7 +125,7 @@ export const Route = createFileRoute('/_public/login')({
 - OAuth click stores `redirectTo` in `localStorage.authRedirectTo` before leaving the page.
 - `SignUpForm` shows "Open the verification link sent to {email}" on `verification-pending`.
 
-Also exported from `@template/ui/components/auth` but not used by the forms: `AuthDivider`, `SocialAuthButton`. `SignInCredentials` / `SignUpCredentials` live in `packages/ui/src/types/auth.ts`.
+Also exported from `@template/ui/components/auth` but not used by the forms: `AuthDivider`, `SocialAuthButton`. The reset link is built by the API (`WEB_URL/reset-password?token=`), so the forms pass no `redirectTo` ([AUTH.md](../AUTH.md)). `SignInCredentials` / `SignUpCredentials` live in `packages/ui/src/types/auth.ts`.
 
 ---
 
@@ -188,7 +195,7 @@ Initialization errors are swallowed; the redirect handles the unauthenticated ca
 | `logout()` | Signs out of this browser: clears the JWT, user, permissions, websocket identity and tenant (→ public) and navigates to `/login`. No server call: the API keeps no session to end. Ending every JWT on every device is `POST /api/v1/me/rotateJwts` ([AUTH.md → Revocation and sign-out](../AUTH.md#revocation-and-sign-out)) |
 | `setStrategy(strategy)` | `{ type: 'login' }` or `{ type: 'embed', parentOrigin? }`; sets `isEmbedded` |
 
-State: `user`, `organizations`, `spaces`, `spaceUsers` (dicts by id / spaceId), `spoofUserEmail`, `spoofingUserEmail` (from the `x-spoofing-user-email` response header), `isAuthenticated`, `isInitialized`, `strategy`, `client`.
+State: `user`, `organizations`, `spaces`, `spaceUsers` (dicts by id / spaceId), `spoofUserEmail`, `spoofingUserEmail` (from the `x-spoofing-user-email` response header), `isAuthenticated`, `isInitialized`, `strategy`.
 
 Logout from a component:
 
@@ -216,10 +223,11 @@ navigateKeepingSearchParams(to, 'all');      // keep every current search param
 
 navigateToLogin(currentAppStore, preserveSearch?);
 navigateToSignUp(currentAppStore, preserveSearch?);
+navigateToForgotPassword(currentAppStore, preserveSearch?);
 redirectPreservingContext(beforeLoadCtx, to);  // throw a redirect keeping org/space/spoof
 ```
 
-`navigateToLogin` / `navigateToSignUp` either carry the current search + hash (`preserveSearch`) or set `?redirectTo=<current path>`. Login ↔ signup links pass `preserveSearch: true`, so `redirectTo` survives the switch:
+`navigateToLogin` / `navigateToSignUp` / `navigateToForgotPassword` either carry the current search + hash (`preserveSearch`) or set `?redirectTo=<current path>`. Login ↔ signup links pass `preserveSearch: true`, so `redirectTo` survives the switch:
 
 1. `/settings` while logged out → guard redirects to `/login?redirectTo=/settings`.
 2. "Sign Up" → `/signup?redirectTo=/settings`.
@@ -251,7 +259,8 @@ VITE_API_URL=http://localhost:<api port>   # locally: the registry api port, wri
 
 ## Testing
 
-- `packages/ui/src/store/slices/auth.test.tsx` — auth slice. There are no LoginForm/LoginPage tests.
+- `packages/ui/src/store/slices/auth.test.tsx` — auth slice.
+- `packages/ui/src/components/auth/{ForgotPasswordForm,ResetPasswordForm}.test.tsx` — the request notice, the mismatch refusal, the expired-link notice. There are no LoginForm/LoginPage tests.
 
 ```bash
 cd packages/ui && bun run test
@@ -261,11 +270,11 @@ cd packages/ui && bun run test
 
 ## Key Files
 
-- `packages/ui/src/lib/auth/` — `signIn.ts`, `signUp.ts`, `token.ts`, `fetchAndHydrateMe.ts`, `types.ts`
+- `packages/ui/src/lib/auth/` — `createBetterAuthClient.ts`, `signIn.ts`, `signUp.ts`, `requestPasswordReset.ts`, `resetPassword.ts`, `changePassword.ts`, `twoFactor.ts`, `storeJwtHandoff.ts`, `token.ts`, `fetchAndHydrateMe.ts`, `types.ts`
 - `packages/ui/src/hooks/useAuthProviders.ts`
 - `packages/ui/src/hooks/useAuthStrategy/` — embed strategy context (`AuthStrategyProvider`, `useAuthStrategy`)
-- `packages/ui/src/pages/{LoginPage,SignUpPage,AuthCallbackPage}.tsx`
-- `packages/ui/src/components/auth/` — `LoginForm`, `SignUpForm`, `AuthDivider`, `SocialAuthButton`
+- `packages/ui/src/pages/{LoginPage,SignUpPage,ForgotPasswordPage,ResetPasswordPage,TwoFactorPage,AuthCallbackPage}.tsx`
+- `packages/ui/src/components/auth/` — `LoginForm`, `SignUpForm`, `ForgotPasswordForm`, `ResetPasswordForm`, `TotpEnrollForm`, `TwoFactorVerifyForm`, `AuthPageShell`, `FormErrorAlert`, `AuthNoticeCard`, `AuthDivider`, `SocialAuthButton`
 - `packages/ui/src/guards/{authGuard,appGuards}.ts`
 - `packages/ui/src/store/slices/auth.ts`, `packages/ui/src/store/types/auth.ts`
 - `packages/ui/src/lib/routeRedirect.ts`, `packages/ui/src/lib/searchParams.ts`

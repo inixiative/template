@@ -30,11 +30,11 @@ export const auth = betterAuth({
     maxPasswordLength: passwordLength.max,
     resetPasswordTokenExpiresIn: 60 * 60,
     sendResetPassword: async ({ user, token }) => {
-      const resetUrl = new URL('/reset-password', process.env.WEB_URL);
-      resetUrl.searchParams.set('token', token);
+      const passwordResetUrl = new URL('/reset-password', process.env.WEB_URL);
+      passwordResetUrl.searchParams.set('token', token);
       await emitAppEvent('user.passwordResetRequested', {
         userId: user.id,
-        resetUrl: resetUrl.toString(),
+        passwordResetUrl: passwordResetUrl.toString(),
       });
     },
     onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
@@ -53,7 +53,6 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
-          await emitAppEvent('user.created', { userId: user.id, isGuest: false });
           if (user.emailVerified) await emitAppEvent('user.emailVerified', { userId: user.id });
         },
       },
