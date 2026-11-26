@@ -4,24 +4,19 @@
  * @partOf feature:inquiry, primitive:caching
  * @uses infrastructure:prisma
  */
-import { db, type Prisma } from '@template/db';
-import { cacheKeysByModel } from '#/hooks/cache/constants/cacheKeysByModel';
+import { db } from '@template/db';
 import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
+import { queueCacheClearForMovedRows } from '#/hooks/cache/queueCacheClearForMovedRows';
 import { spaceKeyColumns } from '#/modules/inquiry/services/transferSpace/spaceKeyColumns';
 
 // why: the space's organization reaches these rows by ON UPDATE CASCADE, which the cache hook never sees.
 export const clearSpaceRowCaches = async (spaceId: string, organizationId: string) => {
-  for (const model of Object.keys(cacheKeysByModel) as Prisma.ModelName[]) {
-    for (const { spaceField, organizationField } of spaceKeyColumns(model)) {
-      const rows = (await db.withDeleted(() =>
-        db.delegate(model).findMany({ where: { [spaceField]: spaceId } }),
-      )) as Record<string, unknown>[];
-      await queueCacheClear(model, [
-        ...rows,
-        ...rows.map((row) => ({ ...row, [organizationField]: organizationId })),
-      ]);
-    }
-  }
+  await queueCacheClearForMovedRows((model) =>
+    spaceKeyColumns(model).map(({ spaceField, organizationField }) => ({
+      where: { [spaceField]: spaceId },
+      priorValues: { [organizationField]: organizationId },
+    })),
+  );
   const sharedArtifacts = await db.artifactEffectivePermission.findMany({
     where: {
       artifactPermission: {

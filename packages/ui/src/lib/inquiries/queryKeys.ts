@@ -26,6 +26,7 @@ export const INQUIRY_TYPE_LABELS: Record<InquiryType, string> = {
   transferSpace: 'Space Transfer',
   transferArtifact: 'Artifact Transfer',
   changeEntitlements: 'Permission Request',
+  mergeUser: 'User Merge',
 };
 
 export const INQUIRY_STATUS_BADGE_CLASSES: Record<InquiryStatus | 'expired', string> = {
@@ -140,6 +141,7 @@ export const queryKeysToInvalidateWhenSourceMutates: Record<
         : meSentManyInquiriesQueryKey(),
   ],
   changeEntitlements: (_inq) => [meSentManyInquiriesQueryKey()],
+  mergeUser: (_inq) => [meSentManyInquiriesQueryKey()],
 };
 
 // Query keys affected when the TARGET side mutates (resolve/approve/deny)
@@ -164,4 +166,5 @@ export const queryKeysToInvalidateWhenTargetMutates: Record<
     inq.targetOrganizationId
       ? [organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } })]
       : [meReceivedManyInquiriesQueryKey()],
+  mergeUser: (_inq) => [meReceivedManyInquiriesQueryKey()],
 };

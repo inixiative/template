@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import { createUser } from '@template/db/test';
 import {
   createEmailContact,
@@ -202,6 +203,69 @@ describe('multi-scope isolation — bulk position write rejected', () => {
           where: { userId: u.id },
           data: { position: { increment: 5 } },
         }))(),
+    ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
+  });
+});
+
+const asUserMergeTo = <T>(fromUserId: string, toUserId: string, fn: () => Promise<T>) =>
+  auditActorContext.scope({ ...nullAuditActor }, () =>
+    db.txn(() =>
+      db.withUserMerge(
+        {
+          sourceUserId: fromUserId,
+          targetUserId: toUserId,
+          plannedWrites: new Map([['Contact.userId', new Set([toUserId])]]),
+          plannedDeletes: new Set(),
+        },
+        fn,
+      ),
+    ),
+  );
+
+describe('moving a row to another scope', () => {
+  it('appends it to the new scope and compacts the old one', async () => {
+    const { entity: from } = await createUser();
+    const { entity: to } = await createUser();
+    const a = await createPhoneContact(from.id);
+    const b = await createPhoneContact(from.id);
+    const c = await createPhoneContact(to.id);
+    await asUserMergeTo(from.id, to.id, () =>
+      db.contact.update({ where: { id: a.id }, data: { userId: to.id } }),
+    );
+
+    const fromRows = await fetchNotDeletedContactPositions(from.id);
+    expect(positions(fromRows)).toEqual([1]);
+    expect(positionOfContact(fromRows, b.id)).toBe(1);
+    const toRows = await fetchNotDeletedContactPositions(to.id);
+    expect(positions(toRows)).toEqual([1, 2]);
+    expect(positionOfContact(toRows, c.id)).toBe(1);
+    expect(positionOfContact(toRows, a.id)).toBe(2);
+  });
+
+  it('gives a moved tombstone a sentinel below the new scope', async () => {
+    const { entity: from } = await createUser();
+    const { entity: to } = await createUser();
+    const a = await createPhoneContact(from.id);
+    await createPhoneContact(to.id);
+    await softDeleteContact(a.id);
+    await asUserMergeTo(from.id, to.id, () =>
+      db.withDeleted(() => db.contact.update({ where: { id: a.id }, data: { userId: to.id } })),
+    );
+
+    const moved = await db.withDeleted(() => db.contact.findUniqueOrThrow({ where: { id: a.id } }));
+    expect(moved.position).toBeLessThan(0);
+    expect(positions(await fetchNotDeletedContactPositions(to.id))).toEqual([1]);
+  });
+
+  it('refuses a bulk write to a scope column', async () => {
+    const { entity: from } = await createUser();
+    const { entity: to } = await createUser();
+    await createPhoneContact(from.id);
+
+    expect(
+      asUserMergeTo(from.id, to.id, () =>
+        db.contact.updateManyAndReturn({ where: { userId: from.id }, data: { userId: to.id } }),
+      ),
     ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 });

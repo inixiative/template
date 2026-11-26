@@ -277,6 +277,7 @@ auditActorContext.scope(
     userAgent: c.req.header('user-agent'),
     sourceInquiryId: inquiry?.id,
     bypassSoftDeleteScope: false, // flipped by db.withDeleted()
+    userMerge: null, // set by db.withUserMerge() while a mergeUser approval runs
   },
   () => next(),
 );

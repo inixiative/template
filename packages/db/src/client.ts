@@ -33,7 +33,12 @@ import {
 } from '@template/db/extensions/transactionRegistry';
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
+import {
+  type AuditActor,
+  auditActorContext,
+  auditActorStore,
+  type UserMerge,
+} from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
 import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
 import { withLockUntilSettled } from '@template/db/lock/withLockUntilSettled';
@@ -311,6 +316,21 @@ const dbMethods = {
 
   withoutDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
     auditActorContext.withoutDeleted(fn),
+
+  withUserMerge: async <T>(merge: UserMerge, fn: () => T | Promise<T>): Promise<Awaited<T>> => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.withUserMerge() requires db.txn()');
+    const actor = openTransaction.bridgedContext.find(
+      ([bridged]) => bridged === auditActorStore,
+    )?.[1] as AuditActor | undefined;
+    if (!actor) throw new Error('db.withUserMerge() requires an audit actor scope');
+    actor.userMerge = merge;
+    try {
+      return await fn();
+    } finally {
+      actor.userMerge = null;
+    }
+  },
 
   currentScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 

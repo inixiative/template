@@ -129,4 +129,12 @@ export const INQUIRY_TYPES = {
       },
     ],
   },
+  mergeUser: {
+    sources: [
+      { model: 'User', send: { all: [actorIsUser, { rel: 'sourceUser', action: 'own' }] } },
+    ],
+    targets: [
+      { model: 'User', resolve: { all: [actorIsUser, { rel: 'targetUser', action: 'own' }] } },
+    ],
+  },
 } as const satisfies Record<InquiryType, InquiryTypeParties>;

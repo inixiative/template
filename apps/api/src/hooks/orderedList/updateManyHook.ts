@@ -27,10 +27,11 @@ export const registerOrderedListUpdateManyHook = () => {
       const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (!data) return;
 
-      for (const field of Object.keys(config)) {
-        if (data[field] !== undefined) {
+      for (const [field, scopeFields] of Object.entries(config)) {
+        const written = [field, ...scopeFields].find((column) => data[column] !== undefined);
+        if (written) {
           throw new Error(
-            `Ordered field "${model}.${field}" cannot be written via updateManyAndReturn. ` +
+            `"${model}.${written}" orders "${model}.${field}" and cannot be written via updateManyAndReturn. ` +
               `Use a single update() per row — the update hook will shift siblings atomically.`,
           );
         }

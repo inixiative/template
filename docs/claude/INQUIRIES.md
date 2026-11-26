@@ -22,6 +22,7 @@
   - [Current Services](#current-services)
   - [Asking to change a record's entitlements](#asking-to-change-a-records-entitlements)
   - [Transferring a space](#transferring-a-space)
+  - [Merging users](#merging-users)
 - [Response Schemas](#response-schemas)
 - [Permissions (ReBAC)](#permissions-rebac)
 - [Adding a New Service](#adding-a-new-service)
@@ -303,8 +304,9 @@ Why: an approval is the approver's own answer, kept beside the request, never a 
 | `updateSpace` | Space | admin | `untargeted` | 90 days | Updates `Space` with content fields |
 | `transferSpace` | Space | Organization | `untargeted` | 30 days | Moves the space and everything keyed to it into the target org; see *Transferring a space* |
 | `changeEntitlements` | User | Token, Integration | `targeted` | 30 days | Adds and removes the target's entitlements through `changeEntitlements`; see *Asking to change a record's entitlements* |
+| `mergeUser` | User | User | `untargeted` | 30 days | Moves everything the source user holds to the target user, then hard-deletes the source user; see *Merging users* |
 
-All five services return `autoApprove: async () => false` — no type currently auto-approves.
+All six services return `autoApprove: async () => false` — no type currently auto-approves.
 
 ### Asking to change a record's entitlements
 
@@ -325,9 +327,23 @@ Approving a transfer moves the space, its members and everything downstream into
 2. One update tombstones every not-deleted `SpaceUser` whose user is not a not-deleted member of the target org, stamped with the transfer time; `softDeleteCascade` tombstones what they owned and deletes their tokens.
 3. Every space member, not-deleted or tombstoned, gets a tombstoned `member` row in the target org unless they already have one (`skipDuplicates`): the `SpaceUser` → `OrganizationUser` key needs it once step 4 re-keys their space membership. Its stamp is one no space membership carries, so hiring the person revives only their org membership. Putting them back in the space is a manual re-add; the transfer revives nothing.
 4. `Space.organizationId` is set. Every row keyed to the space or a space member carries the org in a composite key (`SpaceUser`; Integration, Token, EmailTemplate and EmailComponent; Inquiry and AuditLog rows keyed to a space member), so one statement re-keys them all by `ON UPDATE CASCADE`; Postgres runs every cascade of a statement before it checks the keys. `spaceKeys.test.ts` (`packages/db/src/registries`) fails when a Space- or SpaceUser-owned model carries an org column outside such a key.
-5. The rows the cascade re-keyed are cleared from the cache (`clearSpaceRowCaches`, through `queueCacheClear`). It finds them through every cached model's composite relation to `Space` or `SpaceUser` (`spaceKeyColumns`), so a prefixed pair such as `sourceSpaceId`/`sourceOrganizationId` counts; a space reference without an org column isn't re-keyed and is left alone.
+5. The rows the cascade re-keyed are cleared from the cache (`clearSpaceRowCaches`, through `queueCacheClearForMovedRows`). It finds them through every cached model's composite relation to `Space` or `SpaceUser` (`spaceKeyColumns`), so a prefixed pair such as `sourceSpaceId`/`sourceOrganizationId` counts; a space reference without an org column isn't re-keyed and is left alone.
 
 No row keyed to the space keeps the old org's membership, so reviving a membership in the old org revives nothing in the moved space. Audit rows record their context (`contextOrganizationId`) as it was when written, so the space's earlier history stays filed under the old org.
+
+### Merging users
+
+`mergeUser` merges the source user into the target user. The person signed in as the source user (the one that goes away) sends it; the person signed in as the target user (the one that stays) approves it (Aron, 2026-11-26: "its final step is to hard delete user"). The request is `{ sourceUser: { id, email } }`, and the approval sends back exactly the same object as a sanity check ("resolution payload is just the same as the content for saniy checking"). An approval with a different object, or none, is refused with 422. The type registers `approvesOnlyInReview` in the UI inquiry registry, so the target sees Review and Decline but no one-click Approve; the Review dialog sends the object. Denying or asking for changes needs no object.
+
+1. Both users are locked (`db.findForUpdate`). If the source user's email changed since the request, the merge is refused with 409.
+2. `mergeUserRows` runs a queue of repoints (`{ model, column, from, to }`). It starts with every user column of every model (`userKeyColumns`), memberships first, from the source user to the target user. Each repoint moves the rows and recomputes their dual polymorphism ids (`fetchRepointData`), so a row keyed to a source membership that collides with the target's points at the target's membership. Memberships re-key their children by `ON UPDATE CASCADE`. The source user's sign-in methods are not moved: its sessions, passkeys, two-factor secret and password account stay on it and are deleted with it, so the source user's password does not open the target. Its sign-in providers (OAuth accounts) move.
+3. **Where both users hold the same record, the target's wins** ("always keep targets values for things they shared a record for"). A source row whose unique key the target already holds (`fetchRowAlreadyHoldingTheUniqueKey`, through `uniqueKeysOnColumn` and the partial unique predicates in `partialUniquePredicates.ts`) is not moved. Instead, every row pointing at it is queued to point at the target's row, so a tag in a category both users hold ends up in the target's category. Then the losing row is soft-deleted and `softDeleteCascade` takes what is still under it; a losing row of a model without soft delete is deleted. One exception: a tombstone the target holds gives way to a live source row (the target's tombstone is hard-deleted and the source row moves), so a membership the target had removed and the source still holds survives.
+4. Rows anchored on a losing record are not repointed to the winner: a grant on the source user's root artifact (`ArtifactPermission.artifactId`) and an entitlement sourced from a losing record (`Entitlement` source keys) stay with the losing record and go when it goes. Moving them would hand the target's record grants nobody gave it.
+5. Every Inquiry is repointed, open or closed. Audit logs about the source user's memberships and other records are repointed through `subjectUserId`. Every other user column on an audit log (`actorUserId`, `actorSpoofUserId`, `contextUserId`, and `subjectUserId` where the subject is the User itself) orphans: the target did not do what the source did. `orphanAuditColumnsOfSourceUser` clears the actor, spoof and context columns just before the delete, the same writes their `SetNull` would make, because Postgres rechecks every key of an audit row a `SetNull` touches, and a row naming both the source user and a record cascaded with it would otherwise fail. Each null is a planned write (`merge.plannedWrites`, which `immutableFields` honours).
+6. Ordered lists (a user's contacts) are placed by the `orderedList` hook: the source user's rows land after the target's, with no two at one position.
+7. The source user is hard-deleted inside `db.withUserMerge`, the one scope in which `preventHardDelete` and `immutableFields` allow it (only the deletes in `merge.plannedDeletes` and the writes in `merge.plannedWrites`). Then every edge row that now runs from a record to the same record because the source and target each held one end is closed the way a deleted party closes it (`closeRowsWhoseEndsBecameOneRecord`): an open inquiry is canceled (`CLOSE_ON_PARENT_DELETE`), a soft-delete row such as a customer relationship between the two users is tombstoned, any other row is deleted. Edges that already pointed at themselves before the merge, such as a member's self-grant, are left alone. The rows the cascade re-keyed are cleared from the cache (`queueCacheClearForMovedRows`, shared with `transferSpace`), and `user.updated` is emitted for the target user.
+
+Merging organizations is FEAT-036, not built.
 
 **Who may send and resolve, by type** (declared in `INQUIRY_TYPES`):
 
@@ -337,6 +353,7 @@ No row keyed to the space keeps the old org's membership, so reviving a membersh
 | `createSpace` | Organization `own` | The platform (superadmin) |
 | `updateSpace` | Space `own` (a space owner, or an org owner through `space.own → org.own`) | The platform (superadmin) |
 | `transferSpace` | Space: `own` on the space's organization (`{ rel: 'sourceSpace.organization', action: 'own' }`) | Organization `own` |
+| `mergeUser` | The source user themselves (a person, `own` on `sourceUser`) | The target user themselves (a person, `own` on `targetUser`) |
 
 `updateSpace` and `transferSpace` differ intentionally. `updateSpace` asks `own` on the space, which an org owner also holds. `transferSpace` is a rule with a dot-path `rel` to the space's organization, so the check is `own` on the organization itself: a space owner alone cannot transfer it.
 

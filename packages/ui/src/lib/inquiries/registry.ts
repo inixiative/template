@@ -18,6 +18,7 @@ export type InquiryTargetComponents = {
   summary: ComponentType<{ inquiry: InquiryItem }>;
   detail?: ComponentType<{ inquiry: InquiryItem; onClose: () => void }>;
   review?: ComponentType<{ inquiry: InquiryItem; onClose: () => void }>;
+  approvesOnlyInReview?: boolean;
 };
 
 export type InquiryTypeComponentsEntry = {

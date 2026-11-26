@@ -7,6 +7,7 @@
 import { modelOf, tableName } from '@inixiative/field-map';
 import { db, hasDeletedAt, orderedListRegistry, Prisma } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import { isEqual } from 'lodash-es';
 
 type Where = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -354,6 +355,19 @@ export const applyOrderedListUpdate = async (
     const isRestoring = data.deletedAt === null;
     if (wasDeleted && isRestoring) {
       data[field] = await nextSortOrderRaw(model, scope, field);
+      continue;
+    }
+
+    const previousScope = buildScope(previous, scopeFields);
+    if (!isEqual(previousScope, scope)) {
+      const oldPos = previous[field] as number;
+      if (wasDeleted) {
+        data[field] = await minSortOrderRaw(model, scope, field);
+        continue;
+      }
+      data[field] = await nextSortOrderRaw(model, scope, field);
+      if (typeof oldPos === 'number' && oldPos > 0)
+        affected.push(...(await compactAfterRemove(model, previousScope, oldPos, field)));
       continue;
     }
 

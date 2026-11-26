@@ -1,4 +1,5 @@
 import { DbAction, HookTiming, type ModelName, registerDbHook } from '@template/db';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { unset } from 'lodash-es';
 import {
   fieldsRefusedAfterCreate,
@@ -6,12 +7,29 @@ import {
 } from '#/hooks/immutableFields/registry';
 import { makeError } from '#/lib/errors';
 
+const fieldsTheUserMergePlanned = (obj: Record<string, unknown>, model: ModelName): Set<string> => {
+  const merge = auditActorContext.currentUserMerge();
+  if (!merge) return new Set();
+  return new Set(
+    Object.keys(obj).filter((field) => {
+      const value = obj[field];
+      return (
+        (typeof value === 'string' || value === null) &&
+        merge.plannedWrites.get(`${model}.${field}`)?.has(value)
+      );
+    }),
+  );
+};
+
 const stripFromObject = (obj: Record<string, unknown>, model: ModelName): void => {
-  const [refused] = fieldsRefusedAfterCreate(model).filter((field) => obj[field] !== undefined);
+  const allowed = fieldsTheUserMergePlanned(obj, model);
+  const [refused] = fieldsRefusedAfterCreate(model).filter(
+    (field) => obj[field] !== undefined && !allowed.has(field),
+  );
   if (refused)
     throw makeError({ status: 422, message: `${model}.${refused} cannot change after create` });
   for (const field of immutableFieldsForModel(model)) {
-    unset(obj, field);
+    if (!allowed.has(field)) unset(obj, field);
   }
 };
 

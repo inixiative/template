@@ -10,6 +10,8 @@ import {
   fetchEntitlementAnchors,
   type HookOptions,
   HookTiming,
+  MEMBER_MODELS,
+  type MemberModel,
   registerDbHook,
   toEntitlementCreateData,
 } from '@template/db';
@@ -24,10 +26,7 @@ import {
 import { castArray, keyBy } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
-type MemberModel = 'OrganizationUser' | 'SpaceUser';
 type Member = Record<string, unknown> & { id: string; userId: string; deletedAt: Date | null };
-
-const MEMBER_MODELS: readonly MemberModel[] = ['OrganizationUser', 'SpaceUser'];
 
 const resourceOf: Record<MemberModel, MemberResource> = {
   OrganizationUser: 'db:OrganizationUser',

@@ -126,11 +126,11 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
 | `entitlementLens` | On `Entitlement` (`create`, `createManyAndReturn`, `upsert`'s create): a `lens` must be a valid json-rules narrowing over the resource's base lens that never hides `id` (422 otherwise), whoever writes it ([PERMISSIONS.md](PERMISSIONS.md#lenses-keep-id-paths-merge-by-id)) |
 | `fullDelegate` | On `Token` and `Integration`: a row written `full` gets `role: null` before the write, and its not-deleted entitlement rows are tombstoned after it. On `Entitlement`, a create whose target is a `full` delegate is refused (422 `full takes no entitlements`), whoever writes it |
-| `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
+| `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates; inside `db.withUserMerge` it lets through a value the merge planned for that column (`userMerge.plannedWrites`, `Model.field` → the planned values, `null` included) |
 | `memberSelfGrant` | After an `OrganizationUser` or `SpaceUser` is created (`create`, `createManyAndReturn`, an `upsert` that creates), writes its self-grant as an `Entitlement` row, tombstoned with the member's own `deletedAt` when the member is created tombstoned. `memberSelfGrant:kept` refuses (422) tombstoning a not-deleted member's self-grant; only the member's own tombstone takes it ([PERMISSIONS.md](PERMISSIONS.md#the-member-self-grant)) |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
 | `ownerRootArtifact` | Eagerly provisions an `ArtifactKind.root` container whenever a `User`, `Organization`, `Space`, `OrganizationUser`, or `SpaceUser` is created (not soft-deleted) or revived ([ARTIFACTS.md](ARTIFACTS.md)) |
-| `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
+| `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted; inside `db.withUserMerge` it allows a single-row `delete` listed in `userMerge.plannedDeletes` (`Model.id`, the source user included), nothing else |
 | `projectIntegrationOwner` | Enforces tenant-boundary ownership (same organization, same user for personal, same space for space-scoped integrations) on `ProjectIntegration` creates and upserts (`apps/api/src/hooks/projectIntegrationOwner/hook.ts`) |
 | `ruleReference` | Keeps `RuleReference` edges in step with each rule-bearing column (`RULE_REFERENCE_SURFACES`, `apps/api/src/hooks/ruleReference/surfaces.ts`: email templates and components, segment `conditions`, `Entitlement.where` read through `entitlementWhereLens`, which names the entitled record by id) |
 | `ruleReference:target` | Copies a named row's `deletedAt` onto the edges that name it, for every edge in `NAMING_EDGES` (`targetHook.ts`): `RuleReference.targetDeletedAt` and `Entitlement.sourceDeletedAt`. A purged row is left to the null FK |
@@ -224,12 +224,13 @@ auditActorContext.scope(
     userAgent: c.req.header('user-agent'),
     sourceInquiryId: inquiry?.id,
     bypassSoftDeleteScope: false, // flipped by db.withDeleted()
+    userMerge: null, // set by db.withUserMerge() while a mergeUser approval runs
   },
   () => next(),
 );
 ```
 
-The same store carries the soft-delete bypass flag, so anything that bridges this context across a boundary (e.g. into a transaction) carries them too.
+The same store carries the soft-delete bypass flag and the user merge, so anything that bridges this context across a boundary (e.g. into a transaction) carries them too. `userMerge` is `{ sourceUserId, targetUserId, plannedWrites, plannedDeletes }`: the merge records each write and delete it is about to make, and the two hooks above allow exactly those, so a merge can move fixed columns and hard-delete without turning either guard off ([INQUIRIES.md](INQUIRIES.md#merging-users)).
 
 ---
 

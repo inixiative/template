@@ -51,6 +51,10 @@ const RESOLUTION_EFFECTS: Record<
   },
   transferArtifact: async () => {},
   changeEntitlements: async () => {},
+  mergeUser: async (_inq, { refreshMe, queryClient }) => {
+    await queryClient.invalidateQueries({ queryKey: meReadManyOrganizationsQueryKey() });
+    await refreshMe();
+  },
 };
 
 export const useInquiryResolutionEffects = () => {
