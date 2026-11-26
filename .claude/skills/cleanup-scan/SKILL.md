@@ -37,11 +37,12 @@ note. Give it the code and the claim, not your conclusion. Fix what it confirms;
 it reports before relaying it. A plan or a change to what a primitive means is reviewed against
 Aron's stated principles before code is written.
 
-## 3.5. Architectural Subtractor
+## 3.5. Architectural Subtractor & Stale-Plumbing Sweep
 
-Distinct from §1 (code-level duplicates across repo/libs), §3 (correctness/security bugs), and §4 (recurring feedback checks): a separate agent reads the **whole** plan or diff with an explicit deletion mandate — *assume this has 30–50% too much surface area, and try to cut it in half without losing any required behavior* (`docs/claude/GREAT_PROGRAMMER.md`).
+Distinct from §1 (code-level duplicates across repo/libs), §3 (correctness/security bugs), and §4 (recurring feedback checks): a separate agent reads the **whole** plan or diff — plus every surviving file in the touched subsystem — with an explicit deletion mandate: *assume this has 30–50% too much surface area and left old plumbing behind; cut it down and delete every superseded layer without losing required behavior* (`docs/claude/GREAT_PROGRAMMER.md`).
 
-- **Two checkpoints:** run it **before coding** (on the 10-line prose flow and any diagram) and **before merge** (on the full outgoing diff, hunting turn-by-turn accretion).
+- **Checkpoints (never skip later rounds):** run it **before coding** (on the 10-line prose flow and any diagram), **before merge** (on the full outgoing diff), and **again after every architectural or refactor round before pushing** — iterative bug-fix and design rounds add code and routinely leave superseded plumbing behind.
+- **Stale-plumbing & surviving-parts reassessment:** for every new invariant or mechanism introduced by a refactor (e.g., an eager hook replacing lazy setup, a schema relation replacing manual joins, a primitive absorbing a helper), trace the superseded mechanism across the **entire touched subsystem** (not just lines in the latest commit). Delete every fallback, helper, wrapper, branch, guard, column, route, test, and doc that only existed before the new invariant held, and explicitly reassess whether every surviving part still needs to exist.
 - **Primitive absorption:** for every new route, table/column, Redis store, middleware, flag, or wrapper, ask: *can an existing primitive (ReBAC, JWT claims, `rateLimit`, `transitions`, `fieldEncryption`, hooks, scoped DB) absorb this directly?*
 - **Fresh-eyes rebuild:** ignore sunk cost from earlier iterations. If a route, bridge token, or helper only exists to patch a mistake from an earlier design turn, cut it and simplify the whole flow.
 - **Cutout elimination:** reject bypass options or escape hatches bolted onto a primitive to accommodate a clumsy caller; collapse the requirement into the primitive's general rule instead.
@@ -74,7 +75,7 @@ For each changed file that also exists in template, diff it against template's d
 
 ## 8. Leftovers
 
-Unused imports and exports, dead files, stale docs and comments, baselines or exemptions the change made unnecessary, debug output, and files the change made obsolete.
+Unused imports and exports, dead files, stale docs and comments, baselines or exemptions the change made unnecessary, debug output, files the change made obsolete, and any superseded fallbacks, helpers, branches, guards, routes, or tests left standing after an architectural change.
 
 ## 9. Verify and record
 

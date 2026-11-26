@@ -5,10 +5,6 @@
  * @uses none
  */
 import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
-import {
-  type ChangePasswordInput,
-  changePassword as changePasswordFn,
-} from '@template/ui/lib/auth/changePassword';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { signIn as signInFn } from '@template/ui/lib/auth/signIn';
 import { signUp as signUpFn } from '@template/ui/lib/auth/signUp';
@@ -125,14 +121,6 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
           syncWsAuth();
         }
         return result;
-      },
-
-      changePassword: async (input: ChangePasswordInput) => {
-        const spoofUserEmail = get().auth.spoofUserEmail;
-        const handoff = await changePasswordFn(input, { spoofUserEmail });
-        if (spoofUserEmail || !handoff.token) return;
-        storeJwtHandoff(handoff);
-        syncWsAuth();
       },
 
       setStrategy: (strategy) =>
