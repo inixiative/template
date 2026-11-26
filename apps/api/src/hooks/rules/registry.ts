@@ -3,7 +3,7 @@
  * @kind registry
  * @uses infrastructure:prisma
  */
-import type { Condition } from '@inixiative/json-rules';
+import { type Condition, Operator } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { polymorphismRules } from '#/hooks/falsePolymorphism/toRules';
 import { fullDelegateRules } from '#/hooks/rules/fullDelegateRules';
@@ -11,10 +11,24 @@ import { fullDelegateRules } from '#/hooks/rules/fullDelegateRules';
 const both = (model: ModelName, rule: Condition): Condition =>
   polymorphismRules[model] ? { all: [polymorphismRules[model], rule] } : rule;
 
+const userTakesNoTenantAccess: Condition = {
+  any: [
+    { field: 'ownerModel', operator: Operator.notEquals, value: 'User' },
+    {
+      all: [
+        { field: 'readAccess', operator: Operator.notEquals, value: 'tenant' },
+        { field: 'operateAccess', operator: Operator.notEquals, value: 'tenant' },
+      ],
+    },
+  ],
+  error: 'User-owned records cannot use tenant access',
+};
+
 export const RulesRegistry: Partial<Record<ModelName, Condition>> = {
   ...polymorphismRules,
   Integration: both('Integration', fullDelegateRules.Integration),
   Token: both('Token', fullDelegateRules.Token),
+  Project: both('Project', userTakesNoTenantAccess),
   // Add additional rules here:
   // User: { field: 'name', operator: 'notEmpty', value: true, error: 'name required' },
 };

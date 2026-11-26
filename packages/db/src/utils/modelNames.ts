@@ -7,7 +7,7 @@
 import { endpointKey, parseEndpointKey } from '@inixiative/json-rules';
 import { Prisma as PrismaBrowser } from '@template/db/generated/client/browser';
 import type { Prisma } from '@template/db/generated/client/client';
-import { lowerFirst, upperFirst } from 'lodash-es';
+import { keyBy, lowerFirst, upperFirst } from 'lodash-es';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -45,9 +45,7 @@ export const toModelName = (model: string): ModelName => {
 
 type AccessorTypeMap = { [K in ModelName as Uncapitalize<K>]: Uncapitalize<K> };
 
-export const AccessorNames: AccessorTypeMap = Object.fromEntries(
-  modelNames.map((name) => [lowerFirst(name), lowerFirst(name)]),
-) as AccessorTypeMap;
+export const AccessorNames: AccessorTypeMap = keyBy(modelNames.map(lowerFirst)) as AccessorTypeMap;
 
 export const accessorNames = Object.values(AccessorNames);
 

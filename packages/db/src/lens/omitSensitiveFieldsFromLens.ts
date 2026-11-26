@@ -7,11 +7,10 @@
  */
 import type { LensNarrowing, NarrowingDefaults } from '@inixiative/json-rules';
 import { SENSITIVE_FIELDS } from '@template/db/registries/sensitiveFields';
+import { mapValues } from 'lodash-es';
 
 const sensitiveFieldOmitDefaults: NarrowingDefaults = {
-  models: Object.fromEntries(
-    Object.entries(SENSITIVE_FIELDS).map(([model, omits]) => [model, { omits }]),
-  ),
+  models: mapValues(SENSITIVE_FIELDS, (omits) => ({ omits })),
 };
 
 export const omitSensitiveFieldsFromLens = (filterLens: LensNarrowing): LensNarrowing => ({

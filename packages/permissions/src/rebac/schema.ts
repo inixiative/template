@@ -5,7 +5,12 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { ContactSource, IntegrationResourceStatus } from '@template/db/generated/client/enums';
+import {
+  ContactSource,
+  IntegrationResourceStatus,
+  OperateAccess,
+  ReadAccess,
+} from '@template/db/generated/client/enums';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import {
   artifactPermissionResourcePermission,
@@ -14,10 +19,10 @@ import {
 } from '@template/permissions/rebac/artifactResourcePermission';
 import { inquiryResourcePermission } from '@template/permissions/rebac/inquiryResourcePermission';
 import {
-  actionsForRecordOwnedByAnyOwnerModel,
   actorIsDelegateOfUser,
   actorIsUser,
   actorMayCreateTokenAtOwnerWithRole,
+  actorMayPerformActionOnOwner,
   actorOperatesOwnerUserOrManagesOwnerTenant,
   chainedStandardActions,
   integrationAccess,
@@ -25,11 +30,13 @@ import {
   isNull,
   memberRowActions,
   ownerActions,
+  ownerPrivateRead,
+  ownerTenant,
   rowIsThereAnd,
   tokenAdministering,
 } from '@template/permissions/rebac/rebacSchemaRules';
 import { settingResourcePermission } from '@template/permissions/rebac/settingResourcePermission';
-import type { SchemaMap } from '@template/permissions/rebac/types';
+import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
 import { omit } from 'lodash-es';
 
 export const schemaMap: SchemaMap = {
@@ -125,7 +132,48 @@ export const schemaMap: SchemaMap = {
         delete: { any: ['manage', { rel: 'integration', action: 'delete' }] },
       },
     },
-    'db:Project': { actions: actionsForRecordOwnedByAnyOwnerModel },
+    'db:Project': {
+      actions: {
+        ...omit(integrationAdministering, 'delegateFull'),
+        operate: {
+          any: [
+            'manage',
+            actorMayPerformActionOnOwner('operate', '', ['User']),
+            {
+              all: [
+                {
+                  rule: {
+                    field: 'operateAccess',
+                    operator: Operator.equals,
+                    value: OperateAccess.tenant,
+                  },
+                },
+                ownerTenant('operate'),
+              ],
+            },
+          ],
+        },
+        read: {
+          any: [
+            'operate',
+            ownerPrivateRead(),
+            { rule: { field: 'readAccess', operator: Operator.equals, value: ReadAccess.public } },
+            {
+              all: [
+                {
+                  rule: {
+                    field: 'readAccess',
+                    operator: Operator.equals,
+                    value: ReadAccess.tenant,
+                  },
+                },
+                ownerTenant('read'),
+              ],
+            },
+          ],
+        },
+      },
+    },
     'db:ProjectIntegration': {
       actions: {
         create: {

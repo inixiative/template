@@ -17,7 +17,7 @@ import type {
   SettingPermissionAction,
   SettingResourceModelName,
 } from '@template/shared/settings/resourceModels';
-import { isEqual } from 'lodash-es';
+import { groupBy, isEqual } from 'lodash-es';
 
 export type SettingCatalogCategory = {
   readonly key: string;
@@ -152,12 +152,7 @@ export const assembleResourceSettings = (
     };
   });
 
-  const byCategory: Record<string, AssembledSettingItem[]> = {};
-  for (const item of items) {
-    const bucket = byCategory[item.category];
-    if (bucket) bucket.push(item);
-    else byCategory[item.category] = [item];
-  }
+  const byCategory = groupBy(items, 'category');
 
   return { items, byCategory };
 };

@@ -11,6 +11,7 @@ import {
   createWebhookSubscription,
 } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
+import { mapKeys } from 'lodash-es';
 import { sendWebhook } from '#/jobs/handlers/sendWebhook';
 import { createTestApp } from '#tests/createTestApp';
 import { makeTestWorker } from '#tests/makeTestWorker';
@@ -46,11 +47,9 @@ describe('sendWebhook handler', () => {
     setEnvOverride('WEBHOOK_SIGNING_PRIVATE_KEY', privateKey);
     receivedWebhooks.length = 0;
     spyOn(globalThis, 'fetch').mockImplementation(((url: string, init?: RequestInit) => {
-      const headers: Record<string, string> = {};
-      if (init?.headers) {
-        const h = init.headers as Record<string, string>;
-        for (const [k, v] of Object.entries(h)) headers[k.toLowerCase()] = v;
-      }
+      const headers = init?.headers
+        ? mapKeys(init.headers as Record<string, string>, (_v, k) => k.toLowerCase())
+        : {};
       receivedWebhooks.push({
         url,
         body: init?.body ? JSON.parse(init.body as string) : null,

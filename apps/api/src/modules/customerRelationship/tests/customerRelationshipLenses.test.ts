@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { bindLens, type LensNarrowing, Operator, validateNarrowing } from '@inixiative/json-rules';
 import { polymorphicBindings } from '@template/db';
+import { omit } from 'lodash-es';
 import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 import { customerRelationshipsByIdLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipsByIdLens';
 import { lensProjectionSourcesAndSelect } from '#tests/utils/lensProjectionSourcesAndSelect';
@@ -25,7 +26,7 @@ const sortedKeys = (value: unknown): unknown =>
       : value;
 
 const declaredLayerDigest = (lens: LensNarrowing): string => {
-  const { parent: _generatedBase, ...declared } = lens.parent as LensNarrowing;
+  const declared = omit(lens.parent as LensNarrowing, 'parent');
   return createHash('sha256')
     .update(JSON.stringify(sortedKeys(JSON.parse(JSON.stringify(declared)))))
     .digest('hex');

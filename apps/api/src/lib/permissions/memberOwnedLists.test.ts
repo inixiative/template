@@ -126,8 +126,6 @@ describe("a member's own rows are listed under the member, and only there", () =
     ['organization member tokens', () => `/organizationUser/${member.id}/tokens`],
     ['space member integrations', () => `/spaceUser/${spaceMember.id}/integrations`],
     ['space member tokens', () => `/spaceUser/${spaceMember.id}/tokens`],
-    ['organization member projects', () => `/organizationUser/${member.id}/projects`],
-    ['space member projects', () => `/spaceUser/${spaceMember.id}/projects`],
   ] as const) {
     it(`${label}: the member and the organization's owner read them; an admin, another member and an outsider can't`, async () => {
       expect(await whoCanList(path())).toEqual({
@@ -137,6 +135,25 @@ describe("a member's own rows are listed under the member, and only there", () =
         anotherMember: 'denied',
         outsider: 'denied',
       });
+    });
+  }
+
+  for (const [label, path, rowKey] of [
+    [
+      'organization member projects',
+      () => `/organizationUser/${member.id}/projects`,
+      'memberProject',
+    ],
+    ['space member projects', () => `/spaceUser/${spaceMember.id}/projects`, 'spaceMemberProject'],
+  ] as const) {
+    it(`${label}: the member and the organization's owner see private projects; an admin, another member and an outsider see none`, async () => {
+      const visibleIds = async (headers: Headers) =>
+        ((await list(headers, path())) as Row[]).map((row) => row.id);
+      expect(await visibleIds(callers.member)).toEqual([rows[rowKey]]);
+      expect(await visibleIds(callers['organization owner'])).toEqual([rows[rowKey]]);
+      expect(await visibleIds(callers['organization admin'])).toEqual([]);
+      expect(await visibleIds(callers.anotherMember)).toEqual([]);
+      expect(await visibleIds(callers.outsider)).toEqual([]);
     });
   }
 

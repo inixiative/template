@@ -62,6 +62,8 @@
   - [Dot-path vs. Single-hop Delegation](#dot-path-vs-single-hop-delegation)
   - [Inquiry permissions](#inquiry-permissions)
 - [Owner-Polymorphic Models](#owner-polymorphic-models)
+- [Record Access](#record-access)
+  - [Why `validateEntitlementGrants` strips access fields (`withoutAccessFields`)](#why-validateentitlementgrants-strips-access-fields-withoutaccessfields)
 - [Row-Level Overrides](#row-level-overrides)
   - [Schema](#schema)
   - [How `check()` merges](#how-check-merges)
@@ -132,7 +134,7 @@ One word per party, used in code and prose alike. Names in code are composed of 
 | **owner** | the row a token or integration belongs to (its `ownerModel`): a user, a member, a tenant, or (for a token) an integration |
 | **delegate** | a token or an integration |
 | **permissions** | a principal's authority — a delegate's `{ role, full, entitlements }`, a member's tenant role, or an explicit per-record grant (`ArtifactPermission`) |
-| **access** | a resource's visibility (`private`, `tenant`, `public`, plus `inherit` on `ArtifactPlacement`) — the resource-side mirror of permissions; controls who can discover or read a record without an explicit grant |
+| **access** | a resource's audience settings (`readAccess`: `private \| tenant \| public`; `operateAccess`: `private \| tenant`, plus `inherit` on `ArtifactPlacement`) — the resource-side mirror of permissions; controls who can read or operate a record without an explicit grant |
 | **entitlement** | a named grant `{ resource, anchor: { resource, id, path? }, where?, actions }`, stored as one `Entitlement` row whose **source** is the anchor and whose **target** is the holder ([Entitlements](#entitlements)) |
 | **member self-grant** | the entitlement every member row carries to `operate` on itself, backed by its user ([The Member Self-Grant](#the-member-self-grant)) |
 | **delegateFull** | the person-only action on an owner that lets you set `full` on its delegate ([Full and delegateFull](#full-and-delegatefull)) |
@@ -673,7 +675,7 @@ The schema is `schemaMap` in `packages/permissions/src/rebac/schema.ts`, keyed b
 | `memberRowActions(tenant)` | a member row's actions |
 | `memberRoleWrite(tenant)`, `memberRemoval(tenant)` | writing a member's role; removing a member |
 | `integrationAdministering`, `integrationAccess` | `db:Integration`'s `create`, `manage`, `delete`, `delegateFull`; its `operate` and `read` |
-| `actionsForRecordOwnedByAnyOwnerModel` | the same by owner kind without `delegateFull`, for a model owned by any of the five owners (`db:Project`) |
+| `ownerTenant(action, at?)`, `ownerPrivateRead(at?)` | tenant `read`/`operate` (`Organization`, `Space`, `OrganizationUser`, `SpaceUser` via `${at}organization` / `${at}space`) and private-owner `read`, shared by `readAccess`/`operateAccess` rules (e.g. `db:Project`) |
 | `integrationRoleWrite`, `roleHeldAtOwner(at?)` | writing an integration's role; the role on the row held at its owner |
 | `actorMayCreateTokenAtOwnerWithRole`, `tokenAdministering` | `db:Token`'s `create`; its `read` and `delete` |
 | `chainedStandardActions`, `ownerActions(rels?)` | the standard chain; the owner fan-out over it |
@@ -779,11 +781,37 @@ Models with nullable foreign keys to several owners (Contact, WebhookSubscriptio
 
 For each standard action the helper asks the same action of `user`, `organization` and `space`, chained. Only the populated relation is hydrated, so the others fail and the rule follows the actual owner. Integrations and tokens are owner-polymorphic too but follow their own owner-kind rules ([Integrations and Tokens by Owner Kind](#integrations-and-tokens-by-owner-kind)).
 
-`ownerActions()` reads the `user`, `organization` and `space` relations, so it can't tell a member's row from its tenant's: an OrganizationUser-owned row carries `organizationId` too, and `manage` on the organization would reach it. A model owned by any of the five owner kinds (User, OrganizationUser, Organization, Space, SpaceUser) uses `actionsForRecordOwnedByAnyOwnerModel` instead. It is the integration rules without `delegateFull`, keyed on `ownerModel` ([Integrations](#integrations)): an organization's admin manages its organization's rows but can't reach a member's own; the organization's owner can read and delete a member's row, not change it; only the member manages it.
+`ownerActions()` reads the `user`, `organization` and `space` relations, so it can't tell a member's row from its tenant's: an OrganizationUser-owned row carries `organizationId` too, and `manage` on the organization would reach it. A model owned by any of the five owner kinds (User, OrganizationUser, Organization, Space, SpaceUser) keys its rules on `ownerModel` ([Integrations](#integrations)): an organization's admin manages its organization's rows but can't reach a member's own; the organization's owner can read and delete a member's row, not change it; only the member manages it.
 
-```typescript
-'db:Project': { actions: actionsForRecordOwnedByAnyOwnerModel },
-```
+`db:Project` layers `readAccess` (`ReadAccess`: `public | tenant | private`, default `private`) and `operateAccess` (`OperateAccess`: `tenant | private`, default `private`) on top of `omit(integrationAdministering, 'delegateFull')`. See [Record Access](#record-access) below.
+
+---
+
+## Record Access
+
+Beside role rules, row `permissionRules`, and `tenantPermissionRules`, access-bearing models such as `Project` carry two independent enums (`packages/db/prisma/schema/access.prisma`), both defaulting to `private`:
+
+- **`readAccess` (`ReadAccess`: `private | tenant | public`):**
+  - **`private` (default):** Closed to regular org/space members. On `Organization`/`Space` records, only tenant admins/owners (`manage`) hold access; on `OrganizationUser`/`SpaceUser` records, only the member (`operate` → `manage`) and tenant `owner` (`own` → `read`/`delete`, not `admin`); on `User` records, only the user.
+  - **`tenant`:** Opens `read` to anyone with `read` on the owning tenant via `ownerTenant('read')` (`Organization`/`OrganizationUser` → `organization:read`, `Space`/`SpaceUser` → `space:read`). Refused (`422`) on `User`-owned rows, which have no tenant.
+  - **`public`:** Strictly `read`-only for any caller (including unauthenticated requests and tokens/bots). Never grants `operate`.
+- **`operateAccess` (`OperateAccess`: `private | tenant`):**
+  - **`private` (default):** Only `manage` (or explicit grants / `User` owner) can `operate`.
+  - **`tenant`:** Opens `operate` (and by implication `read`) to anyone with `operate` on the owning tenant via `ownerTenant('operate')` (`member`+ on the org or space, never `viewer` and never `manage`/`delete`). Independent of `readAccess`: e.g. `readAccess: 'public', operateAccess: 'private'` is a public read-only showcase; `readAccess: 'private', operateAccess: 'tenant'` is member-only (hidden from viewers); `readAccess: 'tenant', operateAccess: 'tenant'` is a team workspace. Refused (`422`) on `User`-owned rows.
+
+Owner list routes (`/me/projects`, `/user/:id/projects`, `/organization/:id/projects`, `/space/:id/projects`, `/organizationUser/:id/projects`, `/spaceUser/:id/projects`) use `fetchSubmodelAccessWhere(c)` with plain `paginate(...)` to reflect `readAccess`, `operateAccess`, and verified direct entitlements in SQL (returning `200 []` when a caller has no accessible rows).
+
+### Why `validateEntitlementGrants` strips access fields (`withoutAccessFields`)
+
+An `Entitlement` anchored at a record (e.g. `sourceModel: 'Project'`, `sourceId: P.id`, no `where`) is evaluated at runtime against the holder's backing owner permissions (`organizationOwnerPermissions` / `spaceOwnerPermissions`, which hold `owner` role), not the admin who wrote the row.
+
+Because `readAccess` and `operateAccess` are mutable, leaving their live values on the hydrated anchor during `canGrantEntitlement` would allow privilege escalation:
+
+1. A member temporarily flips their `OrganizationUser` project `P` to `readAccess: 'tenant'` or `operateAccess: 'tenant'` (or a `Space` project is briefly `readAccess: 'public'`).
+2. An org admin (who cannot read or operate `P` when `private`) grants themselves a self-anchored `db:Project` entitlement on `P` with no `where`. If `anchor` carried the live access fields, `canGrantEntitlement` would pass.
+3. When the owner flips `P` back to `private`, the stored entitlement would still hold forever because its backing `organizationOwnerPermissions` holds `organizationUser:own` even on `private` rows.
+
+`withoutAccessFields` in `apps/api/src/lib/permissions/validateEntitlementGrants.ts` recursively omits `readAccess`, `operateAccess`, `effectiveReadAccess`, and `effectiveOperateAccess` from the hydrated anchor record before calling `pseudoRecordsOfEntitlement` / `canGrantEntitlement`. Anchor-level grants therefore succeed only when the writer holds the action independent of record access (e.g. org admin on an `Organization` project, member on their own project, or org owner), while parent-anchored entitlements that explicitly pin `where: { readAccess: 'tenant' }` remain enforced live by `entry.where`.
 
 ---
 
@@ -974,7 +1002,7 @@ Routes that still check an action on the owner (`validatePermission` on spaces, 
 
 A model with a five-way owner (`User`, `OrganizationUser`, `Organization`, `Space`, `SpaceUser`; a token also has `Integration`) gets one list per owner kind: `/me/tokens`, `/organizationUser/:id/tokens`, `/organization/:id/tokens`, `/space/:id/tokens`, `/spaceUser/:id/tokens`, `/integration/:id/tokens`. Each tenant and member list returns exactly that owner's rows: an organization's list holds no member's rows. `/me/tokens` is the user's view across tenants: their own tokens and every membership's, each with its `organization`, `organizationUser`, `space` and `spaceUser`.
 
-The controller filters with `submodelOwnerWhere(c)` (`apps/api/src/lib/prisma/submodelOwnerWhere.ts`): the owner keys and kind of the same placement the route's `validateSubmodelPermission('read')` checked. One check on the owner covers every row the list returns, and the two can't drift apart.
+The controller filters with `submodelOwnerWhere(c)` (`apps/api/src/lib/prisma/submodelOwnerWhere.ts`): the owner keys and kind of the same placement the route's `validateSubmodelPermission('read')` checked. One check on the owner covers every row the list returns, and the two can't drift apart. Models with `readAccess` / `operateAccess` (`Project`) instead omit `validateSubmodelPermission('read')` on their owner list routes (`/me/projects`, `/user/:id/projects`, `/organization/:id/projects`, `/space/:id/projects`, `/organizationUser/:id/projects`, `/spaceUser/:id/projects`) and filter with `fetchSubmodelAccessWhere(c)` (`apps/api/src/lib/prisma/fetchSubmodelAccessWhere.ts`), which evaluates `readAccess`, `operateAccess`, and verified direct entitlements on the hydrated placement.
 
 ```typescript
 const { data, pagination } = await paginate(c, db.token, {
@@ -983,7 +1011,7 @@ const { data, pagination } = await paginate(c, db.token, {
 });
 ```
 
-A member's list is read by the member and by the organization's owner, never by an admin or another member (`memberOwnedLists.test.ts`). In the UI, an organization or space page shows two lists: yours there (the membership's) and the tenant's (`tokenContextQueries` / `integrationContextQueries` with `{ ownedByMyMembership: true }`).
+A member's non-visibility list (integrations, tokens) is read by the member and by the organization's owner, never by an admin or another member (`memberOwnedLists.test.ts`); member `Project` lists return `200` filtered to the caller's visibility (`private` hidden from admins, coworkers, and outsiders). In the UI, an organization or space page shows two lists: yours there (the membership's) and the tenant's (`tokenContextQueries` / `integrationContextQueries` with `{ ownedByMyMembership: true }`).
 
 ### The user as a resource
 
