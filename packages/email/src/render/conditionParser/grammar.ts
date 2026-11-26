@@ -22,7 +22,19 @@ export const RESERVED_SCOPE_ROOTS: ReadonlySet<string> = new Set(SCOPE_ROOTS);
 
 export const TOKEN_PATTERN = /\{\{([a-z][a-z0-9-]*)((?:\.[a-zA-Z0-9_-]+)*)\}\}/g;
 
-const GRAMMAR_KEYWORDS = ['else', 'if', 'each', 'as', 'index', 'rule', 'filter'] as const;
+export const DATETIME_TOKEN_PATTERN =
+  /\{\{datetime ([a-z][a-z0-9-]*(?:\.[a-zA-Z0-9_-]+)*)(?: tz=([A-Za-z0-9_+/-]+))?\}\}/g;
+
+const GRAMMAR_KEYWORDS = [
+  'else',
+  'if',
+  'each',
+  'as',
+  'index',
+  'rule',
+  'filter',
+  'datetime',
+] as const;
 
 export const RESERVED_BINDING_NAMES: ReadonlySet<string> = new Set([
   ...RESERVED_SCOPE_ROOTS,

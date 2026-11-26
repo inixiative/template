@@ -132,3 +132,22 @@ describe('validateTokens — guards the review found gameable', () => {
     ).toContain('not allowed in the subject');
   });
 });
+
+describe('validateTokens — {{datetime}}', () => {
+  it('accepts a known time zone and no time zone', () => {
+    expect(validateTokens('{{datetime data.at tz=America/New_York}} {{datetime data.at}}')).toEqual(
+      [],
+    );
+  });
+
+  it('refuses a time zone it does not know, instead of printing UTC', () => {
+    expect(
+      validateTokens('{{datetime data.at tz=Mars/Olympus}}').map((issue) => issue.message),
+    ).toEqual(['{{datetime}} has an unknown time zone: Mars/Olympus']);
+  });
+
+  it('checks the path the way a plain token is checked', () => {
+    expect(messages('{{datetime recipient.missing}}')[0]).toContain('is not provided');
+    expect(messages('{{datetime nope.at}}')[0]).toContain('names no scope root');
+  });
+});

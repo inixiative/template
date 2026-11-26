@@ -34,4 +34,12 @@ describe('visitTemplateBlocks', () => {
     expect(fieldPaths).toContain('recipient.name');
     expect(fieldPaths).not.toContain('data.items.name');
   });
+
+  it('records the field a {{datetime}} token prints', () => {
+    expect(
+      collectHydrationPaths(
+        '<mjml><mj-body>{{datetime data.request.lastScheduledAt tz=America/New_York}}</mj-body></mjml>',
+      ).fieldPaths,
+    ).toEqual(['data.request.lastScheduledAt']);
+  });
 });

@@ -874,3 +874,67 @@ describe('interpolate — {{#each}} expansion bounds', () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe('interpolate — {{datetime}}', () => {
+  const CALL = '2026-11-26T19:00:00.000Z';
+  const render = (template: string, data: Record<string, unknown>, issues: string[] = []) =>
+    interpolate(template, { data }, (issue) => issues.push(issue.detail), {
+      lens: defaultEmailLens,
+    });
+
+  it('prints a date and time in UTC when no time zone is named', () => {
+    expect(render('Call: {{datetime data.at}}', { at: new Date(CALL) })).toBe(
+      'Call: Nov 26, 7:00 PM UTC',
+    );
+  });
+
+  it('prints in the named time zone on both sides of a daylight-saving change', () => {
+    const template =
+      '{{datetime data.before tz=America/New_York}} / {{datetime data.after tz=America/New_York}}';
+    const result = render(template, {
+      before: new Date('2026-10-31T16:00:00.000Z'),
+      after: new Date('2026-11-02T17:00:00.000Z'),
+    });
+    expect(result).toBe('Oct 31, 12:00 PM EDT / Nov 2, 12:00 PM EST');
+  });
+
+  it('prints the same for an ISO string and a Date', () => {
+    const template =
+      '{{datetime data.asString tz=America/New_York}} = {{datetime data.asDate tz=America/New_York}}';
+    expect(render(template, { asString: CALL, asDate: new Date(CALL) })).toBe(
+      'Nov 26, 2:00 PM EST = Nov 26, 2:00 PM EST',
+    );
+  });
+
+  it('prints nothing for an empty, missing or invalid value, and reports each', () => {
+    const issues: string[] = [];
+    const template =
+      '[{{datetime data.empty}}][{{datetime data.missing}}][{{datetime data.blank}}][{{datetime data.bad}}][{{datetime data.object}}]';
+    const result = render(
+      template,
+      { empty: null, blank: '', bad: 'not a date', object: { at: CALL } },
+      issues,
+    );
+    expect(result).toBe('[][][][][]');
+    expect(issues).toHaveLength(5);
+    expect(issues[0]).toBe('{{datetime data.empty}} is not a date');
+  });
+
+  it('reads a loop binding inside {{#each}}', () => {
+    const template =
+      '{{#each data.calls as=call}}<{{datetime call.at tz=America/New_York}}>{{/each}}';
+    expect(render(template, { calls: [{ at: CALL }] })).toBe('<Nov 26, 2:00 PM EST>');
+  });
+
+  it('prints nothing and reports a root that is not a scope root or a binding', () => {
+    const issues: string[] = [];
+    expect(render('{{datetime nope.at}}', {}, issues)).toBe('');
+    expect(issues).toEqual(['{{datetime nope.at}} names no scope root or loop binding']);
+  });
+
+  it('refuses a prototype key', () => {
+    const issues: string[] = [];
+    expect(render('{{datetime data.__proto__}}', {}, issues)).toBe('');
+    expect(issues).toEqual(['{{datetime data.__proto__}} addresses a prototype key']);
+  });
+});

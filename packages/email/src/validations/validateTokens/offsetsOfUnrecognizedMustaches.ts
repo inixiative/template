@@ -6,6 +6,7 @@
  */
 import { componentTagPattern } from '@template/email/render/blockTags';
 import {
+  DATETIME_TOKEN_PATTERN,
   EACH,
   ELSE,
   ELSE_IF,
@@ -23,10 +24,11 @@ const startsKnownConstruct = (content: string, at: number): boolean => {
   block.lastIndex = at;
   const blockMatch = block.exec(content);
   if (blockMatch && blockMatch.index === at) return true;
-  const token = new RegExp(TOKEN_PATTERN.source, 'g');
-  token.lastIndex = at;
-  const tokenMatch = token.exec(content);
-  return !!tokenMatch && tokenMatch.index === at;
+  return [TOKEN_PATTERN, DATETIME_TOKEN_PATTERN].some((pattern) => {
+    const token = new RegExp(pattern.source, 'g');
+    token.lastIndex = at;
+    return token.exec(content)?.index === at;
+  });
 };
 
 /** Offsets of every `{{` that opens nothing the engine understands — text that would ship as written. */

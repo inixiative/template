@@ -4,7 +4,8 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import { TOKEN_PATTERN } from '@template/email/render/conditionParser';
+import { DATETIME_TOKEN_PATTERN, TOKEN_PATTERN } from '@template/email/render/conditionParser';
+import { substituteDatetimeToken } from '@template/email/render/evaluateTemplate/substituteDatetimeToken';
 import { substituteToken } from '@template/email/render/evaluateTemplate/substituteToken';
 import type {
   RuleErrorSink,
@@ -19,7 +20,11 @@ export const substituteTokensInText = (
   onError?: RuleErrorSink,
 ): string => {
   if (!options.substitute) return text;
-  return text.replace(TOKEN_PATTERN, (_match, root: string, segments: string) =>
-    substituteToken(root, segments, scope, onError, options),
-  );
+  return text
+    .replace(DATETIME_TOKEN_PATTERN, (_match, path: string, timeZone: string | undefined) =>
+      substituteDatetimeToken(path, timeZone, scope, onError, options),
+    )
+    .replace(TOKEN_PATTERN, (_match, root: string, segments: string) =>
+      substituteToken(root, segments, scope, onError, options),
+    );
 };

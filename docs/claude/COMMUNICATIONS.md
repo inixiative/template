@@ -301,6 +301,14 @@ Three prefixes for variable substitution:
 | `recipient` | Recipient user | `{{recipient.email}}` |
 | `data` | Explicit from send call | `{{data.code}}` |
 
+`{{datetime <path> tz=<Zone>}}` prints a date and time in a time zone, through the shared
+`formatDateTimeShort` (`Nov 26, 2:00 PM EST`), in UTC when no zone is named. The path is any token
+path, a loop binding included. A Date and an ISO string print the same; an empty, missing or
+invalid value renders empty and is one issue in the sink, like any token. Save checks the path as
+it checks a plain token and refuses a zone that is not a canonical IANA id (`isTimezoneId`) rather
+than printing UTC; the field the token prints is a hydration path, and `datetime` is a reserved
+binding name.
+
 ```typescript
 import { interpolate } from '@template/email/render';
 

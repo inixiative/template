@@ -6,11 +6,13 @@
  */
 import type { TokenIssue } from '@template/email/errors/TokenValidationError';
 import {
+  DATETIME_TOKEN_PATTERN,
   RESERVED_SCOPE_ROOTS,
   TOKEN_PATTERN,
   visitTemplateBlocks,
 } from '@template/email/render/conditionParser';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
+import { splitRoot } from '@template/email/rules/emailLens';
 import { isRailProvidedSystemField } from '@template/email/rules/railProvidedSystemFields';
 import { replaceLoopBindingsWithAbsolutePaths } from '@template/email/rules/replaceLoopBindingsWithAbsolutePaths';
 import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
@@ -18,6 +20,7 @@ import { offsetsOfUnrecognizedMustaches } from '@template/email/validations/vali
 import { pathsGuaranteedPresentByRule } from '@template/email/validations/validateTokens/pathsGuaranteedPresentByRule';
 import { emailTokenPathKind } from '@template/email/validations/validateTokens/tokenPathKind';
 import type { ValidateTokensOptions } from '@template/email/validations/validateTokens/types';
+import { isTimezoneId } from '@template/shared/reference/timezones';
 
 const SYSTEM_TOKEN_NAMES = new Set<string>(SYSTEM_TOKENS.map(({ name }) => name));
 
@@ -91,6 +94,14 @@ const checkText = (text: string, walk: Walk): void => {
     const token = `${root}${segments}`;
     const message = tokenProblem(token, root, segments, walk);
     if (message) walk.issues.push({ path: `{{${token}}}`, message });
+  }
+  for (const [, path = '', timeZone] of text.matchAll(DATETIME_TOKEN_PATTERN)) {
+    const { root, rest } = splitRoot(path);
+    const message =
+      timeZone && !isTimezoneId(timeZone)
+        ? `{{datetime}} has an unknown time zone: ${timeZone}`
+        : tokenProblem(path, root, rest ? `.${rest}` : '', walk);
+    if (message) walk.issues.push({ path: `{{datetime ${path}}}`, message });
   }
 };
 

@@ -8,6 +8,7 @@
 export { collectRules } from './collectRules';
 export { findJsonEnd } from './findJsonEnd';
 export {
+  DATETIME_TOKEN_PATTERN,
   EACH,
   ELSE,
   ELSE_IF,
