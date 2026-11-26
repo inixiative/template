@@ -181,7 +181,7 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
               ? 'Requests you send will be tracked here until they are resolved.'
               : 'Requests addressed to you will appear here for review.',
         }}
-        isPending={activeQuery.isLoading}
+        isLoading={activeQuery.isLoading}
       />
     </Page>
   );

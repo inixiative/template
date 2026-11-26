@@ -71,7 +71,7 @@ export const OrganizationProfilePage = () => {
     <Page title="Profile" description="Manage your organization settings and preferences">
       <div className="max-w-2xl space-y-6">
         <ProfileFormCard
-          isPending={isLoading}
+          isLoading={isLoading}
           name={name}
           onNameChange={setName}
           slug={slug}

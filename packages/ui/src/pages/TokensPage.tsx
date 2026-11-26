@@ -152,7 +152,7 @@ const TokenSection = ({
         description: 'Tokens let scripts and integrations call the API on your behalf.',
         action: { label: 'Create token', onClick: () => setIsModalOpen(true) },
       }}
-      isPending={isLoading}
+      isLoading={isLoading}
     />
   );
 

@@ -93,7 +93,7 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
       actions={statusDropdown}
     >
       {view === 'all' ? (
-        <AdminAllInquiryTable inquiries={inquiries} isPending={isLoading} />
+        <AdminAllInquiryTable inquiries={inquiries} isLoading={isLoading} />
       ) : (
         <Table
           columns={[
@@ -133,7 +133,7 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
             icon: 'lucide:inbox',
             description: 'Requests that need platform approval will show up here.',
           }}
-          isPending={isLoading}
+          isLoading={isLoading}
         />
       )}
     </Page>
@@ -144,12 +144,12 @@ const adminAllInquiryHeadings = ['Type', 'Status', 'Actor', 'Sent', 'Expires', '
 
 const AdminAllInquiryTable = ({
   inquiries,
-  isPending,
+  isLoading,
 }: {
   inquiries: Inquiry[];
-  isPending: boolean;
+  isLoading: boolean;
 }) => {
-  if (!isPending && inquiries.length === 0) {
+  if (!isLoading && inquiries.length === 0) {
     return (
       <EmptyState
         icon="lucide:inbox"
@@ -175,7 +175,7 @@ const AdminAllInquiryTable = ({
             ))}
           </tr>
         </thead>
-        {isPending && (
+        {isLoading && (
           <tbody>
             <TablePlaceholderRows columnCount={adminAllInquiryHeadings.length} rows={5} />
           </tbody>

@@ -21,7 +21,6 @@ import {
   meTwoFactorTotpDisable,
   meTwoFactorTotpStart,
 } from '@template/sdk';
-import {} from '@template/ui/components';
 import { BackupCodesRevealModal } from '@template/ui/components/auth/BackupCodesRevealModal';
 import type { TotpSetupState } from '@template/ui/components/auth/TotpEnrollForm';
 import { Badge } from '@template/ui/components/primitives/Badge';
@@ -159,7 +158,7 @@ export const TwoFactorSecurityCard = ({ onEnrolled }: { onEnrolled?: () => void 
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-4" isPending={isLoading || !status}>
+        <CardContent className="space-y-4" isLoading={isLoading || !status}>
           {status && (
             <>
               {errorMessage && (

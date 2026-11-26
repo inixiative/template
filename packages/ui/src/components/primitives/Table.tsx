@@ -41,8 +41,7 @@ export type TableProps<T> = {
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   sectionId?: string;
   className?: string;
-  isPending?: boolean;
-  placeholderRows?: number;
+  isLoading?: boolean;
 };
 
 export const Table = <T,>({
@@ -59,8 +58,7 @@ export const Table = <T,>({
   scrollRef,
   sectionId,
   className,
-  isPending = false,
-  placeholderRows = 5,
+  isLoading = false,
 }: TableProps<T>) => {
   // Hooks must be called unconditionally, before any early returns.
   const sentinelRef = useInfiniteScrollTrigger({
@@ -73,7 +71,7 @@ export const Table = <T,>({
   const shouldShow = typeof show === 'function' ? show() : show;
   if (!shouldShow) return null;
 
-  if (!isPending && data.length === 0 && !infiniteScroll?.isLoading) {
+  if (!isLoading && data.length === 0 && !infiniteScroll?.isLoading) {
     return (
       <EmptyState
         {...empty}
@@ -105,11 +103,9 @@ export const Table = <T,>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y" aria-busy={isPending}>
-            {isPending && (
-              <TablePlaceholderRows columnCount={columns.length} rows={placeholderRows} />
-            )}
-            {!isPending &&
+          <tbody className="divide-y" aria-busy={isLoading}>
+            {isLoading && <TablePlaceholderRows columnCount={columns.length} rows={5} />}
+            {!isLoading &&
               data.map((item) => (
                 <tr
                   key={keyExtractor(item)}

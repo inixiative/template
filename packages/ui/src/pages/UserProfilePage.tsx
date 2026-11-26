@@ -30,7 +30,7 @@ export const UserProfilePage = () => {
     <Page title="Profile" description="Manage your user settings and preferences">
       <div className="max-w-2xl space-y-6">
         <ProfileFormCard
-          isPending={isLoading}
+          isLoading={isLoading}
           name={profile?.name ?? ''}
           canEditName={false}
           readOnlyMessage="User profile editing coming soon"

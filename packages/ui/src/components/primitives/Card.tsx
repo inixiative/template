@@ -56,17 +56,19 @@ CardDescription.displayName = 'CardDescription';
 
 const CardContent = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { isPending?: boolean }
->(({ className, isPending = false, children, ...props }, ref) => (
-  <div ref={ref} className={cn('p-6 pt-0', className)} aria-busy={isPending} {...props}>
-    {isPending ? (
+  React.HTMLAttributes<HTMLDivElement> & { isLoading?: boolean }
+>(({ className, isLoading = false, children, ...props }, ref) => (
+  <div ref={ref} className={cn('p-6 pt-0', className)} aria-busy={isLoading} {...props}>
+    {!isLoading ? (
+      children
+    ) : children ? (
+      <Skeleton isLoading>{children}</Skeleton>
+    ) : (
       <div className="space-y-3">
         <Skeleton className="h-4 w-2/3" />
         <Skeleton className="h-4 w-1/2" />
         <Skeleton className="h-9 w-full" />
       </div>
-    ) : (
-      children
     )}
   </div>
 ));

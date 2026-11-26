@@ -125,7 +125,7 @@ export const SegmentsPage = ({ view }: { view: 'owned' | 'memberships' }) => {
             icon: 'lucide:filter',
             description: 'Segments you define will be listed here along with their rule status.',
           }}
-          isPending={isLoading}
+          isLoading={isLoading}
         />
       ) : (
         <Table
@@ -137,7 +137,7 @@ export const SegmentsPage = ({ view }: { view: 'owned' | 'memberships' }) => {
             icon: 'lucide:users-round',
             description: 'When a provider adds you to one of their segments, it will show up here.',
           }}
-          isPending={isLoading}
+          isLoading={isLoading}
         />
       )}
     </Page>

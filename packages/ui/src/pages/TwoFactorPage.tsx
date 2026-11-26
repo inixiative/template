@@ -7,7 +7,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
 import { meTwoFactor, meTwoFactorQueryKey } from '@template/sdk';
-import {} from '@template/ui/components';
 import { TwoFactorVerifyForm } from '@template/ui/components/auth/TwoFactorVerifyForm';
 import { Button } from '@template/ui/components/primitives/Button';
 import {
@@ -84,7 +83,7 @@ export const TwoFactorPage = () => {
                 Confirm your identity with a passkey, authenticator app, or backup code.
               </CardDescription>
             </CardHeader>
-            <CardContent isPending={isLoadingTwoFactor || isReturning || !twoFactorData?.data}>
+            <CardContent isLoading={isLoadingTwoFactor || isReturning || !twoFactorData?.data}>
               <TwoFactorVerifyForm
                 methods={twoFactorData?.data?.methods ?? []}
                 onVerified={(jwt) => {

@@ -20,20 +20,14 @@ const columns = [
 ];
 
 describe('Table', () => {
-  test('a pending table keeps its header and draws placeholder rows, never the empty state', () => {
+  test('a loading table keeps its header and draws placeholder rows, never the empty state', () => {
     const { container } = render(
-      <Table<Row>
-        columns={columns}
-        data={[]}
-        keyExtractor={(row) => row.id}
-        isPending
-        placeholderRows={4}
-      />,
+      <Table<Row> columns={columns} data={[]} keyExtractor={(row) => row.id} isLoading />,
     );
     expect(screen.getByText('Name')).toBeTruthy();
     expect(screen.getByText('Role')).toBeTruthy();
     expect(screen.queryByText('Nothing here yet')).toBeNull();
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(4);
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(5);
     expect(container.querySelectorAll('tbody tr:first-child td')).toHaveLength(2);
   });
 
@@ -43,7 +37,7 @@ describe('Table', () => {
         columns={columns}
         data={[{ id: '1', name: 'Ada', role: 'owner' }]}
         keyExtractor={(row) => row.id}
-        isPending={false}
+        isLoading={false}
       />,
     );
     expect(screen.getByText('Ada')).toBeTruthy();
@@ -51,11 +45,11 @@ describe('Table', () => {
 });
 
 describe('List', () => {
-  test('a pending list draws placeholder rows, not its empty message', () => {
+  test('a loading list draws placeholder rows, not its empty message', () => {
     const { container } = render(
       <List<Row>
         items={[]}
-        isPending
+        isLoading
         emptyMessage="No rows"
         renderItem={(row) => <li key={row.id}>{row.name}</li>}
       />,
@@ -77,16 +71,26 @@ describe('List', () => {
 });
 
 describe('CardContent', () => {
-  test('pending content hides its children behind placeholder lines', () => {
-    render(<CardContent isPending>Loaded body</CardContent>);
-    expect(screen.queryByText('Loaded body')).toBeNull();
+  test('loading content masks children that can render, keeping their shape', () => {
+    const { container } = render(
+      <CardContent isLoading>
+        <button type="button">Save</button>
+      </CardContent>,
+    );
+    expect(container.querySelector('[inert] button')).toBeTruthy();
+  });
+
+  test('loading content with no renderable children draws placeholder lines', () => {
+    const { container } = render(<CardContent isLoading>{false}</CardContent>);
+    expect(container.querySelector('[inert]')).toBeNull();
+    expect(container.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(0);
   });
 });
 
 describe('Skeleton', () => {
   test('wrapping content masks it while not loaded and shows it plainly once loaded', () => {
     const { container, rerender } = render(
-      <Skeleton loaded={false}>
+      <Skeleton isLoading>
         <button type="button">Save</button>
       </Skeleton>,
     );
@@ -94,7 +98,7 @@ describe('Skeleton', () => {
     expect(mask.getAttribute('aria-busy')).toBe('true');
     expect(mask.hasAttribute('inert')).toBe(true);
     rerender(
-      <Skeleton loaded>
+      <Skeleton isLoading={false}>
         <button type="button">Save</button>
       </Skeleton>,
     );

@@ -11,9 +11,8 @@ import type * as React from 'react';
 export type ListProps<T> = {
   items: T[];
   renderItem: (item: T) => React.ReactNode;
-  emptyMessage: string;
-  isPending?: boolean;
-  placeholderRows?: number;
+  emptyMessage?: string;
+  isLoading?: boolean;
   className?: string;
 };
 
@@ -23,17 +22,16 @@ export const List = <T,>({
   items,
   renderItem,
   emptyMessage,
-  isPending = false,
-  placeholderRows = 3,
+  isLoading = false,
   className,
 }: ListProps<T>) => {
-  if (!isPending && items.length === 0)
-    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
+  if (!isLoading && items.length === 0)
+    return emptyMessage ? <p className="text-sm text-muted-foreground">{emptyMessage}</p> : null;
 
   return (
-    <ul className={cn('divide-y rounded-md border', className)} aria-busy={isPending}>
-      {isPending
-        ? Array.from({ length: placeholderRows }, (_, row) => (
+    <ul className={cn('divide-y rounded-md border', className)} aria-busy={isLoading}>
+      {isLoading
+        ? Array.from({ length: 3 }, (_, row) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
             <li key={row} className="flex items-center justify-between gap-4 px-4 py-3">
               <Skeleton

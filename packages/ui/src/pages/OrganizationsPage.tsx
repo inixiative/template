@@ -165,7 +165,7 @@ export const OrganizationsPage = () => {
             description: 'Create one to share members, spaces and settings with other people.',
             action: { label: 'Create organization', onClick: () => setIsCreateModalOpen(true) },
           }}
-          isPending={isLoading}
+          isLoading={isLoading}
         />
       </Page>
 

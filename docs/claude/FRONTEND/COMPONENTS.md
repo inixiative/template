@@ -142,8 +142,7 @@ type TableProps<T> = {
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   sectionId?: string;
   className?: string;
-  isPending?: boolean;          // header + placeholder rows instead of data or the empty state
-  placeholderRows?: number;     // default 5
+  isLoading?: boolean;          // header + placeholder rows instead of data or the empty state
 };
 ```
 
@@ -173,22 +172,26 @@ Composed: `Avatar` (frame, `show`), `AvatarImage` (renders nothing when `src` is
 
 ### Skeleton
 
-**Pages never place skeletons.** A page renders its layout at once and passes each data component its query's `isPending`; the component draws its own loading state in its own shape, so nothing moves when the data lands:
+**Pages never place skeletons.** A page renders its layout at once and passes each data component its query's `isLoading`; the component draws its loading state in its own shape, so the page does not jump when the data lands:
 
-| Component | While `isPending` |
+| Component | While `isLoading` |
 |-----------|-------------------|
-| `Table` | its real header and `placeholderRows` (default 5) pulsing rows of real row height; never the empty state |
-| `List` | `placeholderRows` (default 3) pulsing rows in the bordered list; never `emptyMessage` |
-| `CardContent` | a few pulsing lines in place of its children; the card's header stays |
-| `ProfileFormCard` | its fields masked, its title visible |
+| `Table` | its real header and five pulsing rows of real row height; never the empty state |
+| `List` | three pulsing rows in the bordered list; never `emptyMessage` |
+| `CardContent` | its children masked (text, inputs, buttons and icons become pulsing bars of their own size, clicks blocked); a body that cannot render without data passes no children and gets pulsing lines; the card's header stays |
+| `ProfileFormCard` | its fields masked through `CardContent`, its title visible |
 
 ```typescript
-<Table columns={columns} data={query.data?.data ?? []} keyExtractor={(row) => row.id} isPending={query.isPending} />
+<Table columns={columns} data={query.data?.data ?? []} keyExtractor={(row) => row.id} isLoading={query.isLoading} />
 
-<List items={projects} isPending={projectsQuery.isPending} emptyMessage="No projects yet." renderItem={(project) => <li key={project.id}>…</li>} />
+<List items={projects} isLoading={projectsQuery.isLoading} emptyMessage="No projects yet." renderItem={(project) => <li key={project.id}>…</li>} />
+
+<CardContent isLoading={!status}>{status && <TwoFactorDetails status={status} />}</CardContent>
 ```
 
-`Skeleton` is what those components are built from. Bare, it is one pulsing box sized by `className`. Wrapping content, `<Skeleton loaded={!isPending}>…</Skeleton>` renders the real content masked (text, inputs, buttons and icons become pulsing bars of their own size, clicks blocked) until it loads; a data component uses that to keep its exact shape. Children are still built while masked, so they must not dereference data that is not there yet. A table with hand-built rows uses `TablePlaceholderRows` for its pending body.
+Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a masked `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`) and the card falls back to pulsing lines.
+
+`Skeleton` is what those components are built from: bare, one pulsing box sized by `className`; wrapping content, `<Skeleton isLoading>…</Skeleton>` masks it as above (a heading whose text comes from data uses this). A table with hand-built rows uses `TablePlaceholderRows` for its loading body.
 
 Icons: every `lucide:` and `simple-icons:` name the apps use is bundled by `bun run generate:frontend` (`packages/ui/src/lib/icons/bundledIconCollections.gen.ts`, registered in each app's `main.tsx`), so icons render in the first frame instead of after a fetch to the Iconify API.
 

@@ -68,7 +68,7 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
           icon: 'lucide:layout-grid',
           description: 'Spaces created in this organization will appear here.',
         }}
-        isPending={isLoading}
+        isLoading={isLoading}
       />
     </Page>
   );

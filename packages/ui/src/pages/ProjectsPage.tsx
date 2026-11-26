@@ -199,7 +199,7 @@ const ProjectOwnerSection = ({
         <CardContent>
           <List
             items={projects}
-            isPending={projectsQuery.isLoading}
+            isLoading={projectsQuery.isLoading}
             emptyMessage="No projects yet."
             renderItem={(project) => (
               <li key={project.id} className="flex items-center justify-between gap-4 px-4 py-3">

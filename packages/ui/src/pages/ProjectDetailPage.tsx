@@ -7,7 +7,6 @@
 import { Icon } from '@iconify/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
-import {} from '@template/ui/components';
 import { Page } from '@template/ui/components/layout/Page';
 import {
   Badge,
@@ -227,7 +226,7 @@ export const ProjectDetailPage = ({
               <CardTitle>Project details</CardTitle>
               <CardDescription>Update this project&apos;s name and description.</CardDescription>
             </CardHeader>
-            <CardContent isPending={!project}>
+            <CardContent isLoading={!project}>
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -300,7 +299,11 @@ export const ProjectDetailPage = ({
               }}
               category="general"
             />
-          ) : null}
+          ) : (
+            <Card>
+              <CardContent className="pt-6" isLoading />
+            </Card>
+          )}
 
           {canDeleteProject ? (
             <Card className="border-destructive/40">
@@ -329,7 +332,11 @@ export const ProjectDetailPage = ({
           project={project}
           renderProjectIntegrationResources={renderProjectIntegrationResources}
         />
-      ) : null}
+      ) : (
+        <Card>
+          <CardContent className="pt-6" isLoading />
+        </Card>
+      )}
     </Page>
   );
 };

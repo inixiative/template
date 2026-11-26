@@ -195,7 +195,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
                 ? { label: 'Invite member', onClick: () => setIsInviteModalOpen(true) }
                 : undefined,
           }}
-          isPending={isLoading}
+          isLoading={isLoading}
         />
       </Page>
 

@@ -126,7 +126,7 @@ export const WebhooksPage = () => {
             'Webhooks send an HTTP request to your URL whenever a subscribed model changes.',
           action: { label: 'Create webhook', onClick: () => setIsModalOpen(true) },
         }}
-        isPending={isLoading}
+        isLoading={isLoading}
       />
       <CreateWebhookModal
         isOpen={isModalOpen}

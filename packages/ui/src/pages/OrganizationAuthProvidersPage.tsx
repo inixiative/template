@@ -188,7 +188,7 @@ export const OrganizationAuthProvidersPage = () => {
               'Platform email/password authentication is enabled by default. Add SSO or OAuth for your members.',
             action: { label: 'Add provider', onClick: () => setIsModalOpen(true) },
           }}
-          isPending={isLoading}
+          isLoading={isLoading}
         />
       </Page>
 

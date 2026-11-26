@@ -227,7 +227,7 @@ export const ProjectIntegrationsSection = ({
         <CardContent>
           <List
             items={connectedRows}
-            isPending={connectedQuery.isLoading}
+            isLoading={connectedQuery.isLoading}
             emptyMessage="No integrations are connected to this project yet."
             renderItem={(pi) => {
               const integration = integrationsById.get(pi.integrationId);
@@ -370,7 +370,7 @@ export const ProjectIntegrationsSection = ({
           ) : (
             <List
               items={[]}
-              isPending={anyScopeLoading}
+              isLoading={anyScopeLoading}
               emptyMessage="No additional integrations are available to connect to this project."
               renderItem={renderConnectableIntegration}
             />

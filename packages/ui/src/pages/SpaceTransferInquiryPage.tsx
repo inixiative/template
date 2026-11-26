@@ -99,9 +99,9 @@ export const SpaceTransferInquiryPage = () => {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>New transfer request</CardTitle>
+            <CardTitle>{isLoading ? 'Transfer request' : 'New transfer request'}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4" isPending={isLoading}>
+          <CardContent className="space-y-4" isLoading={isLoading}>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="target-org-slug">
                 Target organization slug

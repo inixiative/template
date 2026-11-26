@@ -67,7 +67,7 @@ export const SpaceProfilePage = () => {
     <Page title="Profile" description="Manage your space settings and preferences">
       <div className="max-w-2xl space-y-6">
         <ProfileFormCard
-          isPending={isLoading}
+          isLoading={isLoading}
           name={name}
           onNameChange={setName}
           slug={slug}
