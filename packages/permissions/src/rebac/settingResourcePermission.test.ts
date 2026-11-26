@@ -14,11 +14,11 @@ import { check, makeCheck } from '@template/permissions/rebac/check';
 import { schemaMap } from '@template/permissions/rebac/schema';
 import {
   settingResourceModelRule,
-  settingResourcePermissionFromDefinitions,
+  settingResourcePermissionFromTrees,
 } from '@template/permissions/rebac/settingResourcePermission';
 import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
 import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
-import { defineSetting, SETTING_DEFINITIONS } from '@template/shared/settings';
+import { SETTING_TREES, type SettingTrees } from '@template/shared/settings';
 import { z } from 'zod';
 
 const modelAt = (path: string): string | undefined =>
@@ -54,54 +54,55 @@ const isKnown = (name: string) => {
 
 const unknownNames = (rule: ActionRule) => leafNames(rule).filter((name) => !isKnown(name));
 
-const syntheticDefinitions = {
-  ...SETTING_DEFINITIONS,
-  'synthetic.ownOnly': defineSetting({
-    key: 'synthetic.ownOnly',
-    category: 'general',
-    label: 'Owner Only',
-    description: 'Synthetic owner-gated setting with admin-only read.',
-    resourceModels: ['Organization'],
-    valueType: 'boolean',
-    schema: z.boolean(),
-    defaultValue: false,
-    order: 30,
-    permission: 'own',
-    readPermission: 'manage',
-  }),
-  'synthetic.operateSetting': defineSetting({
-    key: 'synthetic.operateSetting',
-    category: 'general',
-    label: 'Operate Setting',
-    description: 'Synthetic operate-gated setting.',
-    resourceModels: ['Organization', 'Space', 'Project', 'Integration', 'ProjectIntegration'],
-    valueType: 'boolean',
-    schema: z.boolean(),
-    defaultValue: false,
-    order: 40,
-    permission: 'operate',
-  }),
+const operateSetting = {
+  valueType: 'boolean',
+  schema: z.boolean(),
+  defaultValue: false,
+  label: 'Operate Setting',
+  description: 'Synthetic operate-gated setting.',
+  __manage: 'operate',
+} as const;
+
+const syntheticTrees: SettingTrees = {
+  ...SETTING_TREES,
+  Organization: {
+    ...SETTING_TREES.Organization,
+    synthetic: {
+      ownOnly: {
+        valueType: 'boolean',
+        schema: z.boolean(),
+        defaultValue: false,
+        label: 'Owner Only',
+        description: 'Synthetic owner-gated setting with admin-only read.',
+        __read: 'manage',
+        __manage: 'own',
+      },
+      operateSetting,
+    },
+  },
+  Space: { ...SETTING_TREES.Space, synthetic: { operateSetting } },
+  Project: { ...SETTING_TREES.Project, synthetic: { operateSetting } },
+  Integration: { ...SETTING_TREES.Integration, synthetic: { operateSetting } },
+  ProjectIntegration: { ...SETTING_TREES.ProjectIntegration, synthetic: { operateSetting } },
 };
 
 const syntheticSchemaMap: SchemaMap = {
   ...schemaMap,
   permissions: {
     ...schemaMap.permissions,
-    'db:Setting': settingResourcePermissionFromDefinitions(syntheticDefinitions),
+    'db:Setting': settingResourcePermissionFromTrees(syntheticTrees),
   },
 };
 
-describe('settingResourcePermissionFromDefinitions', () => {
+describe('settingResourcePermissionFromTrees', () => {
   it('exposes exactly manage and read actions and serves them on db:Setting', () => {
-    const compiled = settingResourcePermissionFromDefinitions(SETTING_DEFINITIONS);
+    const compiled = settingResourcePermissionFromTrees(SETTING_TREES);
     expect(Object.keys(compiled.actions).sort()).toEqual(['manage', 'read']);
     expect(schemaMap.permissions['db:Setting']).toEqual(compiled);
   });
 
-  it('names only relations, actions, and fields the schema actually has across starter and synthetic definitions (all 8 resourceModels)', () => {
-    const declared = Object.values(
-      settingResourcePermissionFromDefinitions(syntheticDefinitions).actions,
-    );
+  it('names only relations, actions, and fields the schema actually has across starter and synthetic trees (all 8 resourceModels)', () => {
+    const declared = Object.values(settingResourcePermissionFromTrees(syntheticTrees).actions);
 
     expect(declared.flatMap(unknownNames)).toEqual([]);
     expect(declared.flatMap(leafNames)).toContain('resourceOrganization:own');

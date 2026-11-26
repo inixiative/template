@@ -103,45 +103,42 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
   });
 
   describe('GET /api/v1/setting/info', () => {
-    it('returns minimal starter master-data catalog (general category with defaultTimezone & displayLocale)', async () => {
+    it('serves one tree per resource model, leaves carrying JSON Schema and permissions passing down', async () => {
       const response = await ownerApp.fetch(get('/api/v1/setting/info'));
       expect(response.status).toBe(200);
       const { data } = await parseSuccessBody<{
         guide: Record<string, string>;
-        types: {
-          categories: Record<string, { key: string; order: number }>;
-          definitions: Record<
-            string,
-            {
-              key: string;
-              valueType: string;
-              schema: Record<string, unknown>;
-              defaultValue: unknown;
-              permission: unknown;
-              readPermission: unknown;
-            }
-          >;
-        };
+        types: { trees: Record<string, Record<string, unknown>> };
       }>(response);
 
       expect(Object.keys(data.guide).length).toBeGreaterThan(0);
-      expect(Object.keys(data.types.categories)).toEqual(['general']);
-      expect(Object.keys(data.types.definitions).sort()).toEqual([
-        'general.defaultTimezone',
-        'general.displayLocale',
+      expect(Object.keys(data.types.trees).sort()).toEqual([
+        'Integration',
+        'Organization',
+        'OrganizationUser',
+        'Project',
+        'ProjectIntegration',
+        'Space',
+        'SpaceUser',
+        'User',
       ]);
-      expect(data.types.definitions['general.defaultTimezone']).toMatchObject({
-        valueType: 'text',
-        defaultValue: 'UTC',
-        permission: 'manage',
-        readPermission: 'read',
+      expect(data.types.trees.Organization).toMatchObject({
+        __read: 'read',
+        __manage: 'manage',
+        general: {
+          __label: 'General',
+          defaultTimezone: { valueType: 'text', defaultValue: 'UTC' },
+          displayLocale: { valueType: 'text', defaultValue: 'en' },
+        },
       });
-      expect(data.types.definitions['general.displayLocale']).toMatchObject({
-        valueType: 'text',
-        defaultValue: 'en',
-        permission: { default: 'manage', OrganizationUser: 'operate', SpaceUser: 'operate' },
-        readPermission: { default: 'read', OrganizationUser: 'operate', SpaceUser: 'operate' },
+      expect(data.types.trees.OrganizationUser).toMatchObject({
+        __read: 'operate',
+        __manage: 'operate',
+        general: { displayLocale: { valueType: 'text' } },
       });
+      const timezone = (data.types.trees.User?.general as Record<string, { schema: unknown }>)
+        .defaultTimezone;
+      expect(timezone?.schema).toMatchObject({ type: 'string' });
     });
   });
 
@@ -316,7 +313,7 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
       expect((await parseSuccessBody<Setting[]>(adminList)).data.length).toBeGreaterThanOrEqual(5);
     });
 
-    it('rejects empty batch [], duplicate keys in batch, invalid keys, invalid values, and disallowed resourceModel with 422', async () => {
+    it('rejects empty batch [], duplicate keys in batch, invalid keys, invalid values with 422, and a key the resource tree does not hold with 403', async () => {
       // Empty batch
       expect((await ownerApp.fetch(patch('/api/v1/me/settings', []))).status).toBe(422);
 
@@ -350,8 +347,8 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
 
       // Multi-error batch collects fieldErrors across all failing items with array-indexed paths
       const multiErrRes = await ownerApp.fetch(
-        patch(`/api/v1/project/${orgProject.id}/settings`, [
-          { key: 'general.displayLocale', value: 'en' },
+        patch('/api/v1/me/settings', [
+          { key: 'general.displayLocale', value: 'not-a-language' },
           { key: 'general.defaultTimezone', value: 'Not/A_Zone' },
         ]),
       );
@@ -359,10 +356,10 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
       const multiErrBody = (await multiErrRes.json()) as {
         fieldErrors?: Record<string, string[]>;
       };
-      expect(multiErrBody.fieldErrors?.['0.key']?.length).toBeGreaterThan(0);
+      expect(multiErrBody.fieldErrors?.['0.value']?.length).toBeGreaterThan(0);
       expect(multiErrBody.fieldErrors?.['1.value']?.length).toBeGreaterThan(0);
 
-      // Disallowed resourceModel (displayLocale is not on Project)
+      // A key Project's tree doesn't hold: db:setting has no rule for it there
       expect(
         (
           await ownerApp.fetch(
@@ -371,7 +368,7 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
             ]),
           )
         ).status,
-      ).toBe(422);
+      ).toBe(403);
     });
   });
 

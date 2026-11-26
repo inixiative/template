@@ -38,7 +38,6 @@ const syntheticNumberDef = defineAttributeField({
   defaultValue: 10,
   label: 'Max Tasks',
   description: 'Synthetic number attribute for DB operator tests.',
-  resourceModels: ['OrganizationUser'],
 });
 
 const syntheticBoolDef = defineAttributeField({
@@ -48,7 +47,6 @@ const syntheticBoolDef = defineAttributeField({
   defaultValue: false,
   label: 'Enabled',
   description: 'Synthetic boolean attribute for DB tests.',
-  resourceModels: ['OrganizationUser'],
 });
 
 const syntheticDateDef = defineAttributeField({
@@ -58,7 +56,6 @@ const syntheticDateDef = defineAttributeField({
   defaultValue: null,
   label: 'Snooze Until',
   description: 'Synthetic date attribute for DB operator tests.',
-  resourceModels: ['User'],
 });
 
 const syntheticJsonDef = defineAttributeField({
@@ -68,7 +65,6 @@ const syntheticJsonDef = defineAttributeField({
   defaultValue: { enabled: false, startHour: 22 },
   label: 'Quiet Hours',
   description: 'Synthetic JSON attribute for DB tests.',
-  resourceModels: ['User'],
 });
 
 const syntheticMultiDef = defineAttributeField({
@@ -78,7 +74,6 @@ const syntheticMultiDef = defineAttributeField({
   defaultValue: ['inquiries', 'security'],
   label: 'Topics',
   description: 'Synthetic multiSelect attribute for Postgres GIN tests.',
-  resourceModels: ['User'],
 });
 
 describe('Attribute model capability (5-column codec, operators, Postgres GIN indexes)', () => {
@@ -116,21 +111,13 @@ describe('Attribute model capability (5-column codec, operators, Postgres GIN in
       );
     });
 
-    it('rejects unknown locators, invalid schemas, mixed columns, Prisma.JsonNull, and disallowed resourceModels', () => {
+    it('rejects unknown locators, invalid schemas, mixed columns, and Prisma.JsonNull', () => {
       expect(() => encodeAttributeColumns('setting', 'unknown.key', true)).toThrow(
         'Unknown attribute locator',
       );
       expect(() =>
         encodeAttributeColumns('setting', 'general.defaultTimezone', 'Not/A_Zone'),
       ).toThrow('Invalid value');
-
-      expect(() =>
-        validateAttributeWrite('setting', {
-          resourceModel: 'Project',
-          key: 'general.displayLocale',
-          valueText: 'en',
-        }),
-      ).toThrow(/not valid for resourceModel='Project'/);
 
       expect(() =>
         validateAttributeWrite('setting', {

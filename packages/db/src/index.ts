@@ -41,6 +41,7 @@ export {
 } from './lanes';
 // Attribute model capability (registry, DMMF/index validation, typed codec, operators, hook, utils)
 export * from './lib/attributes';
+export * from './lib/settings/fetchSettingResourceKinds';
 // Distributed lock
 export {
   type AcquireOptions,

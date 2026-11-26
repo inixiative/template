@@ -16,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@template/ui/components/primitives';
-import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
+import { SettingTreeView } from '@template/ui/components/settings/SettingTreeView';
 import { hydrateSettingTargetForPermissions } from '@template/ui/lib/hydrateRecordForPermissions';
 import {
   connectableIntegrationScopesForProject,
@@ -270,7 +270,7 @@ export const ProjectIntegrationsSection = ({
                         className="mt-4 space-y-4 border-t pt-4"
                         data-testid={`project-integration-details-${pi.id}`}
                       >
-                        <ResourceSettingsSection
+                        <SettingTreeView
                           target={{
                             model: 'ProjectIntegration',
                             id: pi.id,

@@ -23,7 +23,7 @@ import {
   ProjectIntegrationsSection,
   type ProjectIntegrationsSectionProps,
 } from '@template/ui/components/projects/ProjectIntegrationsSection';
-import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
+import { SettingTreeView } from '@template/ui/components/settings/SettingTreeView';
 import { hydrateSettingTargetForPermissions } from '@template/ui/lib/hydrateRecordForPermissions';
 import {
   projectDeleteMutationFn,
@@ -291,13 +291,12 @@ export const ProjectDetailPage = ({
             </CardContent>
           </Card>
 
-          <ResourceSettingsSection
+          <SettingTreeView
             target={{
               model: 'Project',
               id: project.id,
               record: project as unknown as HydratedRecord,
             }}
-            category="general"
           />
 
           {canDeleteProject ? (

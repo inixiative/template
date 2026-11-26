@@ -1,149 +1,240 @@
 import { describe, expect, it } from 'bun:test';
 import { encodeAttributeValue, validateAttributeTypedColumns } from '@template/shared/attributes';
 import {
-  SETTING_CATEGORIES,
-  SETTING_DEFINITIONS,
-  SETTING_KEYS,
+  SETTING_PERMISSION_ACTIONS,
   SETTING_RESOURCE_MODELS,
-  SettingPermissionSpecSchema,
-  settingAppliesToIntegrationProvider,
-  settingCategoryForKey,
+  SETTING_TREES,
+  type SettingBranch,
+  type SettingResourceKinds,
+  type SettingTree,
   settingDefinitionForKey,
-  settingDefinitionForKeyOrThrow,
-  settingDefinitionsForResourceModel,
-  settingPermissionForModel,
+  settingDefinitionForResource,
+  settingDefinitionsForResource,
+  settingDefinitionsHeldByModel,
+  settingDefinitionsInTree,
+  settingTreeEntries,
 } from '@template/shared/settings';
-import { defineSetting } from '@template/shared/settings/types';
+import { isEqual } from 'lodash-es';
 import { z } from 'zod';
 
-describe('SETTING_DEFINITIONS registry invariants', () => {
-  it('every definition key matches its map key, points at a registered category, and resolves permissions for every listed resourceModel', () => {
-    for (const [key, definition] of Object.entries(SETTING_DEFINITIONS)) {
-      expect(definition.key as string).toBe(key);
-      expect(settingCategoryForKey(definition.category)).toBeDefined();
-      expect(definition.resourceModels.length).toBeGreaterThan(0);
-      expect(SettingPermissionSpecSchema.safeParse(definition.permission).success).toBe(true);
-      const readPerm = 'readPermission' in definition ? definition.readPermission : undefined;
-      if (readPerm !== undefined) {
-        expect(SettingPermissionSpecSchema.safeParse(readPerm).success).toBe(true);
-      }
-      for (const model of definition.resourceModels) {
-        expect(settingPermissionForModel(definition.permission, model)).toBeTruthy();
-        expect(settingPermissionForModel(readPerm, model, 'read')).toBeTruthy();
-      }
+const settingNamesIn = (branch: SettingBranch): string[] =>
+  settingTreeEntries(branch).flatMap((entry) => {
+    if (entry.kind === 'meta') return [];
+    if (entry.kind === 'kind') return settingNamesIn(entry.node);
+    if (entry.kind === 'leaf') return [entry.name];
+    return [entry.name, ...settingNamesIn(entry.node)];
+  });
+
+const kindValuesIn = (branch: SettingBranch, into: Record<string, Set<string>> = {}) => {
+  for (const entry of settingTreeEntries(branch)) {
+    if (entry.kind === 'kind') {
+      into[entry.field] = new Set([...(into[entry.field] ?? []), entry.value]);
+      kindValuesIn(entry.node, into);
     }
+    if (entry.kind === 'branch') kindValuesIn(entry.node, into);
+  }
+  return into;
+};
 
-    expect(
-      settingPermissionForModel(
-        SETTING_DEFINITIONS['general.displayLocale'].permission,
-        'OrganizationUser',
-      ),
-    ).toBe('operate');
-    expect(
-      settingPermissionForModel(
-        SETTING_DEFINITIONS['general.displayLocale'].permission,
-        'Organization',
-      ),
-    ).toBe('manage');
-    expect(
-      settingPermissionForModel(
-        SETTING_DEFINITIONS['general.displayLocale'].readPermission,
-        'SpaceUser',
-        'read',
-      ),
-    ).toBe('operate');
-    expect(() => settingPermissionForModel({ User: 'manage' }, 'Organization')).toThrow(
-      /no action or default/,
-    );
+const everyKindAssignment = (tree: SettingTree): SettingResourceKinds[] =>
+  Object.entries(kindValuesIn(tree)).reduce<SettingResourceKinds[]>(
+    (assignments, [field, values]) =>
+      assignments.flatMap((assignment) => [
+        assignment,
+        ...[...values].map((value) => ({ ...assignment, [field]: value })),
+      ]),
+    [{}],
+  );
+
+const keysDeclaredTwiceIn = (tree: SettingTree): string[] =>
+  everyKindAssignment(tree).flatMap((kinds) => {
+    const keys = settingDefinitionsInTree(tree, kinds).map((definition) => definition.key);
+    return keys.filter((key, index) => keys.indexOf(key) !== index);
   });
 
-  it('every non-null defaultValue validates cleanly under its valueType and Zod schema', () => {
-    for (const definition of Object.values(SETTING_DEFINITIONS)) {
-      if (definition.defaultValue === null) continue;
-      const encoded = encodeAttributeValue(definition.valueType, definition.defaultValue);
-      expect(() =>
-        validateAttributeTypedColumns(
-          definition.valueType,
-          encoded,
-          definition.schema as z.ZodType,
-        ),
-      ).not.toThrow();
+describe('SETTING_TREES rules', () => {
+  it('names every setting and branch with a plain name: no `__` prefix, no `:`, not integer-like', () => {
+    for (const model of SETTING_RESOURCE_MODELS)
+      for (const name of settingNamesIn(SETTING_TREES[model])) {
+        expect(name.startsWith('__')).toBe(false);
+        expect(name.includes(':')).toBe(false);
+        expect(/^\d+$/.test(name)).toBe(false);
+      }
+  });
+
+  it('resolves both a read and a manage permission for every setting', () => {
+    for (const model of SETTING_RESOURCE_MODELS)
+      for (const definition of settingDefinitionsHeldByModel(model)) {
+        expect(SETTING_PERMISSION_ACTIONS).toContain(definition.read);
+        expect(SETTING_PERMISSION_ACTIONS).toContain(definition.manage);
+      }
+  });
+
+  it('gives a key one meaning in every tree it appears in', () => {
+    for (const model of SETTING_RESOURCE_MODELS)
+      for (const definition of settingDefinitionsHeldByModel(model)) {
+        const meaning = settingDefinitionForKey(definition.key);
+        expect(meaning?.valueType).toBe(definition.valueType);
+        expect(meaning?.schema).toBe(definition.schema);
+        expect(isEqual(meaning?.defaultValue, definition.defaultValue)).toBe(true);
+      }
+  });
+
+  it('declares each key once for any one resource, whatever its kinds', () => {
+    for (const model of SETTING_RESOURCE_MODELS)
+      expect(keysDeclaredTwiceIn(SETTING_TREES[model])).toEqual([]);
+  });
+
+  it('gives a key one permission per model across its kinds', () => {
+    for (const model of SETTING_RESOURCE_MODELS) {
+      const held = settingDefinitionsHeldByModel(model);
+      for (const definition of held)
+        for (const other of held.filter((candidate) => candidate.key === definition.key)) {
+          expect(other.read).toBe(definition.read);
+          expect(other.manage).toBe(definition.manage);
+        }
     }
   });
 
-  it('ships the minimal clean starter catalog (general category with defaultTimezone and displayLocale)', () => {
-    expect(Object.keys(SETTING_CATEGORIES)).toEqual(['general']);
-    expect(SETTING_KEYS).toEqual(['general.defaultTimezone', 'general.displayLocale']);
-    expect(SETTING_RESOURCE_MODELS).toEqual([
-      'User',
-      'Organization',
-      'Space',
-      'OrganizationUser',
-      'SpaceUser',
-      'Project',
-      'Integration',
-      'ProjectIntegration',
-    ]);
-  });
-
-  it('looks up definitions by key and filters by resourceModel in deterministic order', () => {
-    expect(settingDefinitionForKey('general.defaultTimezone')?.valueType).toBe('text');
-    expect(settingDefinitionForKey('general.displayLocale')?.valueType).toBe('text');
-    expect(settingDefinitionForKey('does.not.exist')).toBeUndefined();
-    expect(() => settingDefinitionForKeyOrThrow('does.not.exist')).toThrow('Unknown setting key');
-
-    expect(settingDefinitionsForResourceModel('User').map((d) => d.key)).toEqual([
-      'general.defaultTimezone',
-      'general.displayLocale',
-    ]);
-    expect(settingDefinitionsForResourceModel('OrganizationUser').map((d) => d.key)).toEqual([
-      'general.displayLocale',
-    ]);
-    expect(settingDefinitionsForResourceModel('Project').map((d) => d.key)).toEqual([
-      'general.defaultTimezone',
-    ]);
-    // Starter template has zero Integration/ProjectIntegration definitions until downstream apps add them
-    expect(settingDefinitionsForResourceModel('Integration')).toEqual([]);
-    expect(settingDefinitionsForResourceModel('ProjectIntegration')).toEqual([]);
+  it('validates every non-null default under its value type and schema', () => {
+    for (const model of SETTING_RESOURCE_MODELS)
+      for (const definition of settingDefinitionsHeldByModel(model)) {
+        if (definition.defaultValue === null) continue;
+        expect(() =>
+          validateAttributeTypedColumns(
+            definition.valueType,
+            encodeAttributeValue(definition.valueType, definition.defaultValue),
+            definition.schema,
+          ),
+        ).not.toThrow();
+      }
   });
 });
 
-describe('provider-scoped setting definitions', () => {
-  const scoped = defineSetting({
-    key: 'test.scopedToLinear',
-    category: 'general',
-    label: 'Scoped',
-    description: 'Applies only to Linear integrations and their project links.',
-    resourceModels: ['Integration', 'ProjectIntegration'],
-    integrationProviders: ['linear'],
-    valueType: 'boolean',
-    schema: z.boolean(),
-    defaultValue: false,
-    order: 99,
-    permission: 'manage',
-  });
-  const definitions = SETTING_DEFINITIONS as Record<string, unknown>;
+describe('compiling a setting tree', () => {
+  const cacheBlock = {
+    boxesMin: {
+      valueType: 'number',
+      schema: z.number().int(),
+      defaultValue: 0,
+      label: 'Minimum boxes',
+      description: 'Fewest boxes.',
+    },
+    boxesMax: {
+      valueType: 'number',
+      schema: z.number().int(),
+      defaultValue: 1,
+      label: 'Maximum boxes',
+      description: 'Most boxes.',
+    },
+  } as const;
 
-  it('applies an unscoped definition to every provider and a scoped one only to its own', () => {
-    const unscoped = SETTING_DEFINITIONS['general.defaultTimezone'];
-    expect(settingAppliesToIntegrationProvider(unscoped, undefined)).toBe(true);
-    expect(settingAppliesToIntegrationProvider(unscoped, 'slack')).toBe(true);
-    expect(settingAppliesToIntegrationProvider(scoped, 'linear')).toBe(true);
-    expect(settingAppliesToIntegrationProvider(scoped, 'slack')).toBe(false);
-    expect(settingAppliesToIntegrationProvider(scoped, undefined)).toBe(false);
+  const tree: SettingTree = {
+    __read: 'read',
+    __manage: 'manage',
+    notifications: {
+      enabled: {
+        valueType: 'boolean',
+        schema: z.boolean(),
+        defaultValue: true,
+        label: 'Notify',
+        description: 'Send notifications.',
+      },
+    },
+    'provider:linear': {
+      __manage: 'own',
+      linear: {
+        __label: 'Linear',
+        l1: cacheBlock,
+        l2: { keep: cacheBlock, full: cacheBlock },
+        paused: {
+          valueType: 'boolean',
+          schema: z.boolean(),
+          defaultValue: false,
+          label: 'Paused',
+          description: 'Pause sync.',
+          __manage: 'operate',
+        },
+      },
+    },
+  };
+
+  it('keys each leaf by its path, skipping kind branches, in declaration order', () => {
+    expect(settingDefinitionsInTree(tree, { provider: 'linear' }).map(({ key }) => key)).toEqual([
+      'notifications.enabled',
+      'linear.l1.boxesMin',
+      'linear.l1.boxesMax',
+      'linear.l2.keep.boxesMin',
+      'linear.l2.keep.boxesMax',
+      'linear.l2.full.boxesMin',
+      'linear.l2.full.boxesMax',
+      'linear.paused',
+    ]);
   });
 
-  it('lists a scoped definition only for its provider', () => {
-    definitions[scoped.key] = scoped;
-    try {
-      const keys = (model: 'Integration' | 'ProjectIntegration', provider?: string) =>
-        settingDefinitionsForResourceModel(model, provider).map((d) => d.key);
-      expect(keys('ProjectIntegration', 'linear')).toContain(scoped.key);
-      expect(keys('Integration', 'linear')).toContain(scoped.key);
-      expect(keys('ProjectIntegration', 'slack')).not.toContain(scoped.key);
-      expect(keys('ProjectIntegration')).not.toContain(scoped.key);
-    } finally {
-      delete definitions[scoped.key];
-    }
+  it('finds a key placed twice for one resource', () => {
+    expect(
+      keysDeclaredTwiceIn({
+        ...tree,
+        'provider:linear': { linear: { l1: cacheBlock } },
+        linear: { l1: cacheBlock },
+      }),
+    ).toContain('linear.l1.boxesMin');
+  });
+
+  it('allows one key in sibling kinds of the same field', () => {
+    expect(
+      keysDeclaredTwiceIn({
+        __read: 'read',
+        __manage: 'manage',
+        'provider:jira': { atlassian: { l1: cacheBlock } },
+        'provider:confluence': { atlassian: { l1: cacheBlock } },
+      }),
+    ).toEqual([]);
+  });
+
+  it('holds only the settings outside kind branches for another kind or none', () => {
+    expect(settingDefinitionsInTree(tree, { provider: 'slack' }).map(({ key }) => key)).toEqual([
+      'notifications.enabled',
+    ]);
+    expect(settingDefinitionsInTree(tree, {}).map(({ key }) => key)).toEqual([
+      'notifications.enabled',
+    ]);
+  });
+
+  it('passes __read and __manage down, the nearest one winning', () => {
+    const byKey = Object.fromEntries(
+      settingDefinitionsInTree(tree, { provider: 'linear' }).map((definition) => [
+        definition.key,
+        definition,
+      ]),
+    );
+    expect(byKey['notifications.enabled']).toMatchObject({ read: 'read', manage: 'manage' });
+    expect(byKey['linear.l2.full.boxesMax']).toMatchObject({ read: 'read', manage: 'own' });
+    expect(byKey['linear.paused']).toMatchObject({ read: 'read', manage: 'operate' });
+  });
+});
+
+describe('template trees', () => {
+  it('ships timezone and display language on the models that hold them', () => {
+    expect(settingDefinitionsForResource('User', {}).map(({ key }) => key)).toEqual([
+      'general.defaultTimezone',
+      'general.displayLocale',
+    ]);
+    expect(settingDefinitionsForResource('Project', {}).map(({ key }) => key)).toEqual([
+      'general.defaultTimezone',
+    ]);
+    expect(settingDefinitionsForResource('OrganizationUser', {})).toEqual([
+      expect.objectContaining({
+        key: 'general.displayLocale',
+        read: 'operate',
+        manage: 'operate',
+      }),
+    ]);
+  });
+
+  it('finds a definition only on a resource whose tree holds it', () => {
+    expect(settingDefinitionForResource('Organization', {}, 'general.displayLocale')).toBeDefined();
+    expect(settingDefinitionForResource('Project', {}, 'general.displayLocale')).toBeUndefined();
   });
 });

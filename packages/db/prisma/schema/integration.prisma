@@ -17,7 +17,6 @@ model Integration {
 
   provider Provider?
 
-  // What the provider needs to be called (a Jira cloudId, an Archive url); shape per provider in @inixiative/integrations
   configuration Json?
 
   // A delegate: its permissions, capped live by its direct owner

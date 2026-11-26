@@ -1,5 +1,4 @@
 export * from './parsing/attributeColumnForValueType';
-export * from './parsing/attributePermissionForModel';
 export * from './parsing/decodeAttributeColumnValue';
 export * from './parsing/deduplicateMultiSelect';
 export * from './parsing/isStringArray';
@@ -8,7 +7,6 @@ export * from './parsing/parseAttributeValue';
 export * from './parsing/populatedAttributeColumns';
 export * from './typing/columns';
 export * from './typing/definition';
-export * from './typing/permission';
 export * from './typing/valueTypes';
 export * from './writing/encodeAttributeValue';
 export * from './writing/validateAttributeTypedColumns';

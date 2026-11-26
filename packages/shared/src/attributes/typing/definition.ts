@@ -4,7 +4,6 @@
  * @partOf primitive:shared
  * @uses none
  */
-import type { AttributePermissionSpec } from '@template/shared/attributes/typing/permission';
 import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 import type { z } from 'zod';
 
@@ -19,11 +18,6 @@ export type AttributeFieldDefinition<TKey extends string = string, TValue = unkn
   readonly defaultValue?: TValue | null;
   readonly label: string;
   readonly description: string;
-  readonly category?: string;
-  readonly order?: number;
-  readonly resourceModels?: readonly string[];
-  readonly permission?: AttributePermissionSpec;
-  readonly readPermission?: AttributePermissionSpec;
 };
 
 /** Declares a typed attribute field definition without side effects. */

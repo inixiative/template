@@ -19,7 +19,6 @@ import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHoo
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSettingIntegrationProviderHook } from '#/hooks/settingIntegrationProvider/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 import { registerUserEmailAddressValidationHook } from '#/hooks/userEmail/hook';
@@ -36,7 +35,6 @@ export const registerHooks = () => {
   registerRulesHook();
   registerAttributeValidationHook();
   registerAuditLogHook();
-  registerSettingIntegrationProviderHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();
   registerClearCacheHook();

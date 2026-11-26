@@ -10,13 +10,9 @@ import { Page } from '@template/ui/components';
 import {
   ChangePasswordCard,
   ProfileFormCard,
-  ResourceSettingsSection,
   TwoFactorSecurityCard,
 } from '@template/ui/components/settings';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-
-const personalContext: AuthenticatedContext = { type: 'user' };
 
 export const UserProfilePage = () => {
   const { data, isLoading } = useQuery({
@@ -27,7 +23,7 @@ export const UserProfilePage = () => {
   const profile = data?.data;
 
   return (
-    <Page title="Profile" description="Manage your user settings and preferences">
+    <Page title="Profile" description="Your profile, password and sign-in security">
       {isLoading ? (
         <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
       ) : (
@@ -38,7 +34,6 @@ export const UserProfilePage = () => {
             readOnlyMessage="User profile editing coming soon"
             showThemeSelector
           />
-          <ResourceSettingsSection context={personalContext} category="general" />
           <ChangePasswordCard />
           <TwoFactorSecurityCard />
         </div>

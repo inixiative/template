@@ -4,47 +4,54 @@
  * @partOf primitive:shared
  * @uses none
  */
-
-import type { Provider } from '@template/db/generated/client/enums';
-import type { AttributeFieldDefinition, AttributeValueType } from '@template/shared/attributes';
+import type { AttributeValueType } from '@template/shared/attributes';
 import type {
-  SettingPermissionSpec,
+  SettingPermissionAction,
   SettingResourceModelName,
 } from '@template/shared/settings/resourceModels';
 import type { z } from 'zod';
 
-export type SettingCategoryDefinition<TKey extends string = string> = {
-  readonly key: TKey;
-  readonly label: string;
-  readonly description: string;
-  readonly order: number;
-};
+export type SettingSchema = z.ZodType<unknown>;
 
-export type SettingDefinition<
-  TKey extends string = string,
-  TCategory extends string = string,
-  TValue = unknown,
-> = Omit<
-  AttributeFieldDefinition<TKey, TValue>,
-  'category' | 'order' | 'resourceModels' | 'permission' | 'readPermission'
-> & {
-  readonly key: TKey;
-  readonly category: TCategory;
-  readonly resourceModels: readonly SettingResourceModelName[];
-  readonly integrationProviders?: readonly Provider[];
+export type SettingJsonSchema = Record<string, unknown>;
+
+export type SettingLeaf<TSchema = SettingSchema> = {
   readonly valueType: AttributeValueType;
-  readonly schema: z.ZodType<TValue>;
-  readonly defaultValue: TValue | null;
+  readonly schema: TSchema;
+  readonly defaultValue: unknown;
   readonly label: string;
   readonly description: string;
-  readonly order: number;
-  readonly permission: SettingPermissionSpec;
-  readonly readPermission?: SettingPermissionSpec;
+  readonly __read?: SettingPermissionAction;
+  readonly __manage?: SettingPermissionAction;
 };
 
-/** Declares a typed setting category definition without side effects. */
-export const defineSettingCategory = <const T extends SettingCategoryDefinition>(category: T): T =>
-  category;
+export type SettingBranch<TSchema = SettingSchema> = {
+  readonly __label?: string;
+  readonly __read?: SettingPermissionAction;
+  readonly __manage?: SettingPermissionAction;
+  readonly [child: string]: SettingNode<TSchema> | string | undefined;
+};
 
-/** Declares a typed setting definition without side effects. */
-export const defineSetting = <const T extends SettingDefinition>(definition: T): T => definition;
+export type SettingNode<TSchema = SettingSchema> = SettingLeaf<TSchema> | SettingBranch<TSchema>;
+
+export type SettingTree<TSchema = SettingSchema> = SettingBranch<TSchema> & {
+  readonly __read: SettingPermissionAction;
+  readonly __manage: SettingPermissionAction;
+};
+
+export type SettingTrees<TSchema = SettingSchema> = Readonly<
+  Record<SettingResourceModelName, SettingTree<TSchema>>
+>;
+
+export type SettingResourceKinds = Readonly<Record<string, string | null | undefined>>;
+
+export type SettingDefinition<TSchema = SettingSchema> = {
+  readonly key: string;
+  readonly valueType: AttributeValueType;
+  readonly schema: TSchema;
+  readonly defaultValue: unknown;
+  readonly label: string;
+  readonly description: string;
+  readonly read: SettingPermissionAction;
+  readonly manage: SettingPermissionAction;
+};

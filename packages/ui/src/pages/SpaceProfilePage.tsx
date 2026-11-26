@@ -12,7 +12,7 @@ import {
   spaceUpdate,
 } from '@template/sdk';
 import { Page } from '@template/ui/components';
-import { ProfileFormCard, ResourceSettingsSection } from '@template/ui/components/settings';
+import { ProfileFormCard } from '@template/ui/components/settings';
 import { useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -23,7 +23,6 @@ import { useEffect, useState } from 'react';
 export const SpaceProfilePage = () => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const spaceId = context.space!.id;
-  const hasMembership = useAppStore((state) => Boolean(state.auth.spaceUsers?.[spaceId]));
   const detailQueryKey = spaceProtectedQueryKey({ path: { id: spaceId } });
 
   const { data, isLoading } = useQuery({
@@ -64,7 +63,7 @@ export const SpaceProfilePage = () => {
   };
 
   return (
-    <Page title="Profile" description="Manage your space settings and preferences">
+    <Page title="Profile" description="Your space's name and slug">
       {isLoading ? (
         <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
       ) : (
@@ -78,16 +77,6 @@ export const SpaceProfilePage = () => {
             onSave={handleSave}
             isSaving={updateMutation.isPending}
           />
-          <ResourceSettingsSection context={context} category="general" />
-          {hasMembership ? (
-            <ResourceSettingsSection
-              context={context}
-              ownership={{ ownedByMyMembership: true }}
-              category="general"
-              title={`Your preferences in ${profile?.name ?? context.space?.name ?? 'this space'}`}
-              description="Personal overrides scoped to your membership in this space."
-            />
-          ) : null}
         </div>
       )}
     </Page>

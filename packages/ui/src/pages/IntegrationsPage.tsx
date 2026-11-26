@@ -13,7 +13,7 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
-import { settingAppliesToIntegrationProvider } from '@template/shared/settings';
+import { settingDefinitionsInTree, settingKindsOfProvider } from '@template/shared/settings';
 import {
   Badge,
   Button,
@@ -25,7 +25,7 @@ import {
   Page,
 } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
-import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
+import { SettingTreeView } from '@template/ui/components/settings/SettingTreeView';
 import {
   createOptimisticListTarget,
   useInfiniteDataQuery,
@@ -235,7 +235,7 @@ const IntegrationProviderSection = ({
                 </div>
                 {hasIntegrationSettings && openSettingsIntegrationId === integration.id ? (
                   <div className="mt-3">
-                    <ResourceSettingsSection
+                    <SettingTreeView
                       target={{
                         model: 'Integration',
                         id: integration.id,
@@ -285,11 +285,8 @@ const IntegrationOwnerSection = ({
   const hasIntegrationSettings = (provider: IntegrationProvider | null) =>
     Boolean(
       catalog &&
-        Object.values(catalog.definitions).some(
-          (definition) =>
-            definition.resourceModels.includes('Integration') &&
-            settingAppliesToIntegrationProvider(definition, provider ?? undefined),
-        ),
+        settingDefinitionsInTree(catalog.trees.Integration, settingKindsOfProvider(provider))
+          .length > 0,
     );
   const integrationQueries = integrationContextQueries(context, ownership);
   const canManage =

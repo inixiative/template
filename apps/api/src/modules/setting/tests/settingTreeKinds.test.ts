@@ -9,25 +9,23 @@ import {
   createProjectIntegration,
   createSetting,
 } from '@template/db/test';
-import { SETTING_DEFINITIONS } from '@template/shared/settings';
-import { defineSetting } from '@template/shared/settings/types';
+import { SETTING_TREES } from '@template/shared/settings';
 import { z } from 'zod';
 
-const scoped = defineSetting({
-  key: 'test.scopedToLinear',
-  category: 'general',
-  label: 'Scoped',
-  description: 'Applies only to Linear integrations and their project links.',
-  resourceModels: ['Integration', 'ProjectIntegration'],
-  integrationProviders: ['linear'],
-  valueType: 'boolean',
-  schema: z.boolean(),
-  defaultValue: false,
-  order: 99,
-  permission: 'manage',
-});
-const definitions = SETTING_DEFINITIONS as Record<string, unknown>;
-const value = { key: scoped.key, valueText: null, valueBoolean: true };
+const linearBranch = {
+  linear: {
+    paused: {
+      valueType: 'boolean',
+      schema: z.boolean(),
+      defaultValue: false,
+      label: 'Paused',
+      description: 'Applies only to Linear integrations and their project links.',
+    },
+  },
+} as const;
+
+const mutableTrees = SETTING_TREES as unknown as Record<string, Record<string, unknown>>;
+const value = { key: 'linear.paused', valueText: null, valueBoolean: true };
 
 let organization: Organization;
 const integrationOf = (provider: 'linear' | 'slack') =>
@@ -36,16 +34,18 @@ const integrationOf = (provider: 'linear' | 'slack') =>
   );
 
 beforeEach(async () => {
-  definitions[scoped.key] = scoped;
+  mutableTrees.Integration!['provider:linear'] = linearBranch;
+  mutableTrees.ProjectIntegration!['provider:linear'] = linearBranch;
   ({ entity: organization } = await createOrganization());
 });
 
 afterEach(async () => {
-  delete definitions[scoped.key];
+  delete mutableTrees.Integration!['provider:linear'];
+  delete mutableTrees.ProjectIntegration!['provider:linear'];
   await cleanupTouchedTables(db);
 });
 
-describe('a setting scoped to a provider is written only on that provider', () => {
+describe('a setting under a provider: branch is written only on that provider', () => {
   it('on an integration', async () => {
     await createSetting(
       { ...value, resourceModel: 'Integration' },
@@ -56,7 +56,7 @@ describe('a setting scoped to a provider is written only on that provider', () =
         { ...value, resourceModel: 'Integration' },
         { integration: await integrationOf('slack') },
       ),
-    ).rejects.toMatchObject({ status: 422 });
+    ).rejects.toThrow(/'linear.paused' is not defined on this/);
   });
 
   it('on a project link, by the integration it links to', async () => {
@@ -81,8 +81,6 @@ describe('a setting scoped to a provider is written only on that provider', () =
         { ...value, resourceModel: 'ProjectIntegration' },
         { projectIntegration: slackLink },
       ),
-    ).rejects.toMatchObject({
-      status: 422,
-    });
+    ).rejects.toThrow(/'linear.paused' is not defined on this/);
   });
 });

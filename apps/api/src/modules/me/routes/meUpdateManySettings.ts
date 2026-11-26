@@ -9,7 +9,7 @@ import { updateRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { OpenApiTags } from '#/modules/openApiTags';
 import {
-  makeSettingUpsertItemRefinement,
+  settingUpsertItemRefinement,
   settingUpsertItemSchema,
 } from '#/modules/setting/schemas/settingSchemas';
 
@@ -19,7 +19,7 @@ export const meUpdateManySettingsRoute = updateRoute({
   many: true,
   skipId: true,
   bodySchema: settingUpsertItemSchema,
-  bodyRefinement: makeSettingUpsertItemRefinement('User'),
+  bodyRefinement: settingUpsertItemRefinement,
   responseSchema: SettingScalarSchema,
   tags: [OpenApiTags.me, OpenApiTags.setting],
   description: 'Atomically creates or updates a batch of personal settings for the acting user.',

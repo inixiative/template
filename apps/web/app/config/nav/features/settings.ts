@@ -15,6 +15,13 @@ export const settingsItem: NavItem = {
     permissions.check(...permissionCheckTargetForTenantContext(context), 'read'),
   items: [
     {
+      label: 'Settings',
+      path: '/settings',
+      icon: 'lucide:sliders-horizontal',
+      access: (permissions, context) =>
+        permissions.check(...permissionCheckTargetForTenantContext(context), 'read'),
+    },
+    {
       label: 'Profile',
       path: '/profile',
       icon: 'lucide:user',

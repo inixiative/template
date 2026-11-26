@@ -66,9 +66,38 @@ export const registerAttributeValidationHook = (
     ? { resolveDefinition: options.resolveDefinition }
     : undefined;
 
-  const validateAndNormalizeRow = (model: ModelName, mergedRow: Row, writableData?: Row): void => {
+  const definitionHeldByRowResource = async (
+    model: ModelName,
+    row: Row,
+  ): Promise<AttributeFieldDefinition | undefined> => {
+    const config = attributeModelConfig(toAccessor(model) as AttributeModelName);
+    if (options.resolveDefinition || !config.fetchDefinitionForRow || !config.locatorField) return;
+    const locator = row[config.locatorField];
+    if (typeof locator !== 'string' || !locator) return;
+    const definition = await config.fetchDefinitionForRow(row);
+    if (definition) return definition;
+    const resourceModel = config.resourceModelField ? row[config.resourceModelField] : undefined;
+    throw new AttributeValidationError([
+      {
+        code: 'attribute_locator_not_on_resource',
+        message: `${model} ${config.locatorField} '${locator}' is not defined on this ${String(resourceModel ?? 'resource')}`,
+        path: [config.locatorField],
+      },
+    ]);
+  };
+
+  const validateAndNormalizeRow = async (
+    model: ModelName,
+    mergedRow: Row,
+    writableData?: Row,
+  ): Promise<void> => {
     const accessor = toAccessor(model) as AttributeModelName;
-    const result = validateAttributeWrite(accessor, mergedRow, validationOptions);
+    const heldDefinition = await definitionHeldByRowResource(model, mergedRow);
+    const result = validateAttributeWrite(
+      accessor,
+      mergedRow,
+      heldDefinition ? { resolveDefinition: () => heldDefinition } : validationOptions,
+    );
     if (writableData) {
       if (result.normalizedValueJson !== undefined && writableData.valueJson !== undefined) {
         writableData.valueJson = result.normalizedValueJson;
@@ -91,19 +120,23 @@ export const registerAttributeValidationHook = (
     }
   };
 
-  const processCreateData = (data: unknown, model: ModelName): void => {
+  const processCreateData = async (data: unknown, model: ModelName): Promise<void> => {
     if (!data || typeof data !== 'object') return;
     for (const row of castArray(data) as Row[]) {
-      validateAndNormalizeRow(model, row, row);
+      await validateAndNormalizeRow(model, row, row);
     }
   };
 
-  const processUpdateData = (data: unknown, model: ModelName, previous?: Row): void => {
+  const processUpdateData = async (
+    data: unknown,
+    model: ModelName,
+    previous?: Row,
+  ): Promise<void> => {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return;
     const writable = data as Row;
     if (isTombstoneOnlyUpdate(writable)) return;
     const merged = applyWriteDataOverPreviousRow(previous, writable, { model });
-    validateAndNormalizeRow(model, merged, writable);
+    await validateAndNormalizeRow(model, merged, writable);
   };
 
   registerDbHook(
@@ -112,7 +145,7 @@ export const registerAttributeValidationHook = (
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ model, args }) => {
-      processCreateData((args as Row | null)?.data, model);
+      await processCreateData((args as Row | null)?.data, model);
     },
   );
 
@@ -123,7 +156,7 @@ export const registerAttributeValidationHook = (
     [DbAction.update],
     async (hookOptions: HookOptions) => {
       const { model, args, previous } = hookOptions as HookOptions & { action: SingleAction };
-      processUpdateData((args as Row | null)?.data, model, previous as Row | undefined);
+      await processUpdateData((args as Row | null)?.data, model, previous as Row | undefined);
     },
   );
 
@@ -136,9 +169,9 @@ export const registerAttributeValidationHook = (
       const { model, args, previous } = hookOptions as HookOptions & { action: SingleAction };
       const upsertArgs = args as Row | null;
       if (previous) {
-        processUpdateData(upsertArgs?.update, model, previous as Row);
+        await processUpdateData(upsertArgs?.update, model, previous as Row);
       } else {
-        processCreateData(upsertArgs?.create, model);
+        await processCreateData(upsertArgs?.create, model);
       }
     },
   );
@@ -181,7 +214,7 @@ export const registerAttributeValidationHook = (
       const data = (args as Row | null)?.data;
       if (isTombstoneOnlyUpdate(data)) return;
       for (const record of castArray(result ?? []) as Row[]) {
-        validateAndNormalizeRow(model, record);
+        await validateAndNormalizeRow(model, record);
       }
     },
   );

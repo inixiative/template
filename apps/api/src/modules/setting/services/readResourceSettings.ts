@@ -6,6 +6,7 @@
  */
 import {
   cacheKey,
+  fetchSettingResourceKinds,
   fetchThroughCache,
   type HydratedRecord,
   hydrate,
@@ -14,10 +15,9 @@ import {
 import type { Setting } from '@template/db/generated/client/client';
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
-import { settingDefinitionsForResourceModel } from '@template/shared/settings';
+import { isSettingKeyUnderPath, settingDefinitionsForResource } from '@template/shared/settings';
 import type { Context } from 'hono';
 import type { SettingListQuery } from '#/modules/setting/schemas/settingSchemas';
-import { settingIntegrationProvider } from '#/modules/setting/services/settingIntegrationProvider';
 import type { AppEnv } from '#/types/appEnv';
 
 /**
@@ -25,7 +25,8 @@ import type { AppEnv } from '#/types/appEnv';
  * Parent `read` access is enforced on the route via `validatePermission('read')`;
  * raw not-deleted rows for `(resourceModel, resourceId)` are cached in Redis via `fetchThroughCache`
  * (invalidated automatically by `cacheKeysByModel.Setting`), then filtered in memory per key
- * through `db:Setting:read` and optional `category`/`key` filters.
+ * through `db:Setting:read`, limited to what the resource's tree holds for its kinds and the
+ * optional `path` / `key` filters.
  */
 export const readResourceSettings = async (
   c: Context<AppEnv>,
@@ -38,11 +39,11 @@ export const readResourceSettings = async (
   const resourceId = resource.id as string;
   const targetFks = polymorphicArmKeys('Setting', 'resourceModel', resourceModel, resource);
 
-  const definitions = settingDefinitionsForResourceModel(
+  const definitions = settingDefinitionsForResource(
     resourceModel,
-    await settingIntegrationProvider({ resourceModel, ...targetFks }),
+    await fetchSettingResourceKinds({ resourceModel, ...targetFks }),
   ).filter((definition) => {
-    if (query.category && definition.category !== query.category) return false;
+    if (query.path && !isSettingKeyUnderPath(definition.key, query.path)) return false;
     if (query.key && definition.key !== query.key) return false;
     return true;
   });

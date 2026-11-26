@@ -31,8 +31,8 @@ export type ValidateAttributeWriteOptions = {
  * Validates an Attribute row write (create or merged update) and throws `AttributeValidationError`
  * on violation:
  * - Enforces the Layer 1 invariant (at most one of the 5 typed columns populated; never Prisma.JsonNull).
- * - If `resolveDefinition` is configured on the model (or passed via options), checks locator,
- *   `resourceModel`, exact typed column match, optional Zod `schema`, and normalizes `multiSelect`/`date`.
+ * - If `resolveDefinition` is configured on the model (or passed via options), checks the locator,
+ *   exact typed column match, optional Zod `schema`, and normalizes `multiSelect`/`date`.
  */
 export const validateAttributeWrite = (
   model: AttributeModelName | ModelName,
@@ -76,22 +76,6 @@ export const validateAttributeWrite = (
             path: [config.locatorField],
           },
         ]);
-      }
-
-      if (config.resourceModelField && definition.resourceModels?.length) {
-        const resourceModel = row[config.resourceModelField];
-        if (
-          typeof resourceModel !== 'string' ||
-          !definition.resourceModels.includes(resourceModel)
-        ) {
-          throw new AttributeValidationError([
-            {
-              code: 'invalid_attribute_resource_model',
-              message: `${config.model} ${config.locatorField} '${locator}' is not valid for ${config.resourceModelField}='${String(resourceModel)}' (allowed: ${definition.resourceModels.join(', ')})`,
-              path: [config.resourceModelField],
-            },
-          ]);
-        }
       }
     }
   }

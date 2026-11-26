@@ -5,13 +5,10 @@
  * @uses none
  */
 import type { AttributeModelConfig } from '@template/db/lib/attributes/types';
+import { fetchSettingDefinitionForRow } from '@template/db/lib/settings/fetchSettingDefinitionForRow';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { ATTRIBUTE_COLUMN_NAMES } from '@template/shared/attributes';
-import {
-  type SettingResourceModelName,
-  settingDefinitionForKey,
-  settingDefinitionsForResourceModel,
-} from '@template/shared/settings';
+import { settingDefinitionForKey } from '@template/shared/settings';
 import { lowerFirst, upperFirst } from 'lodash-es';
 
 /**
@@ -26,8 +23,7 @@ export const ATTRIBUTE_MODELS = {
     resourceModelField: 'resourceModel',
     disabledField: 'disabled',
     resolveDefinition: settingDefinitionForKey,
-    definitionsForResourceModel: (resourceModel: string) =>
-      settingDefinitionsForResourceModel(resourceModel as SettingResourceModelName),
+    fetchDefinitionForRow: fetchSettingDefinitionForRow,
   } satisfies AttributeModelConfig<'setting'>,
   // ==========================================================================
   // TEMPLATE ABOVE — Register app-specific attribute models below

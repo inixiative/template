@@ -33,39 +33,41 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 
 const initialState = useAppStore.getState();
 
+const emptyTree = { __read: 'read', __manage: 'manage' } as const;
+
 const testCatalog: SettingCatalog = {
-  categories: {
-    general: {
-      key: 'general',
-      label: 'General',
-      description: 'Workspace defaults.',
-      order: 10,
+  trees: {
+    User: emptyTree,
+    Organization: emptyTree,
+    Space: emptyTree,
+    OrganizationUser: emptyTree,
+    SpaceUser: emptyTree,
+    Project: {
+      ...emptyTree,
+      general: {
+        __label: 'General',
+        defaultTimezone: {
+          valueType: 'text',
+          schema: { type: 'string', enum: ['UTC', 'America/New_York'] },
+          defaultValue: 'UTC',
+          label: 'Default Timezone',
+          description: 'IANA timezone for this project.',
+        },
+      },
     },
-  },
-  definitions: {
-    'general.defaultTimezone': {
-      key: 'general.defaultTimezone',
-      category: 'general',
-      label: 'Default Timezone',
-      description: 'IANA timezone for this project.',
-      resourceModels: ['Project'],
-      valueType: 'text',
-      schema: { type: 'string', enum: ['UTC', 'America/New_York'] },
-      defaultValue: 'UTC',
-      order: 10,
-      permission: 'manage',
-    },
-    'general.syncEnabled': {
-      key: 'general.syncEnabled',
-      category: 'general',
-      label: 'Sync Enabled',
-      description: 'Toggle sync for this project integration.',
-      resourceModels: ['ProjectIntegration'],
-      valueType: 'boolean',
-      schema: { type: 'boolean' },
-      defaultValue: true,
-      order: 20,
-      permission: 'manage',
+    Integration: emptyTree,
+    ProjectIntegration: {
+      ...emptyTree,
+      general: {
+        __label: 'General',
+        syncEnabled: {
+          valueType: 'boolean',
+          schema: { type: 'boolean' },
+          defaultValue: true,
+          label: 'Sync Enabled',
+          description: 'Toggle sync for this project integration.',
+        },
+      },
     },
   },
 };
@@ -370,7 +372,7 @@ describe('ProjectsPage & ProjectDetailPage (real ReBAC permissions)', () => {
     ).toBeDefined();
   });
 
-  it('ProjectDetailPage settings view gates project edit, ResourceSettingsSection, and delete with real ReBAC', async () => {
+  it('ProjectDetailPage settings view gates project edit, SettingTreeView, and delete with real ReBAC', async () => {
     const { entity: user } = await buildUser();
     const { entity: org } = await buildOrganization({ name: 'Acme' });
     const { entity: orgMember } = await buildOrganizationUser(
@@ -548,7 +550,7 @@ describe('ProjectsPage & ProjectDetailPage (real ReBAC permissions)', () => {
     cleanup();
 
     // 2. Org owner (with NO SpaceUser row!): CAN connect org integration, expand connected link to see
-    //    ProjectIntegration ResourceSettingsSection + custom resources slot, and disconnect!
+    //    ProjectIntegration SettingTreeView + custom resources slot, and disconnect!
     await installRealSession({
       user: user.__serialize(),
       organizations: [serializedOrg],

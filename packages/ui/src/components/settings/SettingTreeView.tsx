@@ -10,8 +10,11 @@ import {
   type AssembledSettingItem,
   assembleResourceSettings,
   diffSettingDrafts,
-  SETTING_DEFINITIONS,
-  settingAppliesToIntegrationProvider,
+  type SettingBranch,
+  type SettingJsonSchema,
+  type SettingResourceKinds,
+  settingKindsOfProvider,
+  settingTreeEntries,
 } from '@template/shared/settings';
 import {
   Button,
@@ -34,29 +37,48 @@ import {
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { lowerFirst } from 'lodash-es';
-import { useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
-export type ResourceSettingsSectionProps = (
+type TreeBranch = SettingBranch<SettingJsonSchema>;
+
+const branchAtPath = (
+  branch: TreeBranch,
+  segments: readonly string[],
+  kinds: SettingResourceKinds,
+): TreeBranch | undefined => {
+  if (segments.length === 0) return branch;
+  for (const entry of settingTreeEntries(branch)) {
+    if (entry.kind === 'kind' && kinds[entry.field] === entry.value) {
+      const found = branchAtPath(entry.node, segments, kinds);
+      if (found) return found;
+    }
+    if (entry.kind === 'branch' && entry.name === segments[0])
+      return branchAtPath(entry.node, segments.slice(1), kinds);
+  }
+  return undefined;
+};
+
+export type SettingTreeViewProps = (
   | { context: AuthenticatedContext; ownership?: MyMembershipOwnership; target?: undefined }
   | { target: SettingExplicitTarget; context?: undefined; ownership?: undefined }
 ) & {
-  category?: SettingListQueryParams['category'];
+  path?: SettingListQueryParams['path'];
   title?: string;
   description?: string;
   readOnlyMessage?: string;
   hideWhenEmpty?: boolean;
 };
 
-export const ResourceSettingsSection = ({
+export const SettingTreeView = ({
   context,
   ownership,
   target,
-  category,
+  path,
   title,
   description,
   readOnlyMessage = 'You do not have permission to edit this setting.',
   hideWhenEmpty = true,
-}: ResourceSettingsSectionProps) => {
+}: SettingTreeViewProps) => {
   const queryClient = useQueryClient();
   const auth = useAppStore((state) => state.auth);
   const tenantContext = useAppStore((state) => state.tenant.context);
@@ -71,40 +93,47 @@ export const ResourceSettingsSection = ({
     [context, ownership, target],
   );
 
-  const listQueryParams = useMemo(() => (category ? { category } : undefined), [category]);
+  const kinds = useMemo<SettingResourceKinds>(
+    () =>
+      target?.model === 'Integration' || target?.model === 'ProjectIntegration'
+        ? settingKindsOfProvider(target.integrationProvider)
+        : {},
+    [target?.model, target?.integrationProvider],
+  );
+
+  const listQueryParams = useMemo(() => (path ? { path } : undefined), [path]);
   const queryKey = queries.readManyQueryKey(listQueryParams);
 
-  const hasCatalogDefinitions = useMemo(() => {
-    if (!catalog) return false;
-    return Object.values(catalog.definitions).some(
-      (def) =>
-        def.resourceModels.includes(queries.resourceModel) &&
-        settingAppliesToIntegrationProvider(def, target?.integrationProvider) &&
-        (!category || def.category === category),
-    );
-  }, [catalog, queries.resourceModel, category, target?.integrationProvider]);
+  const heldItems = useMemo(
+    () =>
+      catalog ? assembleResourceSettings(catalog, [], queries.resourceModel, { kinds, path }) : [],
+    [catalog, queries.resourceModel, kinds, path],
+  );
 
   const settingsQuery = useQuery({
     queryKey,
     queryFn: queries.readManyQueryFn,
-    enabled: hasCatalogDefinitions,
+    enabled: heldItems.length > 0,
   });
 
-  const assembled = useMemo(() => {
-    if (!catalog) return { items: [] as AssembledSettingItem[], byCategory: {} };
-    return assembleResourceSettings(
-      catalog,
-      settingsQuery.data?.data ?? [],
-      queries.resourceModel,
-      { category, integrationProvider: target?.integrationProvider },
-    );
-  }, [
-    catalog,
-    settingsQuery.data?.data,
-    queries.resourceModel,
-    category,
-    target?.integrationProvider,
-  ]);
+  const items = useMemo(
+    () =>
+      catalog
+        ? assembleResourceSettings(catalog, settingsQuery.data?.data ?? [], queries.resourceModel, {
+            kinds,
+            path,
+          })
+        : [],
+    [catalog, settingsQuery.data?.data, queries.resourceModel, kinds, path],
+  );
+  const itemsByKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items]);
+  const rootBranch = useMemo(
+    () =>
+      catalog
+        ? branchAtPath(catalog.trees[queries.resourceModel], path ? path.split('.') : [], kinds)
+        : undefined,
+    [catalog, queries.resourceModel, path, kinds],
+  );
 
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const [invalidKeys, setInvalidKeys] = useState<Record<string, boolean>>({});
@@ -171,32 +200,15 @@ export const ResourceSettingsSection = ({
     return null;
   }, [target, context, ownership?.ownedByMyMembership, auth, tenantContext]);
 
-  const canManageItem = (item: AssembledSettingItem): boolean => {
-    if (!hydratedTarget) return false;
-    if (item.key in SETTING_DEFINITIONS) {
-      return permissions.check(
-        'setting',
-        {
-          id: item.settingId ?? '',
-          resourceModel: queries.resourceModel,
-          resourceId: hydratedTarget.id,
-          key: item.key,
-          [`resource${queries.resourceModel}`]: hydratedTarget,
-        } as HydratedRecord,
-        'manage',
-      );
-    }
-    return permissions.check(
+  const canManageItem = (item: AssembledSettingItem): boolean =>
+    Boolean(hydratedTarget) &&
+    permissions.check(
       lowerFirst(queries.resourceModel) as AccessorName,
-      hydratedTarget,
-      item.permission,
+      hydratedTarget as HydratedRecord,
+      item.manage,
     );
-  };
 
-  const dirtyItems = useMemo(
-    () => diffSettingDrafts(assembled.items, drafts),
-    [assembled.items, drafts],
-  );
+  const dirtyItems = useMemo(() => diffSettingDrafts(items, drafts), [items, drafts]);
   const hasInvalidFields = useMemo(() => Object.values(invalidKeys).some(Boolean), [invalidKeys]);
 
   const handleFieldValidityChange = useCallback((key: string, isValid: boolean) => {
@@ -258,53 +270,74 @@ export const ResourceSettingsSection = ({
     return <div className="h-24 animate-pulse rounded-xl bg-muted/50" />;
   }
 
-  if (hideWhenEmpty && assembled.items.length === 0) {
+  if (hideWhenEmpty && items.length === 0) {
     return null;
   }
 
-  const categoryInfo = category ? catalog?.categories[category] : undefined;
-  const resolvedTitle = title ?? categoryInfo?.label ?? 'Settings';
-  const resolvedDescription = description ?? categoryInfo?.description;
-  const anyEditable = assembled.items.some(canManageItem);
+  const resolvedTitle = title ?? (path ? rootBranch?.__label : undefined) ?? 'Settings';
+  const anyEditable = items.some(canManageItem);
+
+  const renderField = (item: AssembledSettingItem) => {
+    const editable = canManageItem(item);
+    const storedId = item.settingId;
+    return (
+      <SettingField
+        key={item.key}
+        item={item}
+        value={item.key in drafts ? drafts[item.key] : item.value}
+        resetVersion={resetVersion}
+        disabled={!editable}
+        disabledText={!editable ? readOnlyMessage : undefined}
+        isResetting={resetMutation.isPending && resetMutation.variables?.key === item.key}
+        onValidityChange={(isValid) => handleFieldValidityChange(item.key, isValid)}
+        onChange={(nextValue) => {
+          setStatusMessage(null);
+          setErrorMessage(null);
+          setDrafts((previous) => ({ ...previous, [item.key]: nextValue }));
+        }}
+        onReset={storedId ? () => resetMutation.mutate({ id: storedId, key: item.key }) : undefined}
+      />
+    );
+  };
+
+  const renderBranch = (branch: TreeBranch, segments: readonly string[]): ReactNode[] =>
+    settingTreeEntries(branch).flatMap((entry): ReactNode[] => {
+      if (entry.kind === 'meta') return [];
+      if (entry.kind === 'kind')
+        return kinds[entry.field] === entry.value ? renderBranch(entry.node, segments) : [];
+      const childSegments = [...segments, entry.name];
+      if (entry.kind === 'leaf') {
+        const item = itemsByKey.get(childSegments.join('.'));
+        return item ? [renderField(item)] : [];
+      }
+      const children = renderBranch(entry.node, childSegments);
+      if (children.length === 0) return [];
+      return [
+        <section
+          key={childSegments.join('.')}
+          className="space-y-4"
+          data-testid={`setting-branch-${childSegments.join('.')}`}
+        >
+          {entry.node.__label ? (
+            <h3 className="text-sm font-semibold text-foreground">{entry.node.__label}</h3>
+          ) : null}
+          {children}
+        </section>,
+      ];
+    });
 
   return (
     <Card data-testid={`resource-settings-${queries.resourceModel}`}>
       <CardHeader>
         <CardTitle>{resolvedTitle}</CardTitle>
-        {resolvedDescription ? <CardDescription>{resolvedDescription}</CardDescription> : null}
+        {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
       <CardContent className="space-y-5">
         {settingsQuery.isLoading ? (
           <div className="h-20 animate-pulse rounded-md bg-muted/50" />
         ) : (
           <>
-            {assembled.items.map((item) => {
-              const editable = canManageItem(item);
-              const currentValue = item.key in drafts ? drafts[item.key] : item.value;
-              const storedId = item.settingId;
-              return (
-                <SettingField
-                  key={item.key}
-                  item={item}
-                  value={currentValue}
-                  resetVersion={resetVersion}
-                  disabled={!editable}
-                  disabledText={!editable ? readOnlyMessage : undefined}
-                  isResetting={resetMutation.isPending && resetMutation.variables?.key === item.key}
-                  onValidityChange={(isValid) => handleFieldValidityChange(item.key, isValid)}
-                  onChange={(nextValue) => {
-                    setStatusMessage(null);
-                    setErrorMessage(null);
-                    setDrafts((previous) => ({ ...previous, [item.key]: nextValue }));
-                  }}
-                  onReset={
-                    storedId
-                      ? () => resetMutation.mutate({ id: storedId, key: item.key })
-                      : undefined
-                  }
-                />
-              );
-            })}
+            {rootBranch ? renderBranch(rootBranch, path ? path.split('.') : []) : null}
 
             {errorMessage ? (
               <p role="alert" className="text-sm text-destructive">
