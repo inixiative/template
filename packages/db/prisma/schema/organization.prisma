@@ -42,6 +42,9 @@ model Organization {
   communicationsSent              CommunicationLog[]     @relation("CommunicationSenderOrganization")
   segments                        Segment[]
   settings                        Setting[]
+  artifacts                       Artifact[]             @relation("ArtifactOwnerOrganization")
+  granteeArtifactPermissions      ArtifactPermission[]   @relation("ArtifactPermissionGranteeOrganization")
+  resourceBindings                ResourceBinding[]      @relation("ResourceBindingOrganization")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

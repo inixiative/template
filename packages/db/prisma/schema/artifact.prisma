@@ -1,0 +1,69 @@
+model Artifact {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  kind                   ArtifactKind
+  name                   String
+  effectiveReadAccess    ReadAccess    @default(private)
+  effectiveOperateAccess OperateAccess @default(private)
+
+  ownerModel     ArtifactOwnerModel
+  userId         String?            @db.VarChar(36)
+  organizationId String?            @db.VarChar(36)
+  spaceId        String?            @db.VarChar(36)
+
+  user             User?             @relation("ArtifactOwnerUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization?     @relation("ArtifactOwnerOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationUser OrganizationUser? @relation("ArtifactOwnerOrganizationUser", fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  space            Space?            @relation("ArtifactOwnerSpace", fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
+  spaceUser        SpaceUser?        @relation("ArtifactOwnerSpaceUser", fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+
+  file                          File?
+  resourceBindings              ResourceBinding[]
+  artifactPermissions           ArtifactPermission[]
+  artifactPlacementsAsArtifact  ArtifactPlacement[] @relation("ArtifactPlacementArtifact")
+  artifactPlacementsAsContainer ArtifactPlacement[] @relation("ArtifactPlacementContainer")
+
+  artifactAncestorsAsDescendant ArtifactAncestor[] @relation("ArtifactAncestorDescendant")
+  artifactAncestorsAsAncestor   ArtifactAncestor[] @relation("ArtifactAncestorAncestor")
+
+  /// @permissions(down: [artifactPermission.granteeUser, artifactPermission.granteeOrganization, artifactPermission.granteeSpace.organization, artifactPermission.granteeOrganizationUser.user, artifactPermission.granteeOrganizationUser.organization, artifactPermission.granteeSpaceUser.user, artifactPermission.granteeSpaceUser.space.organization, artifactPermission.granteeCustomerRelationship.customerUser, artifactPermission.granteeCustomerRelationship.customerOrganization, artifactPermission.granteeCustomerRelationship.customerSpace.organization])
+  artifactEffectivePermissions ArtifactEffectivePermission[]
+
+  auditLogs AuditLog[]
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([userId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "Artifact_root_user_key")
+  @@unique([organizationId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "Artifact_root_organization_key")
+  @@unique([spaceId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "Artifact_root_space_key")
+  @@unique([organizationId, userId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "Artifact_root_organization_user_key")
+  @@unique([spaceId, userId], where: raw("\"kind\" = 'root' AND \"ownerModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "Artifact_root_space_user_key")
+  @@index([ownerModel])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([kind])
+}
+
+enum ArtifactKind {
+  root
+  file
+  folder
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific kinds below
+  // ==========================================================================
+}
+
+enum ArtifactOwnerModel {
+  User
+  OrganizationUser
+  Organization
+  Space
+  SpaceUser
+}

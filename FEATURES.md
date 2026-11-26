@@ -30,6 +30,7 @@
 - [Contact System](#contact-system)
 - [Customer Management](#customer-management)
 - [Segments](#segments)
+- [Artifacts and Files](#artifacts-and-files)
 - [Frontend Apps](#frontend-apps)
 - [Frontend Architecture](#frontend-architecture)
 - [UI Components](#ui-components)
@@ -487,6 +488,19 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - 🟡 **Remaining Work** — Segment rule editor, production emitters for five registered reconciliation events, and narrower change-driven evaluation. Feature flags remain unimplemented.
 
 [Learn more: SEGMENTS.md](docs/claude/SEGMENTS.md)
+
+---
+
+## Artifacts and Files
+
+- ✅ **One Node, Many Kinds** — `Artifact` (`root`, `file`, `folder`, fork kinds) with a code catalog of kinds; every owner gets an eager `root` container (`ownerRootArtifact` hook), and an artifact may sit in many containers (`ArtifactPlacement`).
+- ✅ **Access on Placements, Grants on Artifacts** — `ArtifactPlacement.readAccess` (`inherit | private | tenant | public`) and `operateAccess` (`inherit | private | tenant`, root rejects `inherit`, `User` rejects `tenant`) control access per placement and materialize `Artifact.effectiveReadAccess` / `effectiveOperateAccess` across same-owner placements. Explicit grants (`ArtifactPermission`) stay on `Artifact`, reach users, orgs, spaces, members and customers with expiry, and cap roles by membership and token.
+- ✅ **Placements** — containers and objects; same-owner and cross-owner placements (private bookmarks vs public/tenant reshares at root or in folders); deleting a container or removing a last same-owner placement reparents owned items to the owner's `root` via DB hook; loop and depth refusal under the owner's `containers` lock; `GET /artifact/:id` returns the 1-step neighborhood with exact Prisma relation names filtered to what the caller can access.
+- ✅ **Ownership Transfer** — the `transferArtifact` Inquiry, with a tracking pointer or a copy for the sender.
+- ✅ **Deleting and Governance** — deleting a container keeps its contents (marked `exclusive` on `artifactPlacementsAsContainer[].artifact`, deleted through batch); deleting needs `own`; grants are soft-deleted and placements are hard-deleted (`HARD_DELETE_ON_TOMBSTONE`), both audited; org-user content is reachable by org owners, not admins.
+- 🟡 **Remaining Work** — file storage & versioning (`FEAT-029`), resource bindings & lazy copy sweeper (`FEAT-030`), artifact webhooks (`FEAT-031`), file browser UI (`FEAT-032`).
+
+[Learn more: ARTIFACTS.md](docs/claude/ARTIFACTS.md)
 
 ---
 

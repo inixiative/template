@@ -1,0 +1,28 @@
+model FileVersion {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  fileId String @db.VarChar(36)
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  version      Int
+  key          String // S3 object key; NOT unique - a revert reuses a prior version's key.
+  contentType  String
+  size         Int
+  status       FileVersionStatus @default(pending)
+  revertedFrom Int?
+
+  @@unique([fileId, version])
+  @@index([fileId, status])
+  @@index([key])
+}
+
+enum FileVersionStatus {
+  pending
+  active
+  purging
+  purged
+  failed
+}

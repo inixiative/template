@@ -79,15 +79,23 @@ const rulesOf = (
   return rules;
 };
 
+const MEMBER_OWNER_MODELS = new Set(['OrganizationUser', 'SpaceUser']);
+
 /**
  * The rules each tenant above a record holds for its resource (`tenantPermissionRules`), cut to
  * the actions that tenant's lens shows, for `check()` to OR in. A tenant on a side of a record
  * gives the rules whose side check is on that side. A stored rule that is refused throws.
+ * Private member-owned records (`OrganizationUser` / `SpaceUser`) stay isolated from tenant rules.
  */
-export const tenantPermissionRulesAbove: AdditionalRules = (resource, record) => [
-  ...tenantRowsAbove(record).map(({ model, row }) => rulesOf(row, model, resource)),
-  ...tenantRowsOnSides(toModelName(accessorOfResource(resource)), record).map(
-    ({ model, row, relation }) =>
-      pickBy(rulesOf(row, model, resource), (rule) => sideCheckHeldBy(rule)?.rel === relation),
-  ),
-];
+export const tenantPermissionRulesAbove: AdditionalRules = (resource, record) => {
+  if (typeof record.ownerModel === 'string' && MEMBER_OWNER_MODELS.has(record.ownerModel)) {
+    return [];
+  }
+  return [
+    ...tenantRowsAbove(record).map(({ model, row }) => rulesOf(row, model, resource)),
+    ...tenantRowsOnSides(toModelName(accessorOfResource(resource)), record).map(
+      ({ model, row, relation }) =>
+        pickBy(rulesOf(row, model, resource), (rule) => sideCheckHeldBy(rule)?.rel === relation),
+    ),
+  ];
+};

@@ -1,0 +1,23 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:files
+ * @uses primitive:routeTemplates, primitive:authz
+ */
+import { createRoute, polymorphicBodyRefinement } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
+import {
+  artifactPermissionCreateBodySchema,
+  artifactPermissionReadResponseSchema,
+} from '#/modules/artifact/schemas/artifactPermissionSchemas';
+import { Modules } from '#/modules/modules';
+
+export const artifactCreateArtifactPermissionRoute = createRoute({
+  model: Modules.artifact,
+  submodel: Modules.artifactPermission,
+  description: 'Grants a role on an artifact, and through inherit on everything inside it.',
+  bodySchema: artifactPermissionCreateBodySchema,
+  bodyRefinement: polymorphicBodyRefinement('ArtifactPermission', 'granteeModel'),
+  responseSchema: artifactPermissionReadResponseSchema,
+  middleware: [validatePermission('manage')],
+});

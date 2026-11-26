@@ -28,7 +28,9 @@ model OrganizationUser {
   settings           Setting[]
   emailTemplates     EmailTemplate[]
   emailComponents    EmailComponent[]
-  auditLogsAsSubject AuditLog[]       @relation("AuditLogSubjectOrganizationUser")
+  auditLogsAsSubject AuditLog[]           @relation("AuditLogSubjectOrganizationUser")
+  artifacts                  Artifact[]           @relation("ArtifactOwnerOrganizationUser")
+  granteeArtifactPermissions ArtifactPermission[] @relation("ArtifactPermissionGranteeOrganizationUser")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

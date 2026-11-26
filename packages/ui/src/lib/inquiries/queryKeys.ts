@@ -11,6 +11,7 @@ import {
   meSentManyInquiriesQueryKey,
   organizationReceivedManyInquiriesQueryKey,
   organizationSentManyInquiriesQueryKey,
+  spaceReceivedManyInquiriesQueryKey,
   spaceSentManyInquiriesQueryKey,
 } from '@template/sdk';
 
@@ -23,6 +24,7 @@ export const INQUIRY_TYPE_LABELS: Record<InquiryType, string> = {
   createSpace: 'Space Request',
   updateSpace: 'Space Update',
   transferSpace: 'Space Transfer',
+  transferArtifact: 'Artifact Transfer',
   changeEntitlements: 'Permission Request',
 };
 
@@ -114,6 +116,7 @@ export type InquiryMeta = {
   sourceOrganizationId: string | null;
   sourceSpaceId: string | null;
   targetOrganizationId: string | null;
+  targetSpaceId?: string | null;
 };
 
 // Query keys affected when the SOURCE side mutates (cancel/delete)
@@ -129,6 +132,13 @@ export const queryKeysToInvalidateWhenSourceMutates: Record<
   ],
   updateSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
   transferSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
+  transferArtifact: (inq) => [
+    inq.sourceSpaceId
+      ? spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId } })
+      : inq.sourceOrganizationId
+        ? organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId } })
+        : meSentManyInquiriesQueryKey(),
+  ],
   changeEntitlements: (_inq) => [meSentManyInquiriesQueryKey()],
 };
 
@@ -142,6 +152,13 @@ export const queryKeysToInvalidateWhenTargetMutates: Record<
   updateSpace: (_inq) => [],
   transferSpace: (inq) => [
     organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId! } }),
+  ],
+  transferArtifact: (inq) => [
+    inq.targetSpaceId
+      ? spaceReceivedManyInquiriesQueryKey({ path: { id: inq.targetSpaceId } })
+      : inq.targetOrganizationId
+        ? organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } })
+        : meReceivedManyInquiriesQueryKey(),
   ],
   changeEntitlements: (inq) =>
     inq.targetOrganizationId

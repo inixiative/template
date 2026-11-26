@@ -1,0 +1,46 @@
+/**
+ * @atlas
+ * @kind validation
+ * @partOf feature:files
+ * @uses infrastructure:prisma, primitive:authz
+ */
+import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
+import { ArtifactKind } from '@template/db/generated/client/enums';
+import type { Permix } from '@template/permissions/client';
+import { isRootKind } from '@template/shared/artifact';
+import { makeError } from '#/lib/errors';
+import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
+import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
+import { validateArtifactCreateAtOwner } from '#/modules/artifact/validations/validateArtifactCreateAtOwner';
+import { validateArtifactPermission } from '#/modules/artifact/validations/validateArtifactPermission';
+import {
+  isCustomPlacementAccess,
+  type PlacementAccessInput,
+} from '#/modules/artifact/validations/validatePlacementAccess';
+
+export const validatePlacementPermissions = async (
+  permix: Permix,
+  artifact: Artifact,
+  container: Artifact,
+  mode: 'create' | 'delete' | 'manage',
+  access?: PlacementAccessInput,
+): Promise<void> => {
+  const isCustomAccess = mode === 'create' && isCustomPlacementAccess(container, access);
+  if (mode === 'create' && isRootKind(container.kind)) {
+    await validateArtifactCreateAtOwner(permix, ArtifactKind.root, container);
+  }
+  const containerAction = mode === 'manage' || isCustomAccess ? 'manage' : 'operate';
+  await validateArtifactPermission(permix, container, containerAction);
+  const sameOwner = sameArtifactOwner(artifact, container);
+  if (!sameOwner && mode === 'delete') return;
+  await validateArtifactPermission(permix, artifact, sameOwner ? 'manage' : 'read');
+};
+
+export const validatePlacementDeletable = async (
+  permix: Permix,
+  placement: ArtifactPlacement,
+): Promise<void> => {
+  if (!(await holdsOnRecord(permix, 'artifactPlacement', placement, 'delete'))) {
+    throw makeError({ status: 403, message: 'Forbidden' });
+  }
+};

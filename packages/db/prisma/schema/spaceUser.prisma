@@ -35,7 +35,9 @@ model SpaceUser {
   settings           Setting[]
   emailTemplates     EmailTemplate[]
   emailComponents    EmailComponent[]
-  auditLogsAsSubject AuditLog[]       @relation("AuditLogSubjectSpaceUser")
+  auditLogsAsSubject AuditLog[]           @relation("AuditLogSubjectSpaceUser")
+  artifacts                  Artifact[]           @relation("ArtifactOwnerSpaceUser")
+  granteeArtifactPermissions ArtifactPermission[] @relation("ArtifactPermissionGranteeSpaceUser")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

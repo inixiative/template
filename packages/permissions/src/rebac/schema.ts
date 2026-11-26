@@ -5,13 +5,13 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import {
-  ContactSource,
-  IntegrationResourceStatus,
-  OperateAccess,
-  ReadAccess,
-} from '@template/db/generated/client/enums';
+import { ContactSource, IntegrationResourceStatus } from '@template/db/generated/client/enums';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
+import {
+  artifactPermissionResourcePermission,
+  artifactPlacementResourcePermission,
+  artifactResourcePermission,
+} from '@template/permissions/rebac/artifactResourcePermission';
 import { inquiryResourcePermission } from '@template/permissions/rebac/inquiryResourcePermission';
 import {
   actorIsDelegateOfUser,
@@ -24,9 +24,9 @@ import {
   integrationAdministering,
   isNull,
   memberRowActions,
+  ownerAccessOperateBranches,
+  ownerAccessReadBranches,
   ownerActions,
-  ownerPrivateRead,
-  ownerTenant,
   rowIsThereAnd,
   tokenAdministering,
 } from '@template/permissions/rebac/rebacSchemaRules';
@@ -130,43 +130,8 @@ export const schemaMap: SchemaMap = {
     'db:Project': {
       actions: {
         ...omit(integrationAdministering, 'delegateFull'),
-        operate: {
-          any: [
-            'manage',
-            actorMayPerformActionOnOwner('operate', '', ['User']),
-            {
-              all: [
-                {
-                  rule: {
-                    field: 'operateAccess',
-                    operator: Operator.equals,
-                    value: OperateAccess.tenant,
-                  },
-                },
-                ownerTenant('operate'),
-              ],
-            },
-          ],
-        },
-        read: {
-          any: [
-            'operate',
-            ownerPrivateRead(),
-            { rule: { field: 'readAccess', operator: Operator.equals, value: ReadAccess.public } },
-            {
-              all: [
-                {
-                  rule: {
-                    field: 'readAccess',
-                    operator: Operator.equals,
-                    value: ReadAccess.tenant,
-                  },
-                },
-                ownerTenant('read'),
-              ],
-            },
-          ],
-        },
+        operate: { any: ownerAccessOperateBranches() },
+        read: { any: ownerAccessReadBranches() },
       },
     },
     'db:ProjectIntegration': {
@@ -213,6 +178,9 @@ export const schemaMap: SchemaMap = {
       },
     },
     'db:Setting': settingResourcePermission,
+    'db:Artifact': artifactResourcePermission,
+    'db:ArtifactPermission': artifactPermissionResourcePermission,
+    'db:ArtifactPlacement': artifactPlacementResourcePermission,
     'db:Flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:OrganizationUser': { actions: memberRowActions('organization') },

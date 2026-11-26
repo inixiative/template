@@ -18,10 +18,11 @@ import { incrementCounter } from '@template/shared/telemetry';
 export const publishComputed = async (
   redis: RedisEval,
   key: string,
-  captured: Generation,
-  holder: string,
+  capturedGeneration: Generation,
+  holder: string | undefined,
   ttlSeconds: number,
   payload: string,
+  overwriteExisting = false,
 ): Promise<void> => {
   try {
     const published = await publishIfCurrent(
@@ -30,12 +31,13 @@ export const publishComputed = async (
         key,
         generationKey: generationKey(key),
         writtenKey: cacheWrittenMarkerKeyFor(key),
-        lockKey: singleFlightLockKey(key),
+        ...(holder !== undefined ? { lockKey: singleFlightLockKey(key) } : {}),
       },
-      captured,
+      capturedGeneration,
       holder,
       ttlSeconds,
       payload,
+      overwriteExisting,
     );
     if (published) meterLargeWrite(key, payload, ttlSeconds, 'cache');
     else incrementCounter('cache.publish.skipped', 1, { accessor: cacheAccessor(key) });

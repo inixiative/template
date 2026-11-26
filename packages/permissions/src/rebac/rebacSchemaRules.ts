@@ -85,7 +85,7 @@ export const actorManagesRecordUser = (at = ''): ActionRule => ({
   action: 'manage',
 });
 
-const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
+export const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   any: [
     { all: [rowIsThereAnd('id', isNull('role')), heldAt('read')] },
     ...roleHierarchy.map((role) => ({
@@ -207,6 +207,29 @@ export const ownerPrivateRead = (at = ''): ActionRule => ({
     actorMayPerformActionOnOwner('own', at, ['OrganizationUser', 'SpaceUser']),
   ],
 });
+
+export const ownerAccessOperateBranches = (operateField = 'operateAccess'): ActionRule[] => [
+  'manage',
+  actorMayPerformActionOnOwner('operate', '', ['User']),
+  {
+    all: [
+      { rule: { field: operateField, operator: Operator.equals, value: 'tenant' } },
+      ownerTenant('operate'),
+    ],
+  },
+];
+
+export const ownerAccessReadBranches = (readField = 'readAccess'): ActionRule[] => [
+  'operate',
+  ownerPrivateRead(),
+  { rule: { field: readField, operator: Operator.equals, value: 'public' } },
+  {
+    all: [
+      { rule: { field: readField, operator: Operator.equals, value: 'tenant' } },
+      ownerTenant('read'),
+    ],
+  },
+];
 
 // Read on an integration row, whose owner is never another integration.
 export const integrationRoleWrite: ActionRule = {

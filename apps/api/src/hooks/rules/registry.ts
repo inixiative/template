@@ -11,7 +11,7 @@ import { fullDelegateRules } from '#/hooks/rules/fullDelegateRules';
 const both = (model: ModelName, rule: Condition): Condition =>
   polymorphismRules[model] ? { all: [polymorphismRules[model], rule] } : rule;
 
-const userTakesNoTenantAccess: Condition = {
+export const userTakesNoTenantAccess: Condition = {
   any: [
     { field: 'ownerModel', operator: Operator.notEquals, value: 'User' },
     {

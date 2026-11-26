@@ -15,7 +15,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 // - Immutable fields (type fields are immutable)
 
 // Special non-model values for ownership
-type SpecialOwner = 'default' | 'admin' | 'platform';
+type SpecialOwner = 'default' | 'admin' | 'platform' | 'url';
 
 // Valid type values in polymorphic fields (strongly typed)
 export type PolymorphicValue = ModelName | SpecialOwner;
@@ -367,6 +367,9 @@ export const PolymorphismRegistry = {
           ProjectIntegrationResource: ['subjectProjectIntegrationResourceId'],
           Setting: ['subjectSettingId'],
           ProjectIntegration: ['subjectProjectIntegrationId'],
+          Artifact: ['subjectArtifactId'],
+          ArtifactPlacement: ['subjectArtifactPlacementId'],
+          ArtifactPermission: ['subjectArtifactPermissionId'],
           TwoFactor: ['subjectTwoFactorId'],
           Passkey: ['subjectPasskeyId'],
         },
@@ -401,6 +404,52 @@ export const PolymorphismRegistry = {
           User: ['userId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  Artifact: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
+          Organization: ['organizationId'],
+          Space: ['organizationId', 'spaceId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
+        },
+      },
+    ],
+  },
+
+  ArtifactPermission: {
+    axes: [
+      {
+        field: 'granteeModel',
+        fkMap: {
+          User: ['granteeUserId'],
+          Organization: ['granteeOrganizationId'],
+          Space: ['granteeSpaceId'],
+          OrganizationUser: ['granteeOrganizationId', 'granteeUserId'],
+          SpaceUser: ['granteeOrganizationId', 'granteeSpaceId', 'granteeUserId'],
+          CustomerRelationship: ['granteeCustomerRelationshipId'],
+        },
+      },
+    ],
+  },
+
+  ResourceBinding: {
+    axes: [
+      { field: 'sourceModel', fkMap: { Artifact: ['sourceArtifactId'], url: [] } },
+      {
+        field: 'resourceModel',
+        fkMap: {
+          Organization: ['resourceOrganizationId'],
+          Space: ['resourceSpaceId'],
+          User: ['resourceUserId'],
+          CustomerRelationship: ['resourceCustomerRelationshipId'],
         },
       },
     ],

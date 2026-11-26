@@ -1,0 +1,17 @@
+model File {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  artifactId String   @unique @db.VarChar(36)
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  sourceFileId  String? @db.VarChar(36)
+  sourceFile    File?   @relation("FileLazyCopy", fields: [sourceFileId], references: [id])
+  filesAsSource File[]  @relation("FileLazyCopy")
+
+  fileVersions FileVersion[]
+
+  @@index([sourceFileId])
+}

@@ -207,6 +207,8 @@ const awaitingClassification = [
   'AuditLog.subjectProjectIntegrationResourceId belongs to ProjectIntegrationResource',
   'AuditLog.subjectSettingId belongs to Setting',
   'AuditLog.subjectProjectIntegrationId belongs to ProjectIntegration',
+  'AuditLog.subjectArtifactId belongs to Artifact',
+  'AuditLog.subjectArtifactPermissionId belongs to ArtifactPermission',
   'AuditLog.subjectTwoFactorId belongs to TwoFactor',
   'AuditLog.subjectPasskeyId belongs to Passkey',
   'CommunicationLog.recipientContactId belongs to Contact',
