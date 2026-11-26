@@ -16,6 +16,7 @@ import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerOwnerRootArtifactHook } from '#/hooks/ownerRootArtifact/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerProjectIntegrationOwnerHook } from '#/hooks/projectIntegrationOwner/hook';
+import { registerProjectIntegrationResourceHook } from '#/hooks/projectIntegrationResource/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -46,6 +47,7 @@ export const registerHooks = () => {
   registerOrderedListHook();
   registerPreventHardDeleteHook();
   registerProjectIntegrationOwnerHook();
+  registerProjectIntegrationResourceHook();
   registerRuleReferenceHook();
   registerRuleReferenceTargetHook();
   registerSegmentConditionsHook();

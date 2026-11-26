@@ -40,6 +40,8 @@
     "./contact/*": "./src/contact/*.ts",
     "./inquiry": "./src/inquiry/index.ts",
     "./inquiry/*": "./src/inquiry/*.ts",
+    "./integrations": "./src/integrations/index.ts",
+    "./integrations/*": "./src/integrations/*.ts",
     "./artifact": "./src/artifact/index.ts",
     "./reference": "./src/reference/index.ts",
     "./reference/*": "./src/reference/*.ts",

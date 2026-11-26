@@ -17,6 +17,14 @@ export const cacheKeysByModel: CacheKeysByModel = {
 
   Integration: (r) => [cacheKey('integration', r.id)],
 
+  IntegrationResource: (r) => [cacheKey('integrationResource', r.id)],
+
+  Project: (r) => [cacheKey('project', r.id)],
+
+  ProjectIntegration: (r) => [cacheKey('projectIntegration', r.id)],
+
+  ProjectIntegrationResource: (r) => [cacheKey('projectIntegrationResource', r.id)],
+
   Artifact: (r) => [
     cacheKey('artifact', r.id),
     ...(r.kind === 'root' ? [ownerRootCacheKey(r)] : []),

@@ -17,6 +17,10 @@ model ProjectIntegrationResource {
   integrationResourceId String              @db.VarChar(36)
   integrationResource   IntegrationResource @relation(fields: [integrationResourceId], references: [id], onDelete: Cascade)
 
+  projectIntegrationId String?             @db.VarChar(36)
+  projectIntegration   ProjectIntegration? @relation(fields: [projectIntegrationId], references: [id], onDelete: Cascade)
+  isIdentity           Boolean             @default(false)
+
   auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProjectIntegrationResource")
 
   // ==========================================================================
@@ -24,6 +28,8 @@ model ProjectIntegrationResource {
   // ==========================================================================
 
   @@unique([projectId, integrationResourceId], map: "ProjectIntegrationResource_project_integrationResource_key")
+  @@unique([projectIntegrationId], where: raw("\"isIdentity\" = true AND \"deletedAt\" IS NULL"), map: "ProjectIntegrationResource_identity_key")
   @@index([projectId])
   @@index([integrationResourceId])
+  @@index([projectIntegrationId])
 }

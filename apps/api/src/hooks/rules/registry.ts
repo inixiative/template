@@ -24,11 +24,28 @@ export const userTakesNoTenantAccess: Condition = {
   error: 'User-owned records cannot use tenant access',
 };
 
+const identityResourceRequiresProjectIntegration: Condition = {
+  any: [
+    { field: 'isIdentity', operator: Operator.notEquals, value: true },
+    {
+      all: [
+        { field: 'projectIntegrationId', operator: Operator.exists },
+        { field: 'projectIntegrationId', operator: Operator.notEquals, value: null },
+      ],
+    },
+  ],
+  error: 'An identity ProjectIntegrationResource requires a ProjectIntegration',
+};
+
 export const RulesRegistry: Partial<Record<ModelName, Condition>> = {
   ...polymorphismRules,
   Integration: both('Integration', fullDelegateRules.Integration),
   Token: both('Token', fullDelegateRules.Token),
   Project: both('Project', userTakesNoTenantAccess),
+  ProjectIntegrationResource: both(
+    'ProjectIntegrationResource',
+    identityResourceRequiresProjectIntegration,
+  ),
   // Add additional rules here:
   // User: { field: 'name', operator: 'notEmpty', value: true, error: 'name required' },
 };
