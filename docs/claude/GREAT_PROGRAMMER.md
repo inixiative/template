@@ -9,7 +9,8 @@
 - [Essential Complexity vs. Accidental Complexity](#essential-complexity-vs-accidental-complexity)
 - [Design Before You Type — Explain the Mechanism Plainly](#design-before-you-type--explain-the-mechanism-plainly)
 - [Deep Modules, Honest Invariants, No Cutouts](#deep-modules-honest-invariants-no-cutouts)
-- [Delete Courageously](#delete-courageously)
+- [Delete Courageously — and Reassess Every Surviving Part After Refactoring](#delete-courageously--and-reassess-every-surviving-part-after-refactoring)
+- [Falsify the Premise, Don't Defend Consistency](#falsify-the-premise-dont-defend-consistency)
 
 <!-- toc:end -->
 
@@ -101,7 +102,7 @@ Does your change add a boolean flag, bypass option, or one-off carve-out to an e
 
 ---
 
-## Delete Courageously
+## Delete Courageously — and Reassess Every Surviving Part After Refactoring
 
 > "If we wish to count lines of code, we should not regard them as 'lines produced' but as 'lines spent'."
 > — **Edsger W. Dijkstra**, *On the Cruelty of Really Teaching Computing Science* (EWD1036, 1988)
@@ -109,7 +110,29 @@ Does your change add a boolean flag, bypass option, or one-off carve-out to an e
 > "One of my most productive days was throwing away 1,000 lines of code."
 > — **Ken Thompson** *(quoted in Eric S. Raymond, The Art of UNIX Programming, 2003)*
 
-The best diff often has a negative line count. After an iterative build or review cycle, step back and inspect the *whole* feature from scratch as if you were building it fresh with everything you now know — never defend a file or route just because it already passed tests on an earlier turn.
+The best diff often has a negative line count. After an iterative build, review cycle, or architectural change, step back and inspect the *whole* touched subsystem from scratch as if you were building it fresh with everything you now know — never defend a file, route, fallback, or helper just because it already passed tests on an earlier turn.
 
-**Rejection test — The Fresh-Eyes Rebuild:**
-Ask: *knowing everything I know now, if I built this from scratch in one pass, what would I leave out?* Delete everything on that list before asking anyone to review.
+When an architectural change introduces a new invariant or replaces an old mechanism (for example, an eager DB hook replacing lazy setup, a schema relation replacing manual joins, or a primitive absorbing a local layer), **superseded plumbing does not delete itself.** Agents wire up the new path and leave old fallbacks, guards, helpers, branches, wrappers, and tests standing next to it, forcing the human reviewer to spend hours reading dead layers to spot what no longer needs to exist.
+
+**Rejection test — Fresh-Eyes Rebuild & Superseded-Plumbing Audit:**
+1. **Fresh-eyes rebuild:** Ask: *knowing everything I know now, if I built this from scratch in one pass, what would I leave out?*
+2. **Invariant-replacement trace:** List every invariant or mechanism this change established or replaced. Trace every surviving file, helper, hook, fallback, branch, route, column, test, and doc in the touched subsystem — not only the new diff lines — and ask of each: *does this part still need to exist now that the new invariant holds?*
+3. Delete everything superseded before pushing — on **every** refactor round, not just Round 1.
+
+---
+
+## Falsify the Premise, Don't Defend Consistency
+
+> "It is much easier to prove a flawed system internally consistent than to admit its starting axiom is wrong."
+
+**Why this goes wrong:** Once a model is written and passes tests or adversarial reviews, agents treat it as a fixed axiom. Tests and adversarial reviews only prove consistency *inside* the current premise — they never prove the premise itself is right. Holding on to a flawed starting assumption turns every new requirement into local patches and extra machinery, and leads to self-inflicted objections: rejecting a simpler alternative because of a problem that only exists under another assumption already in doubt.
+
+**Why we ask for pushback:** Both in architecture and in product, the method is walking through implications — *"if we do it this way, what actually happens?"* Pushback and double-checks exist to surface real failure modes before committing — never to argue back into sunk-cost code, and never to agree uncritically. Sunk-cost defense protects the old model from scrutiny; sycophancy protects the new suggestion from scrutiny. Real listening and real pushback are the exact same move applied symmetrically to both sides.
+
+**Rejection test — The Symmetrical Premise Check:**
+Whenever a load-bearing assumption is questioned, walk through the implications of both sides on equal footing before recommending one:
+1. **Name both premises** plainly in one line each (**Current** vs. **Alternative**).
+2. **Trace concrete, competing user intents** — include at least one hard case for the current premise and at least one hard case for the alternative. **Do not confabulate smooth outcomes or hand-wave over gaps — the holes are the whole point.**
+3. **Compare the machinery delta** — what tables, columns, hooks, routes, or branches disappear vs. get added under each premise.
+4. **Check for self-inflicted objections** — verify that no argument against the alternative depends on another assumption currently in doubt; if it does, drop both assumptions together and re-evaluate.
+5. **Decide from exposed holes and trade-offs, never sunk cost** — push back hard when the alternative breaks a concrete scenario or adds real risk, and drop the current model cleanly when it is the one accumulating workarounds. Never cite existing code, green tests, or earlier reviews of the old premise as evidence.
