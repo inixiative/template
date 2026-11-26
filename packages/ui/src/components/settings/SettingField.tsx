@@ -5,9 +5,11 @@
  * @uses primitive:shared
  */
 import {
+  AttributeValidationError,
   deduplicateMultiSelect,
   isStringArray,
   parseAttributeDate,
+  validateAttributeValue,
 } from '@template/shared/attributes';
 import type { AssembledSettingItem } from '@template/shared/settings';
 import {
@@ -35,33 +37,6 @@ export type SettingFieldProps = {
   disabledText?: string;
 };
 
-const extractStringEnum = (schema: Record<string, unknown>): string[] => {
-  if (Array.isArray(schema.enum) && schema.enum.every((entry) => typeof entry === 'string')) {
-    return schema.enum;
-  }
-  return [];
-};
-
-const extractMultiSelectOptions = (schema: Record<string, unknown>): string[] => {
-  const items = schema.items;
-  if (items && typeof items === 'object' && !Array.isArray(items)) {
-    return extractStringEnum(items as Record<string, unknown>);
-  }
-  return [];
-};
-
-const schemaAllowsNull = (schema: Record<string, unknown>): boolean => {
-  if (schema.type === 'null') return true;
-  if (Array.isArray(schema.type) && schema.type.includes('null')) return true;
-  if (Array.isArray(schema.anyOf)) {
-    return schema.anyOf.some(
-      (branch) =>
-        branch && typeof branch === 'object' && (branch as Record<string, unknown>).type === 'null',
-    );
-  }
-  return false;
-};
-
 const formatDateTimeLocal = (value: unknown): string => {
   const parsed = parseAttributeDate(value);
   if (!parsed) return '';
@@ -72,8 +47,16 @@ const formatDateTimeLocal = (value: unknown): string => {
 const formatNumberText = (value: unknown): string =>
   typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
 
-const formatJsonText = (value: unknown): string =>
-  value !== null && value !== undefined ? JSON.stringify(value, null, 2) : '';
+const ruleError = (item: AssembledSettingItem, value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  try {
+    validateAttributeValue(item.valueType, value, item);
+    return null;
+  } catch (error) {
+    if (!(error instanceof AttributeValidationError)) throw error;
+    return error.issues.map((issue) => issue.message).join('; ');
+  }
+};
 
 export const SettingField = ({
   item,
@@ -94,12 +77,6 @@ export const SettingField = ({
   const lastEmittedNumberRef = useRef<unknown>(value);
   const lastNumberResetVersionRef = useRef(resetVersion);
 
-  const [jsonText, setJsonText] = useState(() =>
-    item.valueType === 'json' ? formatJsonText(value) : '',
-  );
-  const [jsonError, setJsonError] = useState<string | null>(null);
-  const lastEmittedJsonRef = useRef<unknown>(value);
-  const lastJsonResetVersionRef = useRef(resetVersion);
   const onValidityChangeRef = useRef(onValidityChange);
   onValidityChangeRef.current = onValidityChange;
 
@@ -114,16 +91,10 @@ export const SettingField = ({
     onValidityChangeRef.current?.(true);
   }, [item.valueType, value, resetVersion]);
 
+  const valueError = ruleError(item, value);
   useEffect(() => {
-    if (item.valueType !== 'json') return;
-    const isReset = resetVersion !== lastJsonResetVersionRef.current;
-    lastJsonResetVersionRef.current = resetVersion;
-    if (!isReset && Object.is(value, lastEmittedJsonRef.current)) return;
-    lastEmittedJsonRef.current = value;
-    setJsonText(formatJsonText(value));
-    setJsonError(null);
-    onValidityChangeRef.current?.(true);
-  }, [item.valueType, value, resetVersion]);
+    onValidityChangeRef.current?.(!valueError);
+  }, [valueError]);
 
   const renderControl = () => {
     switch (item.valueType) {
@@ -143,8 +114,10 @@ export const SettingField = ({
         );
 
       case 'text': {
-        const enumValues = extractStringEnum(item.schema);
-        const options = enumValues.map((option) => ({ value: option, label: option }));
+        const options = (item.options ?? []).map(({ value, label }) => ({
+          value: String(value),
+          label,
+        }));
         const currentValue = typeof value === 'string' ? value : '';
 
         if (options.length > SEARCHABLE_SELECT_THRESHOLD) {
@@ -196,15 +169,8 @@ export const SettingField = ({
                 const raw = event.target.value;
                 setNumberText(raw);
                 if (raw.trim() === '') {
-                  if (schemaAllowsNull(item.schema)) {
-                    lastEmittedNumberRef.current = null;
-                    setNumberError(null);
-                    onValidityChange?.(true);
-                    onChange(null);
-                  } else {
-                    setNumberError('Enter a valid number');
-                    onValidityChange?.(false);
-                  }
+                  setNumberError('Enter a valid number');
+                  onValidityChange?.(false);
                   return;
                 }
                 const parsed = Number(raw);
@@ -244,7 +210,10 @@ export const SettingField = ({
         );
 
       case 'multiSelect': {
-        const options = extractMultiSelectOptions(item.schema);
+        const options = (item.options ?? []).map(({ value, label }) => ({
+          value: String(value),
+          label,
+        }));
         const selected = isStringArray(value) ? deduplicateMultiSelect(value) : [];
         const selectedSet = new Set(selected);
 
@@ -257,7 +226,7 @@ export const SettingField = ({
 
         return (
           <fieldset className="flex flex-wrap gap-2 border-0 p-0 pt-1" aria-label={item.label}>
-            {options.map((option) => {
+            {options.map(({ value: option, label }) => {
               const isSelected = selectedSet.has(option);
               return (
                 <label
@@ -277,50 +246,13 @@ export const SettingField = ({
                     onChange={() => toggle(option)}
                     className="sr-only"
                   />
-                  {option}
+                  {label}
                 </label>
               );
             })}
           </fieldset>
         );
       }
-
-      case 'json':
-        return (
-          <div className="space-y-1">
-            <textarea
-              id={inputId}
-              aria-label={item.label}
-              rows={4}
-              value={jsonText}
-              disabled={disabled}
-              onChange={(event) => {
-                const nextText = event.target.value;
-                setJsonText(nextText);
-                try {
-                  const parsed: unknown = JSON.parse(nextText);
-                  lastEmittedJsonRef.current = parsed;
-                  setJsonError(null);
-                  onValidityChange?.(true);
-                  onChange(parsed);
-                } catch {
-                  setJsonError('Invalid JSON syntax');
-                  onValidityChange?.(false);
-                }
-              }}
-              className={cn(
-                'flex w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs ring-offset-background',
-                'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-              )}
-            />
-            {jsonError ? (
-              <p role="alert" className="text-xs text-destructive">
-                {jsonError}
-              </p>
-            ) : null}
-          </div>
-        );
     }
   };
 
@@ -352,6 +284,11 @@ export const SettingField = ({
         ) : null}
       </div>
       {renderControl()}
+      {valueError ? (
+        <p role="alert" className="text-xs text-destructive">
+          {valueError}
+        </p>
+      ) : null}
       {disabled && disabledText ? (
         <p className="text-xs text-muted-foreground">{disabledText}</p>
       ) : null}

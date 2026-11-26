@@ -48,7 +48,7 @@ const testCatalog: SettingCatalog = {
         __label: 'General',
         defaultTimezone: {
           valueType: 'text',
-          schema: { type: 'string', enum: ['UTC', 'America/New_York'] },
+          options: ['UTC', 'America/New_York'].map((value) => ({ value, label: value })),
           defaultValue: 'UTC',
           label: 'Default Timezone',
           description: 'IANA timezone for this project.',
@@ -62,7 +62,6 @@ const testCatalog: SettingCatalog = {
         __label: 'General',
         syncEnabled: {
           valueType: 'boolean',
-          schema: { type: 'boolean' },
           defaultValue: true,
           label: 'Sync Enabled',
           description: 'Toggle sync for this project integration.',

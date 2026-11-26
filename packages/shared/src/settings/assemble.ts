@@ -13,17 +13,12 @@ import {
 } from '@template/shared/attributes';
 import { isSettingKeyUnderPath } from '@template/shared/settings/isSettingKeyUnderPath';
 import type { SettingResourceModelName } from '@template/shared/settings/resourceModels';
-import { settingDefinitionsInTree } from '@template/shared/settings/settingDefinitionsInTree';
-import type {
-  SettingDefinition,
-  SettingJsonSchema,
-  SettingResourceKinds,
-  SettingTrees,
-} from '@template/shared/settings/types';
+import { settingsIn } from '@template/shared/settings/settingsIn';
+import type { Setting, SettingResourceKinds, SettingTrees } from '@template/shared/settings/types';
 import { isEqual } from 'lodash-es';
 
 export type SettingCatalog = {
-  readonly trees: SettingTrees<SettingJsonSchema>;
+  readonly trees: SettingTrees;
 };
 
 export type RawSettingRow = {
@@ -38,7 +33,7 @@ export type RawSettingRow = {
   readonly updatedAt?: Date | string | null;
 };
 
-export type AssembledSettingItem = SettingDefinition<SettingJsonSchema> & {
+export type AssembledSettingItem = Setting & {
   value: unknown;
   storedValue: unknown;
   disabled: boolean;
@@ -68,7 +63,7 @@ export const assembleResourceSettings = (
   const rowByKey = new Map(rawRows.map((row) => [row.key, row]));
   const keyFilter = options.keys ? new Set(options.keys) : null;
 
-  return settingDefinitionsInTree(catalog.trees[resourceModel], options.kinds ?? {})
+  return settingsIn(catalog.trees[resourceModel], options.kinds ?? {})
     .filter((definition) => {
       if (options.path && !isSettingKeyUnderPath(definition.key, options.path)) return false;
       if (keyFilter && !keyFilter.has(definition.key)) return false;

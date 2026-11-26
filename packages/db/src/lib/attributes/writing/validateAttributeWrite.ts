@@ -32,7 +32,7 @@ export type ValidateAttributeWriteOptions = {
  * on violation:
  * - Enforces the Layer 1 invariant (at most one of the 5 typed columns populated; never Prisma.JsonNull).
  * - If `resolveDefinition` is configured on the model (or passed via options), checks the locator,
- *   exact typed column match, optional Zod `schema`, and normalizes `multiSelect`/`date`.
+ *   exact typed column match, `options` and `conditions`, and normalizes `multiSelect`/`date`.
  */
 export const validateAttributeWrite = (
   model: AttributeModelName | ModelName,
@@ -96,7 +96,7 @@ export const validateAttributeWrite = (
     (isAttributeValueType(rowValueType) ? (rowValueType as AttributeValueType) : undefined);
 
   if (effectiveValueType) {
-    const value = validateAttributeTypedColumns(effectiveValueType, columns, definition?.schema);
+    const value = validateAttributeTypedColumns(effectiveValueType, columns, definition);
     return {
       value,
       definition,

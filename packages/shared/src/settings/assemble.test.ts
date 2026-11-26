@@ -4,27 +4,26 @@ import {
   diffSettingDrafts,
   type RawSettingRow,
   type SettingCatalog,
-  type SettingJsonSchema,
   type SettingTree,
 } from '@template/shared/settings';
 
-const emptyTree: SettingTree<SettingJsonSchema> = { __read: 'read', __manage: 'manage' };
+const emptyTree: SettingTree = { __read: 'read', __manage: 'manage' };
 
-const organizationTree: SettingTree<SettingJsonSchema> = {
+const organizationTree: SettingTree = {
   __read: 'read',
   __manage: 'manage',
   general: {
     __label: 'General',
     defaultTimezone: {
       valueType: 'text',
-      schema: { type: 'string', enum: ['UTC', 'America/New_York'] },
+      options: ['UTC', 'America/New_York'].map((value) => ({ value, label: value })),
       defaultValue: 'UTC',
       label: 'Default Timezone',
       description: 'IANA timezone',
     },
     displayLocale: {
       valueType: 'text',
-      schema: { type: 'string', enum: ['en', 'es'] },
+      options: ['en', 'es'].map((value) => ({ value, label: value })),
       defaultValue: 'en',
       label: 'Display Locale',
       description: 'Language code',
@@ -34,14 +33,13 @@ const organizationTree: SettingTree<SettingJsonSchema> = {
     __label: 'Advanced',
     topics: {
       valueType: 'multiSelect',
-      schema: { type: 'array', items: { type: 'string', enum: ['a', 'b', 'c'] } },
+      options: ['a', 'b', 'c'].map((value) => ({ value, label: value })),
       defaultValue: ['a', 'b'],
       label: 'Topics',
       description: 'Subscribed topics',
     },
     snoozeUntil: {
       valueType: 'date',
-      schema: { type: 'string', format: 'date-time' },
       defaultValue: null,
       label: 'Snooze Until',
       description: 'Pause until timestamp',
@@ -58,7 +56,7 @@ const catalog: SettingCatalog = {
       __read: 'operate',
       __manage: 'operate',
       general: {
-        displayLocale: (organizationTree.general as SettingTree<SettingJsonSchema>).displayLocale,
+        displayLocale: (organizationTree.general as SettingTree).displayLocale,
       },
     },
     SpaceUser: emptyTree,
@@ -70,7 +68,6 @@ const catalog: SettingCatalog = {
         linear: {
           paused: {
             valueType: 'boolean',
-            schema: { type: 'boolean' },
             defaultValue: false,
             label: 'Paused',
             description: 'Pause sync.',

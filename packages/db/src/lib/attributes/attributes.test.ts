@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { Operator } from '@inixiative/json-rules';
 import { db, Prisma } from '@template/db';
 import {
   attributeOrderBy,
@@ -29,12 +30,16 @@ import {
   createUser,
 } from '@template/db/test';
 import { defineAttributeField } from '@template/shared/attributes';
-import { z } from 'zod';
 
 const syntheticNumberDef = defineAttributeField({
   key: 'test.maxTasks',
   valueType: 'number',
-  schema: z.number().int().min(1).max(100),
+  conditions: {
+    all: [
+      { field: 'value', operator: Operator.greaterThanEquals, value: 1, error: 'At least 1' },
+      { field: 'value', operator: Operator.lessThanEquals, value: 100, error: 'At most 100' },
+    ],
+  },
   defaultValue: 10,
   label: 'Max Tasks',
   description: 'Synthetic number attribute for DB operator tests.',
@@ -43,7 +48,6 @@ const syntheticNumberDef = defineAttributeField({
 const syntheticBoolDef = defineAttributeField({
   key: 'test.enabled',
   valueType: 'boolean',
-  schema: z.boolean(),
   defaultValue: false,
   label: 'Enabled',
   description: 'Synthetic boolean attribute for DB tests.',
@@ -52,7 +56,6 @@ const syntheticBoolDef = defineAttributeField({
 const syntheticDateDef = defineAttributeField({
   key: 'test.snoozeUntil',
   valueType: 'date',
-  schema: z.iso.datetime(),
   defaultValue: null,
   label: 'Snooze Until',
   description: 'Synthetic date attribute for DB operator tests.',
@@ -61,7 +64,6 @@ const syntheticDateDef = defineAttributeField({
 const syntheticJsonDef = defineAttributeField({
   key: 'test.quietHours',
   valueType: 'json',
-  schema: z.object({ enabled: z.boolean(), startHour: z.number().int() }),
   defaultValue: { enabled: false, startHour: 22 },
   label: 'Quiet Hours',
   description: 'Synthetic JSON attribute for DB tests.',
@@ -70,7 +72,7 @@ const syntheticJsonDef = defineAttributeField({
 const syntheticMultiDef = defineAttributeField({
   key: 'test.topics',
   valueType: 'multiSelect',
-  schema: z.array(z.enum(['inquiries', 'security', 'billing', 'digest'])),
+  options: ['inquiries', 'security', 'billing', 'digest'].map((value) => ({ value, label: value })),
   defaultValue: ['inquiries', 'security'],
   label: 'Topics',
   description: 'Synthetic multiSelect attribute for Postgres GIN tests.',

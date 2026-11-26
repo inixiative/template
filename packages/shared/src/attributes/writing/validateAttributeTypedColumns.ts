@@ -11,19 +11,15 @@ import {
   AttributeValidationError,
   type AttributeValidationIssue,
 } from '@template/shared/attributes/typing/columns';
+import type { AttributeValueRules } from '@template/shared/attributes/typing/definition';
 import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 import { validateAttributeValue } from '@template/shared/attributes/writing/validateAttributeValue';
-import type { z } from 'zod';
 
-/**
- * Validates that a typed-column row has ONLY the column matching `valueType` populated,
- * parses the value, and satisfies optional `schema`. Throws `AttributeValidationError` on failure.
- */
-export const validateAttributeTypedColumns = <T = unknown>(
+export const validateAttributeTypedColumns = (
   valueType: AttributeValueType,
   row: Partial<AttributeTypedColumns>,
-  schema?: z.ZodType<T>,
-): T => {
+  rules?: AttributeValueRules,
+): unknown => {
   const targetColumn = attributeColumnForValueType(valueType);
   const issues: AttributeValidationIssue[] = [];
 
@@ -49,7 +45,7 @@ export const validateAttributeTypedColumns = <T = unknown>(
 
   if (issues.length > 0) throw new AttributeValidationError(issues);
 
-  return validateAttributeValue(valueType, rawValue, schema, {
+  return validateAttributeValue(valueType, rawValue, rules, {
     context: `Column '${targetColumn}'`,
     pathPrefix: [targetColumn],
   });

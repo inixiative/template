@@ -8,7 +8,7 @@ import type { AttributeModelConfig } from '@template/db/lib/attributes/types';
 import { fetchSettingDefinitionForRow } from '@template/db/lib/settings/fetchSettingDefinitionForRow';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { ATTRIBUTE_COLUMN_NAMES } from '@template/shared/attributes';
-import { settingDefinitionForKey } from '@template/shared/settings';
+import { SETTING_RESOURCE_MODELS, SETTING_TREES, settingAt } from '@template/shared/settings';
 import { lowerFirst, upperFirst } from 'lodash-es';
 
 /**
@@ -22,7 +22,10 @@ export const ATTRIBUTE_MODELS = {
     locatorField: 'key',
     resourceModelField: 'resourceModel',
     disabledField: 'disabled',
-    resolveDefinition: settingDefinitionForKey,
+    resolveDefinition: (key: string) =>
+      SETTING_RESOURCE_MODELS.map((model) => settingAt(SETTING_TREES[model], key, 'every')).find(
+        Boolean,
+      ),
     fetchDefinitionForRow: fetchSettingDefinitionForRow,
   } satisfies AttributeModelConfig<'setting'>,
   // ==========================================================================

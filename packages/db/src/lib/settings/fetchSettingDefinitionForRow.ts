@@ -9,19 +9,17 @@ import {
   type SettingResourceRef,
 } from '@template/db/lib/settings/fetchSettingResourceKinds';
 import {
-  type SettingDefinition,
+  SETTING_TREES,
+  type Setting,
   type SettingResourceModelName,
-  settingDefinitionsForResource,
+  settingAt,
 } from '@template/shared/settings';
 
 export const fetchSettingDefinitionForRow = async (
   row: Record<string, unknown>,
-): Promise<SettingDefinition | undefined> => {
+): Promise<Setting | undefined> => {
   const resource = row as SettingResourceRef;
   if (typeof row.key !== 'string' || !resource.resourceModel) return undefined;
-  const kinds = await fetchSettingResourceKinds(resource);
-  return settingDefinitionsForResource(
-    resource.resourceModel as SettingResourceModelName,
-    kinds,
-  ).find((definition) => definition.key === row.key);
+  const tree = SETTING_TREES[resource.resourceModel as SettingResourceModelName];
+  return settingAt(tree, row.key, await fetchSettingResourceKinds(resource));
 };

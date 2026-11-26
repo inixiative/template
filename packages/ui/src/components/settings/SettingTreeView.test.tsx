@@ -5,6 +5,7 @@
  * @uses none
  */
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { Operator } from '@inixiative/json-rules';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
@@ -35,21 +36,20 @@ const initialState = useAppStore.getState();
 const manyTimezones = Array.from({ length: 15 }, (_, idx) => `Zone/City_${idx}`);
 const defaultTimezone = {
   valueType: 'text',
-  schema: { type: 'string', enum: ['UTC', ...manyTimezones] },
+  options: ['UTC', ...manyTimezones].map((value) => ({ value, label: value })),
   defaultValue: 'UTC',
   label: 'Default Timezone',
   description: 'Real compiled setting key across tenant models',
 } as const;
 const displayLocale = {
   valueType: 'text',
-  schema: { type: 'string', enum: ['en', 'es', 'fr'] },
+  options: ['en', 'es', 'fr'].map((value) => ({ value, label: value })),
   defaultValue: 'en',
   label: 'Display Locale',
   description: 'Real compiled setting key including membership scopes',
 } as const;
 const featureEnabled = {
   valueType: 'boolean',
-  schema: { type: 'boolean' },
   defaultValue: false,
   label: 'Feature Enabled',
   description: 'Boolean toggle',
@@ -68,34 +68,28 @@ const fullCatalog: SettingCatalog = {
         featureEnabled,
         maxRetries: {
           valueType: 'number',
-          schema: { type: 'number' },
+          conditions: {
+            field: 'value',
+            operator: Operator.lessThanEquals,
+            value: 10,
+            error: 'At most 10 retries',
+          },
           defaultValue: 3,
           label: 'Max Retries',
           description: 'Numeric input',
         },
         snoozeUntil: {
           valueType: 'date',
-          schema: { type: 'string', format: 'date-time' },
           defaultValue: null,
           label: 'Snooze Until',
           description: 'Date-time input',
         },
         topics: {
           valueType: 'multiSelect',
-          schema: {
-            type: 'array',
-            items: { type: 'string', enum: ['alerts', 'billing', 'digest'] },
-          },
+          options: ['alerts', 'billing', 'digest'].map((value) => ({ value, label: value })),
           defaultValue: ['alerts'],
           label: 'Topics',
           description: 'Multi-select checkbox pills',
-        },
-        extraJson: {
-          valueType: 'json',
-          schema: { type: 'object' },
-          defaultValue: { mode: 'standard' },
-          label: 'Extra Config',
-          description: 'Validated JSON textarea',
         },
       },
     },
@@ -107,7 +101,6 @@ const fullCatalog: SettingCatalog = {
         displayLocale,
         memberAdminOnly: {
           valueType: 'boolean',
-          schema: { type: 'boolean' },
           defaultValue: false,
           label: 'Member Admin Flag',
           description: 'Manage-gated setting on OrganizationUser',
@@ -235,7 +228,7 @@ afterEach(() => {
 });
 
 describe('SettingTreeView & SettingField', () => {
-  it('renders all 6 value types, allows Backspace-clearing numbers, preserves compact JSON edits, disables Save on invalid input, re-enables disabled rows on save, and batch-saves only dirty keys', async () => {
+  it('renders every setting value type, allows Backspace-clearing numbers, shows the message of a failing condition, disables Save on invalid input, re-enables disabled rows on save, and batch-saves only dirty keys', async () => {
     const { entity: user } = await buildUser();
     const { entity: org } = await buildOrganization();
     const { entity: adminMember } = await buildOrganizationUser(
@@ -315,15 +308,11 @@ describe('SettingTreeView & SettingField', () => {
       within(screen.getByTestId('setting-field-general.topics')).getByText('billing'),
     );
 
-    // JSON textarea: invalid syntax disables Save even though other fields are dirty;
-    // typing compact valid JSON does NOT reformat/clobber text mid-edit
-    const jsonArea = screen.getByLabelText('Extra Config') as HTMLTextAreaElement;
-    fireEvent.change(jsonArea, { target: { value: '{not valid json' } });
-    expect(screen.getByRole('alert').textContent).toContain('Invalid JSON');
+    // A value failing the leaf's conditions disables Save, with the condition's message
+    fireEvent.change(retriesInput, { target: { value: '70' } });
+    expect(screen.getByRole('alert').textContent).toContain('At most 10 retries');
     expect(saveButton.disabled).toBe(true);
-
-    fireEvent.change(jsonArea, { target: { value: '{"mode":"strict"}' } });
-    expect(jsonArea.value).toBe('{"mode":"strict"}');
+    fireEvent.change(retriesInput, { target: { value: '7' } });
     expect(screen.queryByRole('alert')).toBeNull();
     expect(saveButton.disabled).toBe(false);
 
@@ -341,7 +330,6 @@ describe('SettingTreeView & SettingField', () => {
       { key: 'general.featureEnabled', value: true },
       { key: 'general.maxRetries', value: 7 },
       { key: 'general.topics', value: ['alerts', 'billing'] },
-      { key: 'general.extraJson', value: { mode: 'strict' } },
     ]);
   });
 

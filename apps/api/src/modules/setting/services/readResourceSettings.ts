@@ -15,7 +15,7 @@ import {
 import type { Setting } from '@template/db/generated/client/client';
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
-import { isSettingKeyUnderPath, settingDefinitionsForResource } from '@template/shared/settings';
+import { isSettingKeyUnderPath, SETTING_TREES, settingsIn } from '@template/shared/settings';
 import type { Context } from 'hono';
 import type { SettingListQuery } from '#/modules/setting/schemas/settingSchemas';
 import type { AppEnv } from '#/types/appEnv';
@@ -39,8 +39,8 @@ export const readResourceSettings = async (
   const resourceId = resource.id as string;
   const targetFks = polymorphicArmKeys('Setting', 'resourceModel', resourceModel, resource);
 
-  const definitions = settingDefinitionsForResource(
-    resourceModel,
+  const definitions = settingsIn(
+    SETTING_TREES[resourceModel],
     await fetchSettingResourceKinds({ resourceModel, ...targetFks }),
   ).filter((definition) => {
     if (query.path && !isSettingKeyUnderPath(definition.key, query.path)) return false;

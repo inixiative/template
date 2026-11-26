@@ -2,13 +2,13 @@
  * @atlas
  * @kind service
  * @partOf feature:integrations
- * @uses primitive:authz, infrastructure:prisma
+ * @uses primitive:authz, infrastructure:prisma, infrastructure:redis
  */
 import { db, type EntitlementInput, type Prisma } from '@template/db';
 import type { Permix } from '@template/permissions';
-import { omit } from 'lodash-es';
+import { isIntegrationOnePer } from '@template/shared/integrations/integrationOnePer';
+import { omit, pickBy } from 'lodash-es';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
-import { fetchOnePerOwnerIntegrationForUpdate } from '#/modules/integration/services/fetchOnePerOwnerIntegrationForUpdate';
 import { integrationOwnerKey } from '#/modules/integration/services/integrationOwnerKey';
 import { validateIntegrationConfiguration } from '#/modules/integration/validations/validateIntegrationConfiguration';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
@@ -24,13 +24,33 @@ export const createIntegration = (
   db.txn(async () => {
     validateIntegrationConfiguration(row);
     await validateIntegrationRole(writer, row);
-    const existing = await fetchOnePerOwnerIntegrationForUpdate(row);
+
+    const owner = integrationOwnerKey(row);
+    const onePerOwner = isIntegrationOnePer(row.provider, 'owner');
+    if (onePerOwner)
+      await db.findForUpdate(
+        'Integration',
+        pickBy(owner, (value) => value !== null),
+        {
+          upserting: true,
+        },
+      );
+    const existing = onePerOwner
+      ? await db.withDeleted(() =>
+          db.integration.findFirst({
+            where: owner,
+            orderBy: { deletedAt: { sort: 'desc', nulls: 'first' } },
+            select: { id: true, deletedAt: true },
+          }),
+        )
+      : null;
+
     const integration = existing
       ? await db.withDeleted(() =>
           db.integration.update({
             where: { id: existing.id },
             data: {
-              ...omit(row, Object.keys(integrationOwnerKey(row))),
+              ...omit(row, Object.keys(owner)),
               ...(existing.deletedAt ? { deletedAt: null } : {}),
             },
           }),

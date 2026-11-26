@@ -19,7 +19,6 @@ import {
 import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
 import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
 import { SETTING_TREES, type SettingTrees } from '@template/shared/settings';
-import { z } from 'zod';
 
 const modelAt = (path: string): string | undefined =>
   relationTarget(prismaMap, 'Setting', path) ?? undefined;
@@ -56,7 +55,6 @@ const unknownNames = (rule: ActionRule) => leafNames(rule).filter((name) => !isK
 
 const operateSetting = {
   valueType: 'boolean',
-  schema: z.boolean(),
   defaultValue: false,
   label: 'Operate Setting',
   description: 'Synthetic operate-gated setting.',
@@ -70,7 +68,6 @@ const syntheticTrees: SettingTrees = {
     synthetic: {
       ownOnly: {
         valueType: 'boolean',
-        schema: z.boolean(),
         defaultValue: false,
         label: 'Owner Only',
         description: 'Synthetic owner-gated setting with admin-only read.',

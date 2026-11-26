@@ -11,11 +11,10 @@ import {
   assembleResourceSettings,
   diffSettingDrafts,
   type SettingBranch,
-  type SettingJsonSchema,
+  type SettingNode,
   type SettingResourceKinds,
-  type SettingTreeChild,
+  settingChildrenFor,
   settingKindsOfProvider,
-  settingTreeChildrenForKinds,
 } from '@template/shared/settings';
 import {
   Button,
@@ -40,19 +39,8 @@ import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { lowerFirst } from 'lodash-es';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
-type TreeBranch = SettingBranch<SettingJsonSchema>;
-type TreeChild = SettingTreeChild<SettingJsonSchema>;
-
-const childAtPath = (
-  branch: TreeBranch,
-  segments: readonly string[],
-  kinds: SettingResourceKinds,
-): TreeChild | undefined => {
-  const [name, ...rest] = segments;
-  const child = settingTreeChildrenForKinds(branch, kinds).find((entry) => entry.name === name);
-  if (!child || rest.length === 0) return child;
-  return child.kind === 'branch' ? childAtPath(child.node, rest, kinds) : undefined;
-};
+const isBranch = (node: SettingNode | undefined): node is SettingBranch =>
+  Boolean(node) && !('valueType' in (node as SettingNode));
 
 export type SettingTreeViewProps = (
   | { context: AuthenticatedContext; ownership?: MyMembershipOwnership; target?: undefined }
@@ -124,11 +112,12 @@ export const SettingTreeView = ({
   );
   const itemsByKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items]);
   const pathSegments = useMemo(() => (path ? path.split('.') : []), [path]);
-  const root = useMemo<TreeChild | undefined>(() => {
+  const root = useMemo<SettingNode | undefined>(() => {
     if (!catalog) return undefined;
-    const tree = catalog.trees[queries.resourceModel];
-    if (pathSegments.length === 0) return { kind: 'branch', name: '', node: tree };
-    return childAtPath(tree, pathSegments, kinds);
+    let node: SettingNode | undefined = catalog.trees[queries.resourceModel];
+    for (const segment of pathSegments)
+      node = isBranch(node) ? settingChildrenFor(node, kinds)[segment] : undefined;
+    return node;
   }, [catalog, queries.resourceModel, pathSegments, kinds]);
 
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
@@ -270,7 +259,7 @@ export const SettingTreeView = ({
     return null;
   }
 
-  const rootLabel = root?.kind === 'branch' && path ? root.node.__label : undefined;
+  const rootLabel = isBranch(root) && path ? root.__label : undefined;
   const resolvedTitle = title ?? rootLabel ?? 'Settings';
   const anyEditable = items.some(canManageItem);
 
@@ -297,14 +286,14 @@ export const SettingTreeView = ({
     );
   };
 
-  const renderBranch = (branch: TreeBranch, segments: readonly string[]): ReactNode[] =>
-    settingTreeChildrenForKinds(branch, kinds).flatMap((entry): ReactNode[] => {
-      const childSegments = [...segments, entry.name];
-      if (entry.kind === 'leaf') {
+  const renderBranch = (branch: SettingBranch, segments: readonly string[]): ReactNode[] =>
+    Object.entries(settingChildrenFor(branch, kinds)).flatMap(([name, node]): ReactNode[] => {
+      const childSegments = [...segments, name];
+      if (!isBranch(node)) {
         const item = itemsByKey.get(childSegments.join('.'));
         return item ? [renderField(item)] : [];
       }
-      const children = renderBranch(entry.node, childSegments);
+      const children = renderBranch(node, childSegments);
       if (children.length === 0) return [];
       return [
         <section
@@ -312,8 +301,8 @@ export const SettingTreeView = ({
           className="space-y-4"
           data-testid={`setting-branch-${childSegments.join('.')}`}
         >
-          {entry.node.__label ? (
-            <h3 className="text-sm font-semibold text-foreground">{entry.node.__label}</h3>
+          {node.__label ? (
+            <h3 className="text-sm font-semibold text-foreground">{node.__label}</h3>
           ) : null}
           {children}
         </section>,
@@ -331,10 +320,11 @@ export const SettingTreeView = ({
           <div className="h-20 animate-pulse rounded-md bg-muted/50" />
         ) : (
           <>
-            {root?.kind === 'branch' ? renderBranch(root.node, pathSegments) : null}
-            {root?.kind === 'leaf' && itemsByKey.get(pathSegments.join('.'))
-              ? renderField(itemsByKey.get(pathSegments.join('.')) as AssembledSettingItem)
-              : null}
+            {isBranch(root)
+              ? renderBranch(root, pathSegments)
+              : itemsByKey.has(pathSegments.join('.'))
+                ? renderField(itemsByKey.get(pathSegments.join('.')) as AssembledSettingItem)
+                : null}
 
             {errorMessage ? (
               <p role="alert" className="text-sm text-destructive">

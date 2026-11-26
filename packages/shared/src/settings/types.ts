@@ -4,54 +4,40 @@
  * @partOf primitive:shared
  * @uses none
  */
-import type { AttributeValueType } from '@template/shared/attributes';
+import type { AttributeValueRules, AttributeValueType } from '@template/shared/attributes';
 import type {
   SettingPermissionAction,
   SettingResourceModelName,
 } from '@template/shared/settings/resourceModels';
-import type { z } from 'zod';
 
-export type SettingSchema = z.ZodType<unknown>;
-
-export type SettingJsonSchema = Record<string, unknown>;
-
-export type SettingLeaf<TSchema = SettingSchema> = {
-  readonly valueType: AttributeValueType;
-  readonly schema: TSchema;
-  readonly defaultValue: unknown;
-  readonly label: string;
-  readonly description: string;
+type SettingPermissions = {
   readonly __read?: SettingPermissionAction;
   readonly __manage?: SettingPermissionAction;
 };
 
-export type SettingBranch<TSchema = SettingSchema> = {
+export type SettingLeaf = AttributeValueRules &
+  SettingPermissions & {
+    readonly valueType: Exclude<AttributeValueType, 'json'>;
+    readonly defaultValue: unknown;
+    readonly label: string;
+    readonly description: string;
+  };
+
+export type SettingBranch = SettingPermissions & {
   readonly __label?: string;
-  readonly __read?: SettingPermissionAction;
-  readonly __manage?: SettingPermissionAction;
-  readonly [child: string]: SettingNode<TSchema> | string | undefined;
+  readonly [child: string]: SettingNode | string | undefined;
 };
 
-export type SettingNode<TSchema = SettingSchema> = SettingLeaf<TSchema> | SettingBranch<TSchema>;
+export type SettingNode = SettingLeaf | SettingBranch;
 
-export type SettingTree<TSchema = SettingSchema> = SettingBranch<TSchema> & {
-  readonly __read: SettingPermissionAction;
-  readonly __manage: SettingPermissionAction;
-};
+export type SettingTree = SettingBranch & Required<SettingPermissions>;
 
-export type SettingTrees<TSchema = SettingSchema> = Readonly<
-  Record<SettingResourceModelName, SettingTree<TSchema>>
->;
+export type SettingTrees = Readonly<Record<SettingResourceModelName, SettingTree>>;
 
 export type SettingResourceKinds = Readonly<Record<string, string | null | undefined>>;
 
-export type SettingDefinition<TSchema = SettingSchema> = {
+export type Setting = Omit<SettingLeaf, '__read' | '__manage'> & {
   readonly key: string;
-  readonly valueType: AttributeValueType;
-  readonly schema: TSchema;
-  readonly defaultValue: unknown;
-  readonly label: string;
-  readonly description: string;
   readonly read: SettingPermissionAction;
   readonly manage: SettingPermissionAction;
 };

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, encodeAttributeColumns, Prisma, parentOf } from '@template/db';
 import { registerAttributeValidationHook } from '@template/db/lib/attributes';
 import {
@@ -10,14 +11,16 @@ import {
   createUser,
 } from '@template/db/test';
 import { type AttributeFieldDefinition, defineAttributeField } from '@template/shared/attributes';
-import { settingDefinitionForKey } from '@template/shared/settings';
-import { z } from 'zod';
+import { SETTING_TREES, settingAt } from '@template/shared/settings';
 
 const syntheticHookDefs: Record<string, AttributeFieldDefinition> = {
   'test.topics': defineAttributeField({
     key: 'test.topics',
     valueType: 'multiSelect',
-    schema: z.array(z.enum(['inquiries', 'security', 'billing', 'digest'])),
+    options: ['inquiries', 'security', 'billing', 'digest'].map((value) => ({
+      value,
+      label: value,
+    })),
     defaultValue: ['inquiries'],
     label: 'Topics',
     description: 'Synthetic multiSelect definition.',
@@ -25,7 +28,12 @@ const syntheticHookDefs: Record<string, AttributeFieldDefinition> = {
   'test.maxTasks': defineAttributeField({
     key: 'test.maxTasks',
     valueType: 'number',
-    schema: z.number().int().min(1).max(100),
+    conditions: {
+      all: [
+        { field: 'value', operator: Operator.greaterThanEquals, value: 1, error: 'At least 1' },
+        { field: 'value', operator: Operator.lessThanEquals, value: 100, error: 'At most 100' },
+      ],
+    },
     defaultValue: 10,
     label: 'Max Tasks',
     description: 'Synthetic number definition.',
@@ -33,7 +41,7 @@ const syntheticHookDefs: Record<string, AttributeFieldDefinition> = {
 };
 
 const resolveTestDefinition = (key: string) =>
-  syntheticHookDefs[key] ?? settingDefinitionForKey(key);
+  syntheticHookDefs[key] ?? settingAt(SETTING_TREES.User, key, 'every');
 
 describe('registerAttributeValidationHook (DB write-time invariant hook)', () => {
   beforeEach(() => {

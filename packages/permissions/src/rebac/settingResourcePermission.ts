@@ -10,11 +10,11 @@ import type { ActionRule, ResourcePermission } from '@template/permissions/rebac
 import {
   SETTING_RESOURCE_MODELS,
   SETTING_TREES,
-  type SettingDefinition,
+  type Setting,
   type SettingPermissionAction,
   type SettingResourceModelName,
   type SettingTrees,
-  settingDefinitionsInTree,
+  settingsIn,
 } from '@template/shared/settings';
 import { groupBy, uniqBy } from 'lodash-es';
 
@@ -34,11 +34,11 @@ export const settingResourceModelRule = (
   all: [isResourceModel(model), { rel: `resource${model}`, action }],
 });
 
-type Placement = { model: SettingResourceModelName; definition: SettingDefinition<unknown> };
+type Placement = { model: SettingResourceModelName; definition: Setting };
 
 const perKey = (
   placements: readonly Placement[],
-  actionOf: (definition: SettingDefinition<unknown>) => SettingPermissionAction,
+  actionOf: (definition: Setting) => SettingPermissionAction,
 ): ActionRule => ({
   any: Object.entries(groupBy(placements, ({ definition }) => definition.key)).map(
     ([key, held]) => ({
@@ -54,11 +54,9 @@ const perKey = (
   ),
 });
 
-export const settingResourcePermissionFromTrees = (
-  trees: SettingTrees<unknown>,
-): ResourcePermission => {
+export const settingResourcePermissionFromTrees = (trees: SettingTrees): ResourcePermission => {
   const placements = SETTING_RESOURCE_MODELS.flatMap((model) =>
-    uniqBy(settingDefinitionsInTree(trees[model], 'every'), 'key').map((definition) => ({
+    uniqBy(settingsIn(trees[model], 'every'), 'key').map((definition) => ({
       model,
       definition,
     })),
