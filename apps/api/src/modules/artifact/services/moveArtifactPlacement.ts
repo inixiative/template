@@ -6,7 +6,6 @@
  */
 import { db } from '@template/db';
 import type { ArtifactPlacement } from '@template/db/generated/client/client';
-import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
 import { makeError } from '#/lib/errors';
 import {
@@ -18,21 +17,22 @@ import {
   validatePlacementTarget,
   withLockedPlacement,
 } from '#/modules/artifact/services/artifactPlacementUtils';
+import type { PlacementAccessInput } from '#/modules/artifact/validations/validatePlacementAccess';
 import {
   validatePlacementDeletable,
   validatePlacementPermissions,
 } from '#/modules/artifact/validations/validatePlacementPermissions';
 
-type MoveArtifactPlacementInput = {
+type MoveArtifactPlacementInput = PlacementAccessInput & {
   targetContainerArtifactId?: string;
-  access?: ArtifactAccess;
 };
 
 export const moveArtifactPlacement = async (
   permix: Permix,
   placement: ArtifactPlacement,
-  { targetContainerArtifactId, access }: MoveArtifactPlacementInput,
+  { targetContainerArtifactId, readAccess, operateAccess }: MoveArtifactPlacementInput,
 ): Promise<ArtifactPlacement> => {
+  const access: PlacementAccessInput = { readAccess, operateAccess };
   const [artifact, sourceContainer] = await Promise.all([
     fetchArtifactOrThrow(placement.artifactId),
     fetchArtifactOrThrow(placement.containerArtifactId),
@@ -68,7 +68,7 @@ export const moveArtifactPlacement = async (
       const resolvedAccess = await validatePlacementTarget(lockedArtifact, lockedTarget, access);
       return db.artifactPlacement.update({
         where: { id: current.id },
-        data: { containerArtifactId: lockedTarget.id, access: resolvedAccess },
+        data: { containerArtifactId: lockedTarget.id, ...resolvedAccess },
       });
     },
   );

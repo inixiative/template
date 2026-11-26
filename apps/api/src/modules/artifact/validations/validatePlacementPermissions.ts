@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma, primitive:authz
  */
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
-import { type ArtifactAccess, ArtifactKind } from '@template/db/generated/client/enums';
+import { ArtifactKind } from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
 import { isRootKind } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
@@ -13,17 +13,19 @@ import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 import { validateArtifactCreateAtOwner } from '#/modules/artifact/validations/validateArtifactCreateAtOwner';
 import { validateArtifactPermission } from '#/modules/artifact/validations/validateArtifactPermission';
-import { defaultPlacementAccess } from '#/modules/artifact/validations/validatePlacementAccess';
+import {
+  isCustomPlacementAccess,
+  type PlacementAccessInput,
+} from '#/modules/artifact/validations/validatePlacementAccess';
 
 export const validatePlacementPermissions = async (
   permix: Permix,
   artifact: Artifact,
   container: Artifact,
   mode: 'create' | 'delete' | 'manage',
-  access?: ArtifactAccess,
+  access?: PlacementAccessInput,
 ): Promise<void> => {
-  const isCustomAccess =
-    mode === 'create' && access !== undefined && access !== defaultPlacementAccess(container);
+  const isCustomAccess = mode === 'create' && isCustomPlacementAccess(container, access);
   if (mode === 'create' && isRootKind(container.kind)) {
     await validateArtifactCreateAtOwner(permix, ArtifactKind.root, container);
   }

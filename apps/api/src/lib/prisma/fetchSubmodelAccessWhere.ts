@@ -5,7 +5,14 @@
  * @uses primitive:authz
  */
 import { fieldOf } from '@inixiative/field-map';
-import { db, type HydratedRecord, hydrate, resourceOfModel, toModelName } from '@template/db';
+import {
+  db,
+  type HydratedRecord,
+  hydrate,
+  hydrateMany,
+  resourceOfModel,
+  toModelName,
+} from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { check, reachableFrom, schemaMap } from '@template/permissions/rebac';
 import type { Context } from 'hono';
@@ -66,7 +73,7 @@ export const fetchSubmodelAccessWhere = async (
     const candidates = (await db.delegate(submodel).findMany({
       where: { ...ownerWhere, id: { in: [...directCandidateIds] } },
     })) as HydratedRecord[];
-    const hydratedCandidates = await Promise.all(candidates.map((row) => hydrate(submodel, row)));
+    const hydratedCandidates = await hydrateMany(submodel, candidates);
     for (const row of hydratedCandidates) {
       if (check(permix, submodel, row, 'read') && typeof row.id === 'string') {
         grantedIds.push(row.id);

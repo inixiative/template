@@ -61,7 +61,8 @@ export const makeContainerOrOwnerRefinement =
   };
 
 export const artifactPlacementCreateBodySchema = ArtifactPlacementScalarInputSchema.pick({
-  access: true,
+  readAccess: true,
+  operateAccess: true,
 })
   .partial()
   .extend({
@@ -80,12 +81,23 @@ export const artifactPlacementMoveBodySchema = z.object({
   targetContainerArtifactId: ArtifactPlacementScalarInputSchema.shape.containerArtifactId
     .min(1)
     .optional(),
-  access: ArtifactPlacementScalarInputSchema.shape.access.optional(),
+  readAccess: ArtifactPlacementScalarInputSchema.shape.readAccess.optional(),
+  operateAccess: ArtifactPlacementScalarInputSchema.shape.operateAccess.optional(),
 });
 
 export const artifactPlacementUpdateBodySchema = ArtifactPlacementScalarInputSchema.pick({
-  access: true,
-}).required();
+  readAccess: true,
+  operateAccess: true,
+}).partial();
+
+export const artifactPlacementUpdateBodyRefinement = (
+  body: { readAccess?: unknown; operateAccess?: unknown },
+  ctx: z.RefinementCtx,
+) => {
+  if (body.readAccess === undefined && body.operateAccess === undefined) {
+    ctx.addIssue({ code: 'custom', message: 'Provide readAccess or operateAccess' });
+  }
+};
 
 export const artifactPlacementReadResponseSchema = ArtifactPlacementScalarSchema;
 

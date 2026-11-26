@@ -4,16 +4,17 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
-import type { Prisma } from '@template/db';
-import type { Role } from '@template/db/generated/client/enums';
+import { hydrate, type Prisma } from '@template/db';
+import type { OperateAccess, ReadAccess, Role } from '@template/db/generated/client/enums';
 import {
   directEntitledIds,
+  ownerPrivateRead,
   permixIdsWithAction,
   STANDARD_ACTIONS_IMPLYING,
 } from '@template/permissions';
 import type { Permix } from '@template/permissions/client';
+import { check } from '@template/permissions/rebac';
 import type { Context } from 'hono';
-import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import {
   type OwnedArtifact,
   type OwnerRef,
@@ -21,13 +22,17 @@ import {
 } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
 
+const ownerPrivateReadRule = ownerPrivateRead();
+
 const callerPrincipalIds = (permix: Permix) => ({
   readableUserIds: permixIdsWithAction(permix, 'db:User', 'read'),
   manageableUserIds: permixIdsWithAction(permix, 'db:User', 'manage'),
   readableOrganizationIds: permixIdsWithAction(permix, 'db:Organization', 'read'),
+  operableOrganizationIds: permixIdsWithAction(permix, 'db:Organization', 'operate'),
   manageableOrganizationIds: permixIdsWithAction(permix, 'db:Organization', 'manage'),
   ownedOrganizationIds: permixIdsWithAction(permix, 'db:Organization', 'own'),
   readableSpaceIds: permixIdsWithAction(permix, 'db:Space', 'read'),
+  operableSpaceIds: permixIdsWithAction(permix, 'db:Space', 'operate'),
   manageableSpaceIds: permixIdsWithAction(permix, 'db:Space', 'manage'),
   ownedSpaceIds: permixIdsWithAction(permix, 'db:Space', 'own'),
   operableOrganizationUserIds: permixIdsWithAction(permix, 'db:OrganizationUser', 'operate'),
@@ -127,26 +132,35 @@ export const effectiveGrantWhere = (
 };
 
 export type OwnerArtifactAccessProbe = {
+  canOwnerReadPrivate: boolean;
   canReadPrivate: boolean;
   canReadPublic: boolean;
   canReadTenant: boolean;
+  canOperateTenant: boolean;
 };
 
 export const probeOwnerArtifactAccess = async (
   permix: Permix,
   ownerFields: OwnedArtifact,
 ): Promise<OwnerArtifactAccessProbe> => {
-  const probe = (effectiveAccess: 'private' | 'public' | 'tenant') =>
-    holdsOnRecord(permix, 'artifact', { id: '', effectiveAccess, ...ownerFields }, 'read');
-  const [canReadPrivate, canReadPublic, canReadTenant] = await Promise.all([
-    probe('private'),
-    probe('public'),
-    probe('tenant'),
-  ]);
-  return { canReadPrivate, canReadPublic, canReadTenant };
+  const hydrated = await hydrate('artifact', {
+    id: '',
+    effectiveReadAccess: 'private',
+    effectiveOperateAccess: 'private',
+    ...ownerFields,
+  });
+  const probe = (effectiveReadAccess: ReadAccess, effectiveOperateAccess: OperateAccess) =>
+    check(permix, 'artifact', { ...hydrated, effectiveReadAccess, effectiveOperateAccess }, 'read');
+  return {
+    canOwnerReadPrivate: check(permix, 'artifact', hydrated, ownerPrivateReadRule),
+    canReadPrivate: probe('private', 'private'),
+    canReadPublic: probe('public', 'private'),
+    canReadTenant: probe('tenant', 'private'),
+    canOperateTenant: probe('private', 'tenant'),
+  };
 };
 
-// why: naive SQL reflection of artifactResourcePermission.read until AUTH-013 compiles ReBAC into SQL.
+// why: naive SQL reflection of artifactResourcePermission.read until INFRA-026 compiles ReBAC into SQL.
 export const accessibleArtifactWhereForOwner = async (
   c: Context<AppEnv>,
   owner: OwnerRef,
@@ -155,7 +169,7 @@ export const accessibleArtifactWhereForOwner = async (
   const permix = c.get('permix');
   if (permix.isSuperadmin()) return null;
 
-  const { canReadPrivate, canReadPublic, canReadTenant } =
+  const { canReadPrivate, canReadPublic, canReadTenant, canOperateTenant } =
     probed ?? (await probeOwnerArtifactAccess(permix, ownerColumns(owner)));
   if (canReadPrivate) return null;
 
@@ -167,8 +181,9 @@ export const accessibleArtifactWhereForOwner = async (
   if (hasBroadEntitlement) return null;
 
   const orClauses: Prisma.ArtifactWhereInput[] = [];
-  if (canReadPublic) orClauses.push({ effectiveAccess: 'public' });
-  if (canReadTenant) orClauses.push({ effectiveAccess: 'tenant' });
+  if (canReadPublic) orClauses.push({ effectiveReadAccess: 'public' });
+  if (canReadTenant) orClauses.push({ effectiveReadAccess: 'tenant' });
+  if (canOperateTenant) orClauses.push({ effectiveOperateAccess: 'tenant' });
   if (canReadPublic || artifactEntitlements.length > 0) {
     const grantClause = effectiveGrantWhere(permix);
     if (grantClause) orClauses.push(grantClause);
@@ -184,10 +199,16 @@ export const accessibleAnyArtifactWhere = async (
   const permix = c.get('permix');
   if (permix.isSuperadmin()) return null;
 
-  const canReadPublic = await holdsOnRecord(
+  const canReadPublic = check(
     permix,
     'artifact',
-    { id: '', effectiveAccess: 'public', ownerModel: 'User', userId: '' },
+    {
+      id: '',
+      effectiveReadAccess: 'public',
+      effectiveOperateAccess: 'private',
+      ownerModel: 'User',
+      userId: null,
+    },
     'read',
   );
   const {
@@ -201,7 +222,7 @@ export const accessibleAnyArtifactWhere = async (
   const ids = callerPrincipalIds(permix);
   const grantClause = effectiveGrantWhere(permix, undefined, ids);
   const orClauses: Prisma.ArtifactWhereInput[] = [
-    ...(canReadPublic ? [{ effectiveAccess: 'public' as const }] : []),
+    ...(canReadPublic ? [{ effectiveReadAccess: 'public' as const }] : []),
     ...(grantClause ? [grantClause] : []),
     ...nonEmptyClauses<Prisma.ArtifactWhereInput>([
       [directArtifactIds, { id: { in: directArtifactIds } }],
@@ -215,7 +236,15 @@ export const accessibleAnyArtifactWhere = async (
         {
           ownerModel: { in: ['Organization', 'OrganizationUser'] },
           organizationId: { in: ids.readableOrganizationIds },
-          effectiveAccess: 'tenant',
+          effectiveReadAccess: 'tenant',
+        },
+      ],
+      [
+        ids.operableOrganizationIds,
+        {
+          ownerModel: { in: ['Organization', 'OrganizationUser'] },
+          organizationId: { in: ids.operableOrganizationIds },
+          effectiveOperateAccess: 'tenant',
         },
       ],
       [
@@ -231,7 +260,15 @@ export const accessibleAnyArtifactWhere = async (
         {
           ownerModel: { in: ['Space', 'SpaceUser'] },
           spaceId: { in: ids.readableSpaceIds },
-          effectiveAccess: 'tenant',
+          effectiveReadAccess: 'tenant',
+        },
+      ],
+      [
+        ids.operableSpaceIds,
+        {
+          ownerModel: { in: ['Space', 'SpaceUser'] },
+          spaceId: { in: ids.operableSpaceIds },
+          effectiveOperateAccess: 'tenant',
         },
       ],
       [ids.ownedSpaceIds, { ownerModel: 'SpaceUser', spaceId: { in: ids.ownedSpaceIds } }],

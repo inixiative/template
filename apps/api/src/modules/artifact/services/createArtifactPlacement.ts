@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma, mutex, primitive:authz
  */
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
-import { type ArtifactAccess, ArtifactKind } from '@template/db/generated/client/enums';
+import { ArtifactKind } from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
 import {
   fetchOwnerRootArtifactOrThrow,
@@ -18,17 +18,18 @@ import {
 } from '#/modules/artifact/services/artifactPlacementUtils';
 import { validateArtifactCreateAtOwner } from '#/modules/artifact/validations/validateArtifactCreateAtOwner';
 import { validateNotRootArtifact } from '#/modules/artifact/validations/validateNotRootArtifact';
+import type { PlacementAccessInput } from '#/modules/artifact/validations/validatePlacementAccess';
 import { validatePlacementPermissions } from '#/modules/artifact/validations/validatePlacementPermissions';
 
-type CreateArtifactPlacementInput =
-  | { artifact: Artifact; containerArtifactId: string; access?: ArtifactAccess }
-  | { artifact: Artifact; owner: OwnerRef; access?: ArtifactAccess };
+type CreateArtifactPlacementInput = PlacementAccessInput &
+  ({ artifact: Artifact; containerArtifactId: string } | { artifact: Artifact; owner: OwnerRef });
 
 export const createArtifactPlacement = async (
   permix: Permix,
   input: CreateArtifactPlacementInput,
 ): Promise<ArtifactPlacement> => {
-  const { artifact, access } = input;
+  const { artifact, readAccess, operateAccess } = input;
+  const access: PlacementAccessInput = { readAccess, operateAccess };
   validateNotRootArtifact(artifact, 'Root container cannot be placed inside another container');
   let container: Artifact;
   if ('owner' in input) {

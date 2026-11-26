@@ -118,7 +118,8 @@ describe('artifact actions', () => {
     const reparented = rootPlacements.data.find((p) => p.artifactId === item.id);
     expect(reparented).toBeDefined();
     expect(reparented!.containerArtifact.kind).toBe(ArtifactKind.root);
-    expect(reparented!.access).toBe('private');
+    expect(reparented!.readAccess).toBe('private');
+    expect(reparented!.operateAccess).toBe('private');
   });
 
   it('owner artifacts is a flat searchable list, artifactPlacements lists root items, and artifactPermissions lists shares + allows leaving', async () => {
@@ -222,7 +223,8 @@ describe('artifact actions', () => {
     expect(rootPlacements).toHaveLength(1);
     expect(rootPlacements[0]!.id).toBe(initialPlacement.id);
     expect(rootPlacements[0]!.containerArtifact.kind).toBe(ArtifactKind.root);
-    expect(rootPlacements[0]!.access).toBe('private');
+    expect(rootPlacements[0]!.readAccess).toBe('private');
+    expect(rootPlacements[0]!.operateAccess).toBe('private');
   });
 
   it("copy makes a new artifact in the container's owner, sharing the file's bytes until swept, and defaults to root when targetContainerArtifactId is omitted", async () => {
@@ -385,7 +387,8 @@ describe('artifact actions', () => {
       const after = await db.artifact.findUniqueOrThrow({ where: { id: file.id } });
       expect(after.ownerModel).toBe('Organization');
       expect(after.organizationId).toBe(organization.id);
-      expect(after.effectiveAccess).toBe('private');
+      expect(after.effectiveReadAccess).toBe('private');
+      expect(after.effectiveOperateAccess).toBe('private');
       const placements = await db.artifactPlacement.findMany({
         where: { artifactId: file.id },
         include: { containerArtifact: true },
@@ -393,7 +396,8 @@ describe('artifact actions', () => {
       expect(placements).toHaveLength(1);
       expect(placements[0]!.containerArtifact.kind).toBe(ArtifactKind.root);
       expect(placements[0]!.containerArtifact.organizationId).toBe(organization.id);
-      expect(placements[0]!.access).toBe('private');
+      expect(placements[0]!.readAccess).toBe('private');
+      expect(placements[0]!.operateAccess).toBe('private');
 
       const tracking = await db.resourceBinding.findMany({ where: { sourceArtifactId: file.id } });
       expect(tracking.map((binding) => [binding.bindingType, binding.resourceUserId])).toEqual([
@@ -420,7 +424,7 @@ describe('artifact actions', () => {
         post(`/api/v1/artifact/${file.id}/artifactPlacements`, {
           ownerModel: 'Organization',
           organizationId: organization.id,
-          access: 'public',
+          readAccess: 'public',
         }),
       );
       expect(pinResp.status).toBe(201);
@@ -434,14 +438,16 @@ describe('artifact actions', () => {
       expect(resolved.status).toBe(200);
       const after = await db.artifact.findUniqueOrThrow({ where: { id: file.id } });
       expect(after.ownerModel).toBe('Organization');
-      expect(after.effectiveAccess).toBe('private');
+      expect(after.effectiveReadAccess).toBe('private');
+      expect(after.effectiveOperateAccess).toBe('private');
       const placements = await db.artifactPlacement.findMany({
         where: { artifactId: file.id },
         include: { containerArtifact: true },
       });
       expect(placements).toHaveLength(1);
       expect(placements[0]!.containerArtifact.kind).toBe(ArtifactKind.root);
-      expect(placements[0]!.access).toBe('private');
+      expect(placements[0]!.readAccess).toBe('private');
+      expect(placements[0]!.operateAccess).toBe('private');
     });
 
     it('a receiver refusing the pointer leaves the sender a copy', async () => {

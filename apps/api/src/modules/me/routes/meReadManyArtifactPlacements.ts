@@ -2,10 +2,9 @@
  * @atlas
  * @kind route
  * @partOf feature:files
- * @uses primitive:routeTemplates, primitive:authz
+ * @uses primitive:routeTemplates
  */
 import { readRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   artifactPlacementListFilterLens,
   artifactPlacementWithArtifactsSchema,
@@ -20,7 +19,6 @@ export const meReadManyArtifactPlacementsRoute = readRoute({
   skipId: true,
   paginate: true,
   filterLens: artifactPlacementListFilterLens,
-  middleware: [validatePermission('read')],
   description:
     "Lists artifact placements in the acting user's workspace (defaults to root placements, including owned items and external pins/reshares), with artifact and containerArtifact inline.",
   responseSchema: artifactPlacementWithArtifactsSchema,

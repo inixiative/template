@@ -26,14 +26,13 @@ export {
 } from './entitlementRows';
 export {
   directEntitledIds,
-  entitlementsCovering,
   permixIdsWithAction,
   STANDARD_ACTIONS_IMPLYING,
 } from './permix';
-export { ownerPrivateRead } from './rebac/artifactResourcePermission';
 // ReBAC
 export { artifactEffectiveRole, check as rebacCheck } from './rebac/check';
 export { INQUIRY_TYPES, type InquiryParty, type InquiryTypeParties } from './rebac/inquiryTypes';
+export { ownerPrivateRead } from './rebac/rebacSchemaRules';
 export { schemaMap } from './rebac/schema';
 export type { ActionRule } from './rebac/types';
 export type { DelegatePermissions } from './roles/delegatePermissions';

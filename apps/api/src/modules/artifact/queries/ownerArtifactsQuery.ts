@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, primitive:authz
  */
-import { hydrate, type Prisma } from '@template/db';
+import { hydrateMany, type Prisma } from '@template/db';
 import type { Artifact, ArtifactPermission } from '@template/db/generated/client/client';
 import { ArtifactKind } from '@template/db/generated/client/enums';
 import { check } from '@template/permissions/rebac';
@@ -61,7 +61,7 @@ export const shapeAccessibleArtifacts = async (
     return rows.map((row) => ({ ...row, artifactPermissions: [] }));
   }
   const permix = c.get('permix');
-  const hydratedRows = await Promise.all(rows.map((row) => hydrate('artifact', row)));
+  const hydratedRows = await hydrateMany('artifact', rows);
   return rows.flatMap((row, index) => {
     const hydrated = hydratedRows[index]!;
     if (!check(permix, 'artifact', hydrated, 'read')) return [];

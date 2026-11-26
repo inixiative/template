@@ -4,9 +4,10 @@ model Artifact {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  kind            ArtifactKind
-  name            String
-  effectiveAccess ArtifactAccess @default(private)
+  kind                   ArtifactKind
+  name                   String
+  effectiveReadAccess    ReadAccess    @default(private)
+  effectiveOperateAccess OperateAccess @default(private)
 
   ownerModel     ArtifactOwnerModel
   userId         String?            @db.VarChar(36)
@@ -57,13 +58,6 @@ enum ArtifactKind {
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific kinds below
   // ==========================================================================
-}
-
-enum ArtifactAccess {
-  inherit
-  public
-  tenant
-  private
 }
 
 enum ArtifactOwnerModel {

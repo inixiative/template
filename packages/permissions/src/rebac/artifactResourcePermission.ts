@@ -6,14 +6,24 @@
  */
 import { DateOperator, Operator } from '@inixiative/json-rules';
 import { makeKindRules } from '@inixiative/permissions';
-import { type ArtifactAccess, ArtifactKind, type Role } from '@template/db/generated/client/enums';
+import {
+  ArtifactKind,
+  OperateAccess,
+  type PlacementOperateAccess,
+  type PlacementReadAccess,
+  type Role,
+} from '@template/db/generated/client/enums';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import type { StandardAction } from '@template/permissions/client';
 import {
   actorMayPerformActionOnOwner,
   integrationAdministering,
   isNull,
+  ownerAccessOperateBranches,
+  ownerAccessReadBranches,
   ownerModelIsOneOf,
+  ownerPrivateRead,
+  ownerTenant,
   roleHeldVia,
   rowIsThereAnd,
 } from '@template/permissions/rebac/rebacSchemaRules';
@@ -135,39 +145,6 @@ const effectiveGrant = (action: StandardAction): ActionRule => ({
   },
 });
 
-const ownerTenantRead = (at = ''): ActionRule => ({
-  any: [
-    {
-      all: [
-        ownerModelIsOneOf(['Organization', 'OrganizationUser'], at),
-        { rel: `${at}organization`, action: 'read' },
-      ],
-    },
-    {
-      all: [ownerModelIsOneOf(['Space', 'SpaceUser'], at), { rel: `${at}space`, action: 'read' }],
-    },
-  ],
-});
-
-export const ownerPrivateRead = (at = ''): ActionRule => ({
-  any: [
-    at ? { rel: at.slice(0, -1), action: 'manage' } : 'manage',
-    actorMayPerformActionOnOwner('read', at, ['User']),
-    actorMayPerformActionOnOwner('own', at, ['OrganizationUser', 'SpaceUser']),
-  ],
-});
-
-const artifactIsPublic: ActionRule = {
-  rule: { field: 'effectiveAccess', operator: Operator.equals, value: 'public' },
-};
-
-const artifactIsTenant: ActionRule = {
-  all: [
-    { rule: { field: 'effectiveAccess', operator: Operator.equals, value: 'tenant' } },
-    ownerTenantRead(),
-  ],
-};
-
 export const artifactResourcePermission: ResourcePermission = {
   actions: {
     own: {
@@ -183,21 +160,10 @@ export const artifactResourcePermission: ResourcePermission = {
     },
     manage: { any: ['own', integrationAdministering.manage, effectiveGrant('manage')] },
     operate: {
-      any: [
-        'manage',
-        actorMayPerformActionOnOwner('operate', '', ['User']),
-        effectiveGrant('operate'),
-      ],
+      any: [...ownerAccessOperateBranches('effectiveOperateAccess'), effectiveGrant('operate')],
     },
     read: {
-      any: [
-        'operate',
-        actorMayPerformActionOnOwner('read', '', ['User']),
-        actorMayPerformActionOnOwner('own', '', ['OrganizationUser', 'SpaceUser']),
-        effectiveGrant('read'),
-        artifactIsPublic,
-        artifactIsTenant,
-      ],
+      any: [...ownerAccessReadBranches('effectiveReadAccess'), effectiveGrant('read')],
     },
     create: integrationAdministering.create,
   },
@@ -227,10 +193,14 @@ export const artifactPermissionResourcePermission: ResourcePermission = {
   },
 };
 
-const accessIs = (...values: ArtifactAccess[]): ActionRule =>
+const readAccessIs = (...values: PlacementReadAccess[]): ActionRule =>
   values.length === 1
-    ? { rule: { field: 'access', operator: Operator.equals, value: values[0] } }
-    : { rule: { field: 'access', operator: Operator.in, value: values } };
+    ? { rule: { field: 'readAccess', operator: Operator.equals, value: values[0] } }
+    : { rule: { field: 'readAccess', operator: Operator.in, value: values } };
+
+const operateAccessIs = (value: PlacementOperateAccess): ActionRule => ({
+  rule: { field: 'operateAccess', operator: Operator.equals, value },
+});
 
 const containerIsRoot: ActionRule = {
   rule: { field: 'containerArtifact.kind', operator: Operator.equals, value: ArtifactKind.root },
@@ -240,12 +210,31 @@ const containerIsNotRoot: ActionRule = {
   rule: { field: 'containerArtifact.kind', operator: Operator.in, value: nonRootArtifactKinds },
 };
 
+const placementSharedAccess = (allowInherit: boolean): ActionRule[] => [
+  allowInherit ? readAccessIs('inherit', 'public') : readAccessIs('public'),
+  { all: [readAccessIs('tenant'), ownerTenant('read', 'containerArtifact.')] },
+  { all: [operateAccessIs('tenant'), ownerTenant('operate', 'containerArtifact.')] },
+  ...(allowInherit
+    ? [
+        {
+          all: [
+            operateAccessIs('inherit'),
+            {
+              rule: {
+                field: 'containerArtifact.effectiveOperateAccess',
+                operator: Operator.equals,
+                value: OperateAccess.tenant,
+              },
+            },
+            ownerTenant('operate', 'containerArtifact.'),
+          ],
+        },
+      ]
+    : []),
+];
+
 const placementAccessRead = (allowInherit: boolean): ActionRule => ({
-  any: [
-    allowInherit ? accessIs('inherit', 'public') : accessIs('public'),
-    { all: [accessIs('tenant'), ownerTenantRead('containerArtifact.')] },
-    ownerPrivateRead('containerArtifact.'),
-  ],
+  any: [...placementSharedAccess(allowInherit), ownerPrivateRead('containerArtifact.')],
 });
 
 export const artifactPlacementResourcePermission: ResourcePermission = {
@@ -270,8 +259,8 @@ export const artifactPlacementResourcePermission: ResourcePermission = {
             { rel: 'containerArtifact', action: 'operate' },
             {
               any: [
-                accessIs('inherit', 'public'),
-                { all: [accessIs('tenant'), ownerTenantRead('containerArtifact.')] },
+                { all: [containerIsRoot, { any: placementSharedAccess(false) }] },
+                { all: [containerIsNotRoot, { any: placementSharedAccess(true) }] },
               ],
             },
           ],

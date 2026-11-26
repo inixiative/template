@@ -8,31 +8,20 @@ import {
   db,
   type HydratedRecord,
   hydrate,
+  hydrateMany,
   isBindableOwnerModel,
   rowPolymorphicAxisPointsAt,
   toAccessor,
 } from '@template/db';
-import type {
-  Artifact,
-  ArtifactPlacement,
-  ResourceBinding,
-} from '@template/db/generated/client/client';
-import {
-  artifactEffectiveRole,
-  entitlementsCovering,
-  STANDARD_ACTIONS_IMPLYING,
-} from '@template/permissions';
+import type { Artifact, ResourceBinding } from '@template/db/generated/client/client';
+import { artifactEffectiveRole } from '@template/permissions';
 import type { Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac';
-import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
-import { isRootKind } from '@template/shared/artifact';
 import type { Context } from 'hono';
 import { holdsOnRecord } from '#/lib/permissions/holdsOnRecord';
 import { includeArtifactDetail } from '#/modules/artifact/queries/artifactIncludes';
 import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 import type { AppEnv } from '#/types/appEnv';
-
-const PLACEMENT_READ_ACTIONS = ['read', 'manage'] as const;
 
 const visibleBindingToCaller = async (
   permix: Permix,
@@ -49,19 +38,11 @@ const visibleBindingToCaller = async (
   return record ? holdsOnRecord(permix, accessor, record as HydratedRecord, 'read') : false;
 };
 
-const hasCustomArtifactRules = (permix: Permix, hydrated: HydratedRecord): boolean =>
-  tenantPermissionRulesAbove('db:Artifact', hydrated).some(
-    (rules) => Boolean(rules) && Object.keys(rules!).length > 0,
-  ) ||
-  entitlementsCovering(permix, 'db:Artifact', STANDARD_ACTIONS_IMPLYING.read).length > 0 ||
-  entitlementsCovering(permix, 'db:ArtifactPlacement', PLACEMENT_READ_ACTIONS).length > 0;
-
-const accessForPlacement = async (
+const callerPlacementPermissions = (
   permix: Permix,
-  placement: ArtifactPlacement,
+  hydratedPlacement: HydratedRecord,
   targetRel: 'artifact' | 'containerArtifact',
-): Promise<{ canRead: boolean; canManage: boolean }> => {
-  const hydratedPlacement = await hydrate('artifactPlacement', placement);
+): { canRead: boolean; canManage: boolean } => {
   if (!check(permix, 'artifactPlacement', hydratedPlacement, 'read')) {
     return { canRead: false, canManage: false };
   }
@@ -74,7 +55,6 @@ const accessForPlacement = async (
 
 export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact) => {
   const permix = c.get('permix');
-  const isAnonymous = !c.get('user') && !c.get('token');
   const [loaded, hydrated] = await Promise.all([
     db.artifact.findUniqueOrThrow({ where: { id: artifact.id }, include: includeArtifactDetail }),
     hydrate('artifact', artifact),
@@ -90,65 +70,47 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
 
   const canManage = check(permix, 'artifact', hydrated, 'manage');
   const parentRole = artifactEffectiveRole(permix, hydrated);
-  const parentIsRoot = isRootKind(scalarArtifact.kind);
-  const canShortCircuit = !hasCustomArtifactRules(permix, hydrated);
 
-  // why: non-private/non-tenant same-owner children inherit container permissions monotonically,
-  // avoiding N individual hydrations when the container already decides visibility & access.
-  const accessForChildPlacement = async (content: (typeof rawContents)[number]) => {
-    const { artifact: child, ...placement } = content;
-    if (canShortCircuit && sameArtifactOwner(child, scalarArtifact)) {
-      if (isAnonymous) {
-        const visible = parentIsRoot
-          ? placement.access === 'public'
-          : placement.access === 'inherit' || placement.access === 'public';
-        return { canRead: visible && child.effectiveAccess === 'public', canManage: false };
-      }
-      if (!parentIsRoot && (placement.access === 'inherit' || placement.access === 'public')) {
-        if (canManage) return { canRead: true, canManage: true };
-        if (
-          parentRole !== null &&
-          child.artifactPermissions.length === 0 &&
-          child.artifactPlacementsAsArtifact.length === 1
-        ) {
-          return { canRead: true, canManage: false };
-        }
-      }
-    }
-    return accessForPlacement(permix, placement, 'artifact');
-  };
+  const placementRows = [
+    ...rawPlacements.map(({ containerArtifact: _container, ...placement }) => placement),
+    ...rawContents.map(({ artifact: _child, ...placement }) => placement),
+  ];
 
-  const [parentAccess, childAccess, bindingFlags] = await Promise.all([
-    Promise.all(
-      rawPlacements.map(({ containerArtifact: _container, ...placement }) =>
-        accessForPlacement(permix, placement, 'containerArtifact'),
-      ),
-    ),
-    Promise.all(rawContents.map((content) => accessForChildPlacement(content))),
+  const [hydratedPlacements, bindingFlags] = await Promise.all([
+    hydrateMany('artifactPlacement', placementRows),
     Promise.all(rawBindings.map((binding) => visibleBindingToCaller(permix, binding))),
   ]);
 
   const artifactPlacementsAsArtifact = rawPlacements
     .flatMap(({ containerArtifact, ...placement }, index) => {
-      const access = parentAccess[index]!;
-      if (!access.canRead) return [];
+      const permissions = callerPlacementPermissions(
+        permix,
+        hydratedPlacements[index]!,
+        'containerArtifact',
+      );
+      if (!permissions.canRead) return [];
       const { artifactPermissions, ...containerScalar } = containerArtifact;
       return [
         {
           ...placement,
           containerArtifact: {
             ...containerScalar,
-            artifactPermissions: access.canManage ? artifactPermissions : [],
+            artifactPermissions: permissions.canManage ? artifactPermissions : [],
           },
         },
       ];
     })
     .sort((a, b) => a.containerArtifact.name.localeCompare(b.containerArtifact.name));
 
+  const contentOffset = rawPlacements.length;
   const artifactPlacementsAsContainer = rawContents
     .flatMap(({ artifact: child, ...placement }, index) => {
-      const access = childAccess[index]!;
-      if (!access.canRead) return [];
+      const permissions = callerPlacementPermissions(
+        permix,
+        hydratedPlacements[contentOffset + index]!,
+        'artifact',
+      );
+      if (!permissions.canRead) return [];
       const {
         artifactPlacementsAsArtifact: childPlacements,
         artifactPermissions: childPermissions,
@@ -162,8 +124,8 @@ export const readArtifactDetail = async (c: Context<AppEnv>, artifact: Artifact)
           ...placement,
           artifact: {
             ...childScalar,
-            artifactPermissions: access.canManage ? childPermissions : [],
-            exclusive: access.canManage && sameOwnerPlacementCount === 1,
+            artifactPermissions: permissions.canManage ? childPermissions : [],
+            exclusive: permissions.canManage && sameOwnerPlacementCount === 1,
           },
         },
       ];

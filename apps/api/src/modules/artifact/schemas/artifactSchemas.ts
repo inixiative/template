@@ -26,8 +26,11 @@ import {
 export const artifactCreateBodySchema = ArtifactScalarInputSchema.pick({ name: true })
   .extend({ kind: z.enum(plainArtifactKinds) })
   .extend(
-    ArtifactPlacementScalarInputSchema.pick({ containerArtifactId: true, access: true }).partial()
-      .shape,
+    ArtifactPlacementScalarInputSchema.pick({
+      containerArtifactId: true,
+      readAccess: true,
+      operateAccess: true,
+    }).partial().shape,
   );
 
 export const artifactUpdateBodySchema = ArtifactScalarInputSchema.pick({ name: true }).partial();

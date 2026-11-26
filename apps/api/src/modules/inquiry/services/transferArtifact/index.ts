@@ -185,7 +185,11 @@ export const transferArtifactService: InquiryService<
       // orphan-reparenting hook sees an active target-owner placement and does not reparent back to source.
       const transferred = await db.artifact.update({
         where: { id: artifact.id },
-        data: { ...targetOwner, effectiveAccess: 'private' },
+        data: {
+          ...targetOwner,
+          effectiveReadAccess: 'private',
+          effectiveOperateAccess: 'private',
+        },
       });
       const targetRoot = await fetchOwnerRootArtifactOrThrow(targetOwner);
       const existingAtTargetRoot = await db.artifactPlacement.findFirst({
@@ -194,9 +198,12 @@ export const transferArtifactService: InquiryService<
       const targetPlacement = existingAtTargetRoot
         ? await db.artifactPlacement.update({
             where: { id: existingAtTargetRoot.id },
-            data: { access: 'private' },
+            data: { readAccess: 'private', operateAccess: 'private' },
           })
-        : await writePlacement(transferred, targetRoot, 'private');
+        : await writePlacement(transferred, targetRoot, {
+            readAccess: 'private',
+            operateAccess: 'private',
+          });
       await db.artifactPlacement.deleteMany({
         where: { artifactId: artifact.id, id: { not: targetPlacement.id } },
       });

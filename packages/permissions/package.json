@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@inixiative/field-map": "^0.1.2",
-    "@inixiative/permissions": "^0.29.0",
+    "@inixiative/permissions": "^0.30.0",
     "@inixiative/transitions": "^0.10.0",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",

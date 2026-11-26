@@ -8,7 +8,7 @@ import type {
   OrganizationUser,
   User,
 } from '@template/db/generated/client/client';
-import type { ArtifactAccess, ArtifactKind } from '@template/db/generated/client/enums';
+import type { ArtifactKind, PlacementReadAccess } from '@template/db/generated/client/enums';
 import {
   createArtifact,
   createArtifactPermission,
@@ -67,13 +67,13 @@ describe('artifact lifecycle', () => {
   const placeInside = async (
     artifact: Artifact,
     container: Artifact,
-    access: ArtifactAccess = 'inherit',
+    readAccess: PlacementReadAccess = 'inherit',
   ) =>
     (
       await createArtifactPlacement({
         artifactId: artifact.id,
         containerArtifactId: container.id,
-        access,
+        readAccess,
       })
     ).entity;
 
@@ -151,7 +151,7 @@ describe('artifact lifecycle', () => {
       expect(
         (
           await memberFetch(
-            patch(`/api/v1/artifactPlacement/${rootPlacement.id}`, { access: 'tenant' }),
+            patch(`/api/v1/artifactPlacement/${rootPlacement.id}`, { readAccess: 'tenant' }),
           )
         ).status,
       ).toBe(200);
@@ -241,17 +241,17 @@ describe('artifact lifecycle', () => {
       ).toEqual([legal.id, operations.id].sort());
       expect(
         topDetail.artifactPlacementsAsContainer.every(
-          (placement) => placement.artifact.exclusive && placement.access === 'inherit',
+          (placement) => placement.artifact.exclusive && placement.readAccess === 'inherit',
         ),
       ).toBe(true);
 
       await db.artifactPlacement.update({
         where: { id: complianceInLegal.id },
-        data: { access: 'private' },
+        data: { readAccess: 'private' },
       });
       await db.artifactPlacement.update({
         where: { id: complianceInOps.id },
-        data: { access: 'private' },
+        data: { readAccess: 'private' },
       });
       await createArtifactPermission({
         artifactId: compliance.id,
@@ -357,7 +357,7 @@ describe('artifact lifecycle', () => {
       const stillPlaced = await db.artifactPlacement.findFirstOrThrow({
         where: { artifactId: alsoElsewhere.id, containerArtifactId: other.id },
       });
-      expect(stillPlaced.access).toBe('inherit');
+      expect(stillPlaced.readAccess).toBe('inherit');
 
       const batch = await ownerFetch(
         post('/api/v1/batch/execute', {
@@ -406,7 +406,7 @@ describe('artifact lifecycle', () => {
     expect(again.status).toBe(201);
   });
 
-  it('access: private on placement inside a public folder keeps the artifact private and hidden from outsiders', async () => {
+  it('readAccess: private on placement inside a public folder keeps the artifact private and hidden from outsiders', async () => {
     const outsider = (await createOrganizationUser({}, {})).context.user;
     const outsiderFetch = createTestApp({ mockUser: outsider, mount }).fetch;
     const lobby = (
@@ -415,7 +415,7 @@ describe('artifact lifecycle', () => {
           post(`/api/v1/organization/${organization.id}/artifacts`, {
             kind: 'folder',
             name: 'lobby',
-            access: 'public',
+            readAccess: 'public',
           }),
         ),
       )
@@ -424,7 +424,7 @@ describe('artifact lifecycle', () => {
     const placed = await ownerFetch(
       post(`/api/v1/artifact/${file.id}/artifactPlacements`, {
         containerArtifactId: lobby.id,
-        access: 'private',
+        readAccess: 'private',
       }),
     );
     expect(placed.status).toBe(201);

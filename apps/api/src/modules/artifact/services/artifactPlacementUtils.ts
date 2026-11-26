@@ -6,14 +6,15 @@
  */
 import { db, type Prisma } from '@template/db';
 import type { Artifact, ArtifactPlacement } from '@template/db/generated/client/client';
-import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import { ARTIFACT_MAX_CHILDREN, isContainerKind, isRootKind } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
 import { withLockedArtifacts } from '#/modules/artifact/services/artifactOwner';
 import { validateContainable } from '#/modules/artifact/validations/validateContainable';
 import { validateNoContainerCycle } from '#/modules/artifact/validations/validateNoContainerCycle';
 import {
-  defaultPlacementAccess,
+  type PlacementAccess,
+  type PlacementAccessInput,
+  resolvePlacementAccess,
   validatePlacementAccess,
 } from '#/modules/artifact/validations/validatePlacementAccess';
 
@@ -55,10 +56,10 @@ export const withLockedPlacement = <T>(
 export const validatePlacementTarget = async (
   artifact: Artifact,
   container: Artifact,
-  access?: ArtifactAccess,
-): Promise<ArtifactAccess> => {
+  access?: PlacementAccessInput,
+): Promise<PlacementAccess> => {
   validateContainable(container, artifact);
-  const resolvedAccess = access ?? defaultPlacementAccess(container);
+  const resolvedAccess = resolvePlacementAccess(container, access);
   validatePlacementAccess(container, resolvedAccess);
   if (isContainerKind(artifact.kind) && !isRootKind(container.kind)) {
     await validateNoContainerCycle(container.id, artifact.id);
@@ -78,25 +79,25 @@ export const validatePlacementTarget = async (
 export const writePlacement = async (
   artifact: Artifact,
   container: Artifact,
-  access?: ArtifactAccess,
+  access?: PlacementAccessInput,
 ): Promise<ArtifactPlacement> => {
   const resolvedAccess = await validatePlacementTarget(artifact, container, access);
   return db.artifactPlacement.create({
     data: {
       artifactId: artifact.id,
       containerArtifactId: container.id,
-      access: resolvedAccess,
+      ...resolvedAccess,
     },
   });
 };
 
 export const insertArtifact = async (
-  data: Omit<Prisma.ArtifactUncheckedCreateInput, 'effectiveAccess'>,
+  data: Omit<Prisma.ArtifactUncheckedCreateInput, 'effectiveReadAccess' | 'effectiveOperateAccess'>,
   container: Artifact,
-  access?: ArtifactAccess,
+  access?: PlacementAccessInput,
 ): Promise<Artifact> => {
   const artifact = await db.artifact.create({
-    data: { ...data, effectiveAccess: 'private' },
+    data: { ...data, effectiveReadAccess: 'private', effectiveOperateAccess: 'private' },
   });
   await writePlacement(artifact, container, access);
   return db.artifact.findUniqueOrThrow({ where: { id: artifact.id } });

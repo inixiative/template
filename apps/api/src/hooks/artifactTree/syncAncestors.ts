@@ -5,39 +5,57 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import type { ArtifactAccess } from '@template/db/generated/client/enums';
+import type {
+  OperateAccess,
+  PlacementOperateAccess,
+  PlacementReadAccess,
+  ReadAccess,
+} from '@template/db/generated/client/enums';
 import type { TreeAround } from '#/hooks/artifactTree/fetchArtifactTreeAround';
 import { syncJoinRows } from '#/hooks/artifactTree/syncJoinRows';
 import { sameArtifactOwner } from '#/modules/artifact/services/artifactOwner';
 
 export type AncestorEdge = { inherits: boolean; depth: number };
-export type EffectiveAccess = 'private' | 'tenant' | 'public';
+export type EffectiveAccess = {
+  effectiveReadAccess: ReadAccess;
+  effectiveOperateAccess: OperateAccess;
+};
 
-const ACCESS_RANK: Record<ArtifactAccess, number> = {
+const READ_RANK: Record<PlacementReadAccess, number> = {
   inherit: 0,
   private: 0,
   tenant: 1,
   public: 2,
 };
-const ACCESS_BY_RANK = ['private', 'tenant', 'public'] as const;
+const READ_BY_RANK = ['private', 'tenant', 'public'] as const;
+
+const OPERATE_RANK: Record<PlacementOperateAccess, number> = {
+  inherit: 0,
+  private: 0,
+  tenant: 1,
+};
+const OPERATE_BY_RANK = ['private', 'tenant'] as const;
 
 export const resolveArtifactTree = ({ artifacts, externalParents }: TreeAround) => {
-  const memo = new Map<string, { ancestors: Map<string, AncestorEdge>; accessRank: number }>();
+  const memo = new Map<
+    string,
+    { ancestors: Map<string, AncestorEdge>; readRank: number; operateRank: number }
+  >();
 
   const walk = (
     artifactId: string,
     visiting: Set<string>,
-  ): { ancestors: Map<string, AncestorEdge>; accessRank: number } => {
+  ): { ancestors: Map<string, AncestorEdge>; readRank: number; operateRank: number } => {
     const cached = memo.get(artifactId);
     if (cached) return cached;
 
     const node = artifacts.get(artifactId);
     const ancestors = new Map<string, AncestorEdge>();
-    if (!node || visiting.has(artifactId)) return { ancestors, accessRank: 0 };
+    if (!node || visiting.has(artifactId)) return { ancestors, readRank: 0, operateRank: 0 };
 
     const nextVisiting = new Set(visiting).add(artifactId);
-    const hasTenant = node.ownerModel !== 'User';
-    let accessRank = 0;
+    let readRank = 0;
+    let operateRank = 0;
 
     const merge = (ancestorId: string, edge: AncestorEdge) => {
       const current = ancestors.get(ancestorId);
@@ -51,7 +69,11 @@ export const resolveArtifactTree = ({ artifacts, externalParents }: TreeAround) 
       }
     };
 
-    for (const { containerArtifactId: parentId, access } of node.artifactPlacementsAsArtifact) {
+    for (const {
+      containerArtifactId: parentId,
+      readAccess,
+      operateAccess,
+    } of node.artifactPlacementsAsArtifact) {
       const internalParent = artifacts.get(parentId);
       const externalParent = internalParent ? undefined : externalParents.get(parentId);
       const parent = internalParent ?? externalParent;
@@ -65,10 +87,10 @@ export const resolveArtifactTree = ({ artifacts, externalParents }: TreeAround) 
               [row.ancestorArtifactId, { inherits: row.inherits, depth: row.depth }] as const,
           ) ?? []);
 
-      // why: cross-owner placements never inherit across tenants; private and explicit tenant
-      // placements stop explicit folder grants from cascading down from ancestors.
+      // why: cross-owner placements never inherit across tenants; explicit private/tenant readAccess
+      // stops explicit folder grants from cascading down from ancestors.
       const sameOwner = sameArtifactOwner(node, parent);
-      const edgeInherits = sameOwner && (access === 'inherit' || access === 'public');
+      const edgeInherits = sameOwner && (readAccess === 'inherit' || readAccess === 'public');
 
       merge(parentId, { inherits: edgeInherits, depth: 1 });
       for (const [ancestorId, ancestorEdge] of parentAncestors) {
@@ -80,29 +102,36 @@ export const resolveArtifactTree = ({ artifacts, externalParents }: TreeAround) 
       }
 
       if (sameOwner && node.kind !== 'root') {
-        let contribution = 0;
-        if (access === 'public') {
-          contribution = ACCESS_RANK.public;
-        } else if (access === 'tenant') {
-          contribution = hasTenant ? ACCESS_RANK.tenant : 0;
-        } else if (access === 'inherit' && parent.kind !== 'root') {
-          contribution = parentState ? parentState.accessRank : ACCESS_RANK[parent.effectiveAccess];
-          if (!hasTenant && contribution === ACCESS_RANK.tenant) contribution = 0;
-        }
-        if (contribution > accessRank) accessRank = contribution;
+        const readContribution =
+          readAccess === 'inherit'
+            ? parent.kind !== 'root'
+              ? (parentState?.readRank ?? READ_RANK[parent.effectiveReadAccess])
+              : 0
+            : READ_RANK[readAccess];
+        if (readContribution > readRank) readRank = readContribution;
+
+        const operateContribution =
+          operateAccess === 'inherit'
+            ? parent.kind !== 'root'
+              ? (parentState?.operateRank ?? OPERATE_RANK[parent.effectiveOperateAccess])
+              : 0
+            : OPERATE_RANK[operateAccess];
+        if (operateContribution > operateRank) operateRank = operateContribution;
       }
     }
 
-    const state = { ancestors, accessRank };
+    const state = { ancestors, readRank, operateRank };
     memo.set(artifactId, state);
     return state;
   };
 
-  return (
-    artifactId: string,
-  ): { ancestors: Map<string, AncestorEdge>; effectiveAccess: EffectiveAccess } => {
-    const { ancestors, accessRank } = walk(artifactId, new Set());
-    return { ancestors, effectiveAccess: ACCESS_BY_RANK[accessRank] ?? 'private' };
+  return (artifactId: string): { ancestors: Map<string, AncestorEdge> } & EffectiveAccess => {
+    const { ancestors, readRank, operateRank } = walk(artifactId, new Set());
+    return {
+      ancestors,
+      effectiveReadAccess: READ_BY_RANK[readRank] ?? 'private',
+      effectiveOperateAccess: OPERATE_BY_RANK[operateRank] ?? 'private',
+    };
   };
 };
 

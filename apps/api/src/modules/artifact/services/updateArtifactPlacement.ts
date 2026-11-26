@@ -6,19 +6,21 @@
  */
 import { db } from '@template/db';
 import type { ArtifactPlacement } from '@template/db/generated/client/client';
-import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
 import {
   fetchArtifactOrThrow,
   withLockedPlacement,
 } from '#/modules/artifact/services/artifactPlacementUtils';
-import { validatePlacementAccess } from '#/modules/artifact/validations/validatePlacementAccess';
+import {
+  type PlacementAccessInput,
+  validatePlacementAccess,
+} from '#/modules/artifact/validations/validatePlacementAccess';
 import { validatePlacementPermissions } from '#/modules/artifact/validations/validatePlacementPermissions';
 
 export const updateArtifactPlacement = async (
   permix: Permix,
   placement: ArtifactPlacement,
-  { access }: { access: ArtifactAccess },
+  access: PlacementAccessInput,
 ): Promise<ArtifactPlacement> => {
   const [artifact, container] = await Promise.all([
     fetchArtifactOrThrow(placement.artifactId),
@@ -34,7 +36,13 @@ export const updateArtifactPlacement = async (
     [],
     async ({ current, lockedArtifact, lockedContainer }) => {
       await validatePlacementPermissions(permix, lockedArtifact, lockedContainer, 'manage');
-      return db.artifactPlacement.update({ where: { id: current.id }, data: { access } });
+      return db.artifactPlacement.update({
+        where: { id: current.id },
+        data: {
+          ...(access.readAccess !== undefined ? { readAccess: access.readAccess } : {}),
+          ...(access.operateAccess !== undefined ? { operateAccess: access.operateAccess } : {}),
+        },
+      });
     },
   );
 };

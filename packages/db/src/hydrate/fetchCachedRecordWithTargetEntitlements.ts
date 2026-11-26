@@ -20,7 +20,7 @@ import {
 } from '@template/db/entitlements/targetEntitlements';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { HydratedRecord } from '@template/db/hydrate/types';
-import { cacheKey, fetchThroughCache } from '@template/db/redis';
+import { cacheKey, fetchManyThroughCache, fetchThroughCache } from '@template/db/redis';
 import { type AccessorName, toModelName } from '@template/db/utils/modelNames';
 import { memoize } from 'lodash-es';
 
@@ -50,6 +50,38 @@ const downIncludeOfAccessor = memoize((accessor: AccessorName): PrismaIncludeOfD
   return prismaIncludeOfDown(down);
 });
 
+const hydrateIncludeOfAccessor = (accessor: AccessorName) => {
+  const targetInclude = isEntitlementTargetAccessor(accessor)
+    ? includeTargetEntitlements(entitlementTargetModelOf(accessor))
+    : undefined;
+  const downInclude = downIncludeOfAccessor(accessor);
+  return targetInclude || downInclude ? { ...targetInclude, ...downInclude } : undefined;
+};
+
+const whereOfIdentifier = (identifier: Identifier): Record<string, unknown> =>
+  typeof identifier === 'string' ? { id: identifier } : identifier;
+
+const whereOfIdentifiers = (
+  wheres: Record<string, unknown>[],
+  columns: readonly string[],
+): Record<string, unknown> => {
+  if (columns.length === 1) {
+    const column = columns[0]!;
+    return { [column]: { in: wheres.map((where) => where[column]) } };
+  }
+  return { OR: wheres };
+};
+
+const cacheKeyOfLoadedRow = (
+  accessor: AccessorName,
+  row: HydratedRecord,
+  columns: readonly string[],
+): string =>
+  cacheKey(
+    accessor,
+    Object.fromEntries(columns.map((column) => [column, String(row[column])])) as Identifier,
+  );
+
 export const fetchCachedRecordWithTargetEntitlements = async <T extends HydratedRecord>(
   accessor: AccessorName,
   identifier: Identifier,
@@ -57,16 +89,61 @@ export const fetchCachedRecordWithTargetEntitlements = async <T extends Hydrated
 ): Promise<T | null> => {
   const key = cacheKey(accessor, identifier);
   const delegate = db.delegate(accessor);
-
-  const where = typeof identifier === 'string' ? { id: identifier } : identifier;
-  const targetInclude = isEntitlementTargetAccessor(accessor)
-    ? includeTargetEntitlements(entitlementTargetModelOf(accessor))
-    : undefined;
-  const downInclude = downIncludeOfAccessor(accessor);
-  const include = targetInclude || downInclude ? { ...targetInclude, ...downInclude } : undefined;
+  const where = whereOfIdentifier(identifier);
+  const include = hydrateIncludeOfAccessor(accessor);
   return fetchThroughCache<T | null>(
     key,
     () => delegate.findFirst({ where, include }) as Promise<T | null>,
+    ttl,
+  );
+};
+
+export const fetchCachedRecordsWithTargetEntitlements = async <T extends HydratedRecord>(
+  accessor: AccessorName,
+  identifiers: readonly Identifier[],
+  ttl: number = DEFAULT_TTL,
+): Promise<(T | null)[]> => {
+  if (identifiers.length === 0) return [];
+  const keys = identifiers.map((identifier) => cacheKey(accessor, identifier));
+  const whereByKey = new Map<string, Record<string, unknown>>();
+  for (let i = 0; i < identifiers.length; i++) {
+    whereByKey.set(keys[i]!, whereOfIdentifier(identifiers[i]!));
+  }
+
+  const delegate = db.delegate(accessor);
+  const include = hydrateIncludeOfAccessor(accessor);
+
+  return fetchManyThroughCache<T>(
+    keys,
+    async (missedKeys) => {
+      const groups = new Map<string, { columns: string[]; wheres: Record<string, unknown>[] }>();
+      for (const key of missedKeys) {
+        const where = whereByKey.get(key)!;
+        const columns = Object.keys(where).sort();
+        const signature = columns.join('\0');
+        let group = groups.get(signature);
+        if (!group) {
+          group = { columns, wheres: [] };
+          groups.set(signature, group);
+        }
+        group.wheres.push(where);
+      }
+
+      const loadedByKey = new Map<string, T>();
+      await Promise.all(
+        [...groups.values()].map(async ({ columns, wheres }) => {
+          const loadedRows = (await delegate.findMany({
+            where: whereOfIdentifiers(wheres, columns),
+            include,
+          })) as T[];
+          for (const loadedRow of loadedRows) {
+            const rowKey = cacheKeyOfLoadedRow(accessor, loadedRow, columns);
+            if (!loadedByKey.has(rowKey)) loadedByKey.set(rowKey, loadedRow);
+          }
+        }),
+      );
+      return loadedByKey;
+    },
     ttl,
   );
 };

@@ -208,6 +208,29 @@ export const ownerPrivateRead = (at = ''): ActionRule => ({
   ],
 });
 
+export const ownerAccessOperateBranches = (operateField = 'operateAccess'): ActionRule[] => [
+  'manage',
+  actorMayPerformActionOnOwner('operate', '', ['User']),
+  {
+    all: [
+      { rule: { field: operateField, operator: Operator.equals, value: 'tenant' } },
+      ownerTenant('operate'),
+    ],
+  },
+];
+
+export const ownerAccessReadBranches = (readField = 'readAccess'): ActionRule[] => [
+  'operate',
+  ownerPrivateRead(),
+  { rule: { field: readField, operator: Operator.equals, value: 'public' } },
+  {
+    all: [
+      { rule: { field: readField, operator: Operator.equals, value: 'tenant' } },
+      ownerTenant('read'),
+    ],
+  },
+];
+
 // Read on an integration row, whose owner is never another integration.
 export const integrationRoleWrite: ActionRule = {
   any: [

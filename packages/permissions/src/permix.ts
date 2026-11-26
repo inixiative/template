@@ -22,18 +22,12 @@ const safePermixTable = (permix: Permix): Record<string, Record<string, boolean>
   }
 };
 
-export const entitlementsCovering = (
-  permix: Permix,
-  resource: string,
-  actions: readonly Action[],
-): Entitlement[] => actions.flatMap((action) => permix.entitlements(resource, action));
-
 export const directEntitledIds = (
   permix: Permix,
   resource: string,
   actions: readonly Action[],
 ): { entitlements: Entitlement[]; directIds: string[]; hasBroadEntitlement: boolean } => {
-  const entitlements = entitlementsCovering(permix, resource, actions);
+  const entitlements = actions.flatMap((action) => permix.entitlements(resource, action));
   const directIds = [
     ...new Set(
       entitlements.flatMap((ent) =>

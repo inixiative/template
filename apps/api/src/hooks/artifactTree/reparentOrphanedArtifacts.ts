@@ -61,7 +61,8 @@ export const reparentOrphanedArtifacts = async (artifactIds: string[]): Promise<
         data: orphanIds.map((id) => ({
           containerArtifactId: root.id,
           artifactId: id,
-          access: 'private' as const,
+          readAccess: 'private' as const,
+          operateAccess: 'private' as const,
         })),
         skipDuplicates: true,
       });

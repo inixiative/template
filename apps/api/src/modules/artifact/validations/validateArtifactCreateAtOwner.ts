@@ -18,7 +18,13 @@ export const validateArtifactCreateAtOwner = async (
   const allowed = await holdsOnRecord(
     permix,
     'artifact',
-    { id: '', kind, effectiveAccess: 'private', ...ownerColumns(owner) },
+    {
+      id: '',
+      kind,
+      effectiveReadAccess: 'private',
+      effectiveOperateAccess: 'private',
+      ...ownerColumns(owner),
+    },
     'create',
   );
   if (!allowed) throw makeError({ status: 403, message: 'Forbidden' });

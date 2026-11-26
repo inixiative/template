@@ -11,6 +11,6 @@ Wire physical object storage onto the `File` / `FileVersion` tables introduced i
 - **Upload flow (Presigned POST):** `POST /artifact` (file kind) / `POST /file/:id/versions` returns presigned POST fields (`status: pending`), followed by a confirm endpoint that HEAD-verifies size/content-type/checksum and flips `FileVersion.status` to `active`.
 - **FileVersion lifecycle:** `pending → active → purging → purged | failed`; current version = highest `active`; revert = new version reusing a prior object key (refcounted).
 - **Authenticated download:** presigned GET URL gated on `db:Artifact` `read`.
-- **Public serving:** Cloudflare proxy + Cache-Tag purge driven by materialized `Artifact.effectiveAccess === 'public'` (`INFRA-010`).
+- **Public serving:** Cloudflare proxy + Cache-Tag purge driven by materialized `Artifact.effectiveReadAccess === 'public'` (`INFRA-010`).
 - **Multipart / resumable uploads & SHA-256 content checksums** on confirm.
 - **File audit events:** upload, confirm, download, revert.

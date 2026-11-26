@@ -49,10 +49,14 @@ export const makeCheck = (schemaMapOfTheCheck: SchemaMap) => {
 export const check = makeCheck(schemaMap);
 
 export const artifactEffectiveRole = (permix: Permix, hydrated: HydratedRecord): Role | null => {
-  // why: public/tenant visibility is reported on artifact.effectiveAccess, not synthesized as a viewer role.
-  const withoutVisibility = { ...hydrated, effectiveAccess: 'private' };
+  // why: public/tenant access is reported on effectiveReadAccess/effectiveOperateAccess, not synthesized as a role.
+  const withoutAccess = {
+    ...hydrated,
+    effectiveReadAccess: 'private',
+    effectiveOperateAccess: 'private',
+  };
   for (const role of [...roleHierarchy].reverse()) {
-    if (check(permix, 'artifact', withoutVisibility, roleToStandardAction(role))) return role;
+    if (check(permix, 'artifact', withoutAccess, roleToStandardAction(role))) return role;
   }
   return null;
 };

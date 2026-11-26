@@ -21,7 +21,8 @@ export const artifactCreateArtifactPlacementController = makeController(
     const placement = await createArtifactPlacement(c.get('permix'), {
       artifact: contextResource<'artifact'>(c),
       ...target,
-      access: body.access,
+      readAccess: body.readAccess,
+      operateAccess: body.operateAccess,
     });
     return respond.created(placement);
   },

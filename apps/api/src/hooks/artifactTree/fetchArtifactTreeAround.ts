@@ -14,8 +14,8 @@ const externalParentWithMaterialized = {
   include: { artifactAncestorsAsDescendant: true, artifactEffectivePermissions: true },
 } satisfies Prisma.ArtifactDefaultArgs;
 
-export type ArtifactWithTreeEdges = Prisma.ArtifactGetPayload<typeof artifactWithTreeEdges>;
-export type ExternalParentWithMaterialized = Prisma.ArtifactGetPayload<
+type ArtifactWithTreeEdges = Prisma.ArtifactGetPayload<typeof artifactWithTreeEdges>;
+type ExternalParentWithMaterialized = Prisma.ArtifactGetPayload<
   typeof externalParentWithMaterialized
 >;
 

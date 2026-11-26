@@ -23,9 +23,13 @@ export { Prisma } from './generated/client/client';
 export * from './generated/zod/enums.gen';
 // Scalar schemas (model schemas without relations)
 export * from './generated/zod/scalarSchemas.gen';
-export type { HydratedRecord, HydrateInclude } from './hydrate';
+export type { HydratedRecord } from './hydrate';
 // Hydration
-export { fetchCachedRecordWithTargetEntitlements, hydrate } from './hydrate';
+export {
+  fetchCachedRecordWithTargetEntitlements,
+  hydrate,
+  hydrateMany,
+} from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
 export {
   claimLane,

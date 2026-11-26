@@ -3,9 +3,10 @@ model ArtifactPlacement {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  containerArtifactId String         @db.VarChar(36)
-  artifactId          String         @db.VarChar(36)
-  access              ArtifactAccess @default(inherit)
+  containerArtifactId String                 @db.VarChar(36)
+  artifactId          String                 @db.VarChar(36)
+  readAccess          PlacementReadAccess    @default(inherit)
+  operateAccess       PlacementOperateAccess @default(inherit)
 
   containerArtifact Artifact @relation("ArtifactPlacementContainer", fields: [containerArtifactId], references: [id], onDelete: Cascade)
   artifact          Artifact @relation("ArtifactPlacementArtifact", fields: [artifactId], references: [id], onDelete: Cascade)
@@ -15,4 +16,17 @@ model ArtifactPlacement {
   @@unique([containerArtifactId, artifactId], map: "ArtifactPlacement_edge_key")
   @@index([containerArtifactId])
   @@index([artifactId])
+}
+
+enum PlacementReadAccess {
+  inherit
+  public
+  tenant
+  private
+}
+
+enum PlacementOperateAccess {
+  inherit
+  tenant
+  private
 }

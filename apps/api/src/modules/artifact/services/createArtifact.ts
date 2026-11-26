@@ -6,7 +6,6 @@
  */
 import type { Prisma } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
-import type { ArtifactAccess } from '@template/db/generated/client/enums';
 import type { Permix } from '@template/permissions/client';
 import { makeError } from '#/lib/errors';
 import {
@@ -21,26 +20,31 @@ import {
 } from '#/modules/artifact/services/artifactPlacementUtils';
 import { validateArtifactPermission } from '#/modules/artifact/validations/validateArtifactPermission';
 import {
-  defaultPlacementAccess,
+  isCustomPlacementAccess,
+  type PlacementAccessInput,
+  resolvePlacementAccess,
   validatePlacementAccess,
 } from '#/modules/artifact/validations/validatePlacementAccess';
 
-type CreateArtifactInput = Omit<Prisma.ArtifactUncheckedCreateInput, 'effectiveAccess'> & {
-  access?: ArtifactAccess;
-  containerArtifactId?: string;
-};
+type CreateArtifactInput = Omit<
+  Prisma.ArtifactUncheckedCreateInput,
+  'effectiveReadAccess' | 'effectiveOperateAccess'
+> &
+  PlacementAccessInput & {
+    containerArtifactId?: string;
+  };
 
 export const createArtifact = async (
   permix: Permix,
-  { containerArtifactId, access, ...data }: CreateArtifactInput,
+  { containerArtifactId, readAccess, operateAccess, ...data }: CreateArtifactInput,
 ): Promise<Artifact> => {
   const ownerFields = ownerColumns(data);
   const container = containerArtifactId
     ? await fetchArtifactOrThrow(containerArtifactId)
     : await fetchOwnerRootArtifactOrThrow(ownerFields);
-  const resolvedAccess = access ?? defaultPlacementAccess(container);
-  const containerAction =
-    resolvedAccess !== defaultPlacementAccess(container) ? 'manage' : 'operate';
+  const accessInput: PlacementAccessInput = { readAccess, operateAccess };
+  const resolvedAccess = resolvePlacementAccess(container, accessInput);
+  const containerAction = isCustomPlacementAccess(container, accessInput) ? 'manage' : 'operate';
   const checkContainer = Boolean(containerArtifactId) || containerAction === 'manage';
 
   if (checkContainer) await validateArtifactPermission(permix, container, containerAction);

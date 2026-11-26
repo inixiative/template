@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma, primitive:caching
  */
 import { db } from '@template/db';
+import type { OperateAccess, ReadAccess } from '@template/db/generated/client/enums';
 import {
   fetchArtifactTreeAround,
   fetchDescendantIds,
@@ -18,8 +19,6 @@ import {
 } from '#/hooks/artifactTree/syncAncestors';
 import { syncJoinRows } from '#/hooks/artifactTree/syncJoinRows';
 import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
-
-const ACCESS_VALUES: readonly EffectiveAccess[] = ['private', 'tenant', 'public'];
 
 const syncEffectivePermissions = async (
   artifactIds: string[],
@@ -65,26 +64,39 @@ const syncEffectiveAccess = async (
   tree: TreeAround,
   desiredByArtifact: Map<string, EffectiveAccess>,
 ): Promise<void> => {
-  const byTarget: Record<EffectiveAccess, string[]> = { private: [], tenant: [], public: [] };
+  const byTarget = new Map<
+    string,
+    {
+      effectiveReadAccess: ReadAccess;
+      effectiveOperateAccess: OperateAccess;
+      ids: string[];
+    }
+  >();
   const changedIds: string[] = [];
 
   for (const [id, desired] of desiredByArtifact) {
-    if (tree.artifacts.get(id)?.effectiveAccess !== desired) {
-      byTarget[desired].push(id);
+    const current = tree.artifacts.get(id);
+    if (
+      current?.effectiveReadAccess !== desired.effectiveReadAccess ||
+      current?.effectiveOperateAccess !== desired.effectiveOperateAccess
+    ) {
+      const key = `${desired.effectiveReadAccess}:${desired.effectiveOperateAccess}`;
+      const bucket = byTarget.get(key) ?? { ...desired, ids: [] };
+      bucket.ids.push(id);
+      byTarget.set(key, bucket);
       changedIds.push(id);
     }
   }
 
-  for (const access of ACCESS_VALUES) {
-    if (byTarget[access].length === 0) continue;
+  for (const { effectiveReadAccess, effectiveOperateAccess, ids } of byTarget.values()) {
     await db.artifact.updateManyAndReturn({
-      where: { id: { in: byTarget[access] } },
-      data: { effectiveAccess: access },
+      where: { id: { in: ids } },
+      data: { effectiveReadAccess, effectiveOperateAccess },
     });
   }
 
   if (changedIds.length > 0) {
-    // why: Artifact.effectiveAccess is in NOOP_FIELDS so the cache hook skips it; invalidate directly.
+    // why: Artifact.effectiveReadAccess/effectiveOperateAccess are in NOOP_FIELDS so the cache hook skips them.
     await queueCacheClear(
       'Artifact',
       changedIds.map((id) => ({ id })),
@@ -106,9 +118,9 @@ export const syncArtifactAncestors = async (artifactIds: string[]): Promise<void
     const desiredAncestors = new Map<string, Map<string, AncestorEdge>>();
     const desiredAccess = new Map<string, EffectiveAccess>();
     for (const id of activeIds) {
-      const state = resolveNode(id);
-      desiredAncestors.set(id, state.ancestors);
-      desiredAccess.set(id, state.effectiveAccess);
+      const { ancestors, effectiveReadAccess, effectiveOperateAccess } = resolveNode(id);
+      desiredAncestors.set(id, ancestors);
+      desiredAccess.set(id, { effectiveReadAccess, effectiveOperateAccess });
     }
 
     await syncAncestors(activeIds, desiredAncestors);

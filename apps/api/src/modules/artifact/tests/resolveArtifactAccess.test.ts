@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { db, fetchCachedRecordWithTargetEntitlements, hydrate } from '@template/db';
 import type { Artifact, Organization, Space, User } from '@template/db/generated/client/client';
-import type { ArtifactAccess, Role } from '@template/db/generated/client/enums';
+import type {
+  PlacementOperateAccess,
+  PlacementReadAccess,
+  Role,
+} from '@template/db/generated/client/enums';
 import {
   createArtifact,
   createArtifactPermission,
@@ -20,7 +24,11 @@ import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermis
 import { ARTIFACT_MAX_DEPTH } from '@template/shared/artifact';
 import { fetchOwnerRootArtifactOrThrow } from '#/modules/artifact/services/artifactOwner';
 
-const folderOf = async (organization: Organization, access?: ArtifactAccess): Promise<Artifact> => {
+const folderOf = async (
+  organization: Organization,
+  readAccess?: PlacementReadAccess,
+  operateAccess?: PlacementOperateAccess,
+): Promise<Artifact> => {
   const folder = (
     await createArtifact({
       kind: 'folder',
@@ -28,7 +36,7 @@ const folderOf = async (organization: Organization, access?: ArtifactAccess): Pr
       organizationId: organization.id,
     })
   ).entity;
-  if (access) {
+  if (readAccess || operateAccess) {
     const root = await fetchOwnerRootArtifactOrThrow({
       ownerModel: 'Organization',
       organizationId: organization.id,
@@ -36,19 +44,26 @@ const folderOf = async (organization: Organization, access?: ArtifactAccess): Pr
     await createArtifactPlacement({
       artifactId: folder.id,
       containerArtifactId: root.id,
-      access,
+      ...(readAccess ? { readAccess } : {}),
+      ...(operateAccess ? { operateAccess } : {}),
     });
     return db.artifact.findUniqueOrThrow({ where: { id: folder.id } });
   }
   return folder;
 };
 
-const place = async (member: Artifact, container: Artifact, access: ArtifactAccess = 'inherit') => {
+const place = async (
+  member: Artifact,
+  container: Artifact,
+  readAccess: PlacementReadAccess = 'inherit',
+  operateAccess: PlacementOperateAccess = 'inherit',
+) => {
   const placement = (
     await createArtifactPlacement({
       artifactId: member.id,
       containerArtifactId: container.id,
-      access,
+      readAccess,
+      operateAccess,
     })
   ).entity;
   const refreshed = await db.artifact.findUniqueOrThrow({ where: { id: member.id } });
@@ -95,18 +110,20 @@ describe('artifact ReBAC & closure inheritance', () => {
     });
     let file = await folderOf(organization);
     file = (await place(file, internal)).artifact;
-    expect(file.effectiveAccess).toBe('private');
+    expect(file.effectiveReadAccess).toBe('private');
+    expect(file.effectiveOperateAccess).toBe('private');
 
     const { artifact: inPublic, placement: publicEdge } = await place(file, shared);
-    expect(inPublic.effectiveAccess).toBe('public');
+    expect(inPublic.effectiveReadAccess).toBe('public');
+    expect(inPublic.effectiveOperateAccess).toBe('private');
     const hydrated = await hydrate('artifact', inPublic);
     const spaceMember = permixForUser(reader, [], [{ id: space.id, role: 'member' }]);
     expect(artifactEffectiveRole(spaceMember, hydrated)).toBe('member');
 
-    // Removing the public placement immediately drops effectiveAccess back to private
+    // Removing the public placement immediately drops effectiveReadAccess back to private
     await db.artifactPlacement.delete({ where: { id: publicEdge.id } });
     const afterRemove = await db.artifact.findUniqueOrThrow({ where: { id: file.id } });
-    expect(afterRemove.effectiveAccess).toBe('private');
+    expect(afterRemove.effectiveReadAccess).toBe('private');
   });
 
   it('a private placement inside a public folder takes nothing from its container', async () => {
@@ -120,7 +137,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     const { artifact: secret } = await place(await folderOf(organization), shared, 'private');
 
     const hydrated = await hydrate('artifact', secret);
-    expect(secret.effectiveAccess).toBe('private');
+    expect(secret.effectiveReadAccess).toBe('private');
     expect(artifactEffectiveRole(permixForUser(reader), hydrated)).toBeNull();
     const orgOwner = permixForUser(reader, [{ id: organization.id, role: 'owner' }]);
     expect(artifactEffectiveRole(orgOwner, hydrated)).toBe('owner');
@@ -137,7 +154,7 @@ describe('artifact ReBAC & closure inheritance', () => {
     const { artifact: page } = await place(await folderOf(organization), team, 'public');
 
     const hydrated = await hydrate('artifact', page);
-    expect(page.effectiveAccess).toBe('public');
+    expect(page.effectiveReadAccess).toBe('public');
     expect(artifactEffectiveRole(permixForUser(reader), hydrated)).toBe('admin');
   });
 
@@ -159,7 +176,7 @@ describe('artifact ReBAC & closure inheritance', () => {
 
     await db.artifactPlacement.update({
       where: { id: middleEdge.id },
-      data: { access: 'private' },
+      data: { readAccess: 'private' },
     });
     expect(artifactEffectiveRole(readerPermix, await hydrate('artifact', leaf))).toBeNull();
   });
@@ -369,7 +386,8 @@ describe('artifact ReBAC & closure inheritance', () => {
       }),
     ).toBe(1);
     expect(await db.artifactEffectivePermission.count({ where: { artifactId: child.id } })).toBe(0);
-    expect(revived.effectiveAccess).toBe('private');
+    expect(revived.effectiveReadAccess).toBe('private');
+    expect(revived.effectiveOperateAccess).toBe('private');
     expect(
       artifactEffectiveRole(permixForUser(reader), await hydrate('artifact', revived)),
     ).toBeNull();
@@ -459,15 +477,17 @@ describe('artifact ReBAC & closure inheritance', () => {
     const outsiderPermix = permixForUser(reader);
 
     const hydratedChild = await hydrate('artifact', inheritedChild);
-    expect(inheritedChild.effectiveAccess).toBe('tenant');
+    expect(inheritedChild.effectiveReadAccess).toBe('tenant');
+    expect(inheritedChild.effectiveOperateAccess).toBe('private');
     expect(check(orgMemberPermix, 'artifact', hydratedChild, 'read')).toBe(true);
+    expect(check(orgMemberPermix, 'artifact', hydratedChild, 'operate')).toBe(false);
     expect(check(outsiderPermix, 'artifact', hydratedChild, 'read')).toBe(false);
     expect(artifactEffectiveRole(orgMemberPermix, hydratedChild)).toBeNull();
 
     // Multi-parent precedence: public > tenant > private
     const pubFolder = await folderOf(organization, 'public');
     const { artifact: nowPublic } = await place(inheritedChild, pubFolder);
-    expect(nowPublic.effectiveAccess).toBe('public');
+    expect(nowPublic.effectiveReadAccess).toBe('public');
 
     // Cache invalidates on parent placement flipping tenant -> private
     const orgRoot = await fetchOwnerRootArtifactOrThrow({
@@ -482,10 +502,10 @@ describe('artifact ReBAC & closure inheritance', () => {
     );
     await db.artifactPlacement.update({
       where: { id: soloRootEdge.id },
-      data: { access: 'private' },
+      data: { readAccess: 'private' },
     });
     const refreshedSoloChild = await db.artifact.findUniqueOrThrow({ where: { id: soloChild.id } });
-    expect(refreshedSoloChild.effectiveAccess).toBe('private');
+    expect(refreshedSoloChild.effectiveReadAccess).toBe('private');
     expect(
       check(orgMemberPermix, 'artifact', await hydrate('artifact', refreshedSoloChild), 'read'),
     ).toBe(false);
@@ -546,7 +566,7 @@ describe('artifact ReBAC & closure inheritance', () => {
       false,
     );
 
-    // User placement with access: 'tenant' has no tenant, so effectiveAccess resolves to 'private'
+    // Even if written directly at the DB layer, ownerTenant excludes User so outsiders never gain read
     const userRoot = await fetchOwnerRootArtifactOrThrow({
       ownerModel: 'User',
       userId: peerCtx.user.id,
@@ -561,9 +581,12 @@ describe('artifact ReBAC & closure inheritance', () => {
       ).entity,
       userRoot,
       'tenant',
+      'tenant',
     );
-    expect(userDoc.effectiveAccess).toBe('private');
     expect(check(outsiderPermix, 'artifact', await hydrate('artifact', userDoc), 'read')).toBe(
+      false,
+    );
+    expect(check(outsiderPermix, 'artifact', await hydrate('artifact', userDoc), 'operate')).toBe(
       false,
     );
 
@@ -578,10 +601,108 @@ describe('artifact ReBAC & closure inheritance', () => {
     const { artifact: tenantMid } = await place(await folderOf(organization), pubTop, 'tenant');
     const { artifact: inheritLeaf } = await place(await folderOf(organization), tenantMid);
     const hydratedLeaf = await hydrate('artifact', inheritLeaf);
-    expect(inheritLeaf.effectiveAccess).toBe('tenant');
+    expect(inheritLeaf.effectiveReadAccess).toBe('tenant');
     expect(check(outsiderPermix, 'artifact', hydratedLeaf, 'read')).toBe(false);
     expect(check(orgMemberPermix, 'artifact', hydratedLeaf, 'read')).toBe(true);
     const stranger = (await createUser()).entity;
     expect(check(permixForUser(stranger), 'artifact', hydratedLeaf, 'read')).toBe(false);
+  });
+
+  it('operateAccess: tenant grants operate (and implied read) to tenant members, never viewers or outsiders; public never grants operate', async () => {
+    const orgMemberPermix = permixForUser(reader, [{ id: organization.id, role: 'member' }]);
+    const orgViewerPermix = permixForUser(reader, [{ id: organization.id, role: 'viewer' }]);
+    const outsiderPermix = permixForUser(reader);
+
+    // readAccess: 'private', operateAccess: 'tenant' -> org member reads & operates; viewer gets neither
+    const teamFolder = await folderOf(organization, 'private', 'tenant');
+    const { artifact: teamChild } = await place(await folderOf(organization), teamFolder);
+    expect(teamFolder.effectiveReadAccess).toBe('private');
+    expect(teamFolder.effectiveOperateAccess).toBe('tenant');
+    expect(teamChild.effectiveReadAccess).toBe('private');
+    expect(teamChild.effectiveOperateAccess).toBe('tenant');
+
+    const hydratedChild = await hydrate('artifact', teamChild);
+    expect(check(orgMemberPermix, 'artifact', hydratedChild, 'operate')).toBe(true);
+    expect(check(orgMemberPermix, 'artifact', hydratedChild, 'read')).toBe(true);
+    expect(check(orgMemberPermix, 'artifact', hydratedChild, 'manage')).toBe(false);
+    expect(check(orgViewerPermix, 'artifact', hydratedChild, 'read')).toBe(false);
+    expect(check(orgViewerPermix, 'artifact', hydratedChild, 'operate')).toBe(false);
+    expect(check(outsiderPermix, 'artifact', hydratedChild, 'read')).toBe(false);
+    expect(artifactEffectiveRole(orgMemberPermix, hydratedChild)).toBeNull();
+
+    // readAccess: 'public', operateAccess: 'private' -> public is strictly read-only
+    const pubOnly = await folderOf(organization, 'public', 'private');
+    const hydratedPub = await hydrate('artifact', pubOnly);
+    expect(check(outsiderPermix, 'artifact', hydratedPub, 'read')).toBe(true);
+    expect(check(outsiderPermix, 'artifact', hydratedPub, 'operate')).toBe(false);
+    expect(check(orgMemberPermix, 'artifact', hydratedPub, 'operate')).toBe(false);
+
+    // Space & SpaceUser operateAccess: 'tenant' -> space member operates; space viewer & non-space org member cannot
+    const spaceMemberPermix = permixForUser(
+      reader,
+      [{ id: organization.id, role: 'member' }],
+      [{ id: space.id, role: 'member' }],
+    );
+    const spaceViewerPermix = permixForUser(
+      reader,
+      [{ id: organization.id, role: 'member' }],
+      [{ id: space.id, role: 'viewer' }],
+    );
+    const spaceRoot = await fetchOwnerRootArtifactOrThrow({
+      ownerModel: 'Space',
+      organizationId: organization.id,
+      spaceId: space.id,
+    });
+    const { artifact: spaceShared } = await place(
+      (
+        await createArtifact({
+          kind: 'file',
+          ownerModel: 'Space',
+          organizationId: organization.id,
+          spaceId: space.id,
+        })
+      ).entity,
+      spaceRoot,
+      'private',
+      'tenant',
+    );
+    const hydratedSpaceShared = await hydrate('artifact', spaceShared);
+    expect(check(spaceMemberPermix, 'artifact', hydratedSpaceShared, 'operate')).toBe(true);
+    expect(check(spaceMemberPermix, 'artifact', hydratedSpaceShared, 'read')).toBe(true);
+    expect(check(spaceViewerPermix, 'artifact', hydratedSpaceShared, 'read')).toBe(false);
+    expect(check(orgMemberPermix, 'artifact', hydratedSpaceShared, 'read')).toBe(false);
+
+    const { entity: orgUser, context: orgUserCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization },
+    );
+    const { context: spaceUserCtx } = await createSpaceUser(
+      { role: 'member' },
+      { organization, space, organizationUser: orgUser, user: orgUserCtx.user },
+    );
+    const spaceUserRoot = await fetchOwnerRootArtifactOrThrow({
+      ownerModel: 'SpaceUser',
+      organizationId: organization.id,
+      spaceId: space.id,
+      userId: spaceUserCtx.user.id,
+    });
+    const { artifact: spacePeerDoc } = await place(
+      (
+        await createArtifact({
+          kind: 'file',
+          ownerModel: 'SpaceUser',
+          organizationId: organization.id,
+          spaceId: space.id,
+          userId: spaceUserCtx.user.id,
+        })
+      ).entity,
+      spaceUserRoot,
+      'private',
+      'tenant',
+    );
+    const hydratedSpacePeer = await hydrate('artifact', spacePeerDoc);
+    expect(check(spaceMemberPermix, 'artifact', hydratedSpacePeer, 'operate')).toBe(true);
+    expect(check(spaceViewerPermix, 'artifact', hydratedSpacePeer, 'read')).toBe(false);
+    expect(check(orgMemberPermix, 'artifact', hydratedSpacePeer, 'read')).toBe(false);
   });
 });

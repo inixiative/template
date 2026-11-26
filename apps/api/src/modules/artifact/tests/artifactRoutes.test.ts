@@ -148,19 +148,23 @@ describe('artifact routes', () => {
       `/api/v1/organization/${organization.id}/artifacts`,
     );
     expect(created.ownerModel).toBe('Organization');
-    expect(created.effectiveAccess).toBe('private');
+    expect(created.effectiveReadAccess).toBe('private');
+    expect(created.effectiveOperateAccess).toBe('private');
     const detail = await adminFetch(get(`/api/v1/artifact/${created.id}`));
     const parsed = (
       await parseSuccessBody<{
         effectiveRole: string | null;
-        effectiveAccess: string;
+        effectiveReadAccess: string;
+        effectiveOperateAccess: string;
         artifactPlacementsAsArtifact: ArtifactPlacement[];
       }>(detail)
     ).data;
     expect(parsed.effectiveRole).toBe('admin');
-    expect(parsed.effectiveAccess).toBe('private');
+    expect(parsed.effectiveReadAccess).toBe('private');
+    expect(parsed.effectiveOperateAccess).toBe('private');
     expect(parsed.artifactPlacementsAsArtifact).toHaveLength(1);
-    expect(parsed.artifactPlacementsAsArtifact[0]!.access).toBe('private');
+    expect(parsed.artifactPlacementsAsArtifact[0]!.readAccess).toBe('private');
+    expect(parsed.artifactPlacementsAsArtifact[0]!.operateAccess).toBe('private');
   });
 
   it('creating inside a container defaults placement access to inherit; root rejects inherit', async () => {
@@ -172,7 +176,8 @@ describe('artifact routes', () => {
     const placement = await db.artifactPlacement.findFirstOrThrow({
       where: { artifactId: inside.id, containerArtifactId: shared.id },
     });
-    expect(placement.access).toBe('inherit');
+    expect(placement.readAccess).toBe('inherit');
+    expect(placement.operateAccess).toBe('inherit');
 
     expect(
       (
@@ -180,7 +185,18 @@ describe('artifact routes', () => {
           post(`/api/v1/organization/${organization.id}/artifacts`, {
             kind: 'folder',
             name: 'bad-root',
-            access: 'inherit',
+            readAccess: 'inherit',
+          }),
+        )
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await adminFetch(
+          post(`/api/v1/organization/${organization.id}/artifacts`, {
+            kind: 'folder',
+            name: 'bad-root-op',
+            operateAccess: 'inherit',
           }),
         )
       ).status,
@@ -189,7 +205,8 @@ describe('artifact routes', () => {
 
   it('an edge needs manage on the artifact and operate on the container', async () => {
     const edge = await placeDraftsInShared();
-    expect(edge.access).toBe('inherit');
+    expect(edge.readAccess).toBe('inherit');
+    expect(edge.operateAccess).toBe('inherit');
   });
 
   it("a viewer-role token cannot use its user's owner grant", async () => {
@@ -224,18 +241,18 @@ describe('artifact routes', () => {
     expect((await tokenFetch(get(`/api/v1/artifact/${drafts.id}`))).status).toBe(403);
   });
 
-  it('placing a private item inside a private folder keeps effectiveAccess private even when also placed privately in a public folder', async () => {
+  it('placing a private item inside a private folder keeps effectiveReadAccess private even when also placed privately in a public folder', async () => {
     const group = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { access: 'public' },
+      { readAccess: 'public' },
     );
     const secret = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
       {
         containerArtifactId: group.id,
-        access: 'private',
+        readAccess: 'private',
       },
     );
     const other = await createFolder(
@@ -244,7 +261,7 @@ describe('artifact routes', () => {
     );
     expect((await place(adminFetch, secret, other)).status).toBe(201);
     const after = await db.artifact.findUniqueOrThrow({ where: { id: secret.id } });
-    expect(after.effectiveAccess).toBe('private');
+    expect(after.effectiveReadAccess).toBe('private');
   });
 
   it("a space-scoped token does not reach its user's personal artifacts", async () => {
@@ -288,7 +305,7 @@ describe('artifact routes', () => {
     const secretDoc = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'payroll', access: 'private' },
+      { name: 'payroll', readAccess: 'private' },
     );
     await adminFetch(
       post(`/api/v1/artifact/${secretDoc.id}/artifactPermissions`, {
@@ -297,15 +314,20 @@ describe('artifact routes', () => {
         role: 'viewer',
       }),
     );
-    expect((await place(memberFetch, secretDoc, drafts, { access: 'public' })).status).toBe(403);
+    expect((await place(memberFetch, secretDoc, drafts, { readAccess: 'public' })).status).toBe(
+      403,
+    );
     const adminEdge = (
       await parseSuccessBody<ArtifactPlacement>(
-        await place(adminFetch, secretDoc, drafts, { access: 'private' }),
+        await place(adminFetch, secretDoc, drafts, { readAccess: 'private' }),
       )
     ).data;
     expect(
-      (await memberFetch(patch(`/api/v1/artifactPlacement/${adminEdge.id}`, { access: 'public' })))
-        .status,
+      (
+        await memberFetch(
+          patch(`/api/v1/artifactPlacement/${adminEdge.id}`, { readAccess: 'public' }),
+        )
+      ).status,
     ).toBe(403);
   });
 
@@ -456,7 +478,7 @@ describe('artifact routes', () => {
     const orgPublic = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { access: 'public' },
+      { readAccess: 'public' },
     );
     const grant = await parseSuccessBody<{ id: string }>(
       await outsiderFetch(
@@ -472,7 +494,7 @@ describe('artifact routes', () => {
     const edgeId = (await parseSuccessBody<{ id: string }>(placed)).data.id;
     expect((await memberFetch(get(`/api/v1/artifact/${personal.id}`))).status).toBe(403);
     const after = await db.artifact.findUniqueOrThrow({ where: { id: personal.id } });
-    expect(after.effectiveAccess).toBe('private');
+    expect(after.effectiveReadAccess).toBe('private');
     expect((await outsiderFetch(del(`/api/v1/artifactPermission/${grant.data.id}`))).status).toBe(
       204,
     );
@@ -483,7 +505,7 @@ describe('artifact routes', () => {
   it('cross-owner placements do not defeat private placement inside a public folder', async () => {
     const aliceFolder = await createFolder(outsiderFetch, '/api/v1/me/artifacts');
     const alicePublic = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
-      access: 'public',
+      readAccess: 'public',
     });
     const aliceFile = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
       containerArtifactId: aliceFolder.id,
@@ -491,7 +513,7 @@ describe('artifact routes', () => {
     const edgeInFolder = await db.artifactPlacement.findFirstOrThrow({
       where: { artifactId: aliceFile.id, containerArtifactId: aliceFolder.id },
     });
-    expect(edgeInFolder.access).toBe('inherit');
+    expect(edgeInFolder.readAccess).toBe('inherit');
 
     await outsiderFetch(
       post(`/api/v1/artifact/${aliceFile.id}/artifactPermissions`, {
@@ -503,7 +525,7 @@ describe('artifact routes', () => {
     const orgPublic = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { access: 'public' },
+      { readAccess: 'public' },
     );
     expect((await place(adminFetch, aliceFile, orgPublic)).status).toBe(201);
 
@@ -570,12 +592,12 @@ describe('artifact routes', () => {
     expect(movedOrgPin.containerArtifact.kind).toBe(ArtifactKind.root);
     expect(movedOrgPin.containerArtifact.ownerModel).toBe('Organization');
 
-    // Placing into alicePublic with explicit access: 'private' keeps effectiveAccess private
-    expect((await place(outsiderFetch, aliceFile, alicePublic, { access: 'private' })).status).toBe(
-      201,
-    );
+    // Placing into alicePublic with explicit readAccess: 'private' keeps effectiveReadAccess private
+    expect(
+      (await place(outsiderFetch, aliceFile, alicePublic, { readAccess: 'private' })).status,
+    ).toBe(201);
     const after = await db.artifact.findUniqueOrThrow({ where: { id: aliceFile.id } });
-    expect(after.effectiveAccess).toBe('private');
+    expect(after.effectiveReadAccess).toBe('private');
     expect((await memberFetch(get(`/api/v1/artifact/${aliceFile.id}`))).status).toBe(403);
   });
 
@@ -611,28 +633,29 @@ describe('artifact routes', () => {
     });
     expect(revivedPlacements).toHaveLength(1);
     expect(revivedPlacements[0]!.containerArtifact.kind).toBe(ArtifactKind.root);
-    expect(revivedPlacements[0]!.access).toBe('private');
+    expect(revivedPlacements[0]!.readAccess).toBe('private');
+    expect(revivedPlacements[0]!.operateAccess).toBe('private');
   });
 
-  it('GET /artifact/:id reports effectiveRole as null for strangers on public artifacts and scalar effectiveAccess as public', async () => {
+  it('GET /artifact/:id reports effectiveRole as null for strangers on public artifacts and scalar effectiveReadAccess as public', async () => {
     const pub = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { access: 'public' },
+      { readAccess: 'public' },
     );
     const asOutsider = await parseSuccessBody<{
       effectiveRole: string | null;
-      effectiveAccess: string;
+      effectiveReadAccess: string;
     }>(await outsiderFetch(get(`/api/v1/artifact/${pub.id}`)));
     expect(asOutsider.data.effectiveRole).toBeNull();
-    expect(asOutsider.data.effectiveAccess).toBe('public');
+    expect(asOutsider.data.effectiveReadAccess).toBe('public');
 
     const asAdmin = await parseSuccessBody<{
       effectiveRole: string | null;
-      effectiveAccess: string;
+      effectiveReadAccess: string;
     }>(await adminFetch(get(`/api/v1/artifact/${pub.id}`)));
     expect(asAdmin.data.effectiveRole).toBe('admin');
-    expect(asAdmin.data.effectiveAccess).toBe('public');
+    expect(asAdmin.data.effectiveReadAccess).toBe('public');
   });
 
   it('PATCH /artifact/:id lets operate rename; PATCH /artifactPlacement/:id requires manage to change access', async () => {
@@ -645,25 +668,25 @@ describe('artifact routes', () => {
     expect(
       (
         await memberFetch(
-          patch(`/api/v1/artifactPlacement/${sharedRootEdge.id}`, { access: 'public' }),
+          patch(`/api/v1/artifactPlacement/${sharedRootEdge.id}`, { readAccess: 'public' }),
         )
       ).status,
     ).toBe(403);
     expect(
       (
         await adminFetch(
-          patch(`/api/v1/artifactPlacement/${sharedRootEdge.id}`, { access: 'public' }),
+          patch(`/api/v1/artifactPlacement/${sharedRootEdge.id}`, { readAccess: 'public' }),
         )
       ).status,
     ).toBe(200);
     expect(
-      (await db.artifact.findUniqueOrThrow({ where: { id: shared.id } })).effectiveAccess,
+      (await db.artifact.findUniqueOrThrow({ where: { id: shared.id } })).effectiveReadAccess,
     ).toBe('public');
     // Root placement rejects inherit
     expect(
       (
         await adminFetch(
-          patch(`/api/v1/artifactPlacement/${sharedRootEdge.id}`, { access: 'inherit' }),
+          patch(`/api/v1/artifactPlacement/${sharedRootEdge.id}`, { readAccess: 'inherit' }),
         )
       ).status,
     ).toBe(422);
@@ -715,7 +738,7 @@ describe('artifact routes', () => {
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
     );
-    await place(adminFetch, hidden, shared, { access: 'private' });
+    await place(adminFetch, hidden, shared, { readAccess: 'private' });
 
     const asAdmin = await parseSuccessBody<{
       artifactPlacementsAsContainer: { artifact: Artifact }[];
@@ -820,17 +843,17 @@ describe('artifact routes', () => {
     const unreadable = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'a-unreadable', access: 'private' },
+      { name: 'a-unreadable', readAccess: 'private' },
     );
     const manageable = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'b-manageable', access: 'private' },
+      { name: 'b-manageable', readAccess: 'private' },
     );
     const viewerOnly = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'c-viewer', access: 'private' },
+      { name: 'c-viewer', readAccess: 'private' },
     );
     await adminFetch(
       post(`/api/v1/artifact/${manageable.id}/artifactPermissions`, {
@@ -846,9 +869,11 @@ describe('artifact routes', () => {
         role: 'viewer',
       }),
     );
-    expect((await place(adminFetch, unreadable, shared, { access: 'private' })).status).toBe(201);
+    expect((await place(adminFetch, unreadable, shared, { readAccess: 'private' })).status).toBe(
+      201,
+    );
     for (const child of [manageable, viewerOnly]) {
-      expect((await place(adminFetch, child, shared, { access: 'inherit' })).status).toBe(201);
+      expect((await place(adminFetch, child, shared, { readAccess: 'inherit' })).status).toBe(201);
     }
     const detail = await parseSuccessBody<{
       artifactPlacementsAsContainer: {
@@ -877,17 +902,17 @@ describe('artifact routes', () => {
     const pubOrg = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'pub-org', access: 'public' },
+      { name: 'pub-org', readAccess: 'public' },
     );
     const tenantOrg = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'tenant-org', access: 'tenant' },
+      { name: 'tenant-org', readAccess: 'tenant' },
     );
     const privateOrg = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'private-org', access: 'private' },
+      { name: 'private-org', readAccess: 'private' },
     );
 
     const asAnon = await parseSuccessBody<(Artifact & { artifactPermissions: unknown[] })[]>(
@@ -919,11 +944,11 @@ describe('artifact routes', () => {
 
     const userPub = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
       name: 'user-pub',
-      access: 'public',
+      readAccess: 'public',
     });
     const userPriv = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
       name: 'user-priv',
-      access: 'private',
+      readAccess: 'private',
     });
     const anonUserList = await parseSuccessBody<Artifact[]>(
       await anonFetch(get(`/api/v1/user/${outsider.id}/artifacts`)),
@@ -940,17 +965,17 @@ describe('artifact routes', () => {
     const waifu = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'waifu-pic', access: 'public' },
+      { name: 'waifu-pic', readAccess: 'public' },
     );
     const essay = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'cool-essay', access: 'public' },
+      { name: 'cool-essay', readAccess: 'public' },
     );
     const privOrg = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'secret-doc', access: 'private' },
+      { name: 'secret-doc', readAccess: 'private' },
     );
 
     // Cannot place unreadable external artifact at root (403)
@@ -974,7 +999,7 @@ describe('artifact routes', () => {
     );
     expect(waifuPinResp.status).toBe(201);
     const waifuPin = (await parseSuccessBody<ArtifactPlacement>(waifuPinResp)).data;
-    expect(waifuPin.access).toBe('private');
+    expect(waifuPin.readAccess).toBe('private');
     // Duplicate root pin returns 409
     expect(
       (
@@ -992,7 +1017,7 @@ describe('artifact routes', () => {
       post(`/api/v1/artifact/${essay.id}/artifactPlacements`, {
         ownerModel: 'User',
         userId: outsider.id,
-        access: 'public',
+        readAccess: 'public',
       }),
     );
     expect(essayPinResp.status).toBe(201);
@@ -1015,7 +1040,7 @@ describe('artifact routes', () => {
     expect(
       (
         await adminFetch(
-          patch(`/api/v1/artifactPlacement/${essayOrgEdge.id}`, { access: 'private' }),
+          patch(`/api/v1/artifactPlacement/${essayOrgEdge.id}`, { readAccess: 'private' }),
         )
       ).status,
     ).toBe(200);
@@ -1024,10 +1049,10 @@ describe('artifact routes', () => {
     );
     expect(anonAfterPrivate.data).toEqual([]);
 
-    // Org bookmark at org root with access: 'tenant' -> coworkers see it, strangers don't; AuditLog carries Org's tenant context
+    // Org bookmark at org root with readAccess: 'tenant' -> coworkers see it, strangers don't; AuditLog carries Org's tenant context
     const externalPub = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
       name: 'external-pub-ref',
-      access: 'public',
+      readAccess: 'public',
     });
     const orgTenantPin = (
       await parseSuccessBody<ArtifactPlacement>(
@@ -1035,7 +1060,7 @@ describe('artifact routes', () => {
           post(`/api/v1/artifact/${externalPub.id}/artifactPlacements`, {
             ownerModel: 'Organization',
             organizationId: organization.id,
-            access: 'tenant',
+            readAccess: 'tenant',
           }),
         ),
       )
@@ -1058,9 +1083,11 @@ describe('artifact routes', () => {
     // Private placement of public waifu inside a public folder stays hidden from strangers on GET /artifact/:publicFolderId
     const pubFolder = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
       name: 'public-showcase',
-      access: 'public',
+      readAccess: 'public',
     });
-    expect((await place(outsiderFetch, waifu, pubFolder, { access: 'private' })).status).toBe(201);
+    expect((await place(outsiderFetch, waifu, pubFolder, { readAccess: 'private' })).status).toBe(
+      201,
+    );
     const showcaseAnon = await parseSuccessBody<{
       artifactPlacementsAsContainer: { artifact: Artifact }[];
     }>(await anonFetch(get(`/api/v1/artifact/${pubFolder.id}`)));
@@ -1093,7 +1120,7 @@ describe('artifact routes', () => {
     const expDoc = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'expired-secret-report', access: 'private' },
+      { name: 'expired-secret-report', readAccess: 'private' },
     );
     await createArtifactPermission({
       artifactId: expDoc.id,
@@ -1209,7 +1236,7 @@ describe('artifact routes', () => {
     const anonFetch = createTestApp({ mount }).fetch;
 
     // 1. operate-only on container cannot set non-default access via place/move; member User token cannot publish public root
-    expect((await place(memberFetch, drafts, shared, { access: 'public' })).status).toBe(403);
+    expect((await place(memberFetch, drafts, shared, { readAccess: 'public' })).status).toBe(403);
     const draftsRootEdge = await db.artifactPlacement.findFirstOrThrow({
       where: { artifactId: drafts.id },
     });
@@ -1218,7 +1245,7 @@ describe('artifact routes', () => {
         await memberFetch(
           post(`/api/v1/artifactPlacement/${draftsRootEdge.id}/move`, {
             targetContainerArtifactId: shared.id,
-            access: 'public',
+            readAccess: 'public',
           }),
         )
       ).status,
@@ -1246,14 +1273,18 @@ describe('artifact routes', () => {
     expect(
       (
         await memberUserTokenFetch(
-          post('/api/v1/me/artifacts', { kind: 'folder', name: 'nope-pub', access: 'public' }),
+          post('/api/v1/me/artifacts', {
+            kind: 'folder',
+            name: 'nope-pub',
+            readAccess: 'public',
+          }),
         )
       ).status,
     ).toBe(403);
     const pubOrgDoc = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
-      { name: 'org-pub-doc', access: 'public' },
+      { name: 'org-pub-doc', readAccess: 'public' },
     );
     expect(
       (
@@ -1261,7 +1292,7 @@ describe('artifact routes', () => {
           post(`/api/v1/artifact/${pubOrgDoc.id}/artifactPlacements`, {
             ownerModel: 'User',
             userId: outsider.id,
-            access: 'public',
+            readAccess: 'public',
           }),
         )
       ).status,
@@ -1271,14 +1302,14 @@ describe('artifact routes', () => {
     // and explicit containerArtifact[kind]=root still returns public root reshares anonymously
     const pubFolder = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
       name: 'pub-folder',
-      access: 'public',
+      readAccess: 'public',
     });
     const privatePinInPub = (
       await parseSuccessBody<ArtifactPlacement>(
-        await place(outsiderFetch, pubOrgDoc, pubFolder, { access: 'private' }),
+        await place(outsiderFetch, pubOrgDoc, pubFolder, { readAccess: 'private' }),
       )
     ).data;
-    expect(privatePinInPub.access).toBe('private');
+    expect(privatePinInPub.readAccess).toBe('private');
     const anonFiltered = await parseSuccessBody<ArtifactPlacement[]>(
       await anonFetch(
         get(
@@ -1300,7 +1331,7 @@ describe('artifact routes', () => {
     // 3. operate-only member on shared cannot delete or move a hidden private placement inside shared
     const hiddenPinInShared = (
       await parseSuccessBody<ArtifactPlacement>(
-        await place(adminFetch, pubFolder, shared, { access: 'private' }),
+        await place(adminFetch, pubFolder, shared, { readAccess: 'private' }),
       )
     ).data;
     expect(
@@ -1361,7 +1392,7 @@ describe('artifact routes', () => {
           post(`/api/v1/artifact/${pubFolder.id}/artifactPlacements`, {
             ownerModel: 'Organization',
             organizationId: organization.id,
-            access: 'private',
+            readAccess: 'private',
           }),
         ),
       )
@@ -1452,7 +1483,9 @@ describe('artifact routes', () => {
       name: 'owned-child',
       containerArtifactId: pubFolder.id,
     });
-    expect((await place(adminFetch, ownedChild, shared, { access: 'private' })).status).toBe(201);
+    expect((await place(adminFetch, ownedChild, shared, { readAccess: 'private' })).status).toBe(
+      201,
+    );
     const pubFolderDetail = await parseSuccessBody<{
       artifactPlacementsAsContainer: { artifact: Artifact & { exclusive: boolean } }[];
     }>(await outsiderFetch(get(`/api/v1/artifact/${pubFolder.id}`)));
@@ -1506,5 +1539,237 @@ describe('artifact routes', () => {
       await adminFetch(patch(`/api/v1/artifactPermission/${versionGrant.id}`, { fromVersion: 2 })),
     );
     expect(lowered.data.fromVersion).toBe(2);
+  });
+
+  it('ReadAccess/OperateAccess split: operateAccess tenant, private+tenant access, User+tenant 422, PATCH empty body 422, and entitlement-only /me lists', async () => {
+    const viewerSeat = await createOrganizationUser({ role: 'viewer' }, { organization });
+    const viewerFetch = createTestApp({
+      mockUser: viewerSeat.context.user,
+      mockOrganizationUsers: [viewerSeat.entity],
+      mount,
+    }).fetch;
+
+    // 1. Organization folder with readAccess: 'private', operateAccess: 'tenant':
+    // org member can read, list (flat + root placements), rename, and add children; org viewer gets 403 and sees neither list
+    const teamBoard = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'team-board', readAccess: 'private', operateAccess: 'tenant' },
+    );
+    expect(teamBoard.effectiveReadAccess).toBe('private');
+    expect(teamBoard.effectiveOperateAccess).toBe('tenant');
+
+    expect((await memberFetch(get(`/api/v1/artifact/${teamBoard.id}`))).status).toBe(200);
+    expect(
+      (await memberFetch(patch(`/api/v1/artifact/${teamBoard.id}`, { name: 'team-board-v2' })))
+        .status,
+    ).toBe(200);
+    // member holds operate on teamBoard via operateAccess: 'tenant', so they can place into it
+    expect((await place(memberFetch, drafts, teamBoard)).status).toBe(201);
+    const boardChild = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'board-child', containerArtifactId: teamBoard.id },
+    );
+    expect(boardChild.effectiveOperateAccess).toBe('tenant');
+    expect(boardChild.effectiveReadAccess).toBe('private');
+    expect(
+      (await memberFetch(patch(`/api/v1/artifact/${boardChild.id}`, { name: 'board-child-v2' })))
+        .status,
+    ).toBe(200);
+
+    // Regression: readAccess: 'private' + implicit operateAccess: 'inherit' inside a tenant-operable folder
+    // stays visible and removable for org members on folder detail, filtered placements, and DELETE.
+    const privateReadChild = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'private-read-team-op', containerArtifactId: teamBoard.id, readAccess: 'private' },
+    );
+    expect(privateReadChild.effectiveReadAccess).toBe('private');
+    expect(privateReadChild.effectiveOperateAccess).toBe('tenant');
+    const teamDetailAsMember = await parseSuccessBody<{
+      artifactPlacementsAsContainer: { id: string; artifact: Artifact }[];
+    }>(await memberFetch(get(`/api/v1/artifact/${teamBoard.id}`)));
+    expect(
+      teamDetailAsMember.data.artifactPlacementsAsContainer.map((p) => p.artifact.id),
+    ).toContain(privateReadChild.id);
+    const filteredPlacementsAsMember = await parseSuccessBody<ArtifactPlacement[]>(
+      await memberFetch(
+        get(
+          `/api/v1/organization/${organization.id}/artifactPlacements?searchFields[containerArtifactId]=${teamBoard.id}`,
+        ),
+      ),
+    );
+    expect(filteredPlacementsAsMember.data.map((p) => p.artifactId)).toContain(privateReadChild.id);
+    // Viewer still sees none of them
+    const filteredPlacementsAsViewer = await parseSuccessBody<ArtifactPlacement[]>(
+      await viewerFetch(
+        get(
+          `/api/v1/organization/${organization.id}/artifactPlacements?searchFields[containerArtifactId]=${teamBoard.id}`,
+        ),
+      ),
+    );
+    expect(filteredPlacementsAsViewer.data).toEqual([]);
+
+    const memberOrgList = await parseSuccessBody<Artifact[]>(
+      await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+    );
+    expect(memberOrgList.data.map((a) => a.id)).toContain(teamBoard.id);
+    const memberOrgPlacements = await parseSuccessBody<ArtifactPlacement[]>(
+      await memberFetch(get(`/api/v1/organization/${organization.id}/artifactPlacements`)),
+    );
+    expect(memberOrgPlacements.data.map((p) => p.artifactId)).toContain(teamBoard.id);
+
+    expect((await viewerFetch(get(`/api/v1/artifact/${teamBoard.id}`))).status).toBe(403);
+    expect(
+      (await viewerFetch(patch(`/api/v1/artifact/${teamBoard.id}`, { name: 'nope' }))).status,
+    ).toBe(403);
+    const viewerOrgList = await parseSuccessBody<Artifact[]>(
+      await viewerFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+    );
+    expect(viewerOrgList.data.map((a) => a.id)).not.toContain(teamBoard.id);
+    const viewerOrgPlacements = await parseSuccessBody<ArtifactPlacement[]>(
+      await viewerFetch(get(`/api/v1/organization/${organization.id}/artifactPlacements`)),
+    );
+    expect(viewerOrgPlacements.data.map((p) => p.artifactId)).not.toContain(teamBoard.id);
+
+    // 2. Public artifact never grants operate to outsiders or org members
+    const pubDoc = await createFolder(
+      adminFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+      { name: 'pub-readonly', readAccess: 'public' },
+    );
+    expect((await outsiderFetch(get(`/api/v1/artifact/${pubDoc.id}`))).status).toBe(200);
+    expect(
+      (await outsiderFetch(patch(`/api/v1/artifact/${pubDoc.id}`, { name: 'hacked' }))).status,
+    ).toBe(403);
+    expect(
+      (await memberFetch(patch(`/api/v1/artifact/${pubDoc.id}`, { name: 'hacked' }))).status,
+    ).toBe(403);
+
+    // 3. PATCH /artifactPlacement/:id rejects empty {} (422) and updates readAccess/operateAccess independently
+    const teamBoardEdge = await db.artifactPlacement.findFirstOrThrow({
+      where: { artifactId: teamBoard.id },
+    });
+    expect(
+      (await adminFetch(patch(`/api/v1/artifactPlacement/${teamBoardEdge.id}`, {}))).status,
+    ).toBe(422);
+    expect(
+      (
+        await adminFetch(
+          patch(`/api/v1/artifactPlacement/${teamBoardEdge.id}`, { readAccess: 'tenant' }),
+        )
+      ).status,
+    ).toBe(200);
+    const updatedEdge = await db.artifactPlacement.findUniqueOrThrow({
+      where: { id: teamBoardEdge.id },
+    });
+    expect(updatedEdge.readAccess).toBe('tenant');
+    expect(updatedEdge.operateAccess).toBe('tenant');
+    expect((await viewerFetch(get(`/api/v1/artifact/${teamBoard.id}`))).status).toBe(200);
+    expect(
+      (await viewerFetch(patch(`/api/v1/artifact/${teamBoard.id}`, { name: 'nope' }))).status,
+    ).toBe(403);
+
+    // 4. User + tenant is rejected with 422 across create, place, update, and move
+    expect(
+      (
+        await outsiderFetch(
+          post('/api/v1/me/artifacts', {
+            kind: 'folder',
+            name: 'bad-user-read',
+            readAccess: 'tenant',
+          }),
+        )
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await outsiderFetch(
+          post('/api/v1/me/artifacts', {
+            kind: 'folder',
+            name: 'bad-user-op',
+            operateAccess: 'tenant',
+          }),
+        )
+      ).status,
+    ).toBe(422);
+    const userFolder = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      name: 'user-folder',
+    });
+    const userChild = await createFolder(outsiderFetch, '/api/v1/me/artifacts', {
+      name: 'user-child',
+    });
+    expect(
+      (await place(outsiderFetch, userChild, userFolder, { readAccess: 'tenant' })).status,
+    ).toBe(422);
+    expect(
+      (await place(outsiderFetch, userChild, userFolder, { operateAccess: 'tenant' })).status,
+    ).toBe(422);
+    const userChildEdge = await db.artifactPlacement.findFirstOrThrow({
+      where: { artifactId: userChild.id },
+    });
+    expect(
+      (
+        await outsiderFetch(
+          patch(`/api/v1/artifactPlacement/${userChildEdge.id}`, { readAccess: 'tenant' }),
+        )
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await outsiderFetch(
+          patch(`/api/v1/artifactPlacement/${userChildEdge.id}`, { operateAccess: 'tenant' }),
+        )
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await outsiderFetch(
+          post(`/api/v1/artifactPlacement/${userChildEdge.id}/move`, {
+            targetContainerArtifactId: userFolder.id,
+            operateAccess: 'tenant',
+          }),
+        )
+      ).status,
+    ).toBe(422);
+
+    // 5. Entitlement-only User token gets 200 (not 403) on GET /me/artifacts and GET /me/artifactPlacements
+    const { entity: entUserToken } = await createToken({
+      ownerModel: 'User',
+      userId: outsider.id,
+      role: null,
+      full: false,
+      entitlements: [
+        {
+          sourceModel: 'User',
+          sourceId: outsider.id,
+          resource: 'Project',
+          actions: ['read'],
+        },
+      ],
+    });
+    const entUserTokenFetch = createTestApp({
+      mockToken: {
+        ...entUserToken,
+        targetEntitlements: await db.entitlement.findMany({
+          where: { targetModel: 'Token', targetTokenId: entUserToken.id },
+        }),
+        user: outsider,
+        organization: null,
+        organizationUser: null,
+        space: null,
+        spaceUser: null,
+        integration: null,
+      },
+      mount,
+    }).fetch;
+    const meArtifactsResp = await entUserTokenFetch(get('/api/v1/me/artifacts'));
+    expect(meArtifactsResp.status).toBe(200);
+    expect((await parseSuccessBody<Artifact[]>(meArtifactsResp)).data).toEqual([]);
+
+    const mePlacementsResp = await entUserTokenFetch(get('/api/v1/me/artifactPlacements'));
+    expect(mePlacementsResp.status).toBe(200);
+    expect((await parseSuccessBody<ArtifactPlacement[]>(mePlacementsResp)).data).toEqual([]);
   });
 });
