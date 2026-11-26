@@ -11,6 +11,7 @@ import {
   createSpace,
   createToken,
 } from '@template/db/test';
+import { mapKeys, upperFirst } from 'lodash-es';
 
 const sides = ['source', 'target'] as const;
 const other = { source: 'target', target: 'source' } as const;
@@ -65,12 +66,7 @@ describe('an inquiry carries the owner keys of the record each side names (Aron,
     const { entity } = await createInquiry({
       [`${other[side]}Model`]: 'Organization',
       [`${other[side]}OrganizationId`]: admin.id,
-      ...Object.fromEntries(
-        Object.entries(party).map(([key, value]) => [
-          `${side}${key.charAt(0).toUpperCase()}${key.slice(1)}`,
-          value,
-        ]),
-      ),
+      ...mapKeys(party, (_value, key) => `${side}${upperFirst(key)}`),
     } as Parameters<typeof createInquiry>[0]);
     return db.inquiry.findUniqueOrThrow({ where: { id: entity.id } });
   };

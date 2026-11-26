@@ -1,0 +1,14 @@
+// ============================================================================
+// ACCESS - Shared resource access enums (read visibility & tenant operate)
+// ============================================================================
+
+enum ReadAccess {
+  public
+  tenant
+  private
+}
+
+enum OperateAccess {
+  tenant
+  private
+}

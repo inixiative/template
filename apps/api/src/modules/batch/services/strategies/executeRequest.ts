@@ -6,6 +6,7 @@
  */
 import { captureTraceContext } from '@template/shared/telemetry';
 import type { Hono } from 'hono';
+import { omitBy } from 'lodash-es';
 import { AUTH_PROBE_HEADER } from '#/lib/utils/authProbe';
 import type { BatchRequest, RequestResult } from '#/modules/batch/services/strategies/types';
 import type { AppEnv } from '#/types/appEnv';
@@ -42,9 +43,7 @@ const STRIPPED_SUBREQUEST_HEADERS = new Set([
 ]);
 
 const omitDisallowedSubrequestHeaders = (headers: Record<string, string>): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries(headers).filter(([key]) => !STRIPPED_SUBREQUEST_HEADERS.has(key.toLowerCase())),
-  );
+  omitBy(headers, (_value, key) => STRIPPED_SUBREQUEST_HEADERS.has(key.toLowerCase()));
 
 export const executeRequest = async (
   app: Hono<AppEnv>,

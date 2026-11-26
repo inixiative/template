@@ -12,8 +12,10 @@ model Project {
   updatedAt            DateTime        @updatedAt
   deletedAt            DateTime?
 
-  name        String
-  description String?
+  name          String
+  description   String?
+  readAccess    ReadAccess    @default(private)
+  operateAccess OperateAccess @default(private)
 
   ownerModel     ProjectOwnerModel
   userId         String?           @db.VarChar(36)

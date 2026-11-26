@@ -7,6 +7,7 @@ import {
   polymorphicSchema,
   toModelName,
 } from '@template/db';
+import { omit } from 'lodash-es';
 import { polymorphismRules } from '#/hooks/falsePolymorphism/toRules';
 
 const id = '019a0000-0000-7000-8000-000000000001';
@@ -33,7 +34,7 @@ describe('polymorphicSchema matches the write rule', () => {
         expect({ value, ...verdicts(row) }).toEqual({ value, schema: true, rule: true });
 
         for (const fk of required) {
-          const { [fk]: _missing, ...without } = row;
+          const without = omit(row, fk);
           expect({ value, fk, ...verdicts(without) }).toEqual({
             value,
             fk,

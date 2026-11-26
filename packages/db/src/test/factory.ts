@@ -32,6 +32,7 @@ import type {
 } from '@template/db/test/factoryTypes';
 import { carryOwnerKeys } from '@template/db/utils/carryOwnerKeys';
 import { toAccessor } from '@template/db/utils/modelNames';
+import { mapValues } from 'lodash-es';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
   if (obj === null || obj === undefined) {
@@ -47,14 +48,9 @@ const serializeEntity = <T>(obj: T): Serialized<T> => {
   }
 
   if (typeof obj === 'object') {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      // Skip non-enumerable properties like __serialize itself
-      if (Object.prototype.propertyIsEnumerable.call(obj, key)) {
-        result[key] = serializeEntity(value);
-      }
-    }
-    return result as Serialized<T>;
+    return mapValues(obj as Record<string, unknown>, (value) =>
+      serializeEntity(value),
+    ) as Serialized<T>;
   }
 
   return obj as Serialized<T>;

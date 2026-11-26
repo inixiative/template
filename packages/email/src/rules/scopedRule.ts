@@ -15,6 +15,7 @@ import {
 } from '@template/email/rules/emailLens';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 import { walkConditionTree } from '@template/email/rules/walkConditionTree';
+import { omitBy } from 'lodash-es';
 
 export type { BindingChain } from '@template/email/rules/resolveBindingPath';
 
@@ -228,8 +229,8 @@ export const narrowToElements = (
   scope: Record<string, unknown>,
   frames: LoopFrame[],
 ): Record<string, unknown> => {
-  const out: Record<string, unknown> = Object.fromEntries(
-    Object.entries(scope).filter(([key]) => !frames.some((frame) => frame.as === key)),
+  const out: Record<string, unknown> = omitBy(scope, (_value, key) =>
+    frames.some((frame) => frame.as === key),
   );
   if (!frames.length) return out;
   let pinned: unknown = scope[frames[frames.length - 1]!.as];

@@ -163,12 +163,16 @@ describe('settingResourcePermission & db:ProjectIntegration through the real che
   };
   const orgProject = {
     id: 'p1',
+    readAccess: 'tenant',
+    operateAccess: 'tenant',
     ownerModel: 'Organization',
     organizationId: organization.id,
     organization,
   };
   const memberProject = {
     id: 'p2',
+    readAccess: 'private',
+    operateAccess: 'private',
     ownerModel: 'OrganizationUser',
     organizationId: organization.id,
     userId: u1.id,

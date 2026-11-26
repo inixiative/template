@@ -48,7 +48,7 @@ import { walkConditionTree } from '@template/email/rules/walkConditionTree';
 import { type LensPathWalk, walkLensPath } from '@template/email/rules/walkLensPath';
 import type { RuleLens, RuleReference, RuleVocabulary } from '@template/shared/rules';
 import { notDeleted } from '@template/shared/rules';
-import { startCase } from 'lodash-es';
+import { mapValues, omit, pick, pickBy, startCase } from 'lodash-es';
 
 export const OPAQUE_SLOT = 'opaque';
 export const EMAIL_MAP_NAME = 'email';
@@ -94,13 +94,7 @@ export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
 
 const viewOf = ({ picks, relations }: ModelNarrowing): ModelNarrowing => ({
   ...(picks ? { picks } : {}),
-  ...(relations
-    ? {
-        relations: Object.fromEntries(
-          Object.entries(relations).map(([name, child]) => [name, viewOf(child)]),
-        ),
-      }
-    : {}),
+  ...(relations ? { relations: mapValues(relations, viewOf) } : {}),
 });
 
 const DEFAULT_RECIPIENT_VIEW = viewOf(DEFAULT_RECIPIENT_NARROWING);
@@ -109,7 +103,7 @@ const withMemberships = (memberships: {
   organizationUsers?: ModelNarrowing;
   spaceUsers?: ModelNarrowing;
 }): ModelNarrowing => {
-  const { organizationUsers: _o, spaceUsers: _s, ...relations } = DEFAULT_RECIPIENT_VIEW.relations!;
+  const relations = omit(DEFAULT_RECIPIENT_VIEW.relations!, ['organizationUsers', 'spaceUsers']);
   return { ...DEFAULT_RECIPIENT_VIEW, relations: { ...relations, ...memberships } };
 };
 
@@ -155,11 +149,8 @@ const exactly = (shown: RuleLens, node: ModelNarrowing, path = ''): ModelNarrowi
     ...(hidden.length ? { omits: [...(node.omits ?? []), ...hidden] } : {}),
     ...(node.relations
       ? {
-          relations: Object.fromEntries(
-            Object.entries(node.relations).map(([name, child]) => [
-              name,
-              exactly(shown, child, path ? `${path}.${name}` : name),
-            ]),
+          relations: mapValues(node.relations, (child, name) =>
+            exactly(shown, child, path ? `${path}.${name}` : name),
           ),
         }
       : {}),
@@ -212,12 +203,7 @@ export const lensFromFieldTypes = (
       [EMAIL_MAP_NAME]: {
         models: {
           [model]: {
-            fields: Object.fromEntries(
-              Object.entries(fields).map(([name, type]) => [
-                name,
-                { kind: 'scalar' as const, type },
-              ]),
-            ),
+            fields: mapValues(fields, (type) => ({ kind: 'scalar' as const, type })),
           },
         },
       },
@@ -586,7 +572,5 @@ const isNarrowing = (value: unknown): value is ModelNarrowing =>
 
 export const parseSlotLenses = (raw: unknown): EmailSlotLenses => {
   if (!isNarrowing(raw)) return {};
-  const doc = raw as Record<string, unknown>;
-  const slots = (['recipient', 'sender', 'data'] as const).filter((root) => isNarrowing(doc[root]));
-  return Object.fromEntries(slots.map((root) => [root, doc[root]]));
+  return pickBy(pick(raw as Record<string, unknown>, ['recipient', 'sender', 'data']), isNarrowing);
 };
