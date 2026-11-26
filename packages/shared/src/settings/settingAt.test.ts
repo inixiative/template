@@ -46,7 +46,7 @@ const tree: SettingTree = {
       },
     },
   },
-  'family:google': { google: { a: boxes('A', 0) } },
+  'integrationFamily:google': { google: { a: boxes('A', 0) } },
   'provider:drive': { google: { b: boxes('B', 0) } },
 };
 
@@ -75,10 +75,12 @@ describe('settingAt', () => {
   });
 
   it('merges branches of one name from every matching kind', () => {
-    const kinds = { provider: 'drive', family: 'google' };
+    const kinds = { provider: 'drive', integrationFamily: 'google' };
     expect(settingAt(tree, 'google.a', kinds)).toBeDefined();
     expect(settingAt(tree, 'google.b', kinds)).toBeDefined();
-    expect(settingAt(tree, 'google.b', { provider: 'gmail', family: 'google' })).toBeUndefined();
+    expect(
+      settingAt(tree, 'google.b', { provider: 'gmail', integrationFamily: 'google' }),
+    ).toBeUndefined();
   });
 
   it("keeps each branch's permissions on its own settings when kinds merge into a plain branch", () => {
@@ -114,7 +116,7 @@ describe('settingAt', () => {
     const families: SettingTree = {
       __read: 'read',
       __manage: 'manage',
-      'family:inixiative': {
+      'integrationFamily:inixiative': {
         __manage: 'operate',
         inixiative: { region: boxes('Region', 0) },
         'provider:chorus': { chorus: { enabled: boxes('Enabled', 0) } },
@@ -123,12 +125,12 @@ describe('settingAt', () => {
     };
     const view = (kinds: Record<string, string | null>) =>
       settingsIn(families, kinds).map(({ key, manage }) => `${key}:${manage}`);
-    expect(view({ provider: 'chorus', family: 'inixiative' })).toEqual([
+    expect(view({ provider: 'chorus', integrationFamily: 'inixiative' })).toEqual([
       'inixiative.region:operate',
       'chorus.enabled:operate',
     ]);
-    expect(view({ provider: 'inixiative', family: null })).toEqual([]);
-    expect(view({ provider: 'chorus', family: null })).toEqual([]);
+    expect(view({ provider: 'inixiative', integrationFamily: null })).toEqual([]);
+    expect(view({ provider: 'chorus', integrationFamily: null })).toEqual([]);
   });
 });
 

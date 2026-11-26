@@ -33,10 +33,10 @@ To do:
 
 ## Provider families in setting trees
 
-`@inixiative/integrations` already gives providers a `family` (`github` holds `githubUser` and `githubOrganization`; `google` holds `drive` and `gmail`), read with `providerFamily(provider)`. Integration and ProjectIntegration trees switch on two kind fields:
+Integration and ProjectIntegration trees switch on two kind fields:
 - `provider:<key>`, the integration's own provider;
-- `family:<key>`, `providerFamily(provider)`, which is the provider itself when it has no family.
+- `integrationFamily:<key>` (labelled "Family"), the family the catalog declares for the provider, null when it declares none, so a family never matches an integration directly.
 
-So family-wide settings go under `'family:google'`, and Atlassian's would go under `'family:atlassian'`.
+A provider in a family is declared inside its family's branch: `'integrationFamily:atlassian': { atlassian: {…shared}, 'provider:jira': { jira: {…} } }`.
 
-**Open, needs Aron:** Jira and Confluence have no family in the catalog yet. Making `atlassian` a family is more than grouping. A family is family-managed (`isFamilyManaged`), so Jira and Confluence would then connect through one Atlassian consent flow, as Google's products do, and Kingdom's create route already refuses direct creates for family-managed providers. That matches Atlassian's single OAuth (3LO) and the shared `cloudId` configuration, but it changes how those integrations are connected. Until it's decided, `family:atlassian` matches nothing.
+**Decided (Aron, 2026-11-26):** Atlassian becomes a family for Jira and Confluence, and inixiative one for Chorus and Oracle; families become a first-class model. See FEAT-034.

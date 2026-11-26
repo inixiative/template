@@ -16,6 +16,6 @@ export const settingResourceKindsOf = (
   resourceModel === 'Integration' || resourceModel === 'ProjectIntegration'
     ? {
         provider: integrationProvider,
-        family: findProvider(integrationProvider)?.family ?? null,
+        integrationFamily: findProvider(integrationProvider)?.family ?? null,
       }
     : {};

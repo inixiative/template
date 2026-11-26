@@ -2,7 +2,7 @@
 
 **Status:** Agreed in principle (Aron, 2026-11-26: "integration family becomes first class model right?"; "sounds good make it so"). Design for review; not started.
 **Repos:** `inixiative/integrations` (the catalog), `inixiative/template`, then Kingdom.
-**Related:** FEAT-029 (settings pages and provider families), template#338 (setting trees, `family:` kind branches).
+**Related:** FEAT-029 (settings pages and provider families), template#338 (setting trees, `integrationFamily:` kind branches).
 
 ## Why
 
@@ -13,7 +13,7 @@ A family is one consent and one credential shared by several products: Google fo
 - The family "integration" has no operations of its own.
 - Family rows need an `organizationId`, so a personal or space owner can't hold one, though Chorus is one per owner of any kind.
 
-Settings now branch on `family:` (template#338), so the model they depend on belongs in template.
+Settings now branch on `integrationFamily:` (template#338), so the model they depend on belongs in template.
 
 ## Shape
 
@@ -52,20 +52,20 @@ export const families = [
   { key: 'atlassian', oauth: { … } },
   { key: 'inixiative' },
 ] as const;
-// a provider names its family: { key: 'jira', family: 'atlassian', … }
+// a provider names its family: { key: 'jira', integrationFamily: 'atlassian', … }
 ```
 
 - **Owner:** any owner, under the same false polymorphism as `Integration`. The family's owner and its products' owner must match. The tenant-boundary hook checks that, as `projectIntegrationOwner` does for links.
 - **One per owner per family.** Connecting a product finds or creates the owner's family first, which is the one-per-owner revive path (`createIntegration`, R-2026-11-24-03).
 - **Lifecycle:** a family is a soft-delete parent of its products. Removing it removes them, and reviving it revives them.
-- **Settings:** `IntegrationFamily` joins `SettingResourceModel` with its own tree, for what the whole family shares (`atlassian.cloudId`, `inixiative.region`). Products keep their `family:` / `provider:` branches on the Integration tree. `settingResourceKindsOf` reads `family` from the product's catalog entry, as it does now.
+- **Settings:** `IntegrationFamily` joins `SettingResourceModel` with its own tree, for what the whole family shares (`atlassian.cloudId`, `inixiative.region`). Products keep their `integrationFamily:` / `provider:` branches on the Integration tree. `settingResourceKindsOf` reads `integrationFamily` from the product's catalog entry, as it does now; the kind branch is `integrationFamily:<key>`, labelled "Family" in the UI.
 - **Permissions:** `db:IntegrationFamily` follows `db:Integration`'s owner rules. Products reach their family upward (`IntegrationFamily → owner`), so a family's `manage` is its owner's.
 
 ## Credentials (Kingdom)
 
 - **A family product's credential hangs off its `IntegrationFamily`.** Kingdom's `Credential` gets a polymorphic parent: `integration` or `integrationFamily`, with a dual id per R-2026-11-17-04. A product without a family keeps its own.
 - **One renewal path per family,** chosen from the catalog's family entry. It replaces the Google-only `renewFamilyCredential`.
-- **Direct credentials on a family product are refused** (today's `isFamilyManaged` check), and the 400 names where to go: `{ family: 'atlassian', integrationFamilyId }`, so the UI can send you to connect the family.
+- **Direct credentials on a family product are refused** (today's `isFamilyManaged` check), and the 400 names where to go: `{ integrationFamily: 'atlassian', integrationFamilyId }`, so the UI can send you to connect the family.
 - **A family with no credential is valid** (`inixiative`): it groups, shares settings, and turns its products off together.
 - **Entitlements:** whatever is anchored at a Kingdom family `Integration` today moves to the `IntegrationFamily`, for example a Signet granting `operate`.
 

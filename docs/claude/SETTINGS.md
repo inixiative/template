@@ -58,7 +58,7 @@ A setting is a value a resource holds: a user's timezone, a Chorus integration's
 | Key | Example | Is |
 |---|---|---|
 | `__name` | `__read`, `__manage`, `__label` | metadata of that branch or leaf |
-| `field:value` | `provider:chorus`, `family:google` | a kind branch: applies only when the resource's `field` is `value`; adds nothing to the key |
+| `field:value` | `provider:chorus`, `integrationFamily:google` | a kind branch: applies only when the resource's `field` is `value`; adds nothing to the key |
 | anything else | `general`, `l1`, `boxesMax` | a branch, or a leaf when it has `valueType` |
 
 A leaf is `valueType` (`boolean`, `text`, `number`, `date`, `multiSelect`; no `json` settings), `defaultValue`, `label`, `description`, and optionally `options` (`{ value, label }[]`) and `conditions` (a json-rules condition on `{ value }`). A value must be of its type, AND one of `options` when there are options, AND pass `conditions` when there are conditions (`validateAttributeValue`, the same function on server and client). Trees are plain data: `/setting/info` serves them as written.
@@ -88,7 +88,7 @@ ProjectIntegration: {
 - **`settingAt(tree, key, kinds)`** reads the path down to the leaf, then walks back up: the nearest `__read` / `__manage` wins (`read ??= node.__read`). Every root sets both, so every leaf has both. A kind branch's own `__read` / `__manage` count only for the settings declared under it, never for a plain branch of the same name it merges into.
 - **`settingsIn(tree, kinds, path?)`** lists every setting a resource holds, in declaration order, or only those at or under `path`. `'every'` as kinds includes every kind branch: what a tree can ever hold.
 - **`settingChildrenFor(branch, kinds)`** is the one place kinds are handled: a branch's own children plus those of its matching kind branches, branches of one name merged at every depth.
-- **Kinds of an integration or link** are `settingResourceKindsOf(resourceModel, provider)` (`{}` for every other model): `provider` (a column), and `family`, derived from the provider's `family` in the `@inixiative/integrations` catalog (`google` for `drive` and `gmail`, null for a provider that declares none, so a family never matches an integration directly). A provider that belongs to a family is declared inside its family's branch (`'family:google': { google: {…shared}, 'provider:drive': { drive: {…} } }`); a provider with no family sits at the root. The server reads kinds with `fetchSettingResourceKinds`.
+- **Kinds of an integration or link** are `settingResourceKindsOf(resourceModel, provider)` (`{}` for every other model): `provider` (a column), and `integrationFamily` (shown as "Family"), derived from the provider's family in the `@inixiative/integrations` catalog (`google` for `drive` and `gmail`, null for a provider that declares none, so a family never matches an integration directly). A provider that belongs to a family is declared inside its family's branch (`'integrationFamily:google': { google: {…shared}, 'provider:drive': { drive: {…} } }`); a provider with no family sits at the root. The server reads kinds with `fetchSettingResourceKinds`.
 - **Order is declaration order.** JavaScript keeps string keys in insertion order through JSON; integer-like names are refused.
 - **One meaning per key:** wherever a key is placed it has the same type, options, conditions and default; permissions may differ by model, but not across one model's kinds.
 - **Shared pieces are plain consts** placed with spread or by reference.
