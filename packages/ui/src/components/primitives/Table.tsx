@@ -71,7 +71,7 @@ export const Table = <T,>({
   scrollRef,
   sectionId,
   className,
-  isLoading = false,
+  isLoading,
   renderItemRows,
   skeletonItemRows,
 }: TableProps<T>) => {

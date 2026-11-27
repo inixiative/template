@@ -26,7 +26,7 @@ export const List = <T,>({
   items,
   renderItem,
   emptyMessage,
-  isLoading = false,
+  isLoading,
   skeletonItem,
   className,
 }: ListProps<T>) => {

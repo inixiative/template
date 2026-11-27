@@ -204,7 +204,7 @@ const columns = [
 <CardTitle {...skeletonAttributes(isCatalogLoading)}>{title}</CardTitle>
 ```
 
-**The skeleton attribute.** `skeletonAttributes(isLoading)` goes on the element that holds the data; the element is the same loading or not, and while loading it gets `inert` and `data-skeleton`, which the rules in [THEME_LAYOUT.md § Skeleton rules](THEME_LAYOUT.md#skeleton-rules) draw. Nothing inside an inert element is read, so `Table`, `List` and `CardContent` keep a `SkeletonStatus` beside it: an sr-only `role="status"` region, always mounted, whose text is "Loading…" while loading and empty otherwise. Any other skeleton region renders one too.
+**The skeleton attribute.** `skeletonAttributes(isLoading)` goes on the element that holds the data; the element is the same loading or not, and while loading it gets `inert` and `data-skeleton`, which the rules in [THEME_LAYOUT.md § Skeleton rules](THEME_LAYOUT.md#skeleton-rules) draw. Nothing inside an inert element is read, so `Table`, `List` and `CardContent`, whenever they are given `isLoading`, keep a `SkeletonStatus` beside it: an sr-only `role="status"` region that stays mounted and reads "Loading…" while loading, empty otherwise. Any other skeleton region renders one too.
 
 Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a skeleton `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`).
 

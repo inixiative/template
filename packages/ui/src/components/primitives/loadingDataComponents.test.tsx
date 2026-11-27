@@ -182,6 +182,15 @@ describe('CardContent', () => {
     expect(screen.getByRole('status')).toBeTruthy();
   });
 
+  test('content never given a loading state has no status region', () => {
+    render(
+      <CardContent>
+        <p>Ready</p>
+      </CardContent>,
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   test('loading content with no renderable children draws skeleton lines', () => {
     const { container } = render(<CardContent isLoading>{false}</CardContent>);
     const content = container.querySelector('[data-skeleton]') as HTMLElement;
