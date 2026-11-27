@@ -1,43 +1,43 @@
 import { describe, expect, it } from 'bun:test';
 import { createPermissions } from '@template/permissions/client';
-import { directEntitledIds, STANDARD_ACTIONS_IMPLYING } from '@template/permissions/permix';
+import { permixIdsWithAction } from '@template/permissions/permix';
 
-describe('directEntitledIds', () => {
-  it('sets hasBroadEntitlement false when multiple actions match the same direct anchor ID', async () => {
+describe('permixIdsWithAction', () => {
+  it('collects IDs from both role table entries and direct-anchored entitlements for covering actions', async () => {
     const owner = createPermissions();
-    await owner.setup({ resource: 'db:ArtifactPlacement', id: 'p-1', actions: { manage: true } });
+    await owner.setup({ resource: 'db:Organization', id: 'org-ent', actions: { manage: true } });
     const permix = createPermissions();
+    await permix.setup({ resource: 'db:Organization', id: 'org-role', actions: { own: true } });
     await permix.setup(
       [
         {
-          resource: 'db:ArtifactPlacement',
-          anchor: { resource: 'db:ArtifactPlacement', id: 'p-1' },
-          actions: { read: true, manage: true },
+          resource: 'db:Organization',
+          anchor: { resource: 'db:Organization', id: 'org-ent' },
+          actions: { manage: true },
         },
-      ],
-      { owner },
-    );
-    const result = directEntitledIds(permix, 'db:ArtifactPlacement', ['read', 'manage']);
-    expect(result.directIds).toEqual(['p-1']);
-    expect(result.hasBroadEntitlement).toBe(false);
-  });
-
-  it('sets hasBroadEntitlement true when an entitlement is anchored above the target resource', async () => {
-    const owner = createPermissions();
-    await owner.setup({ resource: 'db:Organization', id: 'org-1', actions: { own: true } });
-    const permix = createPermissions();
-    await permix.setup(
-      [
         {
-          resource: 'db:Artifact',
-          anchor: { resource: 'db:Organization', id: 'org-1', path: 'organization' },
+          resource: 'db:Organization',
+          anchor: { resource: 'db:Organization', id: 'org-read-only' },
+          actions: { read: true },
+        },
+        {
+          resource: 'db:Space',
+          anchor: { resource: 'db:Organization', id: 'org-ent', path: 'organization' },
           actions: { read: true },
         },
       ],
       { owner },
     );
-    const result = directEntitledIds(permix, 'db:Artifact', STANDARD_ACTIONS_IMPLYING.read);
-    expect(result.directIds).toEqual([]);
-    expect(result.hasBroadEntitlement).toBe(true);
+
+    expect(permixIdsWithAction(permix, 'db:Organization', 'manage').sort()).toEqual([
+      'org-ent',
+      'org-role',
+    ]);
+    expect(permixIdsWithAction(permix, 'db:Organization', 'read').sort()).toEqual([
+      'org-ent',
+      'org-read-only',
+      'org-role',
+    ]);
+    expect(permixIdsWithAction(permix, 'db:Space', 'read')).toEqual([]);
   });
 });

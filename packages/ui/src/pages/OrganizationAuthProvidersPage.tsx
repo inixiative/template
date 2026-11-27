@@ -177,22 +177,19 @@ export const OrganizationAuthProvidersPage = () => {
           </Button>
         }
       >
-        {isLoading ? (
-          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-        ) : (
-          <Table
-            columns={columns}
-            data={providers}
-            keyExtractor={(item) => item.id}
-            emptyMessage="No custom auth providers configured"
-            empty={{
-              icon: 'lucide:shield-check',
-              description:
-                'Platform email/password authentication is enabled by default. Add SSO or OAuth for your members.',
-              action: { label: 'Add provider', onClick: () => setIsModalOpen(true) },
-            }}
-          />
-        )}
+        <Table
+          columns={columns}
+          data={providers}
+          keyExtractor={(item) => item.id}
+          emptyMessage="No custom auth providers configured"
+          empty={{
+            icon: 'lucide:shield-check',
+            description:
+              'Platform email/password authentication is enabled by default. Add SSO or OAuth for your members.',
+            action: { label: 'Add provider', onClick: () => setIsModalOpen(true) },
+          }}
+          isLoading={isLoading}
+        />
       </Page>
 
       <AuthProviderModal

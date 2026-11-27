@@ -24,11 +24,7 @@ export {
   toEntitlementEntry,
   toEntitlementInput,
 } from './entitlementRows';
-export {
-  directEntitledIds,
-  permixIdsWithAction,
-  STANDARD_ACTIONS_IMPLYING,
-} from './permix';
+export { permixIdsWithAction } from './permix';
 // ReBAC
 export { artifactEffectiveRole, check as rebacCheck } from './rebac/check';
 export { INQUIRY_TYPES, type InquiryParty, type InquiryTypeParties } from './rebac/inquiryTypes';

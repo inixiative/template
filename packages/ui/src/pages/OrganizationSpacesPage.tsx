@@ -58,21 +58,18 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
       title="Spaces"
       description="Spaces within this organization. Open one to work in its context."
     >
-      {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-      ) : (
-        <Table
-          columns={columns}
-          data={spaces}
-          keyExtractor={(space) => space.id}
-          onRowClick={(space: Space) => tenant.switchToSpaceContext(space.id)}
-          emptyMessage="No spaces in this organization yet"
-          empty={{
-            icon: 'lucide:layout-grid',
-            description: 'Spaces created in this organization will appear here.',
-          }}
-        />
-      )}
+      <Table
+        columns={columns}
+        data={spaces}
+        keyExtractor={(space) => space.id}
+        onRowClick={(space: Space) => tenant.switchToSpaceContext(space.id)}
+        emptyMessage="No spaces in this organization yet"
+        empty={{
+          icon: 'lucide:layout-grid',
+          description: 'Spaces created in this organization will appear here.',
+        }}
+        isLoading={isLoading}
+      />
     </Page>
   );
 };

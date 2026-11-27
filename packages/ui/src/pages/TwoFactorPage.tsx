@@ -69,8 +69,6 @@ export const TwoFactorPage = () => {
     >
       {isEnroll ? (
         <TwoFactorSecurityCard onEnrolled={() => void returnToOrigin()} />
-      ) : isLoadingTwoFactor || isReturning || !twoFactorData?.data ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
       ) : (
         <Card className="w-full shadow-lg border-border/50">
           <CardHeader>
@@ -79,9 +77,9 @@ export const TwoFactorPage = () => {
               Confirm your identity with a passkey, authenticator app, or backup code.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent isLoading={isLoadingTwoFactor || isReturning || !twoFactorData?.data}>
             <TwoFactorVerifyForm
-              methods={twoFactorData.data.methods}
+              methods={twoFactorData?.data?.methods ?? []}
               onVerified={(jwt) => {
                 applyUpgradedJwt(jwt, false);
                 void returnToOrigin();

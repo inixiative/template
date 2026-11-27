@@ -40,7 +40,7 @@ export const initializeBrowserTelemetry = async (app: BrowserTelemetry['app']): 
     const { BasicTracerProvider, BatchSpanProcessor, TraceIdRatioBasedSampler } = await import(
       '@opentelemetry/sdk-trace-base'
     );
-    const { ExportResultCode, hrTimeToMilliseconds } = await import('@opentelemetry/core');
+    const { makeBrowserSpanExporter } = await import('@template/ui/lib/makeBrowserSpanExporter');
     apiOrigin = new URL(import.meta.env.VITE_API_URL || 'http://localhost:8000').origin;
     const endpoint = `${apiOrigin}/api/telemetry/browser`;
     const ratio = Number(import.meta.env.VITE_OTEL_SAMPLE_RATIO ?? '1');
@@ -50,44 +50,13 @@ export const initializeBrowserTelemetry = async (app: BrowserTelemetry['app']): 
       ),
       spanProcessors: [
         new BatchSpanProcessor(
-          {
-            export(spans, callback) {
-              const data: BrowserTelemetry = {
-                app,
-                spans: spans.map((span) => ({
-                  traceId: span.spanContext().traceId,
-                  spanId: span.spanContext().spanId,
-                  name: span.name as BrowserTelemetry['spans'][number]['name'],
-                  startTimeMs: hrTimeToMilliseconds(span.startTime),
-                  durationMs: Math.min(hrTimeToMilliseconds(span.duration), 600_000),
-                  error: span.status.code === SpanStatusCode.ERROR,
-                  method: span.attributes[
-                    'http.request.method'
-                  ] as BrowserTelemetry['spans'][number]['method'],
-                  status: span.attributes['http.response.status_code'] as number | undefined,
-                  route: span.attributes['http.route'] as string | undefined,
-                  errorType: span.attributes['error.type'] as string | undefined,
-                  errorMessage: span.attributes['error.message'] as string | undefined,
-                  errorStack: span.attributes['error.stack'] as string | undefined,
-                })),
-              };
-              void fetch(endpoint, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify(data),
-                credentials: 'omit',
-                keepalive: true,
-                signal: AbortSignal.timeout(5000),
-              })
-                .then((response) =>
-                  callback({
-                    code: response.ok ? ExportResultCode.SUCCESS : ExportResultCode.FAILED,
-                  }),
-                )
-                .catch(() => callback({ code: ExportResultCode.FAILED }));
+          makeBrowserSpanExporter({
+            app,
+            endpoint,
+            onExportsStopped: () => {
+              tracer = undefined;
             },
-            async shutdown() {},
-          },
+          }),
           {
             maxQueueSize: 100,
             maxExportBatchSize: 10,

@@ -179,6 +179,7 @@ Turborepo caches task outputs based on input file hashes:
 - `generate:openapi` - Generate OpenAPI spec from API routes
 - `generate:sdk` - Generate TypeScript SDK from OpenAPI spec
 - `generate:routes` - Generate route tree for TanStack Router
+- `generate:icons` - Bundle the lucide and simple-icons icons the apps name (`packages/ui/src/lib/icons/bundledIconCollections.gen.ts`), so they render without a network fetch; `bun run generate:frontend` runs both
 
 ### Development Tasks (persistent)
 - `local#api` - Run API server with hot reload
@@ -248,7 +249,7 @@ turbo watch local#api
 turbo watch local#web local#admin local#superadmin
 
 # Run generation tasks
-turbo run generate:sdk generate:routes
+turbo run generate:sdk generate:routes generate:icons
 ```
 
 ## Debugging
