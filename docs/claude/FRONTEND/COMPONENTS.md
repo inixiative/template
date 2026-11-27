@@ -143,7 +143,7 @@ type TableProps<T> = {
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   sectionId?: string;
   className?: string;
-  isLoading?: boolean;          // header + skeleton rows instead of data or the empty state
+  isLoading?: boolean;          // header + skeleton items instead of data or the empty state
   renderItemRows?: (item: T) => React.ReactNode;  // an item drawn as several <tr>s, in its own <tbody>
   skeletonItemRows?: React.ReactNode;             // those rows while loading
 };
@@ -252,7 +252,7 @@ const { data, isFetching } = useQuery({
 
 ### Others
 
-`Badge` (`variant`, or `tone`: `primary`, `tertiary`, `quaternary`, `warning`, `muted` for a tinted status pill with a dot), `Breadcrumb`, `CopyButton` (`value`, `label?`), `Pagination`, `ThemeSelector` (see [THEME_LAYOUT.md](THEME_LAYOUT.md#themeselector)).
+`Badge` (`variant`, or `tone`: `primary`, `tertiary`, `quaternary`, `warning`, `muted` for a tinted, rounded status badge with a dot), `Breadcrumb`, `CopyButton` (`value`, `label?`), `Pagination`, `ThemeSelector` (see [THEME_LAYOUT.md](THEME_LAYOUT.md#themeselector)).
 
 ## Settings
 

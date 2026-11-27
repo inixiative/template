@@ -131,7 +131,7 @@ const ConnectIntegrationButton = ({
   </Button>
 );
 
-const connectButtonSkeleton = <ConnectIntegrationButton />;
+const connectIntegrationButtonSkeleton = <ConnectIntegrationButton />;
 
 const connectedIntegrationSkeletonItem = (
   <ListRow
@@ -145,7 +145,7 @@ const connectableIntegrationSkeletonItem = (
   <ListRow
     name={<SkeletonText width="10rem" />}
     badges={<IntegrationBadges provider="provider" />}
-    actions={connectButtonSkeleton}
+    actions={connectIntegrationButtonSkeleton}
   />
 );
 
@@ -286,7 +286,7 @@ export const ProjectIntegrationsSection = ({
       name={integration.name}
       badges={<IntegrationBadges provider={integration.provider} />}
       actions={
-        <SkeletonSized skeleton={connectButtonSkeleton}>
+        <SkeletonSized skeleton={connectIntegrationButtonSkeleton}>
           {canConnectIntegration(integration) ? (
             <ConnectIntegrationButton
               displayName={integration.name}

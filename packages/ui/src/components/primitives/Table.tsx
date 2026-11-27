@@ -118,9 +118,9 @@ export const Table = <T,>({
             </tr>
           </thead>
           {isLoading &&
-            Array.from({ length: skeletonItemCount }, (_, row) => (
+            Array.from({ length: skeletonItemCount }, (_, item) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: skeleton items have no identity
-              <tbody key={row} className={itemBodyClassName} {...skeletonAttributes(true)}>
+              <tbody key={item} className={itemBodyClassName} {...skeletonAttributes(true)}>
                 {skeletonItemRows ?? (
                   <tr>
                     {columns.map((column, cell) => (

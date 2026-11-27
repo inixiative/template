@@ -20,7 +20,7 @@ const columns = [
 ];
 
 describe('Table', () => {
-  test('a loading table keeps its header and draws skeleton rows, never the empty state', () => {
+  test('a loading table keeps its header and draws skeleton items, never the empty state', () => {
     const { container } = render(
       <Table<Row> columns={columns} data={[]} keyExtractor={(row) => row.id} isLoading />,
     );

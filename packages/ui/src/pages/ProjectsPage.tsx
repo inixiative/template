@@ -240,7 +240,6 @@ export type ProjectsPageProps = {
   onOpenProject?: (project: ProjectRecord) => void;
 };
 
-// One layout for a project row, loaded or skeleton (the skeleton counts the description as present).
 const OpenProjectButton = ({ onOpen }: { onOpen?: () => void }) => (
   <Button type="button" variant="outline" size="sm" onClick={onOpen}>
     Open

@@ -40,25 +40,21 @@ type BadgeTone = keyof typeof badgeToneClassNames;
 type BadgeProps = React.HTMLAttributes<HTMLDivElement> &
   VariantProps<typeof badgeVariants> & { tone?: BadgeTone };
 
-const Badge = ({ className, variant, tone, children, ...props }: BadgeProps) =>
-  tone ? (
-    <div
-      data-slot="badge"
-      className={cn(
-        'inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium',
-        badgeToneClassNames[tone],
-        className,
-      )}
-      {...props}
-    >
-      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
-      {children}
-    </div>
-  ) : (
-    <div data-slot="badge" className={cn(badgeVariants({ variant }), className)} {...props}>
-      {children}
-    </div>
-  );
+const Badge = ({ className, variant, tone, children, ...props }: BadgeProps) => (
+  <div
+    data-slot="badge"
+    className={cn(
+      badgeVariants({ variant: tone ? null : variant }),
+      tone && 'h-6 shrink-0 gap-1.5 whitespace-nowrap border-transparent py-0 font-medium',
+      tone && badgeToneClassNames[tone],
+      className,
+    )}
+    {...props}
+  >
+    {tone ? <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
+    {children}
+  </div>
+);
 
 export type { BadgeProps, BadgeTone };
 export { Badge, badgeVariants };

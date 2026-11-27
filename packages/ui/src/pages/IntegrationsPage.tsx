@@ -13,7 +13,7 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
-import { Button, Page, skeletonAttributes } from '@template/ui/components';
+import { Button, Page, SkeletonStatus, skeletonAttributes } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
 import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
 import {
@@ -166,12 +166,15 @@ const IntegrationProviderSection = ({
     </Button>
   );
   const statusText = showStatus && !providerIntegrations.isError && (
-    <span
-      className="font-mono text-[11px] text-muted-foreground"
-      {...skeletonAttributes(providerIntegrations.isLoading)}
-    >
-      {status.label}
-    </span>
+    <>
+      <SkeletonStatus isLoading={providerIntegrations.isLoading} />
+      <span
+        className="font-mono text-[11px] text-muted-foreground"
+        {...skeletonAttributes(providerIntegrations.isLoading)}
+      >
+        {status.label}
+      </span>
+    </>
   );
   const connectPanel = isConnectOpen && enabled && renderConnect(() => setConnectOpen(false));
   const errorText = providerIntegrations.isError && (

@@ -106,7 +106,7 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
             description: 'Inquiries sent between users, organizations and spaces will appear here.',
           }}
           isLoading={isLoading}
-          renderItemRows={(inq) => <AdminAllInquiryRows cells={adminAllInquiryCells(inq)} />}
+          renderItemRows={(inq) => <AdminAllInquiryRows cells={adminAllInquiryCellsFor(inq)} />}
           skeletonItemRows={<AdminAllInquiryRows cells={adminAllInquirySkeletonCells} />}
         />
       ) : (
@@ -174,7 +174,7 @@ const adminAllInquiryColumns = [
   { key: 'controls', label: '' },
 ];
 
-type AdminAllInquiryRowsCells = {
+type AdminAllInquiryCells = {
   type: React.ReactNode;
   status: React.ReactNode;
   source: React.ReactNode;
@@ -185,7 +185,7 @@ type AdminAllInquiryRowsCells = {
   targetControls: React.ReactNode;
 };
 
-const adminAllInquirySkeletonCells: AdminAllInquiryRowsCells = {
+const adminAllInquirySkeletonCells: AdminAllInquiryCells = {
   type: <SkeletonText width="10rem" />,
   status: <Badge>pending</Badge>,
   source: <SkeletonText width="12rem" />,
@@ -196,7 +196,7 @@ const adminAllInquirySkeletonCells: AdminAllInquiryRowsCells = {
   targetControls: <InquiryTargetControlsSkeleton />,
 };
 
-const AdminAllInquiryRows = ({ cells }: { cells: AdminAllInquiryRowsCells }) => (
+const AdminAllInquiryRows = ({ cells }: { cells: AdminAllInquiryCells }) => (
   <>
     <tr className="group-hover:bg-muted/40 transition-colors">
       <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
@@ -241,27 +241,27 @@ const AdminAllInquiryRows = ({ cells }: { cells: AdminAllInquiryRowsCells }) => 
   </>
 );
 
-const adminAllInquiryCells = (inq: Inquiry): AdminAllInquiryRowsCells => {
-  const entry = inquiryTypeComponentsFor(inq.type);
+const adminAllInquiryCellsFor = (inquiry: Inquiry): AdminAllInquiryCells => {
+  const entry = inquiryTypeComponentsFor(inquiry.type);
   const SourceSummary = entry?.source?.summary;
   const TargetSummary = entry?.target?.summary;
   // Registry components expect InquiryItem; the admin item is structurally compatible
-  const inquiryItem = inq as unknown as InquiryItem;
+  const inquiryItem = inquiry as unknown as InquiryItem;
   return {
-    type: INQUIRY_TYPE_LABELS[inq.type] ?? inq.type,
-    status: <InquiryStatusBadge inquiry={inq} />,
+    type: INQUIRY_TYPE_LABELS[inquiry.type] ?? inquiry.type,
+    status: <InquiryStatusBadge inquiry={inquiry} />,
     source: SourceSummary ? (
       <SourceSummary inquiry={inquiryItem} />
     ) : (
-      inquiryPartyDisplayName(inq, 'source')
+      inquiryPartyDisplayName(inquiry, 'source')
     ),
     target: TargetSummary ? (
       <TargetSummary inquiry={inquiryItem} />
     ) : (
-      inquiryPartyDisplayName(inq, 'target')
+      inquiryPartyDisplayName(inquiry, 'target')
     ),
-    sentAt: inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—',
-    expiresAt: inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—',
+    sentAt: inquiry.sentAt ? new Date(inquiry.sentAt).toLocaleDateString() : '—',
+    expiresAt: inquiry.expiresAt ? new Date(inquiry.expiresAt).toLocaleDateString() : '—',
     sourceControls: <InquirySourceControls inquiry={inquiryItem} />,
     targetControls: <InquiryTargetControls inquiry={inquiryItem} />,
   };
