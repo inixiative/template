@@ -21,7 +21,7 @@
         "@iconify-json/simple-icons": "^1.2.104",
         "@iconify/utils": "^3.1.7",
         "@inixiative/atlas": "^0.5.1",
-        "@inixiative/config": "^0.5.254",
+        "@inixiative/config": "^0.5.255",
         "@lightpanda/browser": "^1.6.0",
         "@mendable/firecrawl-js": "^4.54.0",
         "@tanstack/react-router": "^1.170.46",
@@ -665,7 +665,7 @@
 
     "@inixiative/atlas": ["@inixiative/atlas@0.5.1", "", { "dependencies": { "@inixiative/json-rules": "^4.2.0" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-S3Ix+XxwIB6aa9797JpOBk00owFLhxZ6CnEL/JdI3UhEWsvj7V5qcEgOy4E7GocDD3mKNsl78DNqQVJ62n24Gg=="],
 
-    "@inixiative/config": ["@inixiative/config@0.5.254", "", { "peerDependencies": { "@biomejs/biome": ">=2.5.0", "tsup": ">=8.5.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@biomejs/biome", "tsup", "typescript"], "bin": { "inixiative-config": "dist/cli.js" } }, "sha512-7C3RFQlmUJJvHm3KSow2cxajZtMePUCz6mkEWFrysWEbxGDyMj0T65LwutY7YxQ+rMXpxVHInJaKNq2Ol/VbmQ=="],
+    "@inixiative/config": ["@inixiative/config@0.5.255", "", { "peerDependencies": { "@biomejs/biome": ">=2.5.0", "tsup": ">=8.5.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@biomejs/biome", "tsup", "typescript"], "bin": { "inixiative-config": "dist/cli.js" } }, "sha512-WgnrPdHHED3xjifKpJvfolT0OeIGt6Idlufgxl3UkWpsAUPqLJI61aWoja41BzPQQvrhXpkeBVn4ZrO3qIcHpA=="],
 
     "@inixiative/field-map": ["@inixiative/field-map@0.1.2", "", { "bin": { "field-map": "dist/cli.js" } }, "sha512-mOwd1xs26s/0kKWbE/+6WWkQKw+zfXHdqGQhFf0B35laaYertFS1FF1TH8/8i/RnYmjLW33BkBsjg78yBpXOsw=="],
 
