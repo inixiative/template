@@ -18,6 +18,7 @@
   - [Types](#types)
   - [Usage in Root Component](#usage-in-root-component)
   - [White-Labeling](#white-labeling)
+  - [Skeleton rules](#skeleton-rules)
   - [Testing](#testing)
 - [Key Files](#key-files)
 
@@ -203,6 +204,10 @@ const RootComponent = () => {
 ### White-Labeling
 
 `Space` has `primaryColor` and `logoUrl` columns, and `useApplySpaceThemeCssVariables` applies a `SpaceTheme`, but no app calls `useApplySpaceThemeCssVariables` yet. Wiring it means passing the page space's theme in `__root.tsx`; shades 1–4 then come from `color-mix()`. Tracked in `tickets/FEAT-007-white-labeling.md`.
+
+### Skeleton rules
+
+The `[data-skeleton]` rules at the end of `packages/shared/styles/theme.css` draw an element's content while its data loads, at the content's own size: all text goes blank (mixed content too), controls and badges (`data-slot="badge"`) become one bar with their own radius, leaves become bars the size of their content, an empty text element still takes one line, images and icons hide; `label`, `th`, `dt` and `legend` stay readable, controls inside them do not. The rules are unlayered and `!important` so app CSS cannot show through, except the readable-label colour, which sits in `@layer base` so a label's own colour class wins. Each selector family is its own rule, so a browser without `:has()` loses only the leaf bars. Components set the attribute through `skeletonAttributes` ([COMPONENTS.md § Loading states](COMPONENTS.md#loading-states)).
 
 ### Testing
 

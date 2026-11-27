@@ -6,9 +6,11 @@
  */
 import type { Condition } from '@inixiative/json-rules';
 import {
+  datetimeTokenPaths,
   RESERVED_SCOPE_ROOTS,
   TOKEN_PATTERN,
   visitTemplateBlocks,
+  visitTextSegments,
 } from '@template/email/render/conditionParser';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
@@ -79,16 +81,24 @@ type CollectedPaths = {
   rulePaths: Set<string>;
 };
 
-const collectTokenPaths = (text: string, bindings: BindingChain, out: Set<string>): void => {
-  for (const match of text.matchAll(TOKEN_PATTERN)) {
-    const root = match[1];
-    const segments = match[2] ?? '';
-    if (!root) continue;
-    if (!RESERVED_SCOPE_ROOTS.has(root) && !bindings.has(root)) continue;
+const addTokenPath = (path: string, bindings: BindingChain, out: Set<string>): void => {
+  const root = path.split('.')[0] ?? '';
+  if (!RESERVED_SCOPE_ROOTS.has(root) && !bindings.has(root)) return;
+  const resolved = resolveBindingPath(path, bindings);
+  if (resolved?.includes('.')) out.add(resolved);
+};
 
-    const resolved = resolveBindingPath(`${root}${segments}`, bindings);
-    if (resolved?.includes('.')) out.add(resolved);
-  }
+const collectTokenPaths = (text: string, bindings: BindingChain, out: Set<string>): void => {
+  visitTextSegments(text, {
+    text: (slice) => {
+      for (const [plain = ''] of slice.matchAll(TOKEN_PATTERN)) {
+        addTokenPath(plain.slice(2, -2), bindings, out);
+      }
+    },
+    datetime: (token) => {
+      for (const path of datetimeTokenPaths(token)) addTokenPath(path, bindings, out);
+    },
+  });
 };
 
 const collectFromContent = (content: string, out: CollectedPaths): void =>

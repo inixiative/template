@@ -4,7 +4,11 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import { EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
+import {
+  nextTemplateBlockAt,
+  parseEachBlock,
+  parseIfBlock,
+} from '@template/email/render/conditionParser';
 import { evaluateEachBlock } from '@template/email/render/evaluateTemplate/evaluateEachBlock';
 import { evaluateIfBranches } from '@template/email/render/evaluateTemplate/evaluateIfBranches';
 import { substituteTokensInText } from '@template/email/render/evaluateTemplate/substituteTokensInText';
@@ -23,18 +27,16 @@ export const evaluateTemplateBlocksAndTokens = (
   let result = '';
   let i = 0;
   while (i < content.length) {
-    const ifIdx = content.indexOf(IF, i);
-    const eachIdx = content.indexOf(EACH, i);
-    if (ifIdx === -1 && eachIdx === -1) {
+    const nextBlock = nextTemplateBlockAt(content, i);
+    if (!nextBlock) {
       result += substituteTokensInText(content.slice(i), scope, options, onError);
       return result;
     }
 
-    const isEach = eachIdx !== -1 && (ifIdx === -1 || eachIdx < ifIdx);
-    const openIdx = isEach ? eachIdx : ifIdx;
+    const { kind, openIdx } = nextBlock;
     result += substituteTokensInText(content.slice(i, openIdx), scope, options, onError);
 
-    if (isEach) {
+    if (kind === 'each') {
       const block = parseEachBlock(content, openIdx);
       if (!block) {
         onError?.({ kind: 'each', detail: 'unterminated {{#each}} block - missing {{/each}}' });

@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { db, type Prisma } from '@template/db';
+import {
+  DbAction,
+  db,
+  HookTiming,
+  type Prisma,
+  registerDbHook,
+  unregisterDbHook,
+} from '@template/db';
 import type {
   CustomerRelationship,
   Organization,
@@ -619,6 +626,44 @@ describe('segment reconcile', () => {
       removed: [otherRelationship.id],
     });
     expect(String(partial.cause)).toContain("is not a customer of the segment's Space");
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
+  });
+
+  it('two overlapping reconciles of one segment report each removed member once and spare none', async () => {
+    const { entity: segment } = await createSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.static },
+      { space },
+    );
+    await createSegmentMember({}, { segment, customerRelationship: acmeRelationship });
+    await createSegmentMember({}, { segment, customerRelationship: otherRelationship });
+
+    const hookName = 'test:overlappingTombstones';
+    let tombstonesReached = 0;
+    let isOverlapped = false;
+    registerDbHook(
+      hookName,
+      'SegmentMember',
+      HookTiming.before,
+      [DbAction.updateManyAndReturn],
+      async () => {
+        tombstonesReached += 1;
+        if (tombstonesReached !== 1) return;
+        for (let attempt = 0; attempt < 250 && tombstonesReached < 2; attempt++)
+          await Bun.sleep(20);
+        isOverlapped = tombstonesReached >= 2;
+      },
+    );
+
+    const diffs = await Promise.all([
+      applyMembershipDiff({ segmentId: segment.id, matching: [] }),
+      applyMembershipDiff({ segmentId: segment.id, matching: [] }),
+    ]).finally(() => unregisterDbHook(hookName));
+
+    expect(isOverlapped).toBe(true);
+    expect(diffs.flatMap((diff) => diff.removed).sort()).toEqual(
+      [acmeRelationship.id, otherRelationship.id].sort(),
+    );
+    expect(diffs.flatMap((diff) => diff.added)).toEqual([]);
     expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
   });
 });

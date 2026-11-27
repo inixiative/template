@@ -22,4 +22,5 @@ export type TemplateEvaluationOptions = {
   bindings?: BindingChain;
   lens: EmailLens;
   ruleScope?: Scope;
+  now?: Date;
 };

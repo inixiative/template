@@ -43,7 +43,8 @@ import {
   isWrittenInTransaction,
   newCacheOverlay,
 } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
-import { publishKey } from '@template/db/redis/cache/transactionOverlay/publishKey';
+import { commitEntries } from '@template/db/redis/cache/transactionOverlay/commitEntries';
+import { publishKeys } from '@template/db/redis/cache/transactionOverlay/publishKeys';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { hasDeletedAt } from '@template/db/utils/fieldMetadata';
@@ -56,7 +57,7 @@ import {
 import { LogScope, log } from '@template/shared/logger';
 import { incrementCounter } from '@template/shared/telemetry';
 import {
-  ConcurrencyType,
+  type ConcurrencyType,
   minimumConcurrencyLimitFor,
   runAllWithConcurrencyLimit,
 } from '@template/shared/utils';
@@ -86,17 +87,6 @@ const throwIfFailures = (context: string, errors: unknown[]): void => {
 
 // Every callback runs even when one throws, and a failure is logged, never thrown: the finally
 // queue runs on the rollback path too, where rethrowing would mask the transaction's own error.
-// Every key runs even when one fails (db.parallel's allSettled, as the on-commit batches use); each
-// caller decides what a failure means.
-const publishKeys = (
-  overlay: CacheOverlay,
-  keys: string[],
-): Promise<PromiseSettledResult<void>[]> =>
-  db.parallel(
-    keys.map((key) => () => publishKey(overlay, key)),
-    { concurrency: minimumConcurrencyLimitFor([ConcurrencyType.redis]), resolution: 'allSettled' },
-  );
-
 const drainFinally = async (openTransaction: OpenTransaction | null): Promise<void> => {
   if (!openTransaction?.finallyFns.length) return;
   const fns = openTransaction.finallyFns.splice(0);
@@ -191,10 +181,12 @@ const dbMethods = {
             ...(options?.maxWait ? { maxWait: options.maxWait } : {}),
           },
         );
-        const written = await publishKeys(settled.openTransaction.cacheOverlay, [
-          ...settled.openTransaction.cacheOverlay.written,
-        ]);
-        cacheFailures = written.flatMap((r) => (r.status === 'rejected' ? [r.reason] : []));
+        const overlay = settled.openTransaction.cacheOverlay;
+        try {
+          await publishKeys(commitEntries(overlay, [...overlay.written]));
+        } catch (error) {
+          cacheFailures = [error];
+        }
       } finally {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a
         // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
@@ -205,15 +197,17 @@ const dbMethods = {
       const { result, openTransaction } = settled;
       // Keys the transaction only read publish after the locks drop; a failure costs only the warm-up.
       const overlay = openTransaction.cacheOverlay;
-      const warmKeys = [...overlay.values.keys()].filter(
-        (key) => !isWrittenInTransaction(overlay, key),
+      const warmEntries = commitEntries(
+        overlay,
+        [...overlay.values.keys()].filter((key) => !isWrittenInTransaction(overlay, key)),
       );
-      const warm = await publishKeys(overlay, warmKeys);
-      for (const [i, key] of warmKeys.entries()) {
-        const r = warm[i];
-        if (r?.status !== 'rejected') continue;
-        log.error(`Failed to publish cache key ${key} after commit:`, r.reason, LogScope.db);
-        incrementCounter('cache.publish.failed', 1, { accessor: cacheAccessor(key) });
+      try {
+        await publishKeys(warmEntries);
+      } catch (error) {
+        for (const { key } of warmEntries) {
+          log.error(`Failed to publish cache key ${key} after commit:`, error, LogScope.db);
+          incrementCounter('cache.publish.failed', 1, { accessor: cacheAccessor(key) });
+        }
       }
 
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an

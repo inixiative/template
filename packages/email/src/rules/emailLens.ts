@@ -7,6 +7,7 @@
 import type { ScalarType } from '@inixiative/field-map';
 import {
   assertValidNarrowing,
+  type CheckOptions,
   type Condition,
   check,
   createLens,
@@ -463,12 +464,13 @@ export const evaluateScopedRule = (
   lens: EmailLens,
   scoped: Condition,
   narrowed: Record<string, unknown>,
+  options?: CheckOptions,
 ): boolean | string => {
-  if (!isLeaf(scoped)) return check(applyEmailLens(lens, scoped), narrowed);
+  if (!isLeaf(scoped)) return check(applyEmailLens(lens, scoped), narrowed, options);
   const slice = sliceOf(lens, scoped);
-  if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return check(scoped, narrowed);
+  if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return check(scoped, narrowed, options);
   const row = (narrowed[slice.root] ?? {}) as Record<string, unknown>;
-  return check(narrowRule({ ...scoped, field: slice.rest } as Condition, slice.slot), row);
+  return check(narrowRule({ ...scoped, field: slice.rest } as Condition, slice.slot), row, options);
 };
 
 export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>

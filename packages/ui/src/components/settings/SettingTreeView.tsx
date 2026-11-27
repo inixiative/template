@@ -12,7 +12,6 @@ import {
   diffSettingDrafts,
   isSettingLeaf,
   type SettingBranch,
-  type SettingNode,
   type SettingResourceKinds,
   settingChildrenFor,
   settingNodesAlongKey,
@@ -26,7 +25,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Skeleton,
+  skeletonAttributes,
 } from '@template/ui/components/primitives';
 import { SettingField } from '@template/ui/components/settings/SettingField';
 import { hydrateSettingTargetForPermissions } from '@template/ui/lib/hydrateRecordForPermissions';
@@ -286,9 +285,7 @@ export const SettingTreeView = ({
   return (
     <Card data-testid={`resource-settings-${queries.resourceModel}`}>
       <CardHeader>
-        <Skeleton isLoading={isCatalogLoading && !title}>
-          <CardTitle>{resolvedTitle}</CardTitle>
-        </Skeleton>
+        <CardTitle {...skeletonAttributes(isCatalogLoading && !title)}>{resolvedTitle}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
       <CardContent className="space-y-5" isLoading={isCatalogLoading || settingsQuery.isLoading}>

@@ -2,7 +2,7 @@ import { describe, expect, it, spyOn } from 'bun:test';
 import { interpolate } from '@template/email/render/interpolate';
 import { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from '@template/email/render/limits';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
-import { defaultEmailLens } from '@template/email/rules/emailLens';
+import { defaultEmailLens, emailLens } from '@template/email/rules/emailLens';
 
 describe('interpolate', () => {
   describe('variable substitution', () => {
@@ -872,5 +872,264 @@ describe('interpolate — {{#each}} expansion bounds', () => {
     );
     expect(result).toBe('1|1');
     expect(errors).toEqual([]);
+  });
+});
+
+describe('interpolate — {{datetime}}', () => {
+  const CALL = '2026-11-26T19:00:00.000Z';
+  const NOW = new Date('2026-11-26T19:00:00.000Z');
+  const render = (
+    template: string,
+    data: Record<string, unknown>,
+    issues: string[] = [],
+    now: Date = NOW,
+  ) =>
+    interpolate(template, { data }, (issue) => issues.push(issue.detail), {
+      lens: defaultEmailLens,
+      now,
+    });
+
+  it('prints an ISO 8601 timestamp in UTC when no format or time zone is named', () => {
+    expect(render('Call: {{datetime data.at}}', { at: new Date(CALL) })).toBe(
+      'Call: 2026-11-26T19:00:00Z',
+    );
+  });
+
+  it('prints an ISO 8601 timestamp with the zone offset when only a time zone is named', () => {
+    expect(render('{{datetime data.at tz=America/New_York}}', { at: new Date(CALL) })).toBe(
+      '2026-11-26T14:00:00-05:00',
+    );
+  });
+
+  it('prints with a date-fns format', () => {
+    expect(
+      render('{{datetime data.at format="EEEE, MMMM d \'at\' h:mm a zzz"}}', { at: CALL }),
+    ).toBe('Thursday, November 26 at 7:00 PM UTC');
+  });
+
+  it('prints attributes in any order', () => {
+    const a = render(
+      '{{datetime data.at format="MMM d, h:mm a zzz" tz=America/New_York offset={"ahead":{"days":1}}}}',
+      { at: CALL },
+    );
+    const b = render(
+      '{{datetime data.at tz=America/New_York offset={"ahead":{"days":1}} format="MMM d, h:mm a zzz"}}',
+      { at: CALL },
+    );
+    expect(a).toBe('Nov 27, 2:00 PM EST');
+    expect(b).toBe(a);
+  });
+
+  it('prints now and system.now from the render single clock instant', () => {
+    const issues: string[] = [];
+    const result = render(
+      '{{datetime now format="MMM d, h:mm a zzz" tz=America/New_York}} | {{datetime system.now format="MMM d, h:mm a zzz" tz=America/New_York}} | {{system.now}}',
+      {},
+      issues,
+    );
+    expect(result).toBe('Nov 26, 2:00 PM EST | Nov 26, 2:00 PM EST | November 26, 2026');
+    expect(issues).toEqual([]);
+  });
+
+  it('prints an ISO string literal, anchoring naive dates in tz', () => {
+    const issues: string[] = [];
+    expect(
+      render(
+        '{{datetime "2026-12-01T15:00:00Z" tz=America/New_York format="MMM d, h:mm a zzz"}} | {{datetime "2026-12-01" tz=America/New_York format="yyyy-MM-dd HH:mm zzz"}}',
+        {},
+        issues,
+      ),
+    ).toBe('Dec 1, 10:00 AM EST | 2026-12-01 00:00 EST');
+    expect(issues).toEqual([]);
+  });
+
+  it('evaluates json-rules date expressions (ahead, ago, next, start, end)', () => {
+    const issues: string[] = [];
+    expect(
+      render(
+        [
+          '{{datetime {"ahead":{"weeks":1}} format="yyyy-MM-dd" tz=America/New_York}}',
+          '{{datetime {"ago":{"days":2}} format="yyyy-MM-dd" tz=UTC}}',
+          '{{datetime {"next":"week"} format="EEEE, MMM d" tz=America/New_York}}',
+          '{{datetime {"start":{"next":"week"}} format="yyyy-MM-dd\'T\'HH:mm:ssXXX" tz=America/New_York}}',
+          '{{datetime {"end":{"this":"month"}} format="yyyy-MM-dd" tz=America/New_York}}',
+        ].join(' | '),
+        {},
+        issues,
+      ),
+    ).toBe('2026-12-03 | 2026-11-24 | Monday, Nov 30 | 2026-11-30T00:00:00-05:00 | 2026-11-30');
+    expect(issues).toEqual([]);
+  });
+
+  it('applies rolling date offsets on paths, now, literals, and expressions (including path magnitudes)', () => {
+    const issues: string[] = [];
+    expect(
+      render(
+        [
+          '{{datetime data.at offset={"ahead":{"days":7}} format="yyyy-MM-dd" tz=America/New_York}}',
+          '{{datetime now offset={"ago":{"hours":3}} format="yyyy-MM-dd HH:mm" tz=UTC}}',
+          '{{datetime "2026-12-01T15:00:00Z" offset={"ahead":{"weeks":1}} format="MMM d, h:mm a zzz" tz=America/New_York}}',
+          '{{datetime {"next":"week"} offset={"ahead":{"days":2}} format="EEEE, MMM d" tz=UTC}}',
+          '{{datetime data.at offset={"ahead":{"days":{"path":"data.graceDays"}}} format="yyyy-MM-dd" tz=UTC}}',
+        ].join(' | '),
+        { at: CALL, graceDays: 4 },
+        issues,
+      ),
+    ).toBe('2026-12-03 | 2026-11-26 16:00 | Dec 8, 10:00 AM EST | Wednesday, Dec 2 | 2026-11-30');
+    expect(issues).toEqual([]);
+  });
+
+  it('prints nothing and reports a format the check refuses', () => {
+    const issues: string[] = [];
+    expect(render('{{datetime data.at format="hello"}}', { at: CALL }, issues)).toBe('');
+    expect(issues).toEqual(['{{datetime data.at}} has an invalid format: hello']);
+  });
+
+  it('prints every display token the format check accepts', () => {
+    const format =
+      "y yy yyyy yo Q QQ QQQ QQQQ Qo M MM MMM MMMM MMMMM Mo L LL LLL LLLL LLLLL Lo d dd do E EE EEE EEEE EEEEE EEEEEE a aa aaa aaaa aaaaa h hh ho H HH Ho K KK Ko k kk ko m mm mo s ss so S SS SSS X XX XXX XXXX XXXXX x xx xxx xxxx xxxxx O OO OOO OOOO z zz zzz zzzz P PP PPP PPPP p pp ppp pppp ''";
+    const issues: string[] = [];
+    expect(render(`{{datetime data.at format="${format}"}}`, { at: CALL }, issues)).not.toBe('');
+    expect(issues).toEqual([]);
+  });
+
+  it('prints nothing and reports a time zone it does not know, instead of printing UTC', () => {
+    const issues: string[] = [];
+    expect(render('{{datetime data.at tz=Mars/Olympus}}', { at: CALL }, issues)).toBe('');
+    expect(issues).toEqual(['{{datetime data.at}} has an unknown time zone: Mars/Olympus']);
+  });
+
+  it('prints in the named time zone on both sides of a daylight-saving change', () => {
+    const template =
+      '{{datetime data.before format="MMM d, h:mm a zzz" tz=America/New_York}} / {{datetime data.after format="MMM d, h:mm a zzz" tz=America/New_York}}';
+    const result = render(template, {
+      before: new Date('2026-10-31T16:00:00.000Z'),
+      after: new Date('2026-11-02T17:00:00.000Z'),
+    });
+    expect(result).toBe('Oct 31, 12:00 PM EDT / Nov 2, 12:00 PM EST');
+  });
+
+  it('prints UTC instants across a spring-forward gap without host time zone drift', () => {
+    expect(render('{{datetime "2026-03-08T02:30:00Z"}}', {})).toBe('2026-03-08T02:30:00Z');
+  });
+
+  it('prints the same for an ISO string and a Date', () => {
+    const template =
+      '{{datetime data.asString format="MMM d, h:mm a zzz" tz=America/New_York}} = {{datetime data.asDate format="MMM d, h:mm a zzz" tz=America/New_York}}';
+    expect(render(template, { asString: CALL, asDate: new Date(CALL) })).toBe(
+      'Nov 26, 2:00 PM EST = Nov 26, 2:00 PM EST',
+    );
+  });
+
+  it('prints nothing for an empty, missing or invalid value, and reports each', () => {
+    const issues: string[] = [];
+    const template =
+      '[{{datetime data.empty}}][{{datetime data.missing}}][{{datetime data.blank}}][{{datetime data.bad}}][{{datetime data.object}}]';
+    const result = render(
+      template,
+      { empty: null, blank: '', bad: 'not a date', object: { at: CALL } },
+      issues,
+    );
+    expect(result).toBe('[][][][][]');
+    expect(issues).toHaveLength(5);
+    expect(issues[0]).toBe('{{datetime data.empty}} is not a date');
+  });
+
+  it('reads a loop binding inside {{#each}}, including in an offset path', () => {
+    const template =
+      '{{#each data.calls as=call}}<{{datetime call.at offset={"ahead":{"days":{"path":"call.days"}}} format="MMM d, h:mm a zzz" tz=America/New_York}}>{{/each}}';
+    expect(render(template, { calls: [{ at: CALL, days: 2 }] })).toBe('<Nov 28, 2:00 PM EST>');
+  });
+
+  it('does not re-interpolate mustache, block, or system syntax inside a quoted format literal', () => {
+    const issues: string[] = [];
+    expect(
+      interpolate(
+        [
+          '{{datetime now format="\'{{recipient.email}}\'"}}',
+          '{{datetime now format="\'{{#if rule=true}}hi{{/if}}\'"}}',
+          '{{datetime now format="\'{{system.year}}\'"}}',
+          '{{#if rule={"field":"data.ok","operator":"equals","value":true}}}{{datetime now format="\'{{else}}\'"}}REAL{{else}}FALLBACK{{/if}}',
+        ].join(' | '),
+        { recipient: { email: 'secret@example.com' }, data: { ok: true } },
+        (issue) => issues.push(issue.detail),
+        { lens: defaultEmailLens, now: NOW },
+      ),
+    ).toBe('{{recipient.email}} | {{#if rule=true}}hi{{/if}} | {{system.year}} | {{else}}REAL');
+    expect(issues).toEqual([]);
+  });
+
+  it('forwards the single render now instant into {{#if}} date rules and keeps system values non-spoofable', () => {
+    const issues: string[] = [];
+    const result = interpolate(
+      '{{#if rule={"field":"data.due","dateOperator":"before","value":{"ahead":{"days":7}}}}}SOON {{datetime now format="yyyy-MM-dd"}}{{/if}} | {{datetime now offset={"ahead":{"days":{"path":"system.year"}}} format="yyyy"}}',
+      { data: { due: '2026-11-28T00:00:00Z' }, system: { year: 5 } } as never,
+      (issue) => issues.push(issue.detail),
+      { lens: defaultEmailLens, now: NOW },
+    );
+    expect(result).toBe('SOON 2026-11-26 | 2032');
+    expect(issues).toEqual([]);
+  });
+
+  it('enforces lens visibility for system.now when the lens omits the system slot', () => {
+    const issues: string[] = [];
+    expect(
+      interpolate('{{datetime system.now}}', {}, (issue) => issues.push(issue.detail), {
+        lens: { data: defaultEmailLens.data },
+        now: NOW,
+      }),
+    ).toBe('');
+    expect(issues).toEqual(['{{datetime system.now}} is not a date']);
+  });
+
+  it('enforces lens visibility on { path } magnitudes even when called on raw scope', () => {
+    const clampedLens = emailLens({ narrowing: { recipient: { picks: ['id'] } } });
+    const issues: string[] = [];
+    expect(
+      interpolate(
+        '{{datetime now offset={"ahead":{"days":{"path":"recipient.email"}}} format="yyyy-MM-dd"}}',
+        { recipient: { id: 'u1', email: 5 } },
+        (issue) => issues.push(issue.detail),
+        { lens: clampedLens, now: NOW },
+      ),
+    ).toBe('');
+    expect(issues[0]).toContain('is not a value the lens shows');
+  });
+
+  it('prints nothing and reports a root that is not a scope root or a binding', () => {
+    const issues: string[] = [];
+    expect(render('{{datetime nope.at}}', {}, issues)).toBe('');
+    expect(issues).toEqual(['{{datetime nope.at}} names no scope root or loop binding']);
+  });
+
+  it('refuses a prototype key on target or offset path', () => {
+    const issues: string[] = [];
+    expect(
+      render(
+        '[{{datetime data.__proto__}}][{{datetime now offset={"ahead":{"days":{"path":"data.__proto__"}}}}}]',
+        {},
+        issues,
+      ),
+    ).toBe('[][]');
+    expect(issues).toEqual([
+      '{{datetime data.__proto__}} addresses a prototype key',
+      '{{datetime now}} path "data.__proto__" addresses a prototype key',
+    ]);
+  });
+
+  it('refuses unknown attributes, duplicate attributes, and non-date offsets at render time', () => {
+    const issues: string[] = [];
+    expect(
+      render(
+        '[{{datetime data.at bogus=1}}][{{datetime data.at tz=UTC tz=America/New_York}}][{{datetime data.at offset={"value":5}}}]',
+        { at: CALL },
+        issues,
+      ),
+    ).toBe('[][][]');
+    expect(issues).toEqual([
+      '{{datetime data.at}} has unknown bogus= attribute',
+      '{{datetime data.at}} has duplicate tz= attribute',
+      '{{datetime data.at}} has an invalid offset: must be a rolling ahead or ago offset',
+    ]);
   });
 });

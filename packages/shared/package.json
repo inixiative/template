@@ -55,7 +55,7 @@
     "@hey-api/client-fetch": "^0.13.1",
     "@inixiative/field-map": "^0.1.2",
     "@inixiative/integrations": "^0.2.0",
-    "@inixiative/json-rules": "^4.7.0",
+    "@inixiative/json-rules": "^4.8.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "^0.218.0",
     "@opentelemetry/context-async-hooks": "^2.6.0",
