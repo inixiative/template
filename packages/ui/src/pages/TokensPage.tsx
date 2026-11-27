@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
   Page,
+  SkeletonText,
   Table,
 } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
@@ -89,11 +90,13 @@ const TokenSection = ({
     {
       key: 'name',
       label: 'Name',
+      skeleton: <SkeletonText width="10rem" />,
       render: (item: Token) => <span className="font-medium">{item.name}</span>,
     },
     {
       key: 'createdAt',
       label: 'Created',
+      skeleton: <SkeletonText width="5.5rem" />,
       render: (item: Token) => (
         <span className="text-muted-foreground">
           {new Date(item.createdAt).toLocaleDateString()}
@@ -103,6 +106,7 @@ const TokenSection = ({
     {
       key: 'lastUsedAt',
       label: 'Last Used',
+      skeleton: <SkeletonText width="5.5rem" />,
       render: (item: Token) => (
         <span className="text-muted-foreground">
           {item.lastUsedAt ? new Date(item.lastUsedAt).toLocaleDateString() : 'Never'}

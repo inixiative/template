@@ -6,11 +6,13 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import type { InquiryItem } from '@template/sdk';
-import { ActionButtonsSkeleton, Badge, Page, Table } from '@template/ui/components';
+import { Badge, Page, SkeletonText, Table } from '@template/ui/components';
 import {
   InquirySourceControls,
+  InquirySourceControlsSkeleton,
   InquiryStatusBadge,
   InquiryTargetControls,
+  InquiryTargetControlsSkeleton,
 } from '@template/ui/components/inquiries';
 import {
   receivedInquiryContextQueries,
@@ -90,6 +92,7 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
         }
         return inquiryPartyDisplayName(inq, direction === 'sent' ? 'target' : 'source');
       },
+      skeleton: <SkeletonText width="12rem" />,
     },
     // Type column only shown when not filtered to a single type
     ...(singleType
@@ -99,6 +102,7 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
             key: 'type',
             label: 'Type',
             render: (inq: Row) => INQUIRY_TYPE_LABELS[inq.type] ?? inq.type,
+            skeleton: <SkeletonText width="10rem" />,
           },
         ]),
     {
@@ -111,16 +115,23 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
       key: 'sentAt',
       label: 'Sent',
       render: (inq: Row) => (inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—'),
+      skeleton: <SkeletonText width="5.5rem" />,
     },
     {
       key: 'expiresAt',
       label: 'Expires',
       render: (inq: Row) => (inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—'),
+      skeleton: <SkeletonText width="5.5rem" />,
     },
     {
       key: 'actions',
       label: '',
-      skeleton: <ActionButtonsSkeleton labels={['Cancel']} />,
+      skeleton:
+        direction === 'sent' ? (
+          <InquirySourceControlsSkeleton />
+        ) : (
+          <InquiryTargetControlsSkeleton />
+        ),
       render: (inq: Row) =>
         direction === 'sent' ? (
           <InquirySourceControls inquiry={inq as InquiryItem} />

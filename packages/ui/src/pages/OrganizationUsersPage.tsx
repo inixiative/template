@@ -18,7 +18,7 @@ import {
   organizationReadManyUsersQueryKey,
   organizationUserDelete,
 } from '@template/sdk';
-import { ActionButtonsSkeleton, Button, Page, Table } from '@template/ui/components';
+import { ActionButtonsSkeleton, Button, Page, SkeletonText, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import {
   createOptimisticListTarget,
@@ -88,6 +88,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     {
       key: 'user.name',
       label: 'Name',
+      skeleton: <SkeletonText width="8rem" />,
       render: (orgUser: OrganizationUser) => (
         <span className="font-medium">{orgUser.name || 'N/A'}</span>
       ),
@@ -95,11 +96,13 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     {
       key: 'user.email',
       label: 'Email',
+      skeleton: <SkeletonText width="12rem" />,
       render: (orgUser: OrganizationUser) => orgUser.email || 'N/A',
     },
     {
       key: 'role',
       label: 'Role',
+      skeleton: <SkeletonText width="4rem" />,
       render: (orgUser: OrganizationUser) => (
         <span className="capitalize">{orgUser.organizationUser.role}</span>
       ),
@@ -107,6 +110,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     {
       key: 'createdAt',
       label: 'Joined',
+      skeleton: <SkeletonText width="5.5rem" />,
       render: (orgUser: OrganizationUser) => new Date(orgUser.createdAt).toLocaleDateString(),
     },
     {

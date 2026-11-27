@@ -13,7 +13,7 @@ import type {
   SpaceReadManySegmentMembershipsResponse,
   SpaceReadManySegmentsResponse,
 } from '@template/sdk';
-import { Page, Table } from '@template/ui/components';
+import { Page, SkeletonText, Table } from '@template/ui/components';
 import { segmentContextQueries } from '@template/ui/lib/segmentContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
@@ -34,16 +34,19 @@ const ownedColumns = [
   {
     key: 'name',
     label: 'Name',
+    skeleton: <SkeletonText width="10rem" />,
     render: (segment: OwnedSegment) => <span className="font-medium">{segment.name}</span>,
   },
   {
     key: 'type',
     label: 'Type',
+    skeleton: <SkeletonText width="5rem" />,
     render: (segment: OwnedSegment) => <span className="capitalize">{segment.type}</span>,
   },
   {
     key: 'ruleIssues',
     label: 'Status',
+    skeleton: <SkeletonText width="5rem" />,
     render: (segment: OwnedSegment) =>
       segment.ruleIssues.length ? (
         <span
@@ -59,6 +62,7 @@ const ownedColumns = [
   {
     key: 'createdAt',
     label: 'Created',
+    skeleton: <SkeletonText width="5.5rem" />,
     render: (segment: OwnedSegment) => (
       <span className="text-muted-foreground">{formatDate(segment.createdAt)}</span>
     ),
@@ -69,6 +73,7 @@ const membershipColumns = [
   {
     key: 'segment',
     label: 'Segment',
+    skeleton: <SkeletonText width="10rem" />,
     render: (membership: Membership) => (
       <span className="font-medium">{membership.segment.name}</span>
     ),
@@ -76,6 +81,7 @@ const membershipColumns = [
   {
     key: 'owner',
     label: 'Owner',
+    skeleton: <SkeletonText width="6rem" />,
     render: (membership: Membership) => (
       <span className="capitalize">{membership.segment.ownerModel}</span>
     ),
@@ -83,6 +89,7 @@ const membershipColumns = [
   {
     key: 'createdAt',
     label: 'Since',
+    skeleton: <SkeletonText width="5.5rem" />,
     render: (membership: Membership) => (
       <span className="text-muted-foreground">{formatDate(membership.createdAt)}</span>
     ),

@@ -57,7 +57,6 @@ const CardDescription = React.forwardRef<
 ));
 CardDescription.displayName = 'CardDescription';
 
-// Drawn while loading when the card has nothing it can render yet.
 const CardContentSkeleton = () => (
   <div className="space-y-3 text-sm">
     <p>
@@ -73,7 +72,7 @@ const CardContentSkeleton = () => (
 const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { isLoading?: boolean }
->(({ className, isLoading = false, children, ...props }, ref) => (
+>(({ className, isLoading, children, ...props }, ref) => (
   <>
     <SkeletonStatus isLoading={isLoading} />
     <div
@@ -97,4 +96,12 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 );
 CardFooter.displayName = 'CardFooter';
 
-export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle };
+export {
+  Card,
+  CardContent,
+  CardContentSkeleton,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+};

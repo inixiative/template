@@ -14,7 +14,7 @@ import type {
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
 import { settingResourceKindsOf, settingsIn } from '@template/shared/settings';
-import { Button, Page, skeletonAttributes } from '@template/ui/components';
+import { Button, Page, SkeletonStatus, skeletonAttributes } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
 import { SettingTreeView } from '@template/ui/components/settings/SettingTreeView';
 import {
@@ -167,12 +167,15 @@ const IntegrationProviderSection = ({
     </Button>
   );
   const statusText = showStatus && !providerIntegrations.isError && (
-    <span
-      className="font-mono text-[11px] text-muted-foreground"
-      {...skeletonAttributes(providerIntegrations.isLoading)}
-    >
-      {status.label}
-    </span>
+    <>
+      <SkeletonStatus isLoading={providerIntegrations.isLoading} />
+      <span
+        className="font-mono text-[11px] text-muted-foreground"
+        {...skeletonAttributes(providerIntegrations.isLoading)}
+      >
+        {status.label}
+      </span>
+    </>
   );
   const connectPanel = isConnectOpen && enabled && renderConnect(() => setConnectOpen(false));
   const errorText = providerIntegrations.isError && (

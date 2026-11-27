@@ -5,6 +5,7 @@
  * @uses none
  */
 
+import { ListRow } from '@template/ui/components/primitives/ListRow';
 import { SkeletonStatus } from '@template/ui/components/primitives/SkeletonStatus';
 import { SkeletonText } from '@template/ui/components/primitives/SkeletonText';
 import { skeletonAttributes } from '@template/ui/components/primitives/skeletonAttributes';
@@ -26,7 +27,7 @@ export const List = <T,>({
   items,
   renderItem,
   emptyMessage,
-  isLoading = false,
+  isLoading,
   skeletonItem,
   className,
 }: ListProps<T>) => {
@@ -45,10 +46,10 @@ export const List = <T,>({
               // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows have no identity
               <Fragment key={row}>
                 {skeletonItem ?? (
-                  <li className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
-                    <SkeletonText seed={row} />
-                    <SkeletonText width="4rem" />
-                  </li>
+                  <ListRow
+                    name={<SkeletonText widthIndex={row} />}
+                    actions={<SkeletonText width="4rem" />}
+                  />
                 )}
               </Fragment>
             ))

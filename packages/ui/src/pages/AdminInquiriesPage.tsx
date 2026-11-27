@@ -11,21 +11,13 @@ import {
   adminInquiryReadManyQueryKey,
   type InquiryItem,
 } from '@template/sdk';
-import {
-  ActionButtonsSkeleton,
-  Badge,
-  EmptyState,
-  Page,
-  SkeletonSizedCell,
-  SkeletonStatus,
-  SkeletonText,
-  skeletonAttributes,
-  Table,
-} from '@template/ui/components';
+import { Badge, Page, SkeletonSized, SkeletonText, Table } from '@template/ui/components';
 import {
   InquirySourceControls,
+  InquirySourceControlsSkeleton,
   InquiryStatusBadge,
   InquiryTargetControls,
+  InquiryTargetControlsSkeleton,
 } from '@template/ui/components/inquiries';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { inquiryPartyDisplayName } from '@template/ui/lib/inquiries/inquiryPartyDisplayName';
@@ -104,11 +96,28 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
       actions={statusDropdown}
     >
       {view === 'all' ? (
-        <AdminAllInquiryTable inquiries={inquiries} isLoading={isLoading} />
+        <Table
+          columns={adminAllInquiryColumns}
+          data={inquiries}
+          keyExtractor={(inq) => inq.id}
+          emptyMessage="No inquiries"
+          empty={{
+            icon: 'lucide:inbox',
+            description: 'Inquiries sent between users, organizations and spaces will appear here.',
+          }}
+          isLoading={isLoading}
+          renderItemRows={(inq) => <AdminAllInquiryRows cells={adminAllInquiryCellsFor(inq)} />}
+          skeletonItemRows={<AdminAllInquiryRows cells={adminAllInquirySkeletonCells} />}
+        />
       ) : (
         <Table
           columns={[
-            { key: 'type', label: 'Type', render: (inq: Inquiry) => INQUIRY_TYPE_LABELS[inq.type] },
+            {
+              key: 'type',
+              label: 'Type',
+              render: (inq: Inquiry) => INQUIRY_TYPE_LABELS[inq.type],
+              skeleton: <SkeletonText width="10rem" />,
+            },
             {
               key: 'status',
               label: 'Status',
@@ -119,23 +128,27 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
               key: 'source',
               label: 'Source',
               render: (inq: Inquiry) => inquiryPartyDisplayName(inq, 'source'),
+              skeleton: <SkeletonText width="8rem" />,
             },
             {
               key: 'target',
               label: 'Target',
               render: (inq: Inquiry) => inquiryPartyDisplayName(inq, 'target'),
+              skeleton: <SkeletonText width="8rem" />,
             },
             {
               key: 'sentAt',
               label: 'Sent',
               render: (inq: Inquiry) =>
                 inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—',
+              skeleton: <SkeletonText width="5.5rem" />,
             },
             {
               key: 'expiresAt',
               label: 'Expires',
               render: (inq: Inquiry) =>
                 inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—',
+              skeleton: <SkeletonText width="5.5rem" />,
             },
           ]}
           data={inquiries}
@@ -152,11 +165,16 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
   );
 };
 
-const adminAllInquiryControlsSkeleton = <ActionButtonsSkeleton labels={['Cancel']} />;
+const adminAllInquiryColumns = [
+  { key: 'type', label: 'Type' },
+  { key: 'status', label: 'Status' },
+  { key: 'actor', label: 'Actor' },
+  { key: 'sentAt', label: 'Sent' },
+  { key: 'expiresAt', label: 'Expires' },
+  { key: 'controls', label: '' },
+];
 
-const adminAllInquiryHeadings = ['Type', 'Status', 'Actor', 'Sent', 'Expires', ''];
-
-type AdminAllInquiryRowCells = {
+type AdminAllInquiryCells = {
   type: React.ReactNode;
   status: React.ReactNode;
   source: React.ReactNode;
@@ -167,136 +185,84 @@ type AdminAllInquiryRowCells = {
   targetControls: React.ReactNode;
 };
 
-// Each side's controls cell keeps a small button's height whether or not it has controls, so every inquiry is one height.
-const AdminAllInquiryRow = ({
-  cells,
-  ...props
-}: { cells: AdminAllInquiryRowCells } & React.HTMLAttributes<HTMLTableSectionElement>) => (
-  // group on tbody so both rows highlight together on hover
-  <tbody className="group border-b last:border-b-0" {...props}>
+const adminAllInquirySkeletonCells: AdminAllInquiryCells = {
+  type: <SkeletonText width="10rem" />,
+  status: <Badge>pending</Badge>,
+  source: <SkeletonText width="12rem" />,
+  target: <SkeletonText width="12rem" />,
+  sentAt: <SkeletonText width="5.5rem" />,
+  expiresAt: <SkeletonText width="5.5rem" />,
+  sourceControls: <InquirySourceControlsSkeleton />,
+  targetControls: <InquiryTargetControlsSkeleton />,
+};
+
+const AdminAllInquiryRows = ({ cells }: { cells: AdminAllInquiryCells }) => (
+  <>
     <tr className="group-hover:bg-muted/40 transition-colors">
       <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-        {cells.type}
+        <SkeletonSized skeleton={adminAllInquirySkeletonCells.type}>{cells.type}</SkeletonSized>
       </td>
       <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-        {cells.status}
+        <SkeletonSized skeleton={adminAllInquirySkeletonCells.status}>{cells.status}</SkeletonSized>
       </td>
       <td className="px-4 pt-3 pb-1 text-sm">
-        <span className="text-xs text-muted-foreground mr-1">↑</span>
-        {cells.source}
+        <SkeletonSized skeleton={adminAllInquirySkeletonCells.source}>
+          <span className="text-xs text-muted-foreground mr-1">↑</span>
+          {cells.source}
+        </SkeletonSized>
       </td>
       <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-        {cells.sentAt}
+        <SkeletonSized skeleton={adminAllInquirySkeletonCells.sentAt}>{cells.sentAt}</SkeletonSized>
       </td>
       <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-        {cells.expiresAt}
+        <SkeletonSized skeleton={adminAllInquirySkeletonCells.expiresAt}>
+          {cells.expiresAt}
+        </SkeletonSized>
       </td>
       <td className="px-4 pt-3 pb-1">
-        <SkeletonSizedCell skeleton={adminAllInquiryControlsSkeleton}>
+        <SkeletonSized skeleton={adminAllInquirySkeletonCells.sourceControls}>
           {cells.sourceControls}
-        </SkeletonSizedCell>
+        </SkeletonSized>
       </td>
     </tr>
     <tr className="group-hover:bg-muted/40 transition-colors">
       <td className="px-4 pb-3 pt-1 text-sm">
-        <span className="text-xs text-muted-foreground mr-1">↓</span>
-        {cells.target}
+        <SkeletonSized skeleton={adminAllInquirySkeletonCells.target}>
+          <span className="text-xs text-muted-foreground mr-1">↓</span>
+          {cells.target}
+        </SkeletonSized>
       </td>
       <td className="px-4 pb-3 pt-1">
-        <SkeletonSizedCell skeleton={adminAllInquiryControlsSkeleton}>
+        <SkeletonSized skeleton={adminAllInquirySkeletonCells.targetControls}>
           {cells.targetControls}
-        </SkeletonSizedCell>
+        </SkeletonSized>
       </td>
     </tr>
-  </tbody>
+  </>
 );
 
-const adminAllInquirySkeletonCells: AdminAllInquiryRowCells = {
-  type: <SkeletonText width="6rem" />,
-  status: <Badge>pending</Badge>,
-  source: <SkeletonText width="8rem" />,
-  target: <SkeletonText width="7rem" />,
-  sentAt: <SkeletonText width="5rem" />,
-  expiresAt: <SkeletonText width="5rem" />,
-  sourceControls: adminAllInquiryControlsSkeleton,
-  targetControls: adminAllInquiryControlsSkeleton,
-};
-
-const AdminAllInquiryTable = ({
-  inquiries,
-  isLoading,
-}: {
-  inquiries: Inquiry[];
-  isLoading: boolean;
-}) => {
-  if (!isLoading && inquiries.length === 0) {
-    return (
-      <EmptyState
-        icon="lucide:inbox"
-        title="No inquiries"
-        description="Inquiries sent between users, organizations and spaces will appear here."
-        className="rounded-xl border border-dashed bg-muted/30"
-      />
-    );
-  }
-
-  return (
-    <div className="border rounded-xl overflow-hidden bg-card">
-      <SkeletonStatus isLoading={isLoading} />
-      <table className="w-full">
-        <thead className="bg-muted/60 border-b">
-          <tr>
-            {adminAllInquiryHeadings.map((h) => (
-              <th
-                key={h}
-                className="text-left px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        {isLoading &&
-          Array.from({ length: 5 }, (_, row) => (
-            <AdminAllInquiryRow
-              // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
-              key={row}
-              cells={adminAllInquirySkeletonCells}
-              {...skeletonAttributes(true)}
-            />
-          ))}
-        {inquiries.map((inq) => {
-          const entry = inquiryTypeComponentsFor(inq.type);
-          const SourceSummary = entry?.source?.summary;
-          const TargetSummary = entry?.target?.summary;
-
-          // Registry components expect InquiryItem / InquiryItem; admin item is structurally compatible
-          const inquiryItem = inq as unknown as InquiryItem;
-          return (
-            <AdminAllInquiryRow
-              key={inq.id}
-              cells={{
-                type: INQUIRY_TYPE_LABELS[inq.type] ?? inq.type,
-                status: <InquiryStatusBadge inquiry={inq} />,
-                source: SourceSummary ? (
-                  <SourceSummary inquiry={inquiryItem} />
-                ) : (
-                  inquiryPartyDisplayName(inq, 'source')
-                ),
-                target: TargetSummary ? (
-                  <TargetSummary inquiry={inquiryItem} />
-                ) : (
-                  inquiryPartyDisplayName(inq, 'target')
-                ),
-                sentAt: inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—',
-                expiresAt: inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—',
-                sourceControls: <InquirySourceControls inquiry={inquiryItem} />,
-                targetControls: <InquiryTargetControls inquiry={inquiryItem} />,
-              }}
-            />
-          );
-        })}
-      </table>
-    </div>
-  );
+const adminAllInquiryCellsFor = (inquiry: Inquiry): AdminAllInquiryCells => {
+  const entry = inquiryTypeComponentsFor(inquiry.type);
+  const SourceSummary = entry?.source?.summary;
+  const TargetSummary = entry?.target?.summary;
+  // Registry components expect InquiryItem; the admin item is structurally compatible
+  const inquiryItem = inquiry as unknown as InquiryItem;
+  return {
+    type: INQUIRY_TYPE_LABELS[inquiry.type] ?? inquiry.type,
+    status: <InquiryStatusBadge inquiry={inquiry} />,
+    source: SourceSummary ? (
+      <SourceSummary inquiry={inquiryItem} />
+    ) : (
+      inquiryPartyDisplayName(inquiry, 'source')
+    ),
+    target: TargetSummary ? (
+      <TargetSummary inquiry={inquiryItem} />
+    ) : (
+      inquiryPartyDisplayName(inquiry, 'target')
+    ),
+    sentAt: inquiry.sentAt ? new Date(inquiry.sentAt).toLocaleDateString() : '—',
+    expiresAt: inquiry.expiresAt ? new Date(inquiry.expiresAt).toLocaleDateString() : '—',
+    sourceControls: <InquirySourceControls inquiry={inquiryItem} />,
+    targetControls: <InquiryTargetControls inquiry={inquiryItem} />,
+  };
 };

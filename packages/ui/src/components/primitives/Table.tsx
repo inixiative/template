@@ -7,10 +7,10 @@
 import { Icon } from '@iconify/react';
 import { EmptyState, type EmptyStateProps } from '@template/ui/components/primitives/EmptyState';
 import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
-import { SkeletonSizedCell } from '@template/ui/components/primitives/SkeletonSizedCell';
+import { SkeletonSized } from '@template/ui/components/primitives/SkeletonSized';
 import { SkeletonStatus } from '@template/ui/components/primitives/SkeletonStatus';
+import { SkeletonText } from '@template/ui/components/primitives/SkeletonText';
 import { skeletonAttributes } from '@template/ui/components/primitives/skeletonAttributes';
-import { TableSkeletonRows } from '@template/ui/components/primitives/TableSkeletonRows';
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';
 import { cn } from '@template/ui/lib/utils';
 import type * as React from 'react';
@@ -19,8 +19,6 @@ export type Column<T> = {
   key: string;
   label: React.ReactNode;
   render?: (item: T) => React.ReactNode;
-  // The cell's shape when it is more than one line of text (a badge, a button): drawn while loading,
-  // and kept invisibly under every loaded cell (SkeletonSizedCell) so rows are one height either way.
   skeleton?: React.ReactNode;
 };
 
@@ -48,7 +46,14 @@ export type TableProps<T> = {
   sectionId?: string;
   className?: string;
   isLoading?: boolean;
+  // why: an item spanning several <tr>s; the columns then only head the table, and onRowClick does not apply
+  renderItemRows?: (item: T) => React.ReactNode;
+  skeletonItemRows?: React.ReactNode;
 };
+
+const skeletonItemCount = 5;
+
+const itemBodyClassName = 'group border-b last:border-b-0';
 
 export const Table = <T,>({
   columns,
@@ -64,7 +69,9 @@ export const Table = <T,>({
   scrollRef,
   sectionId,
   className,
-  isLoading = false,
+  isLoading,
+  renderItemRows,
+  skeletonItemRows,
 }: TableProps<T>) => {
   // Hooks must be called unconditionally, before any early returns.
   const sentinelRef = useInfiniteScrollTrigger({
@@ -110,31 +117,51 @@ export const Table = <T,>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y" {...skeletonAttributes(isLoading)}>
-            {isLoading && <TableSkeletonRows columns={columns} rows={5} />}
-            {!isLoading &&
-              data.map((item) => (
-                <tr
-                  key={keyExtractor(item)}
-                  data-key={keyExtractor(item)}
-                  className={cn(
-                    'transition-colors hover:bg-muted/40',
-                    onRowClick && 'cursor-pointer',
-                  )}
-                  onClick={onRowClick ? () => onRowClick(item) : undefined}
-                >
-                  {columns.map((column) => (
-                    <td key={column.key} className="px-4 py-3 text-sm">
-                      <SkeletonSizedCell skeleton={column.skeleton}>
-                        {column.render
-                          ? column.render(item)
-                          : ((item as Record<string, unknown>)[column.key] as React.ReactNode)}
-                      </SkeletonSizedCell>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-          </tbody>
+          {isLoading &&
+            Array.from({ length: skeletonItemCount }, (_, item) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton items have no identity
+              <tbody key={item} className={itemBodyClassName} {...skeletonAttributes(true)}>
+                {skeletonItemRows ?? (
+                  <tr>
+                    {columns.map((column, cell) => (
+                      <td key={column.key} className="px-4 py-3 text-sm">
+                        {column.skeleton ?? <SkeletonText widthIndex={cell} />}
+                      </td>
+                    ))}
+                  </tr>
+                )}
+              </tbody>
+            ))}
+          {!isLoading &&
+            data.map((item) => (
+              <tbody
+                key={keyExtractor(item)}
+                data-key={keyExtractor(item)}
+                className={itemBodyClassName}
+              >
+                {renderItemRows ? (
+                  renderItemRows(item)
+                ) : (
+                  <tr
+                    className={cn(
+                      'transition-colors group-hover:bg-muted/40',
+                      onRowClick && 'cursor-pointer',
+                    )}
+                    onClick={onRowClick ? () => onRowClick(item) : undefined}
+                  >
+                    {columns.map((column) => (
+                      <td key={column.key} className="px-4 py-3 text-sm">
+                        <SkeletonSized skeleton={column.skeleton}>
+                          {column.render
+                            ? column.render(item)
+                            : ((item as Record<string, unknown>)[column.key] as React.ReactNode)}
+                        </SkeletonSized>
+                      </td>
+                    ))}
+                  </tr>
+                )}
+              </tbody>
+            ))}
         </table>
 
         {/* Infinite scroll sentinel + loading indicator */}

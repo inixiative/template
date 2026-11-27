@@ -18,7 +18,14 @@ import {
   organizationReadAuthProvider,
   organizationReadAuthProviderQueryKey,
 } from '@template/sdk';
-import { ActionButtonsSkeleton, Badge, Button, Page, Table } from '@template/ui/components';
+import {
+  ActionButtonsSkeleton,
+  Badge,
+  Button,
+  Page,
+  SkeletonText,
+  Table,
+} from '@template/ui/components';
 import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -97,11 +104,13 @@ export const OrganizationAuthProvidersPage = () => {
     {
       key: 'name',
       label: 'Name',
+      skeleton: <SkeletonText width="8rem" />,
       render: (item: AuthProvider) => <span className="font-medium">{item.name}</span>,
     },
     {
       key: 'type',
       label: 'Type',
+      skeleton: <SkeletonText width="4rem" />,
       render: (item: AuthProvider) => (
         <span className="text-muted-foreground">{authProviderTypeLabel(item.type)}</span>
       ),
@@ -109,6 +118,7 @@ export const OrganizationAuthProvidersPage = () => {
     {
       key: 'provider',
       label: 'Provider',
+      skeleton: <SkeletonText width="5rem" />,
       render: (item: AuthProvider) => <span className="capitalize">{item.provider}</span>,
     },
     {

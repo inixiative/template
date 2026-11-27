@@ -740,10 +740,15 @@ body {
 [data-skeleton] {
   animation: var(--animate-pulse);
 }
+@media (prefers-reduced-motion: reduce) {
+  [data-skeleton] {
+    animation: none;
+  }
+}
 
 /* All text goes blank, mixed content included; fixed labels keep theirs. */
 [data-skeleton]:not(:is(label, th, dt, legend)),
-[data-skeleton] :not(:is(label, th, dt, legend), :is(label, th, dt, legend) *) {
+[data-skeleton] :not(:is(label, th, dt, legend), [data-skeleton] :is(label, th, dt, legend) *) {
   color: transparent !important;
 }
 /* A label without a colour of its own would inherit the blank; give it the text colour back, in the
@@ -772,8 +777,13 @@ body {
 }
 [data-skeleton] input:is([type='checkbox'], [type='radio']) {
   appearance: none;
-  width: 13px;
-  height: 13px;
+}
+/* The native size, in the base layer so the control's own size class still wins. */
+@layer base {
+  [data-skeleton] input:is([type='checkbox'], [type='radio']) {
+    width: 13px;
+    height: 13px;
+  }
 }
 [data-skeleton] :is(img, svg) {
   visibility: hidden;
@@ -787,7 +797,7 @@ body {
 [data-skeleton]
   :not(:has(*)):not(
     :is(label, th, dt, legend, button, a, input, textarea, select, [data-slot='badge']),
-    :is(label, th, dt, legend, button, a, select, [data-slot='badge'], svg) *
+    [data-skeleton] :is(label, th, dt, legend, button, a, select, [data-slot='badge'], svg) *
   ) {
   background-color: hsl(var(--muted)) !important;
   background-clip: content-box;
