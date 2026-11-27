@@ -89,11 +89,11 @@ Use when: **a single operation should hit multiple providers in parallel**. E.g.
 ```typescript
 import { makeBroadcastRegistry } from '@template/shared/adapter';
 
-export const messageProviderRegistry = makeBroadcastRegistry<MessageProviderAdapter>();
+export const notifierRegistry = makeBroadcastRegistry<NotifierAdapter>();
 // Providers register themselves at load:
-messageProviderRegistry.register('email', emailAdapter);
-messageProviderRegistry.register('sms', smsAdapter);
-// Caller: messageProviderRegistry.broadcast(...) → all providers run via Promise.allSettled
+notifierRegistry.register('email', emailNotifier);
+notifierRegistry.register('webhook', webhookNotifier);
+// Caller: notifierRegistry.broadcast(...) → all providers run via Promise.allSettled
 ```
 
 Storage is not a fan-out concern — never use `makeBroadcastRegistry` for storage.
@@ -125,7 +125,6 @@ The `__` prefix is the template-wide convention for **internal/private** items (
 | Error reporting | `apps/api/src/lib/errorReporter/` | `resolveAdapterForEnvironmentOrThrow` | console, sentry |
 | Storage | `apps/api/src/lib/storage/` | `resolveAdapterForEnvironmentOrThrow` | s3 (only) |
 | Email | `packages/email/src/client/` | direct factory | console, resend |
-| Messaging providers | `apps/api/src/lib/messaging/providers.ts` | `makeBroadcastRegistry` | per-channel |
 
 Email uses a direct factory (`createConsoleClient`/`createResendClient`) instead of `resolveAdapterForEnvironmentOrThrow` because consumers pick the provider explicitly per email (different tenant orgs can have different API keys). Storage and errorReporter pick once per environment — hence the router.
 

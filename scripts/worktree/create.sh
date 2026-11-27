@@ -348,7 +348,7 @@ else
 fi
 
 run_step "Generating route trees and icons" bun run generate:frontend || true
-run_step "Generating OpenAPI spec, SDK, and MSW handlers" bun run generate:sdk || true
+run_step "Generating OpenAPI spec and SDK" bun run generate:sdk || true
 
 require_artifact apps/web/app/routeTree.gen.ts "bun run generate:frontend"
 require_artifact apps/admin/app/routeTree.gen.ts "bun run generate:frontend"
@@ -358,7 +358,6 @@ require_artifact packages/db/src/generated/client "bun run db:generate"
 require_artifact packages/db/src/generated/prismaMap.gen.ts "bun run db:generate"
 require_artifact packages/db/src/generated/zod "bun run db:generate"
 require_artifact packages/sdk/src/generated/sdk.gen.ts "bun run generate:sdk"
-require_artifact packages/ui/src/test/mocks/handlers.gen.ts "bun run generate:sdk"
 
 FINISHED=1
 echo

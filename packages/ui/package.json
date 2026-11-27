@@ -39,7 +39,6 @@
   "scripts": {
     "typecheck": "bun check",
     "test": "NODE_ENV=test bun test src/",
-    "generate:msw": "bun scripts/generateMswHandlers.ts",
     "generate:icons": "bun scripts/generateBundledIconCollections.ts"
   },
   "dependencies": {
