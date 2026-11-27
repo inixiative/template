@@ -6,7 +6,7 @@
  */
 import { Icon } from '@iconify/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { List, SkeletonText } from '@template/ui/components';
+import { List, ListRow, SkeletonText } from '@template/ui/components';
 import { Modal } from '@template/ui/components/layout/Modal';
 import { Page } from '@template/ui/components/layout/Page';
 import {
@@ -202,17 +202,18 @@ const ProjectOwnerSection = ({
             isLoading={projectsQuery.isLoading}
             emptyMessage="No projects yet."
             skeletonItem={
-              <ProjectListRow
+              <ListRow
                 name={<SkeletonText width="12rem" />}
-                description={<SkeletonText width="16rem" />}
+                secondary={<SkeletonText width="16rem" />}
+                actions={<OpenProjectButton />}
               />
             }
             renderItem={(project) => (
-              <ProjectListRow
+              <ListRow
                 key={project.id}
                 name={project.name}
-                description={project.description}
-                onOpen={() => onOpenProject(project)}
+                secondary={project.description}
+                actions={<OpenProjectButton onOpen={() => onOpenProject(project)} />}
               />
             )}
           />
@@ -240,25 +241,11 @@ export type ProjectsPageProps = {
 };
 
 // One layout for a project row, loaded or skeleton (the skeleton counts the description as present).
-const ProjectListRow = ({
-  name,
-  description,
-  onOpen,
-}: {
-  name: React.ReactNode;
-  description?: React.ReactNode;
-  onOpen?: () => void;
-}) => (
-  <li className="flex items-center justify-between gap-4 px-4 py-3">
-    <div className="min-w-0">
-      <p className="truncate text-sm font-medium">{name}</p>
-      {description ? <p className="truncate text-xs text-muted-foreground">{description}</p> : null}
-    </div>
-    <Button type="button" variant="outline" size="sm" onClick={onOpen}>
-      Open
-      <Icon icon="lucide:arrow-right" className="ml-1.5 h-4 w-4" />
-    </Button>
-  </li>
+const OpenProjectButton = ({ onOpen }: { onOpen?: () => void }) => (
+  <Button type="button" variant="outline" size="sm" onClick={onOpen}>
+    Open
+    <Icon icon="lucide:arrow-right" className="ml-1.5 h-4 w-4" />
+  </Button>
 );
 
 export const ProjectsPage = ({ onOpenProject }: ProjectsPageProps = {}) => {

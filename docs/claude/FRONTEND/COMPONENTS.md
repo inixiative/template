@@ -183,7 +183,7 @@ Composed: `Avatar` (frame, `show`), `AvatarImage` (renders nothing when `src` is
 | `List` | three `skeletonItem`s (default: a one-line row) in the bordered list; never `emptyMessage` |
 | `CardContent` | its children as a skeleton; a body that cannot render without data passes no children and gets skeleton lines; the card's header stays |
 
-**Rows have one height and columns one width.** `SkeletonText` is an empty inline block that the skeleton rules draw as one line, so it is exactly as tall as the text it stands for; give it a rem width, since a percentage resolves against nothing in an auto-layout table cell. Every column declares its cell's skeleton once in `skeleton`: `SkeletonText` at the column's usual text width, or the badge or buttons it shows. The table draws it while loading and keeps it invisibly under every loaded cell (`SkeletonSized`), so a column is never narrower than its skeleton and a row whose buttons are hidden is as tall as one that shows them. `ActionButtonsSkeleton` is a row's small icon buttons (`count`); a text button's skeleton is the real button, icon included, so its width matches, and a cell whose buttons depend on the row shows the usual case (`InquirySourceControlsSkeleton`, `InquiryTargetControlsSkeleton`). An item that spans several rows passes `renderItemRows` and `skeletonItemRows` instead of cell renders. A list, or a table item drawn as several rows, has one row layout component that both the item renderer and the skeleton fill: real values in one, `SkeletonText` and skeleton controls in the other (`ProjectListRow`, `ProjectIntegrationRow`, `AdminAllInquiryRows`).
+**Rows have one height and columns one width.** `SkeletonText` is an empty inline block that the skeleton rules draw as one line, so it is exactly as tall as the text it stands for; in a table cell give it a rem width, since a percentage resolves against nothing in an auto-layout table cell. Every column declares its cell's skeleton once in `skeleton`: `SkeletonText` at the column's usual text width, or the badge or buttons it shows. The table draws it while loading and keeps it invisibly under every loaded cell (`SkeletonSized`), so a column is never narrower than its skeleton and a row whose buttons are hidden is as tall as one that shows them. `ActionButtonsSkeleton` is a row's small icon buttons (`count`); a text button's skeleton is the real button, icon included, so its width matches, and a cell whose buttons depend on the row shows the usual case (`InquirySourceControlsSkeleton`, `InquiryTargetControlsSkeleton`). An item that spans several rows passes `renderItemRows` and `skeletonItemRows` instead of cell renders. A list's rows are `ListRow` (`name`, `badges`, `secondary`, `actions`, `details`), the one row frame both `renderItem` and `skeletonItem` fill, as a `Table` row serves both: real values in one, `SkeletonText` and the real controls in the other. A table item drawn as several rows has one rows component the same way (`AdminAllInquiryRows`).
 
 ```typescript
 const columns = [
@@ -196,15 +196,15 @@ const columns = [
 <List
   items={projects}
   isLoading={projectsQuery.isLoading}
-  skeletonItem={<ProjectListRow name={<SkeletonText width="12rem" />} description={<SkeletonText width="16rem" />} />}
-  renderItem={(project) => <ProjectListRow key={project.id} name={project.name} description={project.description} onOpen={() => open(project)} />}
+  skeletonItem={<ListRow name={<SkeletonText width="12rem" />} secondary={<SkeletonText width="16rem" />} actions={<OpenProjectButton />} />}
+  renderItem={(project) => <ListRow key={project.id} name={project.name} secondary={project.description} actions={<OpenProjectButton onOpen={() => open(project)} />} />}
 />
 
 <CardContent isLoading={!status}>{status && <TwoFactorDetails status={status} />}</CardContent>
 <CardTitle {...skeletonAttributes(isCatalogLoading)}>{title}</CardTitle>
 ```
 
-**The skeleton attribute.** `skeletonAttributes(isLoading)` goes on the element that holds the data; the element is the same loading or not, and while loading it gets `inert` and `data-skeleton`, which the rules in [THEME_LAYOUT.md § Skeleton rules](THEME_LAYOUT.md#skeleton-rules) draw. Nothing inside an inert element is read, so `Table`, `List` and `CardContent`, whenever they are given `isLoading`, keep a `SkeletonStatus` beside it: an sr-only `role="status"` region that stays mounted and reads "Loading…" while loading, empty otherwise. Any other skeleton region renders one too.
+**The skeleton attribute.** `skeletonAttributes(isLoading)` goes on the element that holds the data; the element is the same loading or not, and while loading it gets `inert` and `data-skeleton`, which the rules in [THEME_LAYOUT.md § Skeleton rules](THEME_LAYOUT.md#skeleton-rules) draw. Nothing inside an inert element is read, so `Table`, `List` and `CardContent`, whenever they are given `isLoading`, keep a `SkeletonStatus` beside it: an sr-only `role="status"` region that stays mounted while the component shows (an empty result may replace it) and reads "Loading…" while loading, empty otherwise. Any other skeleton region renders one too.
 
 Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a skeleton `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`).
 
@@ -252,7 +252,7 @@ const { data, isFetching } = useQuery({
 
 ### Others
 
-`Badge`, `Breadcrumb`, `CopyButton` (`value`, `label?`), `Pagination`, `ThemeSelector` (see [THEME_LAYOUT.md](THEME_LAYOUT.md#themeselector)).
+`Badge` (`variant`, or `tone`: `primary`, `tertiary`, `quaternary`, `warning`, `muted` for a tinted status pill with a dot), `Breadcrumb`, `CopyButton` (`value`, `label?`), `Pagination`, `ThemeSelector` (see [THEME_LAYOUT.md](THEME_LAYOUT.md#themeselector)).
 
 ## Settings
 

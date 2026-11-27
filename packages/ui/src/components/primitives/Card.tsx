@@ -57,7 +57,6 @@ const CardDescription = React.forwardRef<
 ));
 CardDescription.displayName = 'CardDescription';
 
-// Drawn while loading when a body has nothing it can render yet.
 const CardContentSkeleton = () => (
   <div className="space-y-3 text-sm">
     <p>

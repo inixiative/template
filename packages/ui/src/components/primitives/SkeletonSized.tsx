@@ -6,8 +6,7 @@
  */
 import type * as React from 'react';
 
-// Content that is never smaller than its skeleton: the skeleton sits invisibly under the content,
-// so a row whose buttons are hidden is as tall as one that shows them, loading or loaded.
+// why: the invisible skeleton underneath keeps a cell as large as its skeleton, loading or loaded
 export const SkeletonSized = ({
   skeleton,
   children,

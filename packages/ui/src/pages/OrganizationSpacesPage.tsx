@@ -10,7 +10,7 @@ import {
   organizationReadManySpaces,
   organizationReadManySpacesQueryKey,
 } from '@template/sdk';
-import { Page, Table } from '@template/ui/components';
+import { Page, SkeletonText, Table } from '@template/ui/components';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
 
@@ -36,11 +36,13 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
     {
       key: 'name',
       label: 'Space',
+      skeleton: <SkeletonText width="10rem" />,
       render: (space: Space) => <span className="font-medium">{space.name}</span>,
     },
     {
       key: 'role',
       label: 'Your Role',
+      skeleton: <SkeletonText width="4rem" />,
       render: (space: Space) => {
         const role = authSpaceUsers?.[space.id]?.role;
         return <span className="capitalize">{role ?? '—'}</span>;
@@ -49,6 +51,7 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
     {
       key: 'createdAt',
       label: 'Created',
+      skeleton: <SkeletonText width="5.5rem" />,
       render: (space: Space) => new Date(space.createdAt).toLocaleDateString(),
     },
   ];

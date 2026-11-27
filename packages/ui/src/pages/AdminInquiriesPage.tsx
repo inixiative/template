@@ -207,10 +207,8 @@ const AdminAllInquiryRows = ({ cells }: { cells: AdminAllInquiryRowsCells }) => 
       </td>
       <td className="px-4 pt-3 pb-1 text-sm">
         <SkeletonSized skeleton={adminAllInquirySkeletonCells.source}>
-          <span>
-            <span className="text-xs text-muted-foreground mr-1">↑</span>
-            {cells.source}
-          </span>
+          <span className="text-xs text-muted-foreground mr-1">↑</span>
+          {cells.source}
         </SkeletonSized>
       </td>
       <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
@@ -230,10 +228,8 @@ const AdminAllInquiryRows = ({ cells }: { cells: AdminAllInquiryRowsCells }) => 
     <tr className="group-hover:bg-muted/40 transition-colors">
       <td className="px-4 pb-3 pt-1 text-sm">
         <SkeletonSized skeleton={adminAllInquirySkeletonCells.target}>
-          <span>
-            <span className="text-xs text-muted-foreground mr-1">↓</span>
-            {cells.target}
-          </span>
+          <span className="text-xs text-muted-foreground mr-1">↓</span>
+          {cells.target}
         </SkeletonSized>
       </td>
       <td className="px-4 pb-3 pt-1">

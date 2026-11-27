@@ -7,7 +7,7 @@
 import { Icon } from '@iconify/react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
-import { List, SkeletonSized, SkeletonText } from '@template/ui/components';
+import { List, ListRow, SkeletonSized, SkeletonText } from '@template/ui/components';
 import {
   Badge,
   Button,
@@ -45,40 +45,25 @@ export type ProjectIntegrationsSectionProps = {
   ) => React.ReactNode;
 };
 
-const ProjectIntegrationRow = ({
-  name,
+const IntegrationBadges = ({
   provider,
   ownerModel,
-  actions,
-  details,
-  testId,
 }: {
-  name: React.ReactNode;
   provider?: string | null;
   ownerModel?: string | null;
-  actions: React.ReactNode;
-  details?: React.ReactNode;
-  testId?: string;
 }) => (
-  <li className="px-4 py-3" data-testid={testId}>
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-sm font-medium">{name}</span>
-        {provider ? (
-          <Badge variant="outline" className="text-[11px]">
-            {provider}
-          </Badge>
-        ) : null}
-        {ownerModel ? (
-          <Badge variant="secondary" className="text-[11px]">
-            {ownerModel}
-          </Badge>
-        ) : null}
-      </div>
-      {actions}
-    </div>
-    {details}
-  </li>
+  <>
+    {provider ? (
+      <Badge variant="outline" className="text-[11px]">
+        {provider}
+      </Badge>
+    ) : null}
+    {ownerModel ? (
+      <Badge variant="secondary" className="text-[11px]">
+        {ownerModel}
+      </Badge>
+    ) : null}
+  </>
 );
 
 const ConnectedIntegrationActions = ({
@@ -149,18 +134,17 @@ const ConnectIntegrationButton = ({
 const connectButtonSkeleton = <ConnectIntegrationButton />;
 
 const connectedIntegrationSkeletonItem = (
-  <ProjectIntegrationRow
+  <ListRow
     name={<SkeletonText width="10rem" />}
-    provider="provider"
-    ownerModel="organization"
+    badges={<IntegrationBadges provider="provider" ownerModel="organization" />}
     actions={<ConnectedIntegrationActions />}
   />
 );
 
 const connectableIntegrationSkeletonItem = (
-  <ProjectIntegrationRow
+  <ListRow
     name={<SkeletonText width="10rem" />}
-    provider="provider"
+    badges={<IntegrationBadges provider="provider" />}
     actions={connectButtonSkeleton}
   />
 );
@@ -297,10 +281,10 @@ export const ProjectIntegrationsSection = ({
   const renderConnectableIntegration = (
     integration: (typeof availableGroups)[number]['integrations'][number],
   ) => (
-    <ProjectIntegrationRow
+    <ListRow
       key={integration.id}
       name={integration.name}
-      provider={integration.provider}
+      badges={<IntegrationBadges provider={integration.provider} />}
       actions={
         <SkeletonSized skeleton={connectButtonSkeleton}>
           {canConnectIntegration(integration) ? (
@@ -352,12 +336,16 @@ export const ProjectIntegrationsSection = ({
               } as unknown as HydratedRecord;
 
               return (
-                <ProjectIntegrationRow
+                <ListRow
                   key={pi.id}
                   testId={`connected-project-integration-${pi.id}`}
                   name={displayName}
-                  provider={integration?.provider}
-                  ownerModel={integration?.ownerModel}
+                  badges={
+                    <IntegrationBadges
+                      provider={integration?.provider}
+                      ownerModel={integration?.ownerModel}
+                    />
+                  }
                   actions={
                     <ConnectedIntegrationActions
                       displayName={displayName}

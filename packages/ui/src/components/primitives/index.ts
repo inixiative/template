@@ -10,6 +10,7 @@ export * from './EmptyState';
 export * from './Input';
 export * from './Label';
 export * from './List';
+export * from './ListRow';
 export * from './Pagination';
 export * from './PasswordInput';
 export * from './SearchableSelect';

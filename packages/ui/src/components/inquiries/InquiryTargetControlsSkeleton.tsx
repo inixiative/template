@@ -6,7 +6,6 @@
  */
 import { Button } from '@template/ui/components/primitives/Button';
 
-// InquiryTargetControls for an open inquiry, the usual case: Approve and Decline.
 export const InquiryTargetControlsSkeleton = () => (
   <div className="flex justify-end gap-2">
     <Button type="button" variant="outline" size="sm">

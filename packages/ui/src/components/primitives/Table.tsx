@@ -19,8 +19,6 @@ export type Column<T> = {
   key: string;
   label: React.ReactNode;
   render?: (item: T) => React.ReactNode;
-  // The cell's shape (a badge, buttons, or SkeletonText at the column's usual text width): drawn while
-  // loading, and kept invisibly under every loaded cell (SkeletonSized), so rows and columns hold.
   skeleton?: React.ReactNode;
 };
 

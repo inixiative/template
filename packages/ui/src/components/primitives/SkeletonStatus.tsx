@@ -6,8 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 
-// The loading cue for screen readers, beside a skeleton (whose inert content is not read). Mounted
-// whenever a loading state is given, and filled after mount: a live region speaks only when its text changes.
+// why: filled after mount; a live region speaks only when its text changes
 export const SkeletonStatus = ({ isLoading }: { isLoading?: boolean }) => {
   const [message, setMessage] = useState('');
   useEffect(() => setMessage(isLoading ? 'Loading…' : ''), [isLoading]);
