@@ -7,7 +7,12 @@
 import { Icon } from '@iconify/react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
-import { List, PlaceholderText } from '@template/ui/components';
+import {
+  ActionButtonsSkeleton,
+  List,
+  SkeletonSizedCell,
+  SkeletonText,
+} from '@template/ui/components';
 import {
   Badge,
   Button,
@@ -44,6 +49,57 @@ export type ProjectIntegrationsSectionProps = {
     args: ProjectIntegrationResourcesSlotArgs,
   ) => React.ReactNode;
 };
+
+// One layout for a connected integration, loaded or skeleton.
+const ConnectedIntegrationRow = ({
+  name,
+  badges,
+  actions,
+  details,
+  testId,
+}: {
+  name: React.ReactNode;
+  badges: React.ReactNode;
+  actions: React.ReactNode;
+  details?: React.ReactNode;
+  testId?: string;
+}) => (
+  <li className="p-4" data-testid={testId}>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="min-w-0 space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium">{name}</span>
+          {badges}
+        </div>
+      </div>
+      {actions}
+    </div>
+    {details}
+  </li>
+);
+
+const connectActionSkeleton = <ActionButtonsSkeleton labels={['Connect']} />;
+
+// One layout for an integration that can be connected, loaded or skeleton; the action keeps a button's height.
+const ConnectableIntegrationRow = ({
+  name,
+  badge,
+  action,
+}: {
+  name: React.ReactNode;
+  badge: React.ReactNode;
+  action: React.ReactNode;
+}) => (
+  <li className="flex items-center justify-between gap-3 px-4 py-3">
+    <div className="min-w-0">
+      <div className="flex items-center gap-2">
+        <span className="truncate text-sm font-medium">{name}</span>
+        {badge}
+      </div>
+    </div>
+    <SkeletonSizedCell skeleton={connectActionSkeleton}>{action}</SkeletonSizedCell>
+  </li>
+);
 
 export const ProjectIntegrationsSection = ({
   project,
@@ -178,19 +234,18 @@ export const ProjectIntegrationsSection = ({
   ) => {
     const canConnect = canConnectIntegration(integration);
     return (
-      <li key={integration.id} className="flex items-center justify-between gap-3 px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">{integration.name}</span>
-            {integration.provider ? (
-              <Badge variant="outline" className="text-[11px]">
-                {integration.provider}
-              </Badge>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex min-h-9 items-center">
-          {canConnect ? (
+      <ConnectableIntegrationRow
+        key={integration.id}
+        name={integration.name}
+        badge={
+          integration.provider ? (
+            <Badge variant="outline" className="text-[11px]">
+              {integration.provider}
+            </Badge>
+          ) : null
+        }
+        action={
+          canConnect ? (
             <Button
               type="button"
               variant="outline"
@@ -204,9 +259,9 @@ export const ProjectIntegrationsSection = ({
             </Button>
           ) : (
             <span className="text-xs text-muted-foreground">Read-only</span>
-          )}
-        </div>
-      </li>
+          )
+        }
+      />
     );
   };
 
@@ -231,15 +286,16 @@ export const ProjectIntegrationsSection = ({
             items={connectedRows}
             isLoading={connectedQuery.isLoading}
             emptyMessage="No integrations are connected to this project yet."
-            placeholderItem={
-              <li className="flex items-center justify-between gap-3 p-4">
-                <p className="text-sm">
-                  <PlaceholderText width="10rem" />
-                </p>
-                <Button type="button" variant="outline" size="sm" tabIndex={-1}>
-                  Settings &amp; resources
-                </Button>
-              </li>
+            skeletonItem={
+              <ConnectedIntegrationRow
+                name={<SkeletonText width="10rem" />}
+                badges={
+                  <Badge variant="outline" className="text-[11px]">
+                    provider
+                  </Badge>
+                }
+                actions={<ActionButtonsSkeleton labels={['Settings & resources']} />}
+              />
             }
             renderItem={(pi) => {
               const integration = integrationsById.get(pi.integrationId);
@@ -253,27 +309,25 @@ export const ProjectIntegrationsSection = ({
               } as unknown as HydratedRecord;
 
               return (
-                <li
+                <ConnectedIntegrationRow
                   key={pi.id}
-                  className="p-4"
-                  data-testid={`connected-project-integration-${pi.id}`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium">{displayName}</span>
-                        {integration?.provider ? (
-                          <Badge variant="outline" className="text-[11px]">
-                            {integration.provider}
-                          </Badge>
-                        ) : null}
-                        {integration?.ownerModel ? (
-                          <Badge variant="secondary" className="text-[11px]">
-                            {integration.ownerModel}
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </div>
+                  testId={`connected-project-integration-${pi.id}`}
+                  name={displayName}
+                  badges={
+                    <>
+                      {integration?.provider ? (
+                        <Badge variant="outline" className="text-[11px]">
+                          {integration.provider}
+                        </Badge>
+                      ) : null}
+                      {integration?.ownerModel ? (
+                        <Badge variant="secondary" className="text-[11px]">
+                          {integration.ownerModel}
+                        </Badge>
+                      ) : null}
+                    </>
+                  }
+                  actions={
                     <div className="flex items-center gap-2">
                       <Button
                         type="button"
@@ -304,48 +358,49 @@ export const ProjectIntegrationsSection = ({
                         </Button>
                       ) : null}
                     </div>
-                  </div>
+                  }
+                  details={
+                    isExpanded ? (
+                      <div
+                        className="mt-4 space-y-4 border-t pt-4"
+                        data-testid={`project-integration-details-${pi.id}`}
+                      >
+                        <ResourceSettingsSection
+                          target={{
+                            model: 'ProjectIntegration',
+                            id: pi.id,
+                            record: piRecordForPermissions,
+                          }}
+                          title={`${displayName} settings`}
+                        />
 
-                  {isExpanded ? (
-                    <div
-                      className="mt-4 space-y-4 border-t pt-4"
-                      data-testid={`project-integration-details-${pi.id}`}
-                    >
-                      <ResourceSettingsSection
-                        target={{
-                          model: 'ProjectIntegration',
-                          id: pi.id,
-                          record: piRecordForPermissions,
-                        }}
-                        title={`${displayName} settings`}
-                      />
-
-                      {renderProjectIntegrationResources ? (
-                        <div data-testid={`project-integration-resources-${pi.id}`}>
-                          {renderProjectIntegrationResources({
-                            project,
-                            projectIntegration: pi,
-                            integration,
-                          })}
-                        </div>
-                      ) : (
-                        <Card data-testid={`project-integration-resources-${pi.id}`}>
-                          <CardHeader>
-                            <CardTitle className="text-base">Resources</CardTitle>
-                            <CardDescription>
-                              Integration resources attached to {project.name}.
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                              No resources configured for this integration yet.
-                            </p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  ) : null}
-                </li>
+                        {renderProjectIntegrationResources ? (
+                          <div data-testid={`project-integration-resources-${pi.id}`}>
+                            {renderProjectIntegrationResources({
+                              project,
+                              projectIntegration: pi,
+                              integration,
+                            })}
+                          </div>
+                        ) : (
+                          <Card data-testid={`project-integration-resources-${pi.id}`}>
+                            <CardHeader>
+                              <CardTitle className="text-base">Resources</CardTitle>
+                              <CardDescription>
+                                Integration resources attached to {project.name}.
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-sm text-muted-foreground">
+                                No resources configured for this integration yet.
+                              </p>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    ) : null
+                  }
+                />
               );
             }}
           />
@@ -384,15 +439,16 @@ export const ProjectIntegrationsSection = ({
               items={[]}
               isLoading={anyScopeLoading}
               emptyMessage="No additional integrations are available to connect to this project."
-              placeholderItem={
-                <li className="flex items-center justify-between gap-3 px-4 py-3">
-                  <p className="text-sm">
-                    <PlaceholderText width="10rem" />
-                  </p>
-                  <Button type="button" variant="outline" size="sm" tabIndex={-1}>
-                    Connect
-                  </Button>
-                </li>
+              skeletonItem={
+                <ConnectableIntegrationRow
+                  name={<SkeletonText width="10rem" />}
+                  badge={
+                    <Badge variant="outline" className="text-[11px]">
+                      provider
+                    </Badge>
+                  }
+                  action={connectActionSkeleton}
+                />
               }
               renderItem={renderConnectableIntegration}
             />

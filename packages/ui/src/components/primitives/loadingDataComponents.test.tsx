@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { CardContent } from '@template/ui/components/primitives/Card';
 import { List } from '@template/ui/components/primitives/List';
-import { LoadingMask } from '@template/ui/components/primitives/LoadingMask';
+import { skeletonAttributes } from '@template/ui/components/primitives/skeletonAttributes';
 import { Table } from '@template/ui/components/primitives/Table';
 import { cleanup, render, screen } from '@testing-library/react';
 
@@ -29,13 +29,15 @@ describe('Table', () => {
     expect(screen.queryByText('Nothing here yet')).toBeNull();
     expect(container.querySelectorAll('tbody tr')).toHaveLength(5);
     expect(container.querySelectorAll('tbody tr:first-child td')).toHaveLength(2);
-    expect(container.querySelector('tbody[data-loading-mask][inert]')).toBeTruthy();
+    expect(container.querySelector('tbody[data-skeleton][inert]')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('Loading…');
+    expect(screen.getByRole('status').closest('[inert]')).toBeNull();
   });
 
-  test("a column's placeholder is drawn while loading and kept invisibly under each loaded cell", () => {
+  test("a column's skeleton is drawn while loading and kept invisibly under each loaded cell", () => {
     const badgeColumns = [
       { key: 'name', label: 'Name' },
-      { key: 'role', label: 'Role', placeholder: <span data-testid="role-shape">role</span> },
+      { key: 'role', label: 'Role', skeleton: <span data-testid="role-shape">role</span> },
     ];
     const { container, rerender } = render(
       <Table<Row> columns={badgeColumns} data={[]} keyExtractor={(row) => row.id} isLoading />,
@@ -51,9 +53,10 @@ describe('Table', () => {
     );
     const shape = screen.getByTestId('role-shape').parentElement as HTMLElement;
     expect(shape.className).toContain('invisible');
-    expect(shape.hasAttribute('inert')).toBe(true);
     expect(screen.getByText('owner')).toBeTruthy();
-    expect(container.querySelector('tbody[data-loading-mask]')).toBeNull();
+    expect(container.querySelector('tbody[data-skeleton]')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(container.querySelector('[aria-busy]')).toBeNull();
   });
 
   test('the same table shows its rows once loaded', () => {
@@ -83,12 +86,12 @@ describe('List', () => {
     expect(container.querySelectorAll('li')).toHaveLength(3);
   });
 
-  test('a loading list draws its placeholder item three times', () => {
+  test('a loading list draws its skeleton item three times', () => {
     render(
       <List<Row>
         items={[]}
         isLoading
-        placeholderItem={<li data-testid="row-shape">row</li>}
+        skeletonItem={<li data-testid="row-shape">row</li>}
         renderItem={(row) => <li key={row.id}>{row.name}</li>}
       />,
     );
@@ -114,37 +117,21 @@ describe('CardContent', () => {
         <button type="button">Save</button>
       </CardContent>,
     );
-    expect(container.querySelector('[data-loading-mask][inert] button')).toBeTruthy();
+    expect(container.querySelector('[data-skeleton][inert] button')).toBeTruthy();
+    expect(screen.getByRole('status')).toBeTruthy();
   });
 
-  test('loading content with no renderable children draws masked placeholder lines', () => {
+  test('loading content with no renderable children draws skeleton lines', () => {
     const { container } = render(<CardContent isLoading>{false}</CardContent>);
-    const content = container.firstElementChild as HTMLElement;
-    expect(content.hasAttribute('data-loading-mask')).toBe(true);
+    const content = container.querySelector('[data-skeleton]') as HTMLElement;
+    expect(content).toBeTruthy();
     expect(content.querySelectorAll('p').length).toBeGreaterThan(0);
   });
 });
 
-describe('LoadingMask', () => {
-  test('masks its content while loading and keeps the same element once loaded', () => {
-    const { container, rerender } = render(
-      <LoadingMask isLoading className="mask">
-        <button type="button">Save</button>
-      </LoadingMask>,
-    );
-    const mask = container.firstElementChild as HTMLElement;
-    expect(mask.getAttribute('aria-busy')).toBe('true');
-    expect(mask.hasAttribute('inert')).toBe(true);
-    expect(mask.hasAttribute('data-loading-mask')).toBe(true);
-    rerender(
-      <LoadingMask isLoading={false} className="mask">
-        <button type="button">Save</button>
-      </LoadingMask>,
-    );
-    expect(container.firstElementChild).toBe(mask);
-    expect(mask.className).toBe('mask');
-    expect(mask.hasAttribute('inert')).toBe(false);
-    expect(mask.hasAttribute('data-loading-mask')).toBe(false);
-    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+describe('skeletonAttributes', () => {
+  test('marks an element only while loading, so the element itself never changes', () => {
+    expect(skeletonAttributes(true)).toEqual({ inert: true, 'data-skeleton': '' });
+    expect(skeletonAttributes(false)).toEqual({ inert: undefined, 'data-skeleton': undefined });
   });
 });

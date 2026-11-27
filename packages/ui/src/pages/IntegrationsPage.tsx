@@ -13,7 +13,7 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
-import { Button, loadingMaskAttributes, Page } from '@template/ui/components';
+import { Button, Page, skeletonAttributes } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
 import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
 import {
@@ -168,7 +168,7 @@ const IntegrationProviderSection = ({
   const statusText = showStatus && !providerIntegrations.isError && (
     <span
       className="font-mono text-[11px] text-muted-foreground"
-      {...loadingMaskAttributes(providerIntegrations.isLoading)}
+      {...skeletonAttributes(providerIntegrations.isLoading)}
     >
       {status.label}
     </span>

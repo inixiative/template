@@ -12,15 +12,17 @@ import {
   type InquiryItem,
 } from '@template/sdk';
 import {
+  ActionButtonsSkeleton,
   Badge,
   EmptyState,
-  loadingMaskAttributes,
   Page,
-  PlaceholderText,
+  SkeletonSizedCell,
+  SkeletonStatus,
+  SkeletonText,
+  skeletonAttributes,
   Table,
 } from '@template/ui/components';
 import {
-  InquiryControlsPlaceholder,
   InquirySourceControls,
   InquiryStatusBadge,
   InquiryTargetControls,
@@ -111,7 +113,7 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
               key: 'status',
               label: 'Status',
               render: (inq: Inquiry) => <InquiryStatusBadge inquiry={inq} />,
-              placeholder: <Badge>pending</Badge>,
+              skeleton: <Badge>pending</Badge>,
             },
             {
               key: 'source',
@@ -150,6 +152,8 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
   );
 };
 
+const adminAllInquiryControlsSkeleton = <ActionButtonsSkeleton labels={['Cancel']} />;
+
 const adminAllInquiryHeadings = ['Type', 'Status', 'Actor', 'Sent', 'Expires', ''];
 
 type AdminAllInquiryRowCells = {
@@ -163,7 +167,7 @@ type AdminAllInquiryRowCells = {
   targetControls: React.ReactNode;
 };
 
-// Each side's line is a small button tall whether or not it has controls, so every inquiry is the same height.
+// Each side's controls cell keeps a small button's height whether or not it has controls, so every inquiry is one height.
 const AdminAllInquiryRow = ({
   cells,
   ...props
@@ -178,10 +182,8 @@ const AdminAllInquiryRow = ({
         {cells.status}
       </td>
       <td className="px-4 pt-3 pb-1 text-sm">
-        <div className="flex min-h-9 items-center">
-          <span className="text-xs text-muted-foreground mr-1">↑</span>
-          {cells.source}
-        </div>
+        <span className="text-xs text-muted-foreground mr-1">↑</span>
+        {cells.source}
       </td>
       <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
         {cells.sentAt}
@@ -190,32 +192,34 @@ const AdminAllInquiryRow = ({
         {cells.expiresAt}
       </td>
       <td className="px-4 pt-3 pb-1">
-        <div className="flex min-h-9 items-center justify-end">{cells.sourceControls}</div>
+        <SkeletonSizedCell skeleton={adminAllInquiryControlsSkeleton}>
+          {cells.sourceControls}
+        </SkeletonSizedCell>
       </td>
     </tr>
     <tr className="group-hover:bg-muted/40 transition-colors">
       <td className="px-4 pb-3 pt-1 text-sm">
-        <div className="flex min-h-9 items-center">
-          <span className="text-xs text-muted-foreground mr-1">↓</span>
-          {cells.target}
-        </div>
+        <span className="text-xs text-muted-foreground mr-1">↓</span>
+        {cells.target}
       </td>
       <td className="px-4 pb-3 pt-1">
-        <div className="flex min-h-9 items-center justify-end">{cells.targetControls}</div>
+        <SkeletonSizedCell skeleton={adminAllInquiryControlsSkeleton}>
+          {cells.targetControls}
+        </SkeletonSizedCell>
       </td>
     </tr>
   </tbody>
 );
 
-const adminAllInquiryPlaceholderCells: AdminAllInquiryRowCells = {
-  type: <PlaceholderText width="6rem" />,
+const adminAllInquirySkeletonCells: AdminAllInquiryRowCells = {
+  type: <SkeletonText width="6rem" />,
   status: <Badge>pending</Badge>,
-  source: <PlaceholderText width="8rem" />,
-  target: <PlaceholderText width="7rem" />,
-  sentAt: <PlaceholderText width="5rem" />,
-  expiresAt: <PlaceholderText width="5rem" />,
-  sourceControls: <InquiryControlsPlaceholder />,
-  targetControls: <InquiryControlsPlaceholder />,
+  source: <SkeletonText width="8rem" />,
+  target: <SkeletonText width="7rem" />,
+  sentAt: <SkeletonText width="5rem" />,
+  expiresAt: <SkeletonText width="5rem" />,
+  sourceControls: adminAllInquiryControlsSkeleton,
+  targetControls: adminAllInquiryControlsSkeleton,
 };
 
 const AdminAllInquiryTable = ({
@@ -238,6 +242,7 @@ const AdminAllInquiryTable = ({
 
   return (
     <div className="border rounded-xl overflow-hidden bg-card">
+      <SkeletonStatus isLoading={isLoading} />
       <table className="w-full">
         <thead className="bg-muted/60 border-b">
           <tr>
@@ -256,8 +261,8 @@ const AdminAllInquiryTable = ({
             <AdminAllInquiryRow
               // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
               key={row}
-              cells={adminAllInquiryPlaceholderCells}
-              {...loadingMaskAttributes(true)}
+              cells={adminAllInquirySkeletonCells}
+              {...skeletonAttributes(true)}
             />
           ))}
         {inquiries.map((inq) => {

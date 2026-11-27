@@ -126,7 +126,7 @@ type Column<T> = {
   key: string;
   label: React.ReactNode;
   render?: (item: T) => React.ReactNode;   // default: item[key]
-  placeholder?: React.ReactNode;           // the cell's shape when taller than one line (badge, buttons)
+  skeleton?: React.ReactNode;              // the cell's shape when taller than one line (badge, buttons)
 };
 
 type TableProps<T> = {
@@ -173,34 +173,38 @@ Composed: `Avatar` (frame, `show`), `AvatarImage` (renders nothing when `src` is
 
 ### Loading states
 
-**Nothing changes shape when data lands.** A page renders its layout at once and passes each data component its query's `isLoading`; the component draws its loading state at its loaded size. Pages never place skeletons.
+**Nothing changes shape when data lands.** A page renders its layout at once and passes each data component its query's `isLoading`; the component draws its skeleton at its loaded size. Pages never place skeletons. "Skeleton" is the one word for this ([NAMING.md](../NAMING.md#components)).
 
 | Component | While `isLoading` |
 |-----------|-------------------|
-| `Table` | its real header and five placeholder rows; a column's `placeholder` fills its cells; never the empty state |
-| `List` | three `placeholderItem`s (default: a one-line row) in the bordered list; never `emptyMessage` |
-| `CardContent` | its children masked; a body that cannot render without data passes no children and gets placeholder lines; the card's header stays |
+| `Table` | its real header and five skeleton rows; a column's `skeleton` fills its cells; never the empty state |
+| `List` | three `skeletonItem`s (default: a one-line row) in the bordered list; never `emptyMessage` |
+| `CardContent` | its children as a skeleton; a body that cannot render without data passes no children and gets skeleton lines; the card's header stays |
 
-**Rows have one height.** A one-line cell's placeholder is one text line box (`PlaceholderText`), so it is exactly as tall as the text it stands for. A column whose cells are taller than a line (a badge, buttons) declares the shape once in `placeholder`; the table draws it while loading and keeps it invisibly under every loaded cell, so a row whose buttons are hidden is as tall as one that shows them. `RowActionPlaceholder` is the shape of a row's ghost icon buttons. A `List` item, or a hand-built table row (the admin all-inquiries table), passes its own placeholder built from the same markup as the real item.
+**Rows have one height.** `SkeletonText` is an empty inline block; the skeleton rules give an empty text element one line, so it is exactly as tall as the text it stands for. A column whose cells are taller than a line (a badge, buttons) declares its shape once in `skeleton`: the table draws it while loading and keeps it invisibly under every loaded cell (`SkeletonSizedCell`), so a row whose buttons are hidden is as tall as one that shows them. `ActionButtonsSkeleton` is the shape of a row's small buttons (`labels` for text buttons, else `count` icon buttons). A list, or a hand-built table row, has one row layout component that both `renderItem` and `skeletonItem` fill: real values in one, `SkeletonText` and skeleton controls in the other (`ProjectListRow`, `ConnectedIntegrationRow`, `AdminAllInquiryRow`).
 
 ```typescript
 const columns = [
   { key: 'name', label: 'Name' },
-  { key: 'status', label: 'Status', render: (row) => <StatusBadge row={row} />, placeholder: <Badge>pending</Badge> },
-  { key: 'actions', label: '', render: (row) => <RowActions row={row} />, placeholder: <RowActionPlaceholder /> },
+  { key: 'status', label: 'Status', render: (row) => <StatusBadge row={row} />, skeleton: <Badge>pending</Badge> },
+  { key: 'actions', label: '', render: (row) => <RowActions row={row} />, skeleton: <ActionButtonsSkeleton /> },
 ];
 <Table columns={columns} data={query.data?.data ?? []} keyExtractor={(row) => row.id} isLoading={query.isLoading} />
 
-<List items={projects} isLoading={projectsQuery.isLoading} placeholderItem={<li className="…"><p className="text-sm"><PlaceholderText width="12rem" /></p><Button size="sm">Open</Button></li>} renderItem={…} />
+<List
+  items={projects}
+  isLoading={projectsQuery.isLoading}
+  skeletonItem={<ProjectListRow name={<SkeletonText width="12rem" />} description={<SkeletonText width="16rem" />} openButton={<Button size="sm">Open</Button>} />}
+  renderItem={(project) => <ProjectListRow key={project.id} name={project.name} description={project.description} openButton={…} />}
+/>
 
 <CardContent isLoading={!status}>{status && <TwoFactorDetails status={status} />}</CardContent>
+<CardTitle {...skeletonAttributes(isCatalogLoading)}>{title}</CardTitle>
 ```
 
-**The mask.** `LoadingMask` (or `loadingMaskAttributes` on an element that cannot hold a `div`: a `tbody`, a `ul`, `CardContent` itself) renders the same element loading or not; while loading it adds `aria-busy`, `inert` and `data-loading-mask`. The `[data-loading-mask]` rules in `packages/shared/styles/theme.css` pulse the region and turn what carries data (leaf elements, buttons, links, inputs, badges) into bars of their own size; fixed labels (`label`, `th`, `dt`, `legend`) stay readable; an empty text element still draws a one-line bar. Use it for a heading whose text comes from data.
+**The skeleton attribute.** `skeletonAttributes(isLoading)` goes on the element that holds the data; the element is the same loading or not, and while loading it gets `inert` and `data-skeleton`. The rules in `packages/shared/styles/theme.css` ([THEME_LAYOUT.md § Skeleton rules](THEME_LAYOUT.md#skeleton-rules)) blank the text and draw bars of each element's own size and radius; fixed labels stay readable. Nothing inside an inert element is read, so `Table`, `List` and `CardContent` render `SkeletonStatus` (an sr-only `role="status"` "Loading…") beside it while loading.
 
-Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a masked `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`).
-
-`Skeleton` is the bare pulsing box, sized by `className`, for a shape no real element gives.
+Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a skeleton `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`).
 
 Icons: every `lucide:` and `simple-icons:` name the apps use is bundled by `bun run generate:frontend` (`packages/ui/src/lib/icons/bundledIconCollections.gen.ts`, registered in each app's `main.tsx`), so icons render in the first frame instead of after a fetch to the Iconify API.
 

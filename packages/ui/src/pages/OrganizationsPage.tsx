@@ -17,7 +17,7 @@ import {
   organizationCreate,
   organizationDelete,
 } from '@template/sdk';
-import { Button, Page, RowActionPlaceholder, Table } from '@template/ui/components';
+import { ActionButtonsSkeleton, Button, Page, Table } from '@template/ui/components';
 import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -108,7 +108,7 @@ export const OrganizationsPage = () => {
       {
         key: 'actions',
         label: '',
-        placeholder: <RowActionPlaceholder />,
+        skeleton: <ActionButtonsSkeleton />,
         render: (org: Organization) => {
           return (
             <div className="flex justify-end gap-2">

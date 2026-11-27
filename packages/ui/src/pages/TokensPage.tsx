@@ -9,6 +9,7 @@ import { Icon } from '@iconify/react';
 import { useQuery } from '@tanstack/react-query';
 import type { MeCreateTokenData, OrganizationReadManyTokensResponse } from '@template/sdk';
 import {
+  ActionButtonsSkeleton,
   Button,
   Card,
   CardContent,
@@ -16,7 +17,6 @@ import {
   CardHeader,
   CardTitle,
   Page,
-  RowActionPlaceholder,
   Table,
 } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
@@ -112,7 +112,7 @@ const TokenSection = ({
     {
       key: 'actions',
       label: '',
-      placeholder: <RowActionPlaceholder />,
+      skeleton: <ActionButtonsSkeleton />,
       render: (item: Token) => (
         <div className="flex justify-end gap-2">
           <Button

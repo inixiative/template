@@ -6,9 +6,11 @@
  */
 import { Icon } from '@iconify/react';
 import { EmptyState, type EmptyStateProps } from '@template/ui/components/primitives/EmptyState';
-import { loadingMaskAttributes } from '@template/ui/components/primitives/loadingMaskAttributes';
 import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
-import { TablePlaceholderRows } from '@template/ui/components/primitives/TablePlaceholderRows';
+import { SkeletonSizedCell } from '@template/ui/components/primitives/SkeletonSizedCell';
+import { SkeletonStatus } from '@template/ui/components/primitives/SkeletonStatus';
+import { skeletonAttributes } from '@template/ui/components/primitives/skeletonAttributes';
+import { TableSkeletonRows } from '@template/ui/components/primitives/TableSkeletonRows';
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';
 import { cn } from '@template/ui/lib/utils';
 import type * as React from 'react';
@@ -18,8 +20,8 @@ export type Column<T> = {
   label: React.ReactNode;
   render?: (item: T) => React.ReactNode;
   // The cell's shape when it is more than one line of text (a badge, a button): drawn while loading,
-  // and kept invisibly under every loaded cell so rows are the same height either way.
-  placeholder?: React.ReactNode;
+  // and kept invisibly under every loaded cell (SkeletonSizedCell) so rows are one height either way.
+  skeleton?: React.ReactNode;
 };
 
 export type InfiniteScrollProps = {
@@ -30,24 +32,6 @@ export type InfiniteScrollProps = {
 };
 
 const noop = () => {};
-
-const CellKeepingPlaceholderShape = ({
-  placeholder,
-  children,
-}: {
-  placeholder: React.ReactNode;
-  children: React.ReactNode;
-}) =>
-  placeholder === undefined ? (
-    children
-  ) : (
-    <div className="grid items-center [&>*]:col-start-1 [&>*]:row-start-1">
-      <div aria-hidden="true" inert className="invisible">
-        {placeholder}
-      </div>
-      <div>{children}</div>
-    </div>
-  );
 
 export type TableProps<T> = {
   columns: Column<T>[];
@@ -112,6 +96,7 @@ export const Table = <T,>({
         className="border rounded-xl overflow-hidden bg-card"
         style={isViewport ? { maxHeight, overflow: 'auto' } : undefined}
       >
+        <SkeletonStatus isLoading={isLoading} />
         <table className="w-full" style={isViewport ? { tableLayout: 'fixed' } : undefined}>
           <thead className={cn('bg-muted/60 border-b', isViewport && 'sticky top-0 z-10')}>
             <tr>
@@ -125,8 +110,8 @@ export const Table = <T,>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y" {...loadingMaskAttributes(isLoading)}>
-            {isLoading && <TablePlaceholderRows columns={columns} rows={5} />}
+          <tbody className="divide-y" {...skeletonAttributes(isLoading)}>
+            {isLoading && <TableSkeletonRows columns={columns} rows={5} />}
             {!isLoading &&
               data.map((item) => (
                 <tr
@@ -140,11 +125,11 @@ export const Table = <T,>({
                 >
                   {columns.map((column) => (
                     <td key={column.key} className="px-4 py-3 text-sm">
-                      <CellKeepingPlaceholderShape placeholder={column.placeholder}>
+                      <SkeletonSizedCell skeleton={column.skeleton}>
                         {column.render
                           ? column.render(item)
                           : ((item as Record<string, unknown>)[column.key] as React.ReactNode)}
-                      </CellKeepingPlaceholderShape>
+                      </SkeletonSizedCell>
                     </td>
                   ))}
                 </tr>

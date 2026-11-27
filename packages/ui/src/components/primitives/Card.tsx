@@ -4,8 +4,10 @@
  * @partOf primitive:ui
  * @uses none
  */
-import { loadingMaskAttributes } from '@template/ui/components/primitives/loadingMaskAttributes';
-import { PlaceholderText } from '@template/ui/components/primitives/PlaceholderText';
+
+import { SkeletonStatus } from '@template/ui/components/primitives/SkeletonStatus';
+import { SkeletonText } from '@template/ui/components/primitives/SkeletonText';
+import { skeletonAttributes } from '@template/ui/components/primitives/skeletonAttributes';
 import { cn } from '@template/ui/lib/utils';
 import * as React from 'react';
 
@@ -56,13 +58,13 @@ const CardDescription = React.forwardRef<
 CardDescription.displayName = 'CardDescription';
 
 // Drawn while loading when the card has nothing it can render yet.
-const CardContentPlaceholder = () => (
+const CardContentSkeleton = () => (
   <div className="space-y-3 text-sm">
     <p>
-      <PlaceholderText width="66%" />
+      <SkeletonText width="66%" />
     </p>
     <p>
-      <PlaceholderText width="50%" />
+      <SkeletonText width="50%" />
     </p>
     <div className="h-9 w-full" />
   </div>
@@ -72,16 +74,19 @@ const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { isLoading?: boolean }
 >(({ className, isLoading = false, children, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn('p-6 pt-0', className)}
-    {...props}
-    {...loadingMaskAttributes(isLoading)}
-  >
-    {React.Children.toArray(children).length > 0
-      ? children
-      : isLoading && <CardContentPlaceholder />}
-  </div>
+  <>
+    <SkeletonStatus isLoading={isLoading} />
+    <div
+      ref={ref}
+      className={cn('p-6 pt-0', className)}
+      {...props}
+      {...skeletonAttributes(isLoading)}
+    >
+      {React.Children.toArray(children).length > 0
+        ? children
+        : isLoading && <CardContentSkeleton />}
+    </div>
+  </>
 ));
 CardContent.displayName = 'CardContent';
 
