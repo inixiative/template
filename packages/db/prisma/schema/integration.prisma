@@ -17,6 +17,8 @@ model Integration {
 
   provider Provider?
 
+  configuration Json?
+
   // A delegate: its permissions, capped live by its direct owner
   role Role?
   full Boolean @default(false)

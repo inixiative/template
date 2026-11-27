@@ -5,7 +5,6 @@
  * @uses none
  */
 import { FieldKind } from '@inixiative/json-rules';
-import { z } from 'zod';
 
 export const ATTRIBUTE_VALUE_TYPES = [
   'boolean',
@@ -17,8 +16,6 @@ export const ATTRIBUTE_VALUE_TYPES = [
 ] as const;
 
 export type AttributeValueType = (typeof ATTRIBUTE_VALUE_TYPES)[number];
-
-export const AttributeValueTypeSchema = z.enum(ATTRIBUTE_VALUE_TYPES);
 
 export const isAttributeValueType = (value: unknown): value is AttributeValueType =>
   typeof value === 'string' && (ATTRIBUTE_VALUE_TYPES as readonly string[]).includes(value);

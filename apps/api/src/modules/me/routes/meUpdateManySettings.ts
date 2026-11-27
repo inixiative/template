@@ -8,10 +8,7 @@ import { SettingScalarSchema } from '@template/db';
 import { updateRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { OpenApiTags } from '#/modules/openApiTags';
-import {
-  makeSettingUpsertItemRefinement,
-  settingUpsertItemSchema,
-} from '#/modules/setting/schemas/settingSchemas';
+import { settingUpsertItemSchema } from '#/modules/setting/schemas/settingSchemas';
 
 export const meUpdateManySettingsRoute = updateRoute({
   model: Modules.me,
@@ -19,7 +16,6 @@ export const meUpdateManySettingsRoute = updateRoute({
   many: true,
   skipId: true,
   bodySchema: settingUpsertItemSchema,
-  bodyRefinement: makeSettingUpsertItemRefinement('User'),
   responseSchema: SettingScalarSchema,
   tags: [OpenApiTags.me, OpenApiTags.setting],
   description: 'Atomically creates or updates a batch of personal settings for the acting user.',

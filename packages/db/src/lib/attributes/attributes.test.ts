@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { Operator } from '@inixiative/json-rules';
 import { db, Prisma } from '@template/db';
 import {
   attributeOrderBy,
@@ -29,56 +30,52 @@ import {
   createUser,
 } from '@template/db/test';
 import { defineAttributeField } from '@template/shared/attributes';
-import { z } from 'zod';
 
 const syntheticNumberDef = defineAttributeField({
   key: 'test.maxTasks',
   valueType: 'number',
-  schema: z.number().int().min(1).max(100),
+  conditions: {
+    all: [
+      { field: 'value', operator: Operator.greaterThanEquals, value: 1, error: 'At least 1' },
+      { field: 'value', operator: Operator.lessThanEquals, value: 100, error: 'At most 100' },
+    ],
+  },
   defaultValue: 10,
   label: 'Max Tasks',
   description: 'Synthetic number attribute for DB operator tests.',
-  resourceModels: ['OrganizationUser'],
 });
 
 const syntheticBoolDef = defineAttributeField({
   key: 'test.enabled',
   valueType: 'boolean',
-  schema: z.boolean(),
   defaultValue: false,
   label: 'Enabled',
   description: 'Synthetic boolean attribute for DB tests.',
-  resourceModels: ['OrganizationUser'],
 });
 
 const syntheticDateDef = defineAttributeField({
   key: 'test.snoozeUntil',
   valueType: 'date',
-  schema: z.iso.datetime(),
   defaultValue: null,
   label: 'Snooze Until',
   description: 'Synthetic date attribute for DB operator tests.',
-  resourceModels: ['User'],
 });
 
 const syntheticJsonDef = defineAttributeField({
   key: 'test.quietHours',
   valueType: 'json',
-  schema: z.object({ enabled: z.boolean(), startHour: z.number().int() }),
   defaultValue: { enabled: false, startHour: 22 },
   label: 'Quiet Hours',
   description: 'Synthetic JSON attribute for DB tests.',
-  resourceModels: ['User'],
 });
 
 const syntheticMultiDef = defineAttributeField({
   key: 'test.topics',
   valueType: 'multiSelect',
-  schema: z.array(z.enum(['inquiries', 'security', 'billing', 'digest'])),
+  options: ['inquiries', 'security', 'billing', 'digest'].map((value) => ({ value, label: value })),
   defaultValue: ['inquiries', 'security'],
   label: 'Topics',
   description: 'Synthetic multiSelect attribute for Postgres GIN tests.',
-  resourceModels: ['User'],
 });
 
 describe('Attribute model capability (5-column codec, operators, Postgres GIN indexes)', () => {
@@ -116,21 +113,13 @@ describe('Attribute model capability (5-column codec, operators, Postgres GIN in
       );
     });
 
-    it('rejects unknown locators, invalid schemas, mixed columns, Prisma.JsonNull, and disallowed resourceModels', () => {
+    it('rejects unknown locators, invalid schemas, mixed columns, and Prisma.JsonNull', () => {
       expect(() => encodeAttributeColumns('setting', 'unknown.key', true)).toThrow(
         'Unknown attribute locator',
       );
       expect(() =>
         encodeAttributeColumns('setting', 'general.defaultTimezone', 'Not/A_Zone'),
       ).toThrow('Invalid value');
-
-      expect(() =>
-        validateAttributeWrite('setting', {
-          resourceModel: 'Project',
-          key: 'general.displayLocale',
-          valueText: 'en',
-        }),
-      ).toThrow(/not valid for resourceModel='Project'/);
 
       expect(() =>
         validateAttributeWrite('setting', {

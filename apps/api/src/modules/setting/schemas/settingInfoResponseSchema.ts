@@ -6,53 +6,20 @@
  */
 import { z } from '@hono/zod-openapi';
 import { SettingResourceModel } from '@template/db/generated/client/enums';
-import { AttributeValueTypeSchema } from '@template/shared/attributes';
-import {
-  SettingCategoryKeySchema,
-  SettingKeySchema,
-  SettingPermissionSpecSchema,
-} from '@template/shared/settings';
 import { infoResponseSchema } from '#/lib/jsonSchema/infoResponseSchema';
-import { jsonSchemaResponseSchema } from '#/lib/jsonSchema/jsonSchemaResponseSchema';
 
-export const settingCategoryInfoSchema = z.object({
-  key: SettingCategoryKeySchema.describe('Unique category key.'),
-  label: z.string().describe('Human-readable category name.'),
-  description: z.string().describe('What settings in this category control.'),
-  order: z.number().int().describe('Display order relative to other categories.'),
-});
-
-export const settingDefinitionInfoSchema = z.object({
-  key: SettingKeySchema.describe('Namespaced setting key.'),
-  category: SettingCategoryKeySchema.describe('Category key under `types.categories`.'),
-  label: z.string().describe('Human-readable setting name.'),
-  description: z.string().describe('What this setting controls.'),
-  resourceModels: z
-    .array(z.nativeEnum(SettingResourceModel))
-    .describe('Resource models this setting may attach to.'),
-  valueType: AttributeValueTypeSchema.describe(
-    'Typed attribute storage kind (`boolean`, `text`, `number`, `date`, `json`, or `multiSelect`).',
-  ),
-  schema: jsonSchemaResponseSchema.describe('JSON Schema of `value` accepted for this setting.'),
-  defaultValue: z.unknown().describe('Effective default value when no active setting row exists.'),
-  order: z.number().int().describe('Display order within its category.'),
-  permission: SettingPermissionSpecSchema.describe(
-    'ReBAC action (or per-resourceModel map) required on the setting resource to manage (write/delete) this setting.',
-  ),
-  readPermission: SettingPermissionSpecSchema.describe(
-    'ReBAC action (or per-resourceModel map) required on the setting resource to read this setting.',
-  ),
-});
+export const settingTreeInfoSchema = z
+  .record(z.string(), z.unknown())
+  .describe(
+    "One resource model's setting tree. A key starting `__` is metadata (`__label`, `__read`, `__manage`); a `field:value` key (e.g. `provider:linear`) holds settings only for resources of that kind and adds nothing to the path; any other key is a branch, or a leaf when it has `valueType` (with `defaultValue`, `label`, `description`, and optional `options` (`{ value, label }[]`) and `conditions` (a json-rules condition on `{ value }`); a value must be of its type, AND one of `options` when there are options, AND pass `conditions` when there are conditions). A setting's key is its path, joined with `.`. Permissions are the nearest `__read` / `__manage` up the path. Order is declaration order.",
+  );
 
 export const settingInfoResponseSchema = infoResponseSchema(
   z
     .object({
-      categories: z
-        .record(SettingCategoryKeySchema, settingCategoryInfoSchema)
-        .describe('One entry per setting category.'),
-      definitions: z
-        .record(SettingKeySchema, settingDefinitionInfoSchema)
-        .describe('One entry per registered setting key.'),
+      trees: z
+        .record(z.nativeEnum(SettingResourceModel), settingTreeInfoSchema)
+        .describe('One setting tree per resource model.'),
     })
-    .describe('Registered setting categories and definitions.'),
+    .describe('Every setting, as one tree per resource model.'),
 );

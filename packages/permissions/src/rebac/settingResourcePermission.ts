@@ -1,19 +1,22 @@
 /**
  * @atlas
  * @kind constructor
- * @constructs settingResourcePermissionFromDefinitions
+ * @constructs settingResourcePermissionFromTrees
  * @partOf primitive:authz
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 import {
-  SETTING_DEFINITIONS,
+  SETTING_RESOURCE_MODELS,
+  SETTING_TREES,
   type SettingDefinition,
   type SettingPermissionAction,
   type SettingResourceModelName,
-  settingPermissionForModel,
+  type SettingTrees,
+  settingsIn,
 } from '@template/shared/settings';
+import { groupBy, uniqBy } from 'lodash-es';
 
 const isKey = (key: string): ActionRule => ({
   rule: { field: 'key', operator: Operator.equals, value: key },
@@ -31,49 +34,39 @@ export const settingResourceModelRule = (
   all: [isResourceModel(model), { rel: `resource${model}`, action }],
 });
 
-const perDefinition = (
-  definitions: Record<string, SettingDefinition>,
-  actionFor: (
-    definition: SettingDefinition,
-    model: SettingResourceModelName,
-  ) => SettingPermissionAction,
+type SettingOfModel = { model: SettingResourceModelName; definition: SettingDefinition };
+
+const perKey = (
+  settingsOfModels: readonly SettingOfModel[],
+  actionOf: (definition: SettingDefinition) => SettingPermissionAction,
 ): ActionRule => ({
-  any: Object.entries(definitions).map(([key, definition]) => ({
-    all: [
-      isKey(key),
-      {
-        any: definition.resourceModels.map((model) =>
-          settingResourceModelRule(model, actionFor(definition, model)),
-        ),
-      },
-    ],
-  })),
-});
-
-/**
- * Compiles `db:Setting` ReBAC rules directly from `SETTING_DEFINITIONS`.
- * Exactly two actions exist on `db:Setting`:
- * - `manage`: per-key, per-resourceModel write/delete authority resolved from `definition.permission`.
- * - `read`: anyone who can `manage` the setting, OR holds the resolved `definition.readPermission`
- *   (defaulting to `'read'`) on `resource${model}`.
- */
-export const settingResourcePermissionFromDefinitions = (
-  definitions: Record<string, SettingDefinition>,
-): ResourcePermission => ({
-  actions: {
-    manage: perDefinition(definitions, (definition, model) =>
-      settingPermissionForModel(definition.permission, model),
-    ),
-    read: {
-      any: [
-        'manage',
-        perDefinition(definitions, (definition, model) =>
-          settingPermissionForModel(definition.readPermission, model, 'read'),
-        ),
+  any: Object.entries(groupBy(settingsOfModels, ({ definition }) => definition.key)).map(
+    ([key, held]) => ({
+      all: [
+        isKey(key),
+        {
+          any: held.map(({ model, definition }) =>
+            settingResourceModelRule(model, actionOf(definition)),
+          ),
+        },
       ],
-    },
-  },
+    }),
+  ),
 });
 
-export const settingResourcePermission =
-  settingResourcePermissionFromDefinitions(SETTING_DEFINITIONS);
+export const settingResourcePermissionFromTrees = (trees: SettingTrees): ResourcePermission => {
+  const settingsOfModels = SETTING_RESOURCE_MODELS.flatMap((model) =>
+    uniqBy(settingsIn(trees[model], 'every'), 'key').map((definition) => ({
+      model,
+      definition,
+    })),
+  );
+  return {
+    actions: {
+      manage: perKey(settingsOfModels, (definition) => definition.manage),
+      read: { any: ['manage', perKey(settingsOfModels, (definition) => definition.read)] },
+    },
+  };
+};
+
+export const settingResourcePermission = settingResourcePermissionFromTrees(SETTING_TREES);

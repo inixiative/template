@@ -5,6 +5,7 @@
  * @uses none
  */
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { Operator } from '@inixiative/json-rules';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
@@ -22,9 +23,9 @@ import {
 import type { MeReadResponses } from '@template/sdk';
 import type { RawSettingRow, SettingCatalog } from '@template/shared/settings';
 import {
-  ResourceSettingsSection,
-  type ResourceSettingsSectionProps,
-} from '@template/ui/components/settings/ResourceSettingsSection';
+  SettingTreeView,
+  type SettingTreeViewProps,
+} from '@template/ui/components/settings/SettingTreeView';
 import { permissionCheckTargetForTenantContext } from '@template/ui/lib/permissionCheckTargetForTenantContext';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
@@ -34,113 +35,85 @@ import { keyBy } from 'lodash-es';
 const initialState = useAppStore.getState();
 
 const manyTimezones = Array.from({ length: 15 }, (_, idx) => `Zone/City_${idx}`);
+const defaultTimezone = {
+  valueType: 'text',
+  options: ['UTC', ...manyTimezones].map((value) => ({ value, label: value })),
+  defaultValue: 'UTC',
+  label: 'Default Timezone',
+  description: 'Real compiled setting key across tenant models',
+} as const;
+const displayLocale = {
+  valueType: 'text',
+  options: ['en', 'es', 'fr'].map((value) => ({ value, label: value })),
+  defaultValue: 'en',
+  label: 'Display Locale',
+  description: 'Real compiled setting key including membership scopes',
+} as const;
+const featureEnabled = {
+  valueType: 'boolean',
+  defaultValue: false,
+  label: 'Feature Enabled',
+  description: 'Boolean toggle',
+} as const;
+
 const fullCatalog: SettingCatalog = {
-  categories: {
-    general: {
-      key: 'general',
-      label: 'General',
-      description: 'Localization and workspace defaults.',
-      order: 10,
+  trees: {
+    User: { __read: 'read', __manage: 'manage', general: { defaultTimezone, displayLocale } },
+    Organization: {
+      __read: 'read',
+      __manage: 'manage',
+      general: {
+        __label: 'General',
+        defaultTimezone,
+        displayLocale,
+        featureEnabled,
+        maxRetries: {
+          valueType: 'number',
+          conditions: {
+            field: 'value',
+            operator: Operator.lessThanEquals,
+            value: 10,
+            error: 'At most 10 retries',
+          },
+          defaultValue: 3,
+          label: 'Max Retries',
+          description: 'Numeric input',
+        },
+        snoozeUntil: {
+          valueType: 'date',
+          defaultValue: null,
+          label: 'Snooze Until',
+          description: 'Date-time input',
+        },
+        topics: {
+          valueType: 'multiSelect',
+          options: ['alerts', 'billing', 'digest'].map((value) => ({ value, label: value })),
+          defaultValue: ['alerts'],
+          label: 'Topics',
+          description: 'Multi-select checkbox pills',
+        },
+      },
     },
-  },
-  definitions: {
-    'general.defaultTimezone': {
-      key: 'general.defaultTimezone',
-      category: 'general',
-      label: 'Default Timezone',
-      description: 'Real compiled setting key across tenant models',
-      resourceModels: ['User', 'Organization', 'Space', 'Project'],
-      valueType: 'text',
-      schema: { type: 'string', enum: ['UTC', ...manyTimezones] },
-      defaultValue: 'UTC',
-      order: 10,
-      permission: 'manage',
+    Space: { __read: 'read', __manage: 'manage', general: { defaultTimezone, displayLocale } },
+    OrganizationUser: {
+      __read: 'operate',
+      __manage: 'operate',
+      general: {
+        displayLocale,
+        memberAdminOnly: {
+          valueType: 'boolean',
+          defaultValue: false,
+          label: 'Member Admin Flag',
+          description: 'Manage-gated setting on OrganizationUser',
+          __read: 'read',
+          __manage: 'manage',
+        },
+      },
     },
-    'general.displayLocale': {
-      key: 'general.displayLocale',
-      category: 'general',
-      label: 'Display Locale',
-      description: 'Real compiled setting key including membership scopes',
-      resourceModels: ['User', 'Organization', 'Space', 'OrganizationUser', 'SpaceUser'],
-      valueType: 'text',
-      schema: { type: 'string', enum: ['en', 'es', 'fr'] },
-      defaultValue: 'en',
-      order: 20,
-      permission: { default: 'manage', OrganizationUser: 'operate', SpaceUser: 'operate' },
-      readPermission: { default: 'read', OrganizationUser: 'operate', SpaceUser: 'operate' },
-    },
-    'general.memberAdminOnly': {
-      key: 'general.memberAdminOnly',
-      category: 'general',
-      label: 'Member Admin Flag',
-      description: 'Manage-gated setting on OrganizationUser',
-      resourceModels: ['OrganizationUser'],
-      valueType: 'boolean',
-      schema: { type: 'boolean' },
-      defaultValue: false,
-      order: 25,
-      permission: 'manage',
-    },
-    'general.featureEnabled': {
-      key: 'general.featureEnabled',
-      category: 'general',
-      label: 'Feature Enabled',
-      description: 'Boolean toggle',
-      resourceModels: ['Organization', 'Integration', 'ProjectIntegration'],
-      valueType: 'boolean',
-      schema: { type: 'boolean' },
-      defaultValue: false,
-      order: 30,
-      permission: 'manage',
-    },
-    'general.maxRetries': {
-      key: 'general.maxRetries',
-      category: 'general',
-      label: 'Max Retries',
-      description: 'Numeric input',
-      resourceModels: ['Organization'],
-      valueType: 'number',
-      schema: { type: 'number' },
-      defaultValue: 3,
-      order: 40,
-      permission: 'manage',
-    },
-    'general.snoozeUntil': {
-      key: 'general.snoozeUntil',
-      category: 'general',
-      label: 'Snooze Until',
-      description: 'Date-time input',
-      resourceModels: ['Organization'],
-      valueType: 'date',
-      schema: { type: 'string', format: 'date-time' },
-      defaultValue: null,
-      order: 50,
-      permission: 'manage',
-    },
-    'general.topics': {
-      key: 'general.topics',
-      category: 'general',
-      label: 'Topics',
-      description: 'Multi-select checkbox pills',
-      resourceModels: ['Organization'],
-      valueType: 'multiSelect',
-      schema: { type: 'array', items: { type: 'string', enum: ['alerts', 'billing', 'digest'] } },
-      defaultValue: ['alerts'],
-      order: 60,
-      permission: 'manage',
-    },
-    'general.extraJson': {
-      key: 'general.extraJson',
-      category: 'general',
-      label: 'Extra Config',
-      description: 'Validated JSON textarea',
-      resourceModels: ['Organization'],
-      valueType: 'json',
-      schema: { type: 'object' },
-      defaultValue: { mode: 'standard' },
-      order: 70,
-      permission: 'manage',
-    },
+    SpaceUser: { __read: 'operate', __manage: 'operate', general: { displayLocale } },
+    Project: { __read: 'read', __manage: 'manage', general: { defaultTimezone } },
+    Integration: { __read: 'read', __manage: 'manage', general: { featureEnabled } },
+    ProjectIntegration: { __read: 'read', __manage: 'manage', general: { featureEnabled } },
   },
 };
 
@@ -198,10 +171,10 @@ const installRealSession = async (opts: {
   await useAppStore.getState().permissions.installPermissionsForUser(me);
 };
 
-const renderSection = (props: ResourceSettingsSectionProps) =>
+const renderSettingTreeView = (props: SettingTreeViewProps) =>
   render(
     <QueryClientProvider client={client}>
-      <ResourceSettingsSection {...props} />
+      <SettingTreeView {...props} />
     </QueryClientProvider>,
   );
 
@@ -250,8 +223,8 @@ afterEach(() => {
   client.clear();
 });
 
-describe('ResourceSettingsSection & SettingField', () => {
-  it('renders all 6 value types, allows Backspace-clearing numbers, preserves compact JSON edits, disables Save on invalid input, re-enables disabled rows on save, and batch-saves only dirty keys', async () => {
+describe('SettingTreeView & SettingField', () => {
+  it('renders every setting value type, allows Backspace-clearing numbers, shows the message of a failing condition, disables Save on invalid input, re-enables disabled rows on save, and batch-saves only dirty keys', async () => {
     const { entity: user } = await buildUser();
     const { entity: org } = await buildOrganization();
     const { entity: adminMember } = await buildOrganizationUser(
@@ -293,7 +266,7 @@ describe('ResourceSettingsSection & SettingField', () => {
       disabledTzRow.__serialize() as unknown as RawSettingRow,
     ];
 
-    renderSection({ context: orgContext, category: 'general' });
+    renderSettingTreeView({ context: orgContext, path: 'general' });
     await screen.findByTestId('setting-field-general.defaultTimezone');
 
     // SearchableSelect (> 12 enum options) with disabled row falling back to default 'UTC'
@@ -331,15 +304,11 @@ describe('ResourceSettingsSection & SettingField', () => {
       within(screen.getByTestId('setting-field-general.topics')).getByText('billing'),
     );
 
-    // JSON textarea: invalid syntax disables Save even though other fields are dirty;
-    // typing compact valid JSON does NOT reformat/clobber text mid-edit
-    const jsonArea = screen.getByLabelText('Extra Config') as HTMLTextAreaElement;
-    fireEvent.change(jsonArea, { target: { value: '{not valid json' } });
-    expect(screen.getByRole('alert').textContent).toContain('Invalid JSON');
+    // A value failing the leaf's conditions disables Save, with the condition's message
+    fireEvent.change(retriesInput, { target: { value: '70' } });
+    expect(screen.getByRole('alert').textContent).toContain('At most 10 retries');
     expect(saveButton.disabled).toBe(true);
-
-    fireEvent.change(jsonArea, { target: { value: '{"mode":"strict"}' } });
-    expect(jsonArea.value).toBe('{"mode":"strict"}');
+    fireEvent.change(retriesInput, { target: { value: '7' } });
     expect(screen.queryByRole('alert')).toBeNull();
     expect(saveButton.disabled).toBe(false);
 
@@ -357,7 +326,6 @@ describe('ResourceSettingsSection & SettingField', () => {
       { key: 'general.featureEnabled', value: true },
       { key: 'general.maxRetries', value: 7 },
       { key: 'general.topics', value: ['alerts', 'billing'] },
-      { key: 'general.extraJson', value: { mode: 'strict' } },
     ]);
   });
 
@@ -393,7 +361,7 @@ describe('ResourceSettingsSection & SettingField', () => {
       localeRow.__serialize() as unknown as RawSettingRow,
     ];
 
-    renderSection({ context: orgContext, category: 'general' });
+    renderSettingTreeView({ context: orgContext, path: 'general' });
     await screen.findByTestId('setting-field-general.displayLocale');
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset Display Locale to default' }));
@@ -416,7 +384,7 @@ describe('ResourceSettingsSection & SettingField', () => {
     // 1. User context: own settings editable via real db:Setting:manage
     const userContext = { type: 'user' } as AuthenticatedContext;
     await installRealSession({ user: serializedUser, context: userContext });
-    renderSection({ context: userContext, category: 'general' });
+    renderSettingTreeView({ context: userContext, path: 'general' });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(false);
     cleanup();
@@ -449,7 +417,7 @@ describe('ResourceSettingsSection & SettingField', () => {
       context: orgContext,
     });
 
-    renderSection({ context: orgContext, category: 'general', readOnlyMessage: 'Admins only' });
+    renderSettingTreeView({ context: orgContext, path: 'general', readOnlyMessage: 'Admins only' });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(true);
     expect(screen.queryByRole('button', { name: 'Save settings' })).toBeNull();
@@ -459,10 +427,10 @@ describe('ResourceSettingsSection & SettingField', () => {
 
     // 3. OrganizationUser (ownedByMyMembership): member CAN edit operate-gated displayLocale,
     //    CANNOT edit manage-gated memberAdminOnly (proves no hardcoded membership bypass!)
-    renderSection({
+    renderSettingTreeView({
       context: orgContext,
       ownership: { ownedByMyMembership: true },
-      category: 'general',
+      path: 'general',
     });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(false);
@@ -488,7 +456,7 @@ describe('ResourceSettingsSection & SettingField', () => {
       context: spaceContext,
     });
 
-    renderSection({ context: spaceContext, category: 'general' });
+    renderSettingTreeView({ context: spaceContext, path: 'general' });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(false);
     expect(screen.getByRole('button', { name: 'Save settings' })).toBeDefined();
@@ -513,15 +481,15 @@ describe('ResourceSettingsSection & SettingField', () => {
       context: spaceContext,
     });
 
-    renderSection({ context: spaceContext, category: 'general' });
+    renderSettingTreeView({ context: spaceContext, path: 'general' });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(true);
     cleanup();
 
-    renderSection({
+    renderSettingTreeView({
       context: spaceContext,
       ownership: { ownedByMyMembership: true },
-      category: 'general',
+      path: 'general',
     });
     await screen.findByTestId('setting-field-general.displayLocale');
     expect((screen.getByLabelText('Display Locale') as HTMLSelectElement).disabled).toBe(false);
@@ -533,13 +501,13 @@ describe('ResourceSettingsSection & SettingField', () => {
       ownerModel: 'User',
       userId: user.id,
     });
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Integration',
         id: personalIntegration.id,
         record: personalIntegration.__serialize() as unknown as HydratedRecord,
       },
-      category: 'general',
+      path: 'general',
     });
     await screen.findByTestId('setting-field-general.featureEnabled');
     expect((screen.getByLabelText('Feature Enabled') as HTMLInputElement).disabled).toBe(false);
@@ -550,13 +518,13 @@ describe('ResourceSettingsSection & SettingField', () => {
       ownerModel: 'Organization',
       organizationId: org.id,
     });
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Integration',
         id: orgIntegration.id,
         record: orgIntegration.__serialize() as unknown as HydratedRecord,
       },
-      category: 'general',
+      path: 'general',
     });
     await screen.findByTestId('setting-field-general.featureEnabled');
     expect((screen.getByLabelText('Feature Enabled') as HTMLInputElement).disabled).toBe(true);
@@ -570,22 +538,22 @@ describe('ResourceSettingsSection & SettingField', () => {
       spaces: [serializedSpace],
       context: orgContext,
     });
-    renderSection({
+    renderSettingTreeView({
       target: { model: 'Integration', id: orgIntegration.id },
-      category: 'general',
+      path: 'general',
     });
     await screen.findByTestId('setting-field-general.featureEnabled');
     expect((screen.getByLabelText('Feature Enabled') as HTMLInputElement).disabled).toBe(true);
     cleanup();
 
     //    d) Org owner with hydrated flat orgIntegration -> editable; personal integration of another user -> read-only
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Integration',
         id: orgIntegration.id,
         record: orgIntegration.__serialize() as unknown as HydratedRecord,
       },
-      category: 'general',
+      path: 'general',
     });
     await screen.findByTestId('setting-field-general.featureEnabled');
     expect((screen.getByLabelText('Feature Enabled') as HTMLInputElement).disabled).toBe(false);
@@ -595,13 +563,13 @@ describe('ResourceSettingsSection & SettingField', () => {
       ownerModel: 'User',
       userId: otherUser.id,
     });
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Integration',
         id: otherUserIntegration.id,
         record: otherUserIntegration.__serialize() as unknown as HydratedRecord,
       },
-      category: 'general',
+      path: 'general',
     });
     await screen.findByTestId('setting-field-general.featureEnabled');
     expect((screen.getByLabelText('Feature Enabled') as HTMLInputElement).disabled).toBe(true);
@@ -618,13 +586,13 @@ describe('ResourceSettingsSection & SettingField', () => {
       { project: spaceProject, integration: orgIntegration },
     );
 
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'Project',
         id: spaceProject.id,
         record: spaceProject.__serialize() as unknown as HydratedRecord,
       },
-      category: 'general',
+      path: 'general',
     });
     await screen.findByTestId('setting-field-general.defaultTimezone');
     expect(
@@ -636,7 +604,7 @@ describe('ResourceSettingsSection & SettingField', () => {
     ).toBe(false);
     cleanup();
 
-    renderSection({
+    renderSettingTreeView({
       target: {
         model: 'ProjectIntegration',
         id: pi.id,
@@ -645,7 +613,7 @@ describe('ResourceSettingsSection & SettingField', () => {
           project: spaceProject.__serialize(),
         } as unknown as HydratedRecord,
       },
-      category: 'general',
+      path: 'general',
     });
     await screen.findByTestId('setting-field-general.featureEnabled');
     expect((screen.getByLabelText('Feature Enabled') as HTMLInputElement).disabled).toBe(false);

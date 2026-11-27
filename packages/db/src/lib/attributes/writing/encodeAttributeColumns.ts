@@ -25,7 +25,7 @@ export const encodeAttributeColumns = (
   options?: ResolveAttributeTargetOptions,
 ): PrismaAttributeColumnPayload => {
   const { config, definition, valueType } = resolveAttributeTarget(model, locator, options);
-  const validated = validateAttributeValue(valueType, value, definition?.schema, {
+  const validated = validateAttributeValue(valueType, value, definition, {
     context: `Invalid value for ${config.model}.${locator}`,
   });
   return packAttributeValue(valueType, validated);

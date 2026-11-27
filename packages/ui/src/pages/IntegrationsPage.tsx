@@ -13,9 +13,10 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
+import { settingResourceKindsOf, settingsIn } from '@template/shared/settings';
 import { Button, Page, SkeletonStatus, skeletonAttributes } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
-import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
+import { SettingTreeView } from '@template/ui/components/settings/SettingTreeView';
 import {
   createOptimisticListTarget,
   useInfiniteDataQuery,
@@ -250,11 +251,12 @@ const IntegrationProviderSection = ({
               </div>
               {hasIntegrationSettings && openSettingsIntegrationId === integration.id ? (
                 <div className="pb-3">
-                  <ResourceSettingsSection
+                  <SettingTreeView
                     target={{
                       model: 'Integration',
                       id: integration.id,
                       record: integration as unknown as HydratedRecord,
+                      integrationProvider: integration.provider ?? undefined,
                     }}
                     title={`${integration.name} settings`}
                   />
@@ -295,12 +297,12 @@ const IntegrationOwnerSection = ({
   const queryClient = useQueryClient();
   const permissions = useAppStore((state) => state.permissions);
   const { catalog } = useSettingCatalog();
-  const hasIntegrationSettings = Boolean(
-    catalog &&
-      Object.values(catalog.definitions).some((definition) =>
-        definition.resourceModels.includes('Integration'),
-      ),
-  );
+  const hasIntegrationSettings = (provider: IntegrationProvider | null) =>
+    Boolean(
+      catalog &&
+        settingsIn(catalog.trees.Integration, settingResourceKindsOf('Integration', provider))
+          .length > 0,
+    );
   const integrationQueries = integrationContextQueries(context, ownership);
   const canManage =
     ownership?.ownedByMyMembership ||
@@ -380,7 +382,7 @@ const IntegrationOwnerSection = ({
               canConnect={canConnectProvider(provider)}
               showStatus
               canManage={canManage}
-              hasIntegrationSettings={hasIntegrationSettings}
+              hasIntegrationSettings={hasIntegrationSettings(provider)}
               sectionId={`${sectionIdPrefix}connect-${provider}`}
               renderConnect={renderConnect(provider)}
               onDelete={handleDelete}
@@ -398,7 +400,7 @@ const IntegrationOwnerSection = ({
         canConnect={canManage}
         showStatus={false}
         canManage={canManage}
-        hasIntegrationSettings={hasIntegrationSettings}
+        hasIntegrationSettings={hasIntegrationSettings(null)}
         sectionId={`${sectionIdPrefix}add-custom`}
         renderConnect={renderConnect(null)}
         onDelete={handleDelete}
