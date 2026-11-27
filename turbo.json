@@ -34,6 +34,11 @@
       "cache": true
     },
 
+    "generate:icons": {
+      "outputs": ["src/lib/icons/bundledIconCollections.gen.ts"],
+      "cache": false
+    },
+
     "generate:routes": {
       "inputs": ["app/routes/**/*.tsx", "app/routes/**/*.ts", "scripts/generateRouteTree.ts"],
       "outputs": ["app/routeTree.gen.ts"],
@@ -48,7 +53,13 @@
     // ============================================
 
     "local": {
-      "dependsOn": ["db:generate", "generate:openapi", "generate:sdk", "generate:routes"],
+      "dependsOn": [
+        "db:generate",
+        "generate:openapi",
+        "generate:sdk",
+        "generate:routes",
+        "^generate:icons"
+      ],
       "inputs": [
         "src/**/*.ts",
         "app/**/*.ts",

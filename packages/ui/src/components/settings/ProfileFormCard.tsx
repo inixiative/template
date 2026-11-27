@@ -27,6 +27,7 @@ type ProfileFormCardProps = {
   isSaving?: boolean;
   readOnlyMessage?: string;
   showThemeSelector?: boolean;
+  isLoading?: boolean;
 };
 
 export const ProfileFormCard = ({
@@ -40,6 +41,7 @@ export const ProfileFormCard = ({
   isSaving = false,
   readOnlyMessage,
   showThemeSelector = false,
+  isLoading = false,
 }: ProfileFormCardProps) => {
   return (
     <div className="max-w-2xl space-y-6">
@@ -47,7 +49,7 @@ export const ProfileFormCard = ({
         <CardHeader>
           <CardTitle>Profile Information</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4" isLoading={isLoading}>
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input

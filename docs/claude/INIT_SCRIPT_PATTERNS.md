@@ -700,16 +700,22 @@ export const createRailwayConnection = async (
 };
 ```
 
+**Railway and Vercel syncs never delete** (`syncOptions.disableSecretDeletion: true`, checked on existing syncs too). Infisical's default removes destination variables the source doesn't hold, so one set only on the destination, an encryption key included, is lost on the next successful sync. The cost: removing a secret from Infisical does not remove it from the destination. The check runs only while a sync's setup step is incomplete; turn the option on by hand for a project already set up.
+
 **Pattern for sync creation:**
 ```typescript
 export const createRailwaySync = async (
   projectId: string,
   syncName: string,
-  ...config
+  config: SyncConfig
 ): Promise<void> => {
   const response = await fetch('https://app.infisical.com/api/v1/secret-syncs/railway', {
     method: 'POST',
-    body: JSON.stringify({ name: syncName, ...config })
+    body: JSON.stringify({
+      name: syncName,
+      ...config,
+      syncOptions: { ...config.syncOptions, disableSecretDeletion: true },
+    })
   });
 
   if (!response.ok) {

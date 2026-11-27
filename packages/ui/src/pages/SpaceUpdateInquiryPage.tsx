@@ -85,9 +85,7 @@ export const SpaceUpdateInquiryPage = () => {
       title="Update space"
       description="Request a new name or slug for this space. Changes take effect once a platform admin approves them."
     >
-      {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-      ) : activeInquiry ? (
+      {activeInquiry ? (
         <Card>
           <CardHeader>
             <CardTitle>Update request in progress</CardTitle>
@@ -115,9 +113,9 @@ export const SpaceUpdateInquiryPage = () => {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>New update request</CardTitle>
+            <CardTitle>{isLoading ? 'Update request' : 'New update request'}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4" isLoading={isLoading}>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="update-name">
                 New name

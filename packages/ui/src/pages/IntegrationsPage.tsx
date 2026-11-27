@@ -13,16 +13,7 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Page,
-} from '@template/ui/components';
+import { Button, Page, Skeleton } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
 import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
 import {
@@ -57,13 +48,10 @@ type Integration =
 
 type ProviderStatus = 'connected' | 'notConnected' | 'disabled';
 
-const statusBadges: Record<
-  ProviderStatus,
-  { label: string; variant: 'default' | 'outline' | 'secondary' }
-> = {
-  connected: { label: 'Connected', variant: 'default' },
-  notConnected: { label: 'Not connected', variant: 'outline' },
-  disabled: { label: 'Disabled', variant: 'secondary' },
+const statusBadges: Record<ProviderStatus, { label: string }> = {
+  connected: { label: 'Connected' },
+  notConnected: { label: 'Not connected' },
+  disabled: { label: 'Disabled' },
 };
 
 const PROVIDER_SECTION_PAGE_SIZE = 100;
@@ -164,97 +152,118 @@ const IntegrationProviderSection = ({
     ];
   const slug = provider ?? 'custom';
 
-  return (
-    <Card data-testid={`provider-${slug}`}>
-      <div className="flex items-center justify-between gap-4 p-4">
-        <div className="flex items-center gap-3">
-          <Icon icon={icon} className="h-6 w-6" aria-hidden />
-          <span className="font-medium">{label}</span>
-          {showStatus && !providerIntegrations.isLoading && !providerIntegrations.isError && (
-            <Badge variant={status.variant}>{status.label}</Badge>
-          )}
+  const integrations = providerIntegrations.data;
+  const connectButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      disabled={!enabled}
+      aria-label={actionAriaLabel}
+      onClick={() => setConnectOpen(true)}
+    >
+      <Icon icon="lucide:plus" className="h-4 w-4" />
+      {integrations.length > 0 ? null : <span className="sr-only">{actionLabel}</span>}
+    </Button>
+  );
+  const statusText = showStatus &&
+    !providerIntegrations.isLoading &&
+    !providerIntegrations.isError && (
+      <span className="font-mono text-[11px] text-muted-foreground">{status.label}</span>
+    );
+  const connectPanel = isConnectOpen && enabled && renderConnect(() => setConnectOpen(false));
+  const errorText = providerIntegrations.isError && (
+    <p role="alert" className="px-3 pb-2 text-xs text-destructive">
+      {label} integrations could not be loaded.
+    </p>
+  );
+
+  if (integrations.length === 0)
+    return (
+      <div
+        data-testid={`provider-${slug}`}
+        className={connectPanel ? 'col-span-full rounded-md border' : 'rounded-md border'}
+      >
+        <div className="flex h-11 items-center gap-2.5 pl-3 pr-1">
+          <Icon icon={icon} className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
+          {providerIntegrations.isLoading ? <Skeleton className="h-3 w-16" /> : statusText}
+          {connectButton}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!enabled}
-          aria-label={actionAriaLabel}
-          onClick={() => setConnectOpen(true)}
-        >
-          <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
-          {actionLabel}
-        </Button>
+        {errorText}
+        {connectPanel}
       </div>
-      {providerIntegrations.isError && (
-        <p role="alert" className="px-4 pb-3 text-sm text-destructive">
-          {label} integrations could not be loaded.
-        </p>
-      )}
-      {providerIntegrations.isLoading && (
-        <div className="mx-4 mb-4 h-8 animate-pulse rounded-md bg-muted/50" />
-      )}
-      {providerIntegrations.data.length > 0 && (
-        <div className="max-h-80 overflow-y-auto border-t" data-testid={`integrations-${slug}`}>
-          <ul className="divide-y">
-            {providerIntegrations.data.map((integration) => (
-              <li key={integration.id} className="px-4 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium">{integration.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Added {new Date(integration.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {hasIntegrationSettings ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Settings for ${integration.name}`}
-                        onClick={() =>
-                          setOpenSettingsIntegrationId((current) =>
-                            current === integration.id ? null : integration.id,
-                          )
-                        }
-                      >
-                        <Icon icon="lucide:settings" className="h-4 w-4" />
-                      </Button>
-                    ) : null}
-                    {canManage && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Delete ${integration.name}`}
-                        onClick={() => onDelete(integration)}
-                      >
-                        <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                {hasIntegrationSettings && openSettingsIntegrationId === integration.id ? (
-                  <div className="mt-3">
-                    <ResourceSettingsSection
-                      target={{
-                        model: 'Integration',
-                        id: integration.id,
-                        record: integration as unknown as HydratedRecord,
-                      }}
-                      title={`${integration.name} settings`}
-                    />
-                  </div>
+    );
+
+  return (
+    <div data-testid={`provider-${slug}`} className="order-first col-span-full rounded-md border">
+      <div className="flex h-10 items-center gap-2.5 border-b bg-muted/30 pl-3 pr-1">
+        <Icon icon={icon} className="h-4 w-4 shrink-0" aria-hidden />
+        <span className="text-sm font-medium">{label}</span>
+        <span className="font-mono text-[11px] text-muted-foreground">
+          {providerIntegrations.total ?? integrations.length}
+        </span>
+        <span className="flex-1" />
+        {statusText}
+        {connectButton}
+      </div>
+      {errorText}
+      <div className="max-h-80 overflow-y-auto" data-testid={`integrations-${slug}`}>
+        <ul className="divide-y">
+          {integrations.map((integration) => (
+            <li key={integration.id} className="px-3">
+              <div className="flex h-9 items-center gap-3">
+                <p className="min-w-0 truncate text-sm">{integration.name}</p>
+                <span className="flex-1" />
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {new Date(integration.createdAt).toLocaleDateString()}
+                </span>
+                {hasIntegrationSettings ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Settings for ${integration.name}`}
+                    onClick={() =>
+                      setOpenSettingsIntegrationId((current) =>
+                        current === integration.id ? null : integration.id,
+                      )
+                    }
+                  >
+                    <Icon icon="lucide:settings" className="h-4 w-4" />
+                  </Button>
                 ) : null}
-              </li>
-            ))}
-          </ul>
-          <div ref={sentinelRef} aria-hidden="true" />
-          {providerIntegrations.isFetchingNextPage && (
-            <p className="px-4 py-2 text-xs text-muted-foreground">Loading more...</p>
-          )}
-        </div>
-      )}
-      {isConnectOpen && enabled && renderConnect(() => setConnectOpen(false))}
-    </Card>
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Delete ${integration.name}`}
+                    onClick={() => onDelete(integration)}
+                  >
+                    <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+              {hasIntegrationSettings && openSettingsIntegrationId === integration.id ? (
+                <div className="pb-3">
+                  <ResourceSettingsSection
+                    target={{
+                      model: 'Integration',
+                      id: integration.id,
+                      record: integration as unknown as HydratedRecord,
+                    }}
+                    title={`${integration.name} settings`}
+                  />
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        <div ref={sentinelRef} aria-hidden="true" />
+        {providerIntegrations.isFetchingNextPage && (
+          <p className="px-3 py-2 font-mono text-[11px] text-muted-foreground">Loading more...</p>
+        )}
+      </div>
+      {connectPanel}
+    </div>
   );
 };
 
@@ -347,7 +356,7 @@ const IntegrationOwnerSection = ({
   };
 
   const providerSections = (
-    <div className="space-y-3">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
       {integrationProviderValues
         .filter((provider) => providerFitsOwner(provider, integrationQueries.owner.ownerModel))
         .map((provider) => {
@@ -392,14 +401,14 @@ const IntegrationOwnerSection = ({
   );
 
   return title ? (
-    <section className="space-y-3" data-testid={`integrations-section-${sectionKey}`}>
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          {description ? <CardDescription>{description}</CardDescription> : null}
-        </CardHeader>
-        <CardContent>{providerSections}</CardContent>
-      </Card>
+    <section className="space-y-2" data-testid={`integrations-section-${sectionKey}`}>
+      <div className="flex items-baseline gap-2 border-b pb-1.5">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {description ? (
+          <span className="truncate text-xs text-muted-foreground">{description}</span>
+        ) : null}
+      </div>
+      {providerSections}
     </section>
   ) : (
     providerSections
@@ -425,7 +434,7 @@ export const IntegrationsPage = ({
   return (
     <Page title="Integrations" description="Connect the services this workspace works with">
       {tenant ? (
-        <div className="space-y-6">
+        <div className="space-y-8">
           <IntegrationOwnerSection
             context={personalContext}
             connectFlows={connectFlows}

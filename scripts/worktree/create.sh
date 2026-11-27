@@ -347,12 +347,13 @@ else
   run_step "Generating Prisma client, prismaMap, and zod schemas" bun run db:generate || true
 fi
 
-run_step "Generating route trees" bun run generate:routes || true
+run_step "Generating route trees and icons" bun run generate:frontend || true
 run_step "Generating OpenAPI spec, SDK, and MSW handlers" bun run generate:sdk || true
 
-require_artifact apps/web/app/routeTree.gen.ts "bun run generate:routes"
-require_artifact apps/admin/app/routeTree.gen.ts "bun run generate:routes"
-require_artifact apps/superadmin/app/routeTree.gen.ts "bun run generate:routes"
+require_artifact apps/web/app/routeTree.gen.ts "bun run generate:frontend"
+require_artifact apps/admin/app/routeTree.gen.ts "bun run generate:frontend"
+require_artifact apps/superadmin/app/routeTree.gen.ts "bun run generate:frontend"
+require_artifact packages/ui/src/lib/icons/bundledIconCollections.gen.ts "bun run generate:frontend"
 require_artifact packages/db/src/generated/client "bun run db:generate"
 require_artifact packages/db/src/generated/prismaMap.gen.ts "bun run db:generate"
 require_artifact packages/db/src/generated/zod "bun run db:generate"

@@ -28,21 +28,18 @@ export const UserProfilePage = () => {
 
   return (
     <Page title="Profile" description="Manage your user settings and preferences">
-      {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-      ) : (
-        <div className="max-w-2xl space-y-6">
-          <ProfileFormCard
-            name={profile?.name ?? ''}
-            canEditName={false}
-            readOnlyMessage="User profile editing coming soon"
-            showThemeSelector
-          />
-          <ResourceSettingsSection context={personalContext} category="general" />
-          <ChangePasswordCard />
-          <TwoFactorSecurityCard />
-        </div>
-      )}
+      <div className="max-w-2xl space-y-6">
+        <ProfileFormCard
+          isLoading={isLoading}
+          name={profile?.name ?? ''}
+          canEditName={false}
+          readOnlyMessage="User profile editing coming soon"
+          showThemeSelector
+        />
+        <ResourceSettingsSection context={personalContext} category="general" />
+        <ChangePasswordCard />
+        <TwoFactorSecurityCard />
+      </div>
     </Page>
   );
 };

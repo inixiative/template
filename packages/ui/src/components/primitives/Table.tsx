@@ -7,6 +7,7 @@
 import { Icon } from '@iconify/react';
 import { EmptyState, type EmptyStateProps } from '@template/ui/components/primitives/EmptyState';
 import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
+import { TablePlaceholderRows } from '@template/ui/components/primitives/TablePlaceholderRows';
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';
 import { cn } from '@template/ui/lib/utils';
 import type * as React from 'react';
@@ -40,6 +41,7 @@ export type TableProps<T> = {
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   sectionId?: string;
   className?: string;
+  isLoading?: boolean;
 };
 
 export const Table = <T,>({
@@ -56,6 +58,7 @@ export const Table = <T,>({
   scrollRef,
   sectionId,
   className,
+  isLoading = false,
 }: TableProps<T>) => {
   // Hooks must be called unconditionally, before any early returns.
   const sentinelRef = useInfiniteScrollTrigger({
@@ -68,7 +71,7 @@ export const Table = <T,>({
   const shouldShow = typeof show === 'function' ? show() : show;
   if (!shouldShow) return null;
 
-  if (data.length === 0 && !infiniteScroll?.isLoading) {
+  if (!isLoading && data.length === 0 && !infiniteScroll?.isLoading) {
     return (
       <EmptyState
         {...empty}
@@ -100,26 +103,28 @@ export const Table = <T,>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y">
-            {data.map((item) => (
-              <tr
-                key={keyExtractor(item)}
-                data-key={keyExtractor(item)}
-                className={cn(
-                  'transition-colors hover:bg-muted/40',
-                  onRowClick && 'cursor-pointer',
-                )}
-                onClick={onRowClick ? () => onRowClick(item) : undefined}
-              >
-                {columns.map((column) => (
-                  <td key={column.key} className="px-4 py-3 text-sm">
-                    {column.render
-                      ? column.render(item)
-                      : ((item as Record<string, unknown>)[column.key] as React.ReactNode)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+          <tbody className="divide-y" aria-busy={isLoading}>
+            {isLoading && <TablePlaceholderRows columnCount={columns.length} rows={5} />}
+            {!isLoading &&
+              data.map((item) => (
+                <tr
+                  key={keyExtractor(item)}
+                  data-key={keyExtractor(item)}
+                  className={cn(
+                    'transition-colors hover:bg-muted/40',
+                    onRowClick && 'cursor-pointer',
+                  )}
+                  onClick={onRowClick ? () => onRowClick(item) : undefined}
+                >
+                  {columns.map((column) => (
+                    <td key={column.key} className="px-4 py-3 text-sm">
+                      {column.render
+                        ? column.render(item)
+                        : ((item as Record<string, unknown>)[column.key] as React.ReactNode)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
           </tbody>
         </table>
 

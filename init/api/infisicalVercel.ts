@@ -10,6 +10,7 @@ type VercelSecretSync = {
   name: string;
   environment?: { slug?: string };
   folder?: { path?: string };
+  syncOptions?: { disableSecretDeletion?: boolean };
   destinationConfig?: {
     projectId?: string;
     projectName?: string;
@@ -140,7 +141,11 @@ class InfisicalVercelApi {
           environment: infisicalEnvironment,
           secretPath: infisicalSecretPath,
           isEnabled: true,
-          syncOptions: { initialSyncBehavior: 'overwrite-destination' },
+          // why: otherwise a sync deletes every Vercel variable Infisical doesn't hold.
+          syncOptions: {
+            initialSyncBehavior: 'overwrite-destination',
+            disableSecretDeletion: true,
+          },
           destinationConfig: {
             app: vercelProjectId,
             appName: vercelProjectName,
@@ -188,11 +193,15 @@ class InfisicalVercelApi {
       if (existing) {
         // Detect stale branch config — delete and recreate if branch setting has drifted
         const currentBranch = existing.destinationConfig?.branch;
-        if (currentBranch !== input.vercelBranch && (currentBranch || input.vercelBranch)) {
-          await this.deleteVercelSync(existing.id);
-        } else {
-          return;
+        const drifted =
+          currentBranch !== input.vercelBranch && (currentBranch || input.vercelBranch);
+        if (!drifted) {
+          if (existing.syncOptions?.disableSecretDeletion) return;
+          throw new Error(
+            `Vercel sync "${input.syncName}" can delete variables: turn on "Disable Secret Deletion" on it in Infisical, then continue.`,
+          );
         }
+        await this.deleteVercelSync(existing.id);
       }
       await this.createVercelSync(
         input.infisicalProjectId,
