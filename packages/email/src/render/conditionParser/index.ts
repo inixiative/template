@@ -22,6 +22,7 @@ export {
   type ScopeRoot,
   TOKEN_PATTERN,
 } from './grammar';
+export { isDatetimeFormat } from './isDatetimeFormat';
 export { isStructurallyBalanced } from './isStructurallyBalanced';
 export { isUsableLoopBindingName } from './isUsableLoopBindingName';
 export { parseEachBlock } from './parseEachBlock';

@@ -146,6 +146,39 @@ describe('validateTokens — {{datetime}}', () => {
     ).toEqual(['{{datetime}} has an unknown time zone: Mars/Olympus']);
   });
 
+  it('accepts a date-fns format, with and without a time zone', () => {
+    expect(
+      validateTokens(
+        '{{datetime data.at format="MMM d, h:mm a zzz"}} {{datetime data.at format="PPpp" tz=Europe/Paris}}',
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a format date-fns refuses, and says so beside the path check', () => {
+    expect(messages('{{datetime data.at format="hello"}}')).toContain(
+      '{{datetime}} has an invalid format: hello',
+    );
+    expect(messages('{{datetime data.at format="YYYY"}}')).toContain(
+      '{{datetime}} has an invalid format: YYYY',
+    );
+  });
+
+  it('refuses letters that are not display tokens, so a word left unquoted never prints garbage', () => {
+    for (const format of ['MMM d at h:mm a', 'T', 't', 'abc', "d 'of MMM", "'it''"]) {
+      expect(messages(`{{datetime data.at format="${format}"}}`)).toContain(
+        `{{datetime}} has an invalid format: ${format}`,
+      );
+    }
+  });
+
+  it('reports every problem with one token', () => {
+    expect(messages('{{datetime nope.at format="hello" tz=Mars/Olympus}}')).toEqual([
+      '{{datetime}} has an invalid format: hello',
+      '{{datetime}} has an unknown time zone: Mars/Olympus',
+      expect.stringContaining('names no scope root'),
+    ]);
+  });
+
   it('checks the path the way a plain token is checked', () => {
     expect(messages('{{datetime recipient.missing}}')[0]).toContain('is not provided');
     expect(messages('{{datetime nope.at}}')[0]).toContain('names no scope root');

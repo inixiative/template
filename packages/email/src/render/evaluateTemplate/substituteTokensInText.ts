@@ -21,8 +21,10 @@ export const substituteTokensInText = (
 ): string => {
   if (!options.substitute) return text;
   return text
-    .replace(DATETIME_TOKEN_PATTERN, (_match, path: string, timeZone: string | undefined) =>
-      substituteDatetimeToken(path, timeZone, scope, onError, options),
+    .replace(
+      DATETIME_TOKEN_PATTERN,
+      (_match, path: string, format: string | undefined, timeZone: string | undefined) =>
+        substituteDatetimeToken(path, format, timeZone, scope, onError, options),
     )
     .replace(TOKEN_PATTERN, (_match, root: string, segments: string) =>
       substituteToken(root, segments, scope, onError, options),

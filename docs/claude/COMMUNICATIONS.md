@@ -301,13 +301,19 @@ Three prefixes for variable substitution:
 | `recipient` | Recipient user | `{{recipient.email}}` |
 | `data` | Explicit from send call | `{{data.code}}` |
 
-`{{datetime <path> tz=<Zone>}}` prints a date and time in a time zone, through the shared
-`formatDateTimeShort` (`Nov 26, 2:00 PM EST`), in UTC when no zone is named. The path is any token
-path, a loop binding included. A Date and an ISO string print the same; an empty, missing or
-invalid value renders empty and is one issue in the sink, like any token. Save checks the path as
-it checks a plain token and refuses a zone that is not a canonical IANA id (`isTimezoneId`) rather
-than printing UTC; the field the token prints is a hydration path, and `datetime` is a reserved
-binding name.
+`{{datetime <path> format="<format>" tz=<Zone>}}` prints a date and time. `format` is a
+[date-fns format](https://date-fns.org/docs/format) (`format="MMM d, h:mm a zzz"` prints
+`Nov 26, 2:00 PM EST`), printed in `tz` through date-fns-tz `formatInTimeZone`. Both are optional
+and come in that order: with no `format` the token prints an ISO 8601 timestamp
+(`2026-11-26T19:00:00Z`, or `2026-11-26T14:00:00-05:00` with `tz=America/New_York`), and with no
+`tz` it prints in UTC. The path is any token path, a loop binding included. A Date and an ISO string
+print the same; an empty, missing or invalid value renders empty and is one issue in the sink, like
+any token. Save checks the path as it checks a plain token, refuses a zone that is not a
+canonical IANA id (`isTimezoneId`), and refuses a format with a letter run that is not a display
+token or a quote left open (`isDatetimeFormat`: `hello`, `YYYY`, an unquoted `at`, the epoch `T`),
+reporting each problem; render refuses the same and prints nothing rather than something else.
+Literal words go in single quotes (`'at'`). The field the token prints is a hydration path, and
+`datetime` is a reserved binding name.
 
 ```typescript
 import { interpolate } from '@template/email/render';

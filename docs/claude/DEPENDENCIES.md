@@ -15,7 +15,6 @@
 - [Utilities](#utilities)
 - [Frontend](#frontend)
 - [Planned](#planned)
-  - [Adding date-fns](#adding-date-fns)
 - [Dev Dependencies](#dev-dependencies)
 
 <!-- toc:end -->
@@ -107,6 +106,7 @@ OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer xxx
 |---------|---------|-------|
 | `resend` | Email provider | Transactional email API |
 | `mjml` | Email templates | Responsive email markup, renders to HTML |
+| `date-fns`, `date-fns-tz` | Dates in templates | `{{datetime}}` prints a date-fns `format` pattern in a time zone (`formatInTimeZone`) |
 
 Part of `@template/email` package. See [COMMUNICATIONS.md](COMMUNICATIONS.md) for usage.
 
@@ -137,23 +137,9 @@ Part of `@template/email` package. See [COMMUNICATIONS.md](COMMUNICATIONS.md) fo
 
 | Package | Purpose | When to Add |
 |---------|---------|-------------|
-| `date-fns` | Date formatting | User-facing relative times, timezone display |
 | `stripe` | Payments | Billing, subscriptions |
 | `@aws-sdk/client-s3` | File storage | User uploads, assets |
 | `sharp` | Image processing | Thumbnails, optimization |
-
-### Adding date-fns
-
-```bash
-cd packages/shared && bun add date-fns
-```
-
-```typescript
-import { formatDistanceToNow, format } from 'date-fns';
-
-formatDistanceToNow(date);           // "3 days ago"
-format(date, 'MMM d, yyyy');         // "Jan 29, 2024"
-```
 
 ---
 

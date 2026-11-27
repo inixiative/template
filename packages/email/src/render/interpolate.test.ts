@@ -882,15 +882,47 @@ describe('interpolate — {{datetime}}', () => {
       lens: defaultEmailLens,
     });
 
-  it('prints a date and time in UTC when no time zone is named', () => {
+  it('prints an ISO 8601 timestamp in UTC when no format or time zone is named', () => {
     expect(render('Call: {{datetime data.at}}', { at: new Date(CALL) })).toBe(
-      'Call: Nov 26, 7:00 PM UTC',
+      'Call: 2026-11-26T19:00:00Z',
     );
+  });
+
+  it('prints an ISO 8601 timestamp with the zone offset when only a time zone is named', () => {
+    expect(render('{{datetime data.at tz=America/New_York}}', { at: new Date(CALL) })).toBe(
+      '2026-11-26T14:00:00-05:00',
+    );
+  });
+
+  it('prints with a date-fns format', () => {
+    expect(
+      render('{{datetime data.at format="EEEE, MMMM d \'at\' h:mm a zzz"}}', { at: CALL }),
+    ).toBe('Thursday, November 26 at 7:00 PM UTC');
+  });
+
+  it('prints nothing and reports a format the check refuses', () => {
+    const issues: string[] = [];
+    expect(render('{{datetime data.at format="hello"}}', { at: CALL }, issues)).toBe('');
+    expect(issues).toEqual(['{{datetime data.at}} has an invalid format: hello']);
+  });
+
+  it('prints every display token the format check accepts', () => {
+    const format =
+      "y yy yyyy yo Q QQ QQQ QQQQ Qo M MM MMM MMMM MMMMM Mo L LL LLL LLLL LLLLL Lo d dd do E EE EEE EEEE EEEEE EEEEEE a aa aaa aaaa aaaaa h hh ho H HH Ho K KK Ko k kk ko m mm mo s ss so S SS SSS X XX XXX XXXX XXXXX x xx xxx xxxx xxxxx O OO OOO OOOO z zz zzz zzzz P PP PPP PPPP p pp ppp pppp ''";
+    const issues: string[] = [];
+    expect(render(`{{datetime data.at format="${format}"}}`, { at: CALL }, issues)).not.toBe('');
+    expect(issues).toEqual([]);
+  });
+
+  it('prints nothing and reports a time zone it does not know, instead of printing UTC', () => {
+    const issues: string[] = [];
+    expect(render('{{datetime data.at tz=Mars/Olympus}}', { at: CALL }, issues)).toBe('');
+    expect(issues).toEqual(['{{datetime data.at}} has an unknown time zone: Mars/Olympus']);
   });
 
   it('prints in the named time zone on both sides of a daylight-saving change', () => {
     const template =
-      '{{datetime data.before tz=America/New_York}} / {{datetime data.after tz=America/New_York}}';
+      '{{datetime data.before format="MMM d, h:mm a zzz" tz=America/New_York}} / {{datetime data.after format="MMM d, h:mm a zzz" tz=America/New_York}}';
     const result = render(template, {
       before: new Date('2026-10-31T16:00:00.000Z'),
       after: new Date('2026-11-02T17:00:00.000Z'),
@@ -900,7 +932,7 @@ describe('interpolate — {{datetime}}', () => {
 
   it('prints the same for an ISO string and a Date', () => {
     const template =
-      '{{datetime data.asString tz=America/New_York}} = {{datetime data.asDate tz=America/New_York}}';
+      '{{datetime data.asString format="MMM d, h:mm a zzz" tz=America/New_York}} = {{datetime data.asDate format="MMM d, h:mm a zzz" tz=America/New_York}}';
     expect(render(template, { asString: CALL, asDate: new Date(CALL) })).toBe(
       'Nov 26, 2:00 PM EST = Nov 26, 2:00 PM EST',
     );
@@ -922,7 +954,7 @@ describe('interpolate — {{datetime}}', () => {
 
   it('reads a loop binding inside {{#each}}', () => {
     const template =
-      '{{#each data.calls as=call}}<{{datetime call.at tz=America/New_York}}>{{/each}}';
+      '{{#each data.calls as=call}}<{{datetime call.at format="MMM d, h:mm a zzz" tz=America/New_York}}>{{/each}}';
     expect(render(template, { calls: [{ at: CALL }] })).toBe('<Nov 26, 2:00 PM EST>');
   });
 

@@ -11,7 +11,6 @@ export {
   wrapEnvWithOverrides,
 } from './envOverrides';
 export { type FetchAllPagesCap, fetchAllPages, type PageRequest } from './fetchAllPages';
-export { formatDateTimeShort } from './formatDateTimeShort';
 export { appPathSchema, isAppPath } from './isAppPath';
 export { isUuidV7, uuidV7Schema } from './isUuidV7';
 export type { ModelRow } from './modelRow';

@@ -7,6 +7,7 @@
 import type { TokenIssue } from '@template/email/errors/TokenValidationError';
 import {
   DATETIME_TOKEN_PATTERN,
+  isDatetimeFormat,
   RESERVED_SCOPE_ROOTS,
   TOKEN_PATTERN,
   visitTemplateBlocks,
@@ -95,13 +96,20 @@ const checkText = (text: string, walk: Walk): void => {
     const message = tokenProblem(token, root, segments, walk);
     if (message) walk.issues.push({ path: `{{${token}}}`, message });
   }
-  for (const [, path = '', timeZone] of text.matchAll(DATETIME_TOKEN_PATTERN)) {
+  for (const [, path = '', format, timeZone] of text.matchAll(DATETIME_TOKEN_PATTERN)) {
     const { root, rest } = splitRoot(path);
-    const message =
-      timeZone && !isTimezoneId(timeZone)
+    const messages = [
+      format !== undefined && !isDatetimeFormat(format)
+        ? `{{datetime}} has an invalid format: ${format}`
+        : null,
+      timeZone !== undefined && !isTimezoneId(timeZone)
         ? `{{datetime}} has an unknown time zone: ${timeZone}`
-        : tokenProblem(path, root, rest ? `.${rest}` : '', walk);
-    if (message) walk.issues.push({ path: `{{datetime ${path}}}`, message });
+        : null,
+      tokenProblem(path, root, rest ? `.${rest}` : '', walk),
+    ];
+    for (const message of messages) {
+      if (message) walk.issues.push({ path: `{{datetime ${path}}}`, message });
+    }
   }
 };
 
