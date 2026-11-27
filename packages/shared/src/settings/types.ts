@@ -4,44 +4,44 @@
  * @partOf primitive:shared
  * @uses none
  */
-import type { AttributeFieldDefinition, AttributeValueType } from '@template/shared/attributes';
+import type { AttributeValueConstraints, AttributeValueType } from '@template/shared/attributes';
 import type {
-  SettingPermissionSpec,
+  SettingPermissionAction,
   SettingResourceModelName,
 } from '@template/shared/settings/resourceModels';
-import type { z } from 'zod';
 
-export type SettingCategoryDefinition<TKey extends string = string> = {
-  readonly key: TKey;
-  readonly label: string;
-  readonly description: string;
-  readonly order: number;
+type SettingPermissions = {
+  readonly __read?: SettingPermissionAction;
+  readonly __manage?: SettingPermissionAction;
 };
 
-export type SettingDefinition<
-  TKey extends string = string,
-  TCategory extends string = string,
-  TValue = unknown,
-> = Omit<
-  AttributeFieldDefinition<TKey, TValue>,
-  'category' | 'order' | 'resourceModels' | 'permission' | 'readPermission'
-> & {
-  readonly key: TKey;
-  readonly category: TCategory;
-  readonly resourceModels: readonly SettingResourceModelName[];
-  readonly valueType: AttributeValueType;
-  readonly schema: z.ZodType<TValue>;
-  readonly defaultValue: TValue | null;
-  readonly label: string;
-  readonly description: string;
-  readonly order: number;
-  readonly permission: SettingPermissionSpec;
-  readonly readPermission?: SettingPermissionSpec;
+export type SettingLeaf = AttributeValueConstraints &
+  SettingPermissions & {
+    readonly valueType: Exclude<AttributeValueType, 'json'>;
+    readonly defaultValue: unknown;
+    readonly label: string;
+    readonly description: string;
+  };
+
+export type SettingBranch = SettingPermissions & {
+  readonly __label?: string;
+  readonly [child: string]: SettingNode | string | undefined;
 };
 
-/** Declares a typed setting category definition without side effects. */
-export const defineSettingCategory = <const T extends SettingCategoryDefinition>(category: T): T =>
-  category;
+export type SettingNode = SettingLeaf | SettingBranch;
 
-/** Declares a typed setting definition without side effects. */
-export const defineSetting = <const T extends SettingDefinition>(definition: T): T => definition;
+export type SettingTree = SettingBranch & Required<SettingPermissions>;
+
+export type SettingTrees = Readonly<Record<SettingResourceModelName, SettingTree>>;
+
+export type SettingResourceKinds = Readonly<Record<string, string | null | undefined>>;
+
+export type SettingDefinition = Omit<SettingLeaf, '__read' | '__manage'> & {
+  readonly key: string;
+  readonly read: SettingPermissionAction;
+  readonly manage: SettingPermissionAction;
+};
+
+export type SettingCatalog = {
+  readonly trees: SettingTrees;
+};

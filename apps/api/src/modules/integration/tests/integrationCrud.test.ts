@@ -126,6 +126,67 @@ describe('Integration CRUD', () => {
     });
   });
 
+  describe('configuration', () => {
+    const cloudId = '01234567-89ab-4cde-8f01-23456789abcd';
+
+    it('stores a configuration that fits the provider', async () => {
+      const response = await fetch(
+        post('/api/v1/me/integrations', {
+          name: `Jira ${nextFactorySequenceNumber()}`,
+          provider: 'jira',
+          role: 'viewer',
+          configuration: { cloudId },
+        }),
+      );
+      const { data } = await parseSuccessBody<Integration>(response);
+      expect(response.status).toBe(201);
+      expect(data.configuration).toEqual({ cloudId });
+    });
+
+    it('refuses a configuration that does not fit the provider (422)', async () => {
+      const response = await fetch(
+        post('/api/v1/me/integrations', {
+          name: `Jira ${nextFactorySequenceNumber()}`,
+          provider: 'jira',
+          role: 'viewer',
+          configuration: { url: 'https://example.com' },
+        }),
+      );
+      expect(response.status).toBe(422);
+    });
+
+    it('refuses a configuration on a provider-less integration (422)', async () => {
+      const response = await fetch(
+        post('/api/v1/me/integrations', {
+          name: `Plain ${nextFactorySequenceNumber()}`,
+          role: 'viewer',
+          configuration: { cloudId },
+        }),
+      );
+      expect(response.status).toBe(422);
+    });
+
+    it('checks an update against the stored provider (422)', async () => {
+      const { entity: integration } = await createIntegration({
+        name: 'Atlassian',
+        provider: 'confluence',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: user.id,
+      });
+      const refused = await fetch(
+        patch(`/api/v1/integration/${integration.id}`, { configuration: { cloudId: 'nope' } }),
+      );
+      expect(refused.status).toBe(422);
+      const accepted = await fetch(
+        patch(`/api/v1/integration/${integration.id}`, { configuration: { cloudId } }),
+      );
+      const { data } = await parseSuccessBody<Integration>(accepted);
+      expect(accepted.status).toBe(200);
+      expect(data.configuration).toEqual({ cloudId });
+    });
+  });
+
   describe('DELETE /integration/:id', () => {
     it('tombstones own user integration — row survives, read 404s', async () => {
       const { entity: integration } = await createIntegration({

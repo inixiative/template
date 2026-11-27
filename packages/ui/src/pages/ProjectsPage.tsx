@@ -6,7 +6,7 @@
  */
 import { Icon } from '@iconify/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { List } from '@template/ui/components';
+import { List, SkeletonText } from '@template/ui/components';
 import { Modal } from '@template/ui/components/layout/Modal';
 import { Page } from '@template/ui/components/layout/Page';
 import {
@@ -201,24 +201,34 @@ const ProjectOwnerSection = ({
             items={projects}
             isLoading={projectsQuery.isLoading}
             emptyMessage="No projects yet."
+            skeletonItem={
+              <ProjectListRow
+                name={<SkeletonText width="12rem" />}
+                description={<SkeletonText width="16rem" />}
+                openButton={
+                  <Button type="button" variant="outline" size="sm">
+                    Open
+                  </Button>
+                }
+              />
+            }
             renderItem={(project) => (
-              <li key={project.id} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{project.name}</p>
-                  {project.description ? (
-                    <p className="truncate text-xs text-muted-foreground">{project.description}</p>
-                  ) : null}
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onOpenProject(project)}
-                >
-                  Open
-                  <Icon icon="lucide:arrow-right" className="ml-1.5 h-4 w-4" />
-                </Button>
-              </li>
+              <ProjectListRow
+                key={project.id}
+                name={project.name}
+                description={project.description}
+                openButton={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onOpenProject(project)}
+                  >
+                    Open
+                    <Icon icon="lucide:arrow-right" className="ml-1.5 h-4 w-4" />
+                  </Button>
+                }
+              />
             )}
           />
         </CardContent>
@@ -243,6 +253,25 @@ const personalContext: AuthenticatedContext = { type: 'user' };
 export type ProjectsPageProps = {
   onOpenProject?: (project: ProjectRecord) => void;
 };
+
+// One layout for a project row, loaded or skeleton (the skeleton counts the description as present).
+const ProjectListRow = ({
+  name,
+  description,
+  openButton,
+}: {
+  name: React.ReactNode;
+  description?: React.ReactNode;
+  openButton: React.ReactNode;
+}) => (
+  <li className="flex items-center justify-between gap-4 px-4 py-3">
+    <div className="min-w-0">
+      <p className="truncate text-sm font-medium">{name}</p>
+      {description ? <p className="truncate text-xs text-muted-foreground">{description}</p> : null}
+    </div>
+    {openButton}
+  </li>
+);
 
 export const ProjectsPage = ({ onOpenProject }: ProjectsPageProps = {}) => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;

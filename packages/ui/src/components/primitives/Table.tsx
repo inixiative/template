@@ -7,7 +7,10 @@
 import { Icon } from '@iconify/react';
 import { EmptyState, type EmptyStateProps } from '@template/ui/components/primitives/EmptyState';
 import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
-import { TablePlaceholderRows } from '@template/ui/components/primitives/TablePlaceholderRows';
+import { SkeletonSizedCell } from '@template/ui/components/primitives/SkeletonSizedCell';
+import { SkeletonStatus } from '@template/ui/components/primitives/SkeletonStatus';
+import { skeletonAttributes } from '@template/ui/components/primitives/skeletonAttributes';
+import { TableSkeletonRows } from '@template/ui/components/primitives/TableSkeletonRows';
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';
 import { cn } from '@template/ui/lib/utils';
 import type * as React from 'react';
@@ -16,6 +19,9 @@ export type Column<T> = {
   key: string;
   label: React.ReactNode;
   render?: (item: T) => React.ReactNode;
+  // The cell's shape when it is more than one line of text (a badge, a button): drawn while loading,
+  // and kept invisibly under every loaded cell (SkeletonSizedCell) so rows are one height either way.
+  skeleton?: React.ReactNode;
 };
 
 export type InfiniteScrollProps = {
@@ -90,6 +96,7 @@ export const Table = <T,>({
         className="border rounded-xl overflow-hidden bg-card"
         style={isViewport ? { maxHeight, overflow: 'auto' } : undefined}
       >
+        <SkeletonStatus isLoading={isLoading} />
         <table className="w-full" style={isViewport ? { tableLayout: 'fixed' } : undefined}>
           <thead className={cn('bg-muted/60 border-b', isViewport && 'sticky top-0 z-10')}>
             <tr>
@@ -103,8 +110,8 @@ export const Table = <T,>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y" aria-busy={isLoading}>
-            {isLoading && <TablePlaceholderRows columnCount={columns.length} rows={5} />}
+          <tbody className="divide-y" {...skeletonAttributes(isLoading)}>
+            {isLoading && <TableSkeletonRows columns={columns} rows={5} />}
             {!isLoading &&
               data.map((item) => (
                 <tr
@@ -118,9 +125,11 @@ export const Table = <T,>({
                 >
                   {columns.map((column) => (
                     <td key={column.key} className="px-4 py-3 text-sm">
-                      {column.render
-                        ? column.render(item)
-                        : ((item as Record<string, unknown>)[column.key] as React.ReactNode)}
+                      <SkeletonSizedCell skeleton={column.skeleton}>
+                        {column.render
+                          ? column.render(item)
+                          : ((item as Record<string, unknown>)[column.key] as React.ReactNode)}
+                      </SkeletonSizedCell>
                     </td>
                   ))}
                 </tr>

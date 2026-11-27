@@ -126,6 +126,7 @@ export const evaluateEachBlock = (
       emitted.push(pair);
       continue;
     }
+    const checkOptions = options.now ? { now: options.now } : undefined;
     try {
       const passes =
         judged && judgeable
@@ -133,8 +134,13 @@ export const evaluateEachBlock = (
               lens,
               judged,
               toRuleData(narrowToElements({ ...ruleScope, [as]: element }, frames)),
+              checkOptions,
             )
-          : check(filter as Condition, toRuleData({ ...scope, [as]: arrayValue[position] }));
+          : check(
+              filter as Condition,
+              toRuleData({ ...scope, [as]: arrayValue[position] }),
+              checkOptions,
+            );
       if (passes === true) emitted.push(pair);
     } catch (err) {
       return issue(err instanceof Error ? err.message : 'Unknown error');

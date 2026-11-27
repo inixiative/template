@@ -1,3 +1,4 @@
+export * from './ActionButtonsSkeleton';
 export * from './Avatar';
 export * from './Badge';
 export * from './Breadcrumb';
@@ -13,8 +14,10 @@ export * from './Pagination';
 export * from './PasswordInput';
 export * from './SearchableSelect';
 export * from './Select';
-export * from './Skeleton';
+export * from './SkeletonSizedCell';
+export * from './SkeletonStatus';
+export * from './SkeletonText';
 export * from './SlugInput';
+export * from './skeletonAttributes';
 export * from './Table';
-export * from './TablePlaceholderRows';
 export * from './ThemeSelector';

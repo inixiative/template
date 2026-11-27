@@ -101,6 +101,11 @@ describe('validateConditions — {{#each}} blocks', () => {
     expect(issues.some((x) => x.message.includes('collides with a reserved word'))).toBe(true);
   });
 
+  it('flags an as= named datetime as a reserved word', () => {
+    const issues = validateConditions('{{#each data.items as=datetime}}x{{/each}}');
+    expect(issues.some((x) => x.message.includes('collides with a reserved word'))).toBe(true);
+  });
+
   it('flags an as= that collides with an enclosing binding', () => {
     const tpl = '{{#each data.items as=item}}{{#each item.kids as=item}}x{{/each}}{{/each}}';
     expect(

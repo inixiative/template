@@ -7,6 +7,8 @@
 **Updated**: 2026-11-21
 **Related**: [FEAT-020](./FEAT-020-custom-fields-eav.md) (custom fields EAV and when-to-EAV boundary), [FEAT-003](./FEAT-003-feature-flags.md) (typed value columns), `TRACKING.md` (Member settings, parked 2026-11-14)
 
+> **Definitions superseded 2026-11-25 (R-2026-11-25-04, template #338):** `SETTING_CATEGORIES` / `SETTING_DEFINITIONS` became one setting tree per resource model (`SETTING_TREES`); see `docs/claude/SETTINGS.md` § Setting trees. Storage, routes and the attributes layer below stand.
+
 ---
 
 ## Goal

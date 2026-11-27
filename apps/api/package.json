@@ -26,7 +26,7 @@
     "@hono/zod-openapi": "^1.6.3",
     "@inixiative/field-map": "^0.1.2",
     "@inixiative/integrations": "^0.2.1",
-    "@inixiative/json-rules": "^4.7.0",
+    "@inixiative/json-rules": "^4.8.0",
     "@inixiative/transitions": "^0.10.0",
     "@sentry/bun": "^10.42.0",
     "@simplewebauthn/server": "^14.1.0",

@@ -5,7 +5,8 @@
  * @uses none
  */
 import type { Condition } from '@inixiative/json-rules';
-import { ELSE, ELSE_IF, END, IF } from '@template/email/render/conditionParser/grammar';
+import { datetimeTokenAt } from '@template/email/render/conditionParser/datetimeTokenAt';
+import { DATETIME, ELSE, ELSE_IF, END, IF } from '@template/email/render/conditionParser/grammar';
 import { ruleMarkerAt } from '@template/email/render/conditionParser/ruleMarkerAt';
 import type { Branch, IfBlock } from '@template/email/render/conditionParser/types';
 
@@ -31,6 +32,13 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
   let depth = 1;
   let i = open.next;
   while (i < content.length) {
+    if (content.startsWith(DATETIME, i)) {
+      const token = datetimeTokenAt(content, i);
+      if (token) {
+        i = token.end;
+        continue;
+      }
+    }
     if (content.startsWith(IF, i)) {
       const nested = ruleMarkerAt(content, i, IF);
       if (nested) {

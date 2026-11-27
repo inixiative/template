@@ -46,12 +46,7 @@ const samplePayloads = {
   inquiry: { types: { invite: { content: { type: 'object' } } } },
   segment: { types: { CustomerRelationship: { operators: ['equals'] } } },
   setting: {
-    types: {
-      categories: {
-        general: { key: 'general', label: 'General', description: 'Defaults', order: 10 },
-      },
-      definitions: {},
-    },
+    types: { trees: { User: { __read: 'read', __manage: 'manage' } } },
   },
   webhookSubscription: { types: { CustomerRelationship: { events: ['create'] } } },
 };

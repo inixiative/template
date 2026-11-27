@@ -18,6 +18,7 @@ export * from './ProjectDetailPage';
 export * from './ProjectsPage';
 export * from './ResetPasswordPage';
 export * from './SegmentsPage';
+export * from './SettingsPage';
 export * from './SignUpPage';
 export * from './SpaceProfilePage';
 export * from './SpaceTransferInquiryPage';

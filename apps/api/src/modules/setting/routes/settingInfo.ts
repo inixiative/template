@@ -14,5 +14,5 @@ export const settingInfoRoute = readRoute({
   skipId: true,
   responseSchema: settingInfoResponseSchema,
   description:
-    'Lists every setting category and registered setting definition: applicable resource models, attribute value type, JSON Schema of `value`, default value, display order, and required ReBAC permission. Public endpoint.',
+    'Serves every setting as one tree per resource model: each leaf with its value type, default, options and conditions, and the read and manage permission it inherits from the nearest branch above it, in declaration order. Public endpoint.',
 });

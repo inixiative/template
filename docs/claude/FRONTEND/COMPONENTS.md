@@ -13,7 +13,7 @@
   - [Table](#table)
   - [Avatar](#avatar)
   - [EmptyState](#emptystate)
-  - [Skeleton](#skeleton)
+  - [Loading states](#loading-states)
   - [DropdownMenu](#dropdownmenu)
   - [Select and SearchableSelect](#select-and-searchableselect)
   - [Others](#others)
@@ -126,6 +126,7 @@ type Column<T> = {
   key: string;
   label: React.ReactNode;
   render?: (item: T) => React.ReactNode;   // default: item[key]
+  skeleton?: React.ReactNode;              // the cell's shape when taller than one line (badge, buttons)
 };
 
 type TableProps<T> = {
@@ -170,28 +171,40 @@ Composed: `Avatar` (frame, `show`), `AvatarImage` (renders nothing when `src` is
 />
 ```
 
-### Skeleton
+### Loading states
 
-**Pages never place skeletons.** A page renders its layout at once and passes each data component its query's `isLoading`; the component draws its loading state in its own shape, so the page does not jump when the data lands:
+**Nothing changes shape when data lands.** A page renders its layout at once and passes each data component its query's `isLoading`; the component draws its skeleton at its loaded size. Pages never place skeletons. "Skeleton" is the one word for this ([NAMING.md](../NAMING.md#components)).
 
 | Component | While `isLoading` |
 |-----------|-------------------|
-| `Table` | its real header and five pulsing rows of real row height; never the empty state |
-| `List` | three pulsing rows in the bordered list; never `emptyMessage` |
-| `CardContent` | its children masked (text, inputs, buttons and icons become pulsing bars of their own size, clicks blocked); a body that cannot render without data passes no children and gets pulsing lines; the card's header stays |
-| `ProfileFormCard` | its fields masked through `CardContent`, its title visible |
+| `Table` | its real header and five skeleton rows; a column's `skeleton` fills its cells; never the empty state |
+| `List` | three `skeletonItem`s (default: a one-line row) in the bordered list; never `emptyMessage` |
+| `CardContent` | its children as a skeleton; a body that cannot render without data passes no children and gets skeleton lines; the card's header stays |
+
+**Rows have one height.** `SkeletonText` is an empty inline block; the skeleton rules give an empty text element one line, so it is exactly as tall as the text it stands for. A column whose cells are taller than a line (a badge, buttons) declares its shape once in `skeleton`: the table draws it while loading and keeps it invisibly under every loaded cell (`SkeletonSizedCell`), so a row whose buttons are hidden is as tall as one that shows them. `ActionButtonsSkeleton` is the shape of a row's small buttons (`labels` for text buttons, else `count` icon buttons). A list, or a hand-built table row, has one row layout component that both `renderItem` and `skeletonItem` fill: real values in one, `SkeletonText` and skeleton controls in the other (`ProjectListRow`, `ConnectedIntegrationRow`, `AdminAllInquiryRow`).
 
 ```typescript
+const columns = [
+  { key: 'name', label: 'Name' },
+  { key: 'status', label: 'Status', render: (row) => <StatusBadge row={row} />, skeleton: <Badge>pending</Badge> },
+  { key: 'actions', label: '', render: (row) => <RowActions row={row} />, skeleton: <ActionButtonsSkeleton /> },
+];
 <Table columns={columns} data={query.data?.data ?? []} keyExtractor={(row) => row.id} isLoading={query.isLoading} />
 
-<List items={projects} isLoading={projectsQuery.isLoading} emptyMessage="No projects yet." renderItem={(project) => <li key={project.id}>…</li>} />
+<List
+  items={projects}
+  isLoading={projectsQuery.isLoading}
+  skeletonItem={<ProjectListRow name={<SkeletonText width="12rem" />} description={<SkeletonText width="16rem" />} openButton={<Button size="sm">Open</Button>} />}
+  renderItem={(project) => <ProjectListRow key={project.id} name={project.name} description={project.description} openButton={…} />}
+/>
 
 <CardContent isLoading={!status}>{status && <TwoFactorDetails status={status} />}</CardContent>
+<CardTitle {...skeletonAttributes(isCatalogLoading)}>{title}</CardTitle>
 ```
 
-Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a masked `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`) and the card falls back to pulsing lines.
+**The skeleton attribute.** `skeletonAttributes(isLoading)` goes on the element that holds the data; the element is the same loading or not, and while loading it gets `inert` and `data-skeleton`. The rules in `packages/shared/styles/theme.css` ([THEME_LAYOUT.md § Skeleton rules](THEME_LAYOUT.md#skeleton-rules)) blank the text and draw bars of each element's own size and radius; fixed labels stay readable. Nothing inside an inert element is read, so `Table`, `List` and `CardContent` render `SkeletonStatus` (an sr-only `role="status"` "Loading…") beside it while loading.
 
-`Skeleton` is what those components are built from: bare, one pulsing box sized by `className`; wrapping content, `<Skeleton isLoading>…</Skeleton>` masks it as above (a heading whose text comes from data uses this). A table with hand-built rows uses `TablePlaceholderRows` for its loading body.
+Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a skeleton `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`).
 
 Icons: every `lucide:` and `simple-icons:` name the apps use is bundled by `bun run generate:frontend` (`packages/ui/src/lib/icons/bundledIconCollections.gen.ts`, registered in each app's `main.tsx`), so icons render in the first frame instead of after a fetch to the Iconify API.
 
@@ -262,6 +275,7 @@ export const ProfilePage = () => {
 
 **Components** (`packages/ui/src/components/settings/`):
 
+- `SettingTreeView` - Renders a resource's setting tree (`SETTING_TREES`, served by `/api/v1/setting/info`): labelled branches as headings, leaves as `SettingField`s, matching `provider:` kinds for integrations and project links, an optional `path` for one branch, batch Save of changed keys. `SettingsPage` is Settings → Settings (`/settings/settings`): the tree of wherever you are, plus your membership's. See `docs/claude/SETTINGS.md` § Setting trees
 - `ProfileFormCard` - Name / slug form shared by the three profile pages; `showThemeSelector` adds the theme picker
 - `CreateTokenModal` - Token creation modal (API tokens are managed by `TokensPage`, which shows a new key once in `SecretRevealModal`)
 - `CreateWebhookModal` - Webhook subscription creation (managed by `WebhooksPage`)

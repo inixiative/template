@@ -549,13 +549,13 @@ throws.
 The outermost `db.txn` runs its end-of-transaction work in this order:
 
 1. Prisma commits or rolls back the transaction.
-2. On commit, the cache keys the transaction wrote are cleared through `db.parallel(..., { resolution: 'allSettled' })`, so every key runs (see
+2. On commit, the cache keys the transaction wrote are cleared in one Lua call for the group (see
    [REDIS.md § fetchThroughCache() inside a transaction](./REDIS.md#fetchthroughcache-inside-a-transaction)). A failure is
    kept, not thrown yet.
 3. The transaction is marked settled and its finally queue drains, commit or rollback. This releases
    every lock held until the transaction settles.
-4. On commit, the values the transaction only read are published the same way. A failure counts
-   `cache.publish.failed` and is not thrown.
+4. On commit, the values the transaction only read are published the same way, in one call. A
+   failure counts `cache.publish.failed` for each key in the call and is not thrown.
 5. The `db.onCommit` batches run in order.
 6. `db.txn` throws if a batch or a step-2 clear failed (one error, or an `AggregateError` with the
    batch failure first); otherwise it returns `fn`'s result. The commit has landed either way.
@@ -949,8 +949,8 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic over `ProviderModel`) named set of its customer relationships. Every segment has json-rules `conditions` over the segment lens; `static` is computed when created or its conditions change, `dynamic` is recomputed continuously by the reconcile jobs. A hand-picked audience is a static segment whose rule is `id in [...]`. Members are written only by reconcile, and soft-deleted: a member that leaves is tombstoned and one that comes back is revived. See [SEGMENTS.md](SEGMENTS.md) for rules, reconciliation, API routes and the Owned/Memberships pages
 - `flow.prisma` - `Flow`: one user's short-lived walk through a registered flow (`flowKey`, resolved `steps`, optional `returnUrl`); deleted after 15 idle minutes. See [FLOWS.md](FLOWS.md)
 - `contact.prisma` - Unified contact-info entries (phone/email/social handles), false-polymorphic owner (User/Organization/Space), per-type validation registry, per-owner uniqueness on `(ownerModel, …, type, valueKey)`, optional row-level `permissionRules` for sharing
-- `setting.prisma` - `Setting`: dual-polymorphic typed key/value settings across `User`, `Organization`, `Space`, `OrganizationUser`, `SpaceUser`, `Project`, `Integration`, and `ProjectIntegration`, backed by the reusable 5-column Attribute model capability (`ATTRIBUTE_MODELS`), code-first `SETTING_DEFINITIONS`, Postgres `GIN` index on `valueJson`, and per-key compiled ReBAC (`settingResourcePermission`). See [SETTINGS.md](SETTINGS.md)
-- `projectIntegration.prisma` - `ProjectIntegration`: links a `Project` to an `Integration` within the same tenant boundary (`projectIntegrationOwner` hook + cross-org space transfer tombstoning), parent-edged to `Project`, audited and soft-deleted; a plain unique on `(projectId, integrationId)`, so linking again revives the link (upsert inside `db.withDeleted`). See [SETTINGS.md](SETTINGS.md)
+- `setting.prisma` - `Setting`: dual-polymorphic typed key/value settings across `User`, `Organization`, `Space`, `OrganizationUser`, `SpaceUser`, `Project`, `Integration`, and `ProjectIntegration`, backed by the reusable 5-column Attribute model capability (`ATTRIBUTE_MODELS`), code-first setting trees (`SETTING_TREES`), Postgres `GIN` index on `valueJson`, and per-key compiled ReBAC (`settingResourcePermission`). See [SETTINGS.md](SETTINGS.md)
+- `projectIntegration.prisma` - `ProjectIntegration`: links a `Project` to an `Integration` within the same tenant boundary (`projectIntegrationOwner` hook + cross-org space transfer tombstoning), parent-edged to `Project`, audited and soft-deleted; a plain unique on `(projectId, integrationId)`, so linking again revives the link (upsert inside `db.withDeleted`). See [SETTINGS.md](SETTINGS.md). `INTEGRATION_ONE_PER` (`packages/shared/src/integrations/integrationOnePer.ts`) lets a provider allow one live integration per owner (`owner`) and/or one live link per project (`project`); the create paths enforce it, and an integration's `provider` cannot change after create. Connecting a one-per-owner provider (`createIntegration`) locks the owner's key and updates the owner's one row for that provider if there is one, reviving it if removed (the cascade brings back the settings, links and entitlements removed with it, as any revive does), so the owner never holds a second row. A revive always revives; only a link onto a project that has since linked another integration of a one-per-project provider stays removed (`createIntegration` checks each with `fetchOtherOnePerProjectLink`), so the project keeps the link it has. Linking a project (`validateNoOtherOnePerProjectLink`) refuses a second live link of a one-per-project provider with 409; re-linking a project revives the link
 
 **Communications:**
 - See [COMMUNICATIONS.md](COMMUNICATIONS.md#database-models) for email template models

@@ -388,7 +388,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **BullBoard Monitoring** - Rotation jobs visible in BullBoard dashboard. Track progress, execution time, failure reasons
 - ✅ **Full Test Suite** - Coverage for encryption service, helpers, CI validation logic, and environment variable parsing
 - ✅ **AuthProvider Secrets Encrypted** - OAuth client secrets encrypted at rest using the field encryption engine. First production use of the system
-- 🟣 **Key Escrow & Lifecycle** (ticket FEAT-013) - Key backup, recovery procedures, admin visibility into key ages and rotation history
+- 🟣 **KMS-wrapped encryption keys** (ticket FEAT-013) - Data keys wrapped by AWS KMS, every version kept, 30-day deletion window, audited rotation
 - 🟣 **Encryption Admin Dashboard** (ticket FEAT-013) - UI for monitoring encrypted field coverage, rotation status, and key health across all models
 
 ### General Security
@@ -695,7 +695,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, cacheGeneration, cacheQueued, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
 
-- ✅ **Transaction Cache Overlay** - `fetchThroughCache()` inside `db.txn` reads through a per-transaction overlay: the transaction reads its own writes, a rollback leaves nothing cached, and at commit each key is one Lua call behind its generation fence. Written keys are cleared before the transaction's locks are released and a failed clear makes `db.txn` throw; read-only keys are published after, and a failure only counts `cache.publish.failed`. [Learn more: REDIS.md](docs/claude/REDIS.md#fetchthroughcache-inside-a-transaction)
+- ✅ **Transaction Cache Overlay** - `fetchThroughCache()` inside `db.txn` reads through a per-transaction overlay: the transaction reads its own writes, a rollback leaves nothing cached, and at commit each group of keys is one Lua call, with every key behind its own generation fence. Written keys are cleared before the transaction's locks are released and a failed clear makes `db.txn` throw; read-only keys are published after, and a failure only counts `cache.publish.failed`. [Learn more: REDIS.md](docs/claude/REDIS.md#fetchthroughcache-inside-a-transaction)
 
 - ✅ **Create-If-Missing Fence and Lock Sets** - `db.findForUpdate(model, where, { upserting: true })` fences a row that does not exist yet with a Redis key lock held until the transaction settles; one field may list values to fence a batch as one lock set (one token, one heartbeat, one release, one Lua call per step). A wait past `waitMs` throws `FindForUpdateLockTimeoutError`, answered 409. `db.withLockUntilSettled` holds any `makeLock` lock the same way and joins a key the transaction already holds. [Learn more: DATABASE.md](docs/claude/DATABASE.md#row-locks-and-create-if-missing)
 

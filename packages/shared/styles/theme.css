@@ -728,3 +728,73 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
 }
+
+/*
+ * Skeletons (skeletonAttributes in packages/ui). An element carrying `data-skeleton` keeps its exact
+ * layout while its data loads: text goes blank, and what holds data becomes a bar of its own size and
+ * radius. Fixed labels (label, th, dt, legend) stay readable; controls inside them do not. `inert`
+ * already blocks pointer, focus and selection. Unlayered and !important: a skeleton overrides whatever
+ * colours the content brings. One selector family per rule, so a browser that rejects one (`:has`)
+ * keeps the rest.
+ */
+[data-skeleton] {
+  animation: var(--animate-pulse);
+}
+
+/* All text goes blank, mixed content included; fixed labels keep theirs. */
+[data-skeleton]:not(:is(label, th, dt, legend)),
+[data-skeleton] :not(:is(label, th, dt, legend), :is(label, th, dt, legend) *) {
+  color: transparent !important;
+}
+/* A label without a colour of its own would inherit the blank; give it the text colour back, in the
+   base layer so a colour class on the label still wins. */
+@layer base {
+  [data-skeleton] :is(label, th, dt, legend) {
+    color: hsl(var(--foreground));
+  }
+}
+[data-skeleton] ::placeholder {
+  color: transparent !important;
+}
+
+/* Controls and badges become one bar, labels or not; what is inside them is blank. */
+[data-skeleton] :is(button, a, input, textarea, select, [data-slot='badge']) {
+  color: transparent !important;
+  background-color: hsl(var(--muted)) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+[data-skeleton] :is(button, a, select, [data-slot='badge']) * {
+  color: transparent !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+[data-skeleton] input:is([type='checkbox'], [type='radio']) {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+}
+[data-skeleton] :is(img, svg) {
+  visibility: hidden;
+}
+
+/* Leaves that hold text become a bar the size of their content. */
+[data-skeleton]:not(:has(*)) {
+  background-color: hsl(var(--muted)) !important;
+  background-clip: content-box;
+}
+[data-skeleton]
+  :not(:has(*)):not(
+    :is(label, th, dt, legend, button, a, input, textarea, select, [data-slot='badge']),
+    :is(label, th, dt, legend, button, a, select, [data-slot='badge'], svg) *
+  ) {
+  background-color: hsl(var(--muted)) !important;
+  background-clip: content-box;
+}
+
+/* Missing text still takes one line (SkeletonText relies on this). */
+[data-skeleton]:is(p, span, dd, td, li, a, strong, em, small, code, h1, h2, h3, h4, h5, h6):empty::before,
+[data-skeleton] :is(p, span, dd, td, li, a, strong, em, small, code, h1, h2, h3, h4, h5, h6):empty::before {
+  content: '\a0\a0\a0\a0\a0\a0\a0\a0\a0\a0\a0\a0\a0\a0\a0\a0';
+}

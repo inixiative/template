@@ -18,6 +18,7 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
+import * as telemetry from '@template/shared/telemetry';
 import { fetchTokenContext } from '#/lib/context/fetchTokenContext';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -290,6 +291,126 @@ describe('a read through the cache inside a transaction', () => {
     }
     expect(await cachedName(key)).toBeUndefined();
   });
+
+  const committedName = async (id: string) =>
+    (await db.organization.findUnique({ where: { id }, select: { name: true } }))?.name;
+
+  it('keeps the write committed when publishing a key it wrote fails, and reports the failure after commit', async () => {
+    const { entity: organization } = await createOrganization();
+    const key = cacheKey('organization', organization.id);
+    const redis = redisClient();
+    const realEval = redis.eval.bind(redis) as (...args: unknown[]) => Promise<unknown>;
+    let evalSpy: ReturnType<typeof spyOn> | undefined;
+    try {
+      const txn = db.txn(async () => {
+        await db.organization.update({ where: { id: organization.id }, data: { name: 'renamed' } });
+        evalSpy = spyOn(redis, 'eval').mockImplementation(((...args: unknown[]) =>
+          args.includes(key)
+            ? Promise.reject(new Error('redis down'))
+            : realEval(...args)) as typeof redis.eval);
+      });
+      await expect(txn).rejects.toThrow('redis down');
+    } finally {
+      evalSpy?.mockRestore();
+    }
+    expect(await committedName(organization.id)).toBe('renamed');
+  });
+
+  it('has committed the write while publishing a key it wrote still hangs', async () => {
+    const { entity: organization } = await createOrganization();
+    const key = cacheKey('organization', organization.id);
+    const redis = redisClient();
+    const realEval = redis.eval.bind(redis) as (...args: unknown[]) => Promise<unknown>;
+    let release: () => void = () => {};
+    let publishStarted: () => void = () => {};
+    const started = new Promise<void>((resolve) => {
+      publishStarted = resolve;
+    });
+    let evalSpy: ReturnType<typeof spyOn> | undefined;
+    try {
+      const txn = db.txn(async () => {
+        await db.organization.update({ where: { id: organization.id }, data: { name: 'renamed' } });
+        evalSpy = spyOn(redis, 'eval').mockImplementation(((...args: unknown[]) => {
+          if (!args.includes(key)) return realEval(...args);
+          publishStarted();
+          return new Promise((resolve) => {
+            release = () => resolve(realEval(...args));
+          });
+        }) as typeof redis.eval);
+      });
+      await started;
+      expect(await committedName(organization.id)).toBe('renamed');
+      release();
+      await txn;
+    } finally {
+      evalSpy?.mockRestore();
+    }
+  });
+
+  const countedFor = (
+    counter: { mock: { calls: Parameters<typeof telemetry.incrementCounter>[] } },
+    name: string,
+  ) =>
+    counter.mock.calls
+      .filter(([counted]) => counted === name)
+      .map(([, , attributes]) => attributes.accessor);
+
+  it('publishes a commit group in one eval and reports each key separately: published, large and skipped', async () => {
+    const published = cacheKey('publishedProbe', Bun.randomUUIDv7());
+    const large = cacheKey('largeProbe', Bun.randomUUIDv7());
+    const skipped = cacheKey('skippedProbe', Bun.randomUUIDv7());
+    const redis = redisClient();
+    const evals = spyOn(redis, 'eval');
+    const counter = spyOn(telemetry, 'incrementCounter');
+    try {
+      await db.txn(async () => {
+        await fetchThroughCache(published, async () => 'small', 60);
+        await fetchThroughCache(large, async () => 'x'.repeat(300 * 1024), 60);
+        await fetchThroughCache(skipped, async () => 'stale', 60);
+        await clearCacheKeysMatchingPattern(skipped);
+        evals.mockClear();
+        counter.mockClear();
+      });
+      expect(evals).toHaveBeenCalledTimes(1);
+      expect(countedFor(counter, 'cache.publish.skipped')).toEqual(['skippedProbe']);
+      expect(countedFor(counter, 'cache.value.large')).toEqual(['largeProbe']);
+    } finally {
+      evals.mockRestore();
+      counter.mockRestore();
+    }
+    expect(await redis.get(published)).not.toBeNull();
+    expect(await redis.get(large)).not.toBeNull();
+    expect(await redis.get(skipped)).toBeNull();
+  });
+
+  it('clears a marked key and publishes a marked key recomputed after its write, in one eval', async () => {
+    const cleared = cacheKey('clearedProbe', Bun.randomUUIDv7());
+    const recomputed = cacheKey('recomputedProbe', Bun.randomUUIDv7());
+    const redis = redisClient();
+    await fetchThroughCache(cleared, async () => 'before', 60);
+    await fetchThroughCache(recomputed, async () => 'before', 60);
+    const evals = spyOn(redis, 'eval');
+    const counter = spyOn(telemetry, 'incrementCounter');
+    try {
+      await db.txn(async () => {
+        await markCacheWritten([cleared, recomputed]);
+        await fetchThroughCache(recomputed, async () => 'y'.repeat(300 * 1024), 60);
+        evals.mockClear();
+        counter.mockClear();
+      });
+      expect(evals).toHaveBeenCalledTimes(1);
+      expect(countedFor(counter, 'cache.publish.skipped')).toEqual([]);
+      expect(countedFor(counter, 'cache.value.large')).toEqual(['recomputedProbe']);
+    } finally {
+      evals.mockRestore();
+      counter.mockRestore();
+    }
+    expect(await redis.get(cleared)).toBeNull();
+    expect(await fetchThroughCache(recomputed, async () => 'not read', 60)).toBe(
+      'y'.repeat(300 * 1024),
+    );
+  });
+
   it('lists a space created in an organization the user owns', async () => {
     const { entity: user } = await createUser();
     const member = await createOrganizationUser({ role: 'owner' }, { user });

@@ -13,9 +13,10 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
-import { Button, Page, Skeleton } from '@template/ui/components';
+import { settingResourceKindsOf, settingsIn } from '@template/shared/settings';
+import { Button, Page, skeletonAttributes } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
-import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
+import { SettingTreeView } from '@template/ui/components/settings/SettingTreeView';
 import {
   createOptimisticListTarget,
   useInfiniteDataQuery,
@@ -165,11 +166,14 @@ const IntegrationProviderSection = ({
       {integrations.length > 0 ? null : <span className="sr-only">{actionLabel}</span>}
     </Button>
   );
-  const statusText = showStatus &&
-    !providerIntegrations.isLoading &&
-    !providerIntegrations.isError && (
-      <span className="font-mono text-[11px] text-muted-foreground">{status.label}</span>
-    );
+  const statusText = showStatus && !providerIntegrations.isError && (
+    <span
+      className="font-mono text-[11px] text-muted-foreground"
+      {...skeletonAttributes(providerIntegrations.isLoading)}
+    >
+      {status.label}
+    </span>
+  );
   const connectPanel = isConnectOpen && enabled && renderConnect(() => setConnectOpen(false));
   const errorText = providerIntegrations.isError && (
     <p role="alert" className="px-3 pb-2 text-xs text-destructive">
@@ -186,7 +190,7 @@ const IntegrationProviderSection = ({
         <div className="flex h-11 items-center gap-2.5 pl-3 pr-1">
           <Icon icon={icon} className="h-4 w-4 shrink-0" aria-hidden />
           <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
-          {providerIntegrations.isLoading ? <Skeleton className="h-3 w-16" /> : statusText}
+          {statusText}
           {connectButton}
         </div>
         {errorText}
@@ -244,11 +248,12 @@ const IntegrationProviderSection = ({
               </div>
               {hasIntegrationSettings && openSettingsIntegrationId === integration.id ? (
                 <div className="pb-3">
-                  <ResourceSettingsSection
+                  <SettingTreeView
                     target={{
                       model: 'Integration',
                       id: integration.id,
                       record: integration as unknown as HydratedRecord,
+                      integrationProvider: integration.provider ?? undefined,
                     }}
                     title={`${integration.name} settings`}
                   />
@@ -289,12 +294,12 @@ const IntegrationOwnerSection = ({
   const queryClient = useQueryClient();
   const permissions = useAppStore((state) => state.permissions);
   const { catalog } = useSettingCatalog();
-  const hasIntegrationSettings = Boolean(
-    catalog &&
-      Object.values(catalog.definitions).some((definition) =>
-        definition.resourceModels.includes('Integration'),
-      ),
-  );
+  const hasIntegrationSettings = (provider: IntegrationProvider | null) =>
+    Boolean(
+      catalog &&
+        settingsIn(catalog.trees.Integration, settingResourceKindsOf('Integration', provider))
+          .length > 0,
+    );
   const integrationQueries = integrationContextQueries(context, ownership);
   const canManage =
     ownership?.ownedByMyMembership ||
@@ -374,7 +379,7 @@ const IntegrationOwnerSection = ({
               canConnect={canConnectProvider(provider)}
               showStatus
               canManage={canManage}
-              hasIntegrationSettings={hasIntegrationSettings}
+              hasIntegrationSettings={hasIntegrationSettings(provider)}
               sectionId={`${sectionIdPrefix}connect-${provider}`}
               renderConnect={renderConnect(provider)}
               onDelete={handleDelete}
@@ -392,7 +397,7 @@ const IntegrationOwnerSection = ({
         canConnect={canManage}
         showStatus={false}
         canManage={canManage}
-        hasIntegrationSettings={hasIntegrationSettings}
+        hasIntegrationSettings={hasIntegrationSettings(null)}
         sectionId={`${sectionIdPrefix}add-custom`}
         renderConnect={renderConnect(null)}
         onDelete={handleDelete}

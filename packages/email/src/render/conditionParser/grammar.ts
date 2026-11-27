@@ -14,15 +14,30 @@ export const END = '{{/if}}';
 export const EACH = '{{#each ';
 export const END_EACH = '{{/each}}';
 
+export const DATETIME = '{{datetime ';
+
 export const SCOPE_ROOTS = ['sender', 'recipient', 'data', 'system'] as const;
 
 export type ScopeRoot = (typeof SCOPE_ROOTS)[number];
 
 export const RESERVED_SCOPE_ROOTS: ReadonlySet<string> = new Set(SCOPE_ROOTS);
 
-export const TOKEN_PATTERN = /\{\{([a-z][a-z0-9-]*)((?:\.[a-zA-Z0-9_-]+)*)\}\}/g;
+const TOKEN_PATH_SOURCE = '([a-z][a-z0-9-]*)((?:\\.[a-zA-Z0-9_-]+)*)';
 
-const GRAMMAR_KEYWORDS = ['else', 'if', 'each', 'as', 'index', 'rule', 'filter'] as const;
+export const TOKEN_PATH_PATTERN = new RegExp(`^${TOKEN_PATH_SOURCE}$`);
+
+export const TOKEN_PATTERN = new RegExp(`\\{\\{${TOKEN_PATH_SOURCE}\\}\\}`, 'g');
+
+const GRAMMAR_KEYWORDS = [
+  'else',
+  'if',
+  'each',
+  'as',
+  'index',
+  'rule',
+  'filter',
+  'datetime',
+] as const;
 
 export const RESERVED_BINDING_NAMES: ReadonlySet<string> = new Set([
   ...RESERVED_SCOPE_ROOTS,

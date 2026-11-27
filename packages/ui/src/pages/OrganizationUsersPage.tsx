@@ -18,7 +18,7 @@ import {
   organizationReadManyUsersQueryKey,
   organizationUserDelete,
 } from '@template/sdk';
-import { Button, Page, Table } from '@template/ui/components';
+import { ActionButtonsSkeleton, Button, Page, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import {
   createOptimisticListTarget,
@@ -112,6 +112,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     {
       key: 'actions',
       label: '',
+      skeleton: <ActionButtonsSkeleton />,
       render: (orgUser: OrganizationUser) => {
         const member = orgUser.organizationUser;
         const memberRecord = {

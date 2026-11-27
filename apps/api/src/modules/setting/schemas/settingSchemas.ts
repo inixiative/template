@@ -2,81 +2,28 @@
  * @atlas
  * @kind schema
  * @partOf feature:setting
- * @uses infrastructure:prisma, primitive:routeTemplates
+ * @uses primitive:routeTemplates
  */
 import { z } from '@hono/zod-openapi';
-import { AttributeValidationError, validateAttributeValue } from '@template/shared/attributes';
-import {
-  SettingCategoryKeySchema,
-  SettingKeySchema,
-  type SettingResourceModelName,
-  settingDefinitionForKey,
-} from '@template/shared/settings';
 
 export const settingListQuerySchema = z.object({
-  category: SettingCategoryKeySchema.optional(),
-  key: SettingKeySchema.optional(),
+  path: z
+    .string()
+    .optional()
+    .describe('Only settings at or under this key path in the resource tree (e.g. `general`).'),
+  key: z.string().optional().describe('One setting, by its full path.'),
 });
 
 export type SettingListQuery = z.infer<typeof settingListQuerySchema>;
 
 export const settingUpsertItemSchema = z.object({
-  key: SettingKeySchema,
+  key: z.string().describe("The setting's full path in the resource's tree."),
   value: z
     .unknown()
     .describe(
-      'Shape depends on `key`; see GET /api/v1/setting/info (`types.definitions.<key>.schema`).',
+      "Of the leaf's `valueType`, one of its `options` when it has them, passing its `conditions` when it has them; see GET /api/v1/setting/info.",
     ),
   disabled: z.boolean().optional(),
 });
 
 export type SettingUpsertItem = z.infer<typeof settingUpsertItemSchema>;
-
-/** Per-item Zod body refinement for parent-scoped batch `PATCH /.../settings` routes. */
-export const makeSettingUpsertItemRefinement =
-  (resourceModel: SettingResourceModelName) =>
-  (item: SettingUpsertItem, ctx: z.RefinementCtx): void => {
-    const definition = settingDefinitionForKey(item.key);
-    if (!definition) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['key'],
-        message: `Unknown setting key '${item.key}'`,
-      });
-      return;
-    }
-
-    if (!definition.resourceModels.includes(resourceModel)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['key'],
-        message: `Setting '${item.key}' cannot attach to ${resourceModel} (allowed: ${definition.resourceModels.join(', ')})`,
-      });
-      return;
-    }
-
-    if (item.value === undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['value'],
-        message: `value is required for setting '${item.key}'`,
-      });
-      return;
-    }
-
-    // why: Zod superRefine accumulates fieldErrors per array item via ctx.addIssue; letting a throw escape aborts safeParseAsync.
-    try {
-      validateAttributeValue(definition.valueType, item.value, definition.schema, {
-        pathPrefix: ['value'],
-      });
-    } catch (err) {
-      if (!(err instanceof AttributeValidationError)) throw err;
-      for (const issue of err.issues) {
-        ctx.addIssue({
-          code: 'custom',
-          path: issue.path ?? ['value'],
-          message: issue.message,
-        });
-      }
-    }
-  };

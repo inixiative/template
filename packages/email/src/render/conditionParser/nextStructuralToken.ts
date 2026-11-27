@@ -4,7 +4,15 @@
  * @partOf feature:email
  * @uses none
  */
-import { EACH, ELSE_IF, END, END_EACH, IF } from '@template/email/render/conditionParser/grammar';
+import { datetimeTokenAt } from '@template/email/render/conditionParser/datetimeTokenAt';
+import {
+  DATETIME,
+  EACH,
+  ELSE_IF,
+  END,
+  END_EACH,
+  IF,
+} from '@template/email/render/conditionParser/grammar';
 import { ruleMarkerAt } from '@template/email/render/conditionParser/ruleMarkerAt';
 
 export type StructuralBlockKind = 'if' | 'each';
@@ -14,6 +22,13 @@ export const nextStructuralToken = (
   i: number,
 ): { kind: StructuralBlockKind; isClose: boolean; index: number } | null => {
   for (let j = i; j < content.length; j++) {
+    if (content.startsWith(DATETIME, j)) {
+      const token = datetimeTokenAt(content, j);
+      if (token) {
+        j = token.end - 1;
+        continue;
+      }
+    }
     if (content.startsWith(EACH, j)) return { kind: 'each', isClose: false, index: j };
     if (content.startsWith(END_EACH, j)) return { kind: 'each', isClose: true, index: j };
     if (content.startsWith(END, j)) return { kind: 'if', isClose: true, index: j };

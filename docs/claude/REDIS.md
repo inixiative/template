@@ -317,11 +317,14 @@ transaction reads through it:
 - There is no single-flight lock inside a transaction. A cache function only reads; one that writes
   would mark its own key and wait on itself.
 
-When the transaction commits, each key it touched runs one Lua call (`publishKey`). A marked key is
+When the transaction commits, its keys go to Redis in Lua calls that take many keys each
+(`cache/queries/publishAtCommit.ts`, sent by `publishKeys`). A marked key is
 cleared (value, write time, new generation), and a value the transaction computed is published only
 if the key's generation is still the one read before the compute. An exact clear in between, from any
 process, moves the generation, wins and leaves a miss. A key the transaction neither wrote nor computed a
-publishable value for sends nothing. A rollback sends nothing. The calls run in two groups:
+publishable value for sends nothing. A rollback sends nothing. There is one call per group of keys,
+and the script answers for each key, so the `cache.publish.skipped` counter and the large-write
+metering stay per key. A Redis error fails the whole group. The two groups:
 
 - Marked keys, before the transaction releases its held locks and before its
   `db.onCommit` batches, so a waiter on one of those locks never reads the value the write replaced.
@@ -329,10 +332,11 @@ publishable value for sends nothing. A rollback sends nothing. The calls run in 
   so `db.txn` throws it after its `db.onCommit` batches have run. A write that committed then reports
   an error, so a caller that retries on error must be idempotent.
 - Keys the transaction only read, after the held locks are released, so a large batch
-  does not hold them for one call per key, and before the `db.onCommit` batches. The generation check
+  does not hold them, and before the `db.onCommit` batches. The generation check
   makes the late publish safe against a write that commits in between and clears the key exactly,
   which is how the clear-cache hook clears. A failure leaves Redis as it was and only costs the
-  warm-up, so it logs the error with the key, counts `cache.publish.failed` and does not throw.
+  warm-up, so it logs the error for each key in the call, counts `cache.publish.failed` for each and
+  does not throw.
 
 The full commit order is in [DATABASE.md § What Runs at Commit](./DATABASE.md#what-runs-at-commit).
 

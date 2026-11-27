@@ -302,6 +302,24 @@ Three prefixes for variable substitution:
 | `recipient` | Recipient user | `{{recipient.email}}` |
 | `data` | Explicit from send call | `{{data.code}}` |
 
+`{{datetime <target> [offset={...}] [format="<format>"] [tz=<TimeZone>]}}` evaluates and prints a
+date and time through `@inixiative/json-rules` (`evaluateValue`, `validateValue`, `formatDate`,
+`validateDateFormat`). The target may be any token path or loop binding (`data.at`, `call.at`),
+`now` / `system.now` (the render's single clock instant), a quoted ISO 8601 date literal
+(`"2026-12-01T15:00:00Z"`), or a `json-rules` `DateExpr` (`{"ahead":{"weeks":1}}`,
+`{"next":"week"}`, `{"start":{"next":"week"}}`, `{"end":{"this":"month"}}`). Attributes are
+optional and may appear in any order: `offset` takes a `RollingExpr` (`{"ahead":{"days":7}}`,
+`{"ago":{"hours":2}}`, including `{ "path": "..." }` magnitudes), `format` takes a
+[date-fns format](https://date-fns.org/docs/format) (`format="MMM d, h:mm a zzz"` prints
+`Nov 26, 2:00 PM EST`; defaults to ISO 8601 `2026-11-26T19:00:00Z` / `2026-11-26T14:00:00-05:00`),
+and `tz` takes a canonical IANA time zone id (`isTimezoneId`; defaults to `UTC`). Literal words
+inside `format` go in single quotes (`'at'`). Save and render share the same validator
+(`datetimeTokenProblems`): invalid formats, unknown time zones, malformed or non-date expressions,
+non-rolling offsets, duplicate/unknown attributes, and `{ bind }` references are refused on save and
+reported to `onError` (rendering empty) at render time — never silently falling back to UTC. Every
+target path and `{ path }` inside a `DateExpr` or `offset` is checked against the lens and collected
+as a hydration path; `datetime` is a reserved binding name.
+
 ```typescript
 import { interpolate } from '@template/email/render';
 
