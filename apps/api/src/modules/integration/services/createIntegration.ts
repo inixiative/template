@@ -4,16 +4,15 @@
  * @partOf feature:integrations
  * @uses primitive:authz, infrastructure:prisma, infrastructure:redis
  */
-import { db, type EntitlementInput, type Prisma } from '@template/db';
+import { db, type EntitlementInput, type Prisma, polymorphicKeyColumns } from '@template/db';
 import type { Integration } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions';
 import { isIntegrationOnePer } from '@template/shared/integrations/integrationOnePer';
-import { omit, orderBy, pickBy } from 'lodash-es';
+import { omit, orderBy, pick } from 'lodash-es';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
-import { fetchRevivedLinksOnTakenProjects } from '#/modules/integration/services/fetchRevivedLinksOnTakenProjects';
-import { integrationProviderOwnerWhere } from '#/modules/integration/services/integrationProviderOwnerWhere';
 import { validateIntegrationConfiguration } from '#/modules/integration/validations/validateIntegrationConfiguration';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
+import { fetchOtherOnePerProjectLink } from '#/modules/projectIntegration/services/fetchOtherOnePerProjectLink';
 
 type IntegrationCreate = Prisma.IntegrationUncheckedCreateInput & {
   entitlements?: EntitlementInput[];
@@ -27,45 +26,61 @@ export const createIntegration = (
     validateIntegrationConfiguration(row);
     await validateIntegrationRole(writer, row);
 
-    const owner = integrationProviderOwnerWhere(row);
-    const locked = isIntegrationOnePer(row.provider, 'owner')
-      ? await db.withDeleted(() =>
-          db.findForUpdate<Pick<Integration, 'id' | 'provider' | 'deletedAt'>>(
-            'Integration',
-            pickBy(owner, (value) => value !== null),
-            { upserting: true },
-          ),
-        )
-      : [];
+    const grantEntitlements = async (integration: Integration) => ({
+      ...integration,
+      targetEntitlements: await changeEntitlements(
+        writer,
+        { model: 'Integration', id: integration.id },
+        { add: entitlements },
+      ),
+    });
+
+    if (!isIntegrationOnePer(row.provider, 'owner'))
+      return grantEntitlements(await db.integration.create({ data: row }));
+
+    const ownerColumns = [
+      'provider',
+      'ownerModel',
+      ...polymorphicKeyColumns('Integration', 'ownerModel', row.ownerModel),
+    ];
+    const ownersRows = await db.withDeleted(() =>
+      db.findForUpdate<Pick<Integration, 'id' | 'provider' | 'deletedAt'>>(
+        'Integration',
+        pick(row, ownerColumns),
+        { upserting: true },
+      ),
+    );
     const [existing] = orderBy(
-      locked,
+      ownersRows,
       [(found) => found.deletedAt !== null, 'deletedAt'],
       ['asc', 'desc'],
     );
-    const linksOnTakenProjects = existing?.deletedAt
-      ? await fetchRevivedLinksOnTakenProjects(existing)
-      : [];
+    if (!existing) return grantEntitlements(await db.integration.create({ data: row }));
 
-    const integration = existing
-      ? await db.withDeleted(() =>
-          db.integration.update({
-            where: { id: existing.id },
-            data: {
-              ...omit(row, Object.keys(owner)),
-              ...(existing.deletedAt ? { deletedAt: null } : {}),
-            },
-          }),
-        )
-      : await db.integration.create({ data: row });
+    const revivedLinks =
+      existing.deletedAt && isIntegrationOnePer(row.provider, 'project')
+        ? await db.withDeleted(() =>
+            db.projectIntegration.findMany({
+              where: { integrationId: existing.id, deletedAt: existing.deletedAt },
+              select: { id: true, projectId: true },
+            }),
+          )
+        : [];
+    const linksOnTakenProjects: string[] = [];
+    for (const link of revivedLinks)
+      if (await fetchOtherOnePerProjectLink(link.projectId, existing))
+        linksOnTakenProjects.push(link.id);
+
+    const integration = await db.withDeleted(() =>
+      db.integration.update({
+        where: { id: existing.id },
+        data: { ...omit(row, ownerColumns), ...(existing.deletedAt ? { deletedAt: null } : {}) },
+      }),
+    );
     if (linksOnTakenProjects.length)
       await db.projectIntegration.updateManyAndReturn({
         where: { id: { in: linksOnTakenProjects } },
         data: { deletedAt: new Date() },
       });
-    const targetEntitlements = await changeEntitlements(
-      writer,
-      { model: 'Integration', id: integration.id },
-      { add: entitlements },
-    );
-    return { ...integration, targetEntitlements };
+    return grantEntitlements(integration);
   });

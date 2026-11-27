@@ -74,6 +74,13 @@ Kept: `locatorField`, which the immutable-fields registry, `attributeFieldsByMod
 | Write validation | the attributes hook (`packages/db/src/lib/attributes/hook.ts`) |
 | Value constraints | `validateAttributeValue` (options + json-rules conditions) |
 
+## Deferred: generic attribute helpers on the frontend and in assembly
+
+Aron, 2026-11-27: "For the front end, let's start with just the front-end setting stuff. Once we have more attribute stuff, we can think about duplicating them. We should probably add some sort of note that we're deferring extracting front-end settings."
+
+- `SettingField` and `SettingTreeView` stay settings-only, though they already use the shared attribute helpers (`validateAttributeValue`, parsing, typing). An attribute-generic field component is extracted when custom fields need one, not before.
+- The tree walkers (`settingAt`, `settingsIn`, `settingChildrenFor`, `settingNodesAlongKey`) are about the tree shape and stay in settings. `assemble.ts` (stored rows to typed items) may be attribute-generic: decide when this is built.
+
 ## Docs to rewrite
 
 `docs/claude/SETTINGS.md`, where it names `resolveDefinition` and `fetchDefinitionForRow`.
