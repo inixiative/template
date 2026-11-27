@@ -6,9 +6,16 @@
  */
 
 export { collectRules } from './collectRules';
+export { type DatetimeToken, datetimeTokenAt } from './datetimeTokenAt';
+export {
+  datetimeExpressionPaths,
+  datetimeTokenLabel,
+  datetimeTokenPaths,
+  datetimeTokenProblems,
+} from './datetimeTokenProblems';
 export { findJsonEnd } from './findJsonEnd';
 export {
-  DATETIME_TOKEN_PATTERN,
+  DATETIME,
   EACH,
   ELSE,
   ELSE_IF,
@@ -22,9 +29,9 @@ export {
   type ScopeRoot,
   TOKEN_PATTERN,
 } from './grammar';
-export { isDatetimeFormat } from './isDatetimeFormat';
 export { isStructurallyBalanced } from './isStructurallyBalanced';
 export { isUsableLoopBindingName } from './isUsableLoopBindingName';
+export { nextTemplateBlockAt } from './nextTemplateBlockAt';
 export { parseEachBlock } from './parseEachBlock';
 export { parseIfBlock } from './parseIfBlock';
 export type { Branch, EachBlock, IfBlock } from './types';
@@ -35,3 +42,4 @@ export {
   type TemplateLoop,
   visitTemplateBlocks,
 } from './visitTemplateBlocks';
+export { visitTextSegments } from './visitTextSegments';

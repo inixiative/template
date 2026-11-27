@@ -2,9 +2,9 @@
  * @atlas
  * @kind utils
  * @partOf feature:email
- * @uses primitive:shared
+ * @uses none
  */
-import { DATETIME_TOKEN_PATTERN, TOKEN_PATTERN } from '@template/email/render/conditionParser';
+import { TOKEN_PATTERN, visitTextSegments } from '@template/email/render/conditionParser';
 import { substituteDatetimeToken } from '@template/email/render/evaluateTemplate/substituteDatetimeToken';
 import { substituteToken } from '@template/email/render/evaluateTemplate/substituteToken';
 import type {
@@ -20,13 +20,16 @@ export const substituteTokensInText = (
   onError?: RuleErrorSink,
 ): string => {
   if (!options.substitute) return text;
-  return text
-    .replace(
-      DATETIME_TOKEN_PATTERN,
-      (_match, path: string, format: string | undefined, timeZone: string | undefined) =>
-        substituteDatetimeToken(path, format, timeZone, scope, onError, options),
-    )
-    .replace(TOKEN_PATTERN, (_match, root: string, segments: string) =>
-      substituteToken(root, segments, scope, onError, options),
-    );
+  let out = '';
+  visitTextSegments(text, {
+    text: (slice) => {
+      out += slice.replace(TOKEN_PATTERN, (_match, root: string, segments: string) =>
+        substituteToken(root, segments, scope, onError, options),
+      );
+    },
+    datetime: (token) => {
+      out += substituteDatetimeToken(token, scope, onError, options);
+    },
+  });
+  return out;
 };

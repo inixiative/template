@@ -6,12 +6,15 @@
  */
 import type { TokenIssue } from '@template/email/errors/TokenValidationError';
 import {
-  DATETIME_TOKEN_PATTERN,
-  isDatetimeFormat,
+  datetimeTokenLabel,
+  datetimeTokenPaths,
+  datetimeTokenProblems,
   RESERVED_SCOPE_ROOTS,
   TOKEN_PATTERN,
   visitTemplateBlocks,
+  visitTextSegments,
 } from '@template/email/render/conditionParser';
+import { hasUnsafeSegment } from '@template/email/render/evaluateTemplate/hasUnsafeSegment';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 import { splitRoot } from '@template/email/rules/emailLens';
 import { isRailProvidedSystemField } from '@template/email/rules/railProvidedSystemFields';
@@ -21,7 +24,6 @@ import { offsetsOfUnrecognizedMustaches } from '@template/email/validations/vali
 import { pathsGuaranteedPresentByRule } from '@template/email/validations/validateTokens/pathsGuaranteedPresentByRule';
 import { emailTokenPathKind } from '@template/email/validations/validateTokens/tokenPathKind';
 import type { ValidateTokensOptions } from '@template/email/validations/validateTokens/types';
-import { isTimezoneId } from '@template/shared/reference/timezones';
 
 const SYSTEM_TOKEN_NAMES = new Set<string>(SYSTEM_TOKENS.map(({ name }) => name));
 
@@ -49,6 +51,8 @@ const tokenProblem = (
   segments: string,
   walk: Walk,
 ): string | undefined => {
+  if (segments && hasUnsafeSegment(segments.slice(1))) return 'addresses a prototype key';
+
   if (root === 'system' && !walk.options.lens) {
     const name = segments.slice(1);
     if (!name.includes('.') && (SYSTEM_TOKEN_NAMES.has(name) || isRailProvidedSystemField(name)))
@@ -87,8 +91,8 @@ const tokenProblem = (
   }
 };
 
-const checkText = (text: string, walk: Walk): void => {
-  for (const match of text.matchAll(TOKEN_PATTERN)) {
+const checkPlainTokens = (slice: string, walk: Walk): void => {
+  for (const match of slice.matchAll(TOKEN_PATTERN)) {
     const root = match[1];
     const segments = match[2] ?? '';
     if (!root) continue;
@@ -96,21 +100,44 @@ const checkText = (text: string, walk: Walk): void => {
     const message = tokenProblem(token, root, segments, walk);
     if (message) walk.issues.push({ path: `{{${token}}}`, message });
   }
-  for (const [, path = '', format, timeZone] of text.matchAll(DATETIME_TOKEN_PATTERN)) {
-    const { root, rest } = splitRoot(path);
-    const messages = [
-      format !== undefined && !isDatetimeFormat(format)
-        ? `{{datetime}} has an invalid format: ${format}`
-        : null,
-      timeZone !== undefined && !isTimezoneId(timeZone)
-        ? `{{datetime}} has an unknown time zone: ${timeZone}`
-        : null,
-      tokenProblem(path, root, rest ? `.${rest}` : '', walk),
-    ];
-    for (const message of messages) {
-      if (message) walk.issues.push({ path: `{{datetime ${path}}}`, message });
-    }
-  }
+};
+
+const checkText = (text: string, walk: Walk): void => {
+  visitTextSegments(text, {
+    text: (slice) => checkPlainTokens(slice, walk),
+    datetime: (token) => {
+      const label = datetimeTokenLabel(token);
+      for (const problem of datetimeTokenProblems(token)) {
+        walk.issues.push({ path: label, message: `{{datetime}} ${problem}` });
+      }
+      if (
+        token.target?.kind === 'path' &&
+        walk.bindings.has(splitRoot(token.target.path).root) &&
+        resolveBindingPath(token.target.path, walk.bindings) === undefined
+      ) {
+        const { rest } = splitRoot(token.target.path);
+        walk.issues.push({
+          path: label,
+          message: rest
+            ? 'reads a field off a loop index'
+            : 'names a loop index, which is a number, not a date',
+        });
+      }
+      for (const path of datetimeTokenPaths(token)) {
+        if (
+          token.target?.kind === 'path' &&
+          path === token.target.path &&
+          walk.bindings.has(splitRoot(path).root) &&
+          resolveBindingPath(path, walk.bindings) === undefined
+        ) {
+          continue;
+        }
+        const { root, rest } = splitRoot(path);
+        const message = tokenProblem(path, root, rest ? `.${rest}` : '', walk);
+        if (message) walk.issues.push({ path: label, message });
+      }
+    },
+  });
 };
 
 const walkContent = (content: string, walk: Omit<Walk, 'bindings'>): void =>

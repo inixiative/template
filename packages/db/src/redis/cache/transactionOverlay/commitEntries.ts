@@ -22,7 +22,7 @@ export const commitEntries = (overlay: CacheOverlay, keys: string[]): CommitEntr
         generationKey: generationKey(key),
         writtenKey: cacheWrittenMarkerKeyFor(key),
         captured: entry?.generation ?? '',
-        clearedGeneration: newGeneration(),
+        clearedGeneration: shouldClear ? newGeneration() : '',
         ttlSeconds: entry?.ttlSeconds ?? 0,
         payload: shouldPublish ? entry.payload : '',
         shouldClear,

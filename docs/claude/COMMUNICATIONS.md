@@ -301,19 +301,23 @@ Three prefixes for variable substitution:
 | `recipient` | Recipient user | `{{recipient.email}}` |
 | `data` | Explicit from send call | `{{data.code}}` |
 
-`{{datetime <path> format="<format>" tz=<Zone>}}` prints a date and time. `format` is a
+`{{datetime <target> [offset={...}] [format="<format>"] [tz=<TimeZone>]}}` evaluates and prints a
+date and time through `@inixiative/json-rules` (`evaluateValue`, `validateValue`, `formatDate`,
+`validateDateFormat`). The target may be any token path or loop binding (`data.at`, `call.at`),
+`now` / `system.now` (the render's single clock instant), a quoted ISO 8601 date literal
+(`"2026-12-01T15:00:00Z"`), or a `json-rules` `DateExpr` (`{"ahead":{"weeks":1}}`,
+`{"next":"week"}`, `{"start":{"next":"week"}}`, `{"end":{"this":"month"}}`). Attributes are
+optional and may appear in any order: `offset` takes a `RollingExpr` (`{"ahead":{"days":7}}`,
+`{"ago":{"hours":2}}`, including `{ "path": "..." }` magnitudes), `format` takes a
 [date-fns format](https://date-fns.org/docs/format) (`format="MMM d, h:mm a zzz"` prints
-`Nov 26, 2:00 PM EST`), printed in `tz` through date-fns-tz `formatInTimeZone`. Both are optional
-and come in that order: with no `format` the token prints an ISO 8601 timestamp
-(`2026-11-26T19:00:00Z`, or `2026-11-26T14:00:00-05:00` with `tz=America/New_York`), and with no
-`tz` it prints in UTC. The path is any token path, a loop binding included. A Date and an ISO string
-print the same; an empty, missing or invalid value renders empty and is one issue in the sink, like
-any token. Save checks the path as it checks a plain token, refuses a zone that is not a
-canonical IANA id (`isTimezoneId`), and refuses a format with a letter run that is not a display
-token or a quote left open (`isDatetimeFormat`: `hello`, `YYYY`, an unquoted `at`, the epoch `T`),
-reporting each problem; render refuses the same and prints nothing rather than something else.
-Literal words go in single quotes (`'at'`). The field the token prints is a hydration path, and
-`datetime` is a reserved binding name.
+`Nov 26, 2:00 PM EST`; defaults to ISO 8601 `2026-11-26T19:00:00Z` / `2026-11-26T14:00:00-05:00`),
+and `tz` takes a canonical IANA time zone id (`isTimezoneId`; defaults to `UTC`). Literal words
+inside `format` go in single quotes (`'at'`). Save and render share the same validator
+(`datetimeTokenProblems`): invalid formats, unknown time zones, malformed or non-date expressions,
+non-rolling offsets, duplicate/unknown attributes, and `{ bind }` references are refused on save and
+reported to `onError` (rendering empty) at render time — never silently falling back to UTC. Every
+target path and `{ path }` inside a `DateExpr` or `offset` is checked against the lens and collected
+as a hydration path; `datetime` is a reserved binding name.
 
 ```typescript
 import { interpolate } from '@template/email/render';

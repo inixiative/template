@@ -7,6 +7,7 @@
 
 import { EACH, IF } from '@template/email/render/conditionParser/grammar';
 import { isUsableLoopBindingName } from '@template/email/render/conditionParser/isUsableLoopBindingName';
+import { nextTemplateBlockAt } from '@template/email/render/conditionParser/nextTemplateBlockAt';
 import { parseEachBlock } from '@template/email/render/conditionParser/parseEachBlock';
 import { parseIfBlock } from '@template/email/render/conditionParser/parseIfBlock';
 import type { Branch, EachBlock, IfBlock } from '@template/email/render/conditionParser/types';
@@ -48,11 +49,9 @@ export const visitTemplateBlocks = <S = undefined>(
   let i = 0;
   let blockIndex = 0;
   while (i < content.length) {
-    const ifIdx = content.indexOf(IF, i);
-    const eachIdx = content.indexOf(EACH, i);
-    if (ifIdx === -1 && eachIdx === -1) break;
-    const kind: 'if' | 'each' = eachIdx === -1 || (ifIdx !== -1 && ifIdx < eachIdx) ? 'if' : 'each';
-    const openIdx = kind === 'if' ? ifIdx : eachIdx;
+    const nextBlock = nextTemplateBlockAt(content, i);
+    if (!nextBlock) break;
+    const { kind, openIdx } = nextBlock;
     const position: TemplateBlockPosition = { blockIndex, openIdx };
     blockIndex++;
 

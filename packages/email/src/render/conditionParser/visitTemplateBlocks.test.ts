@@ -35,11 +35,26 @@ describe('visitTemplateBlocks', () => {
     expect(fieldPaths).not.toContain('data.items.name');
   });
 
-  it('records the field a {{datetime}} token prints', () => {
+  it('records the field a {{datetime}} token prints and any { path } magnitudes in its expression or offset', () => {
     expect(
       collectHydrationPaths(
-        '<mjml><mj-body>{{datetime data.request.lastScheduledAt tz=America/New_York}}</mj-body></mjml>',
+        [
+          '<mjml><mj-body>',
+          '{{datetime data.request.lastScheduledAt offset={"ahead":{"days":{"path":"data.graceDays"}}} tz=America/New_York}}',
+          '{{datetime {"ahead":{"weeks":{"path":"recipient.trialWeeks"}}}}}',
+          '{{datetime now format="yyyy-MM-dd"}}',
+          '{{datetime "2026-12-01T00:00:00Z"}}',
+          '{{#each data.calls as=call}}{{datetime call.at offset={"ago":{"hours":{"path":"call.leadHours"}}}}}{{/each}}',
+          '</mj-body></mjml>',
+        ].join(''),
       ).fieldPaths,
-    ).toEqual(['data.request.lastScheduledAt']);
+    ).toEqual([
+      'data.request.lastScheduledAt',
+      'data.graceDays',
+      'recipient.trialWeeks',
+      'data.calls',
+      'data.calls.at',
+      'data.calls.leadHours',
+    ]);
   });
 });

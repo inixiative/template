@@ -106,9 +106,8 @@ OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer xxx
 |---------|---------|-------|
 | `resend` | Email provider | Transactional email API |
 | `mjml` | Email templates | Responsive email markup, renders to HTML |
-| `date-fns`, `date-fns-tz` | Dates in templates | `{{datetime}}` prints a date-fns `format` pattern in a time zone (`formatInTimeZone`) |
 
-Part of `@template/email` package. See [COMMUNICATIONS.md](COMMUNICATIONS.md) for usage.
+Part of `@template/email` package. Date math and `{{datetime}}` formatting come through `@inixiative/json-rules`. See [COMMUNICATIONS.md](COMMUNICATIONS.md) for usage.
 
 ---
 

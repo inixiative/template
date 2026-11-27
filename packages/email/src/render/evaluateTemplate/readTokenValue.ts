@@ -2,7 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf feature:email
- * @uses primitive:shared
+ * @uses none
  */
 import { readLensValue } from '@inixiative/json-rules';
 import { RESERVED_SCOPE_ROOTS } from '@template/email/render/conditionParser';

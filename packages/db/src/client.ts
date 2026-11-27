@@ -181,11 +181,12 @@ const dbMethods = {
             ...(options?.maxWait ? { maxWait: options.maxWait } : {}),
           },
         );
-        const committed = settled.openTransaction.cacheOverlay;
-        const [written] = await Promise.allSettled([
-          publishKeys(commitEntries(committed, [...committed.written])),
-        ]);
-        if (written.status === 'rejected') cacheFailures = [written.reason];
+        const overlay = settled.openTransaction.cacheOverlay;
+        try {
+          await publishKeys(commitEntries(overlay, [...overlay.written]));
+        } catch (error) {
+          cacheFailures = [error];
+        }
       } finally {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a
         // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
@@ -200,10 +201,11 @@ const dbMethods = {
         overlay,
         [...overlay.values.keys()].filter((key) => !isWrittenInTransaction(overlay, key)),
       );
-      const [warm] = await Promise.allSettled([publishKeys(warmEntries)]);
-      if (warm.status === 'rejected') {
+      try {
+        await publishKeys(warmEntries);
+      } catch (error) {
         for (const { key } of warmEntries) {
-          log.error(`Failed to publish cache key ${key} after commit:`, warm.reason, LogScope.db);
+          log.error(`Failed to publish cache key ${key} after commit:`, error, LogScope.db);
           incrementCounter('cache.publish.failed', 1, { accessor: cacheAccessor(key) });
         }
       }

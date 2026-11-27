@@ -6,10 +6,11 @@
  */
 import type { Condition } from '@inixiative/json-rules';
 import {
-  DATETIME_TOKEN_PATTERN,
+  datetimeTokenPaths,
   RESERVED_SCOPE_ROOTS,
   TOKEN_PATTERN,
   visitTemplateBlocks,
+  visitTextSegments,
 } from '@template/email/render/conditionParser';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
@@ -88,10 +89,16 @@ const addTokenPath = (path: string, bindings: BindingChain, out: Set<string>): v
 };
 
 const collectTokenPaths = (text: string, bindings: BindingChain, out: Set<string>): void => {
-  for (const [token = ''] of text.matchAll(TOKEN_PATTERN))
-    addTokenPath(token.slice(2, -2), bindings, out);
-  for (const [, path = ''] of text.matchAll(DATETIME_TOKEN_PATTERN))
-    addTokenPath(path, bindings, out);
+  visitTextSegments(text, {
+    text: (slice) => {
+      for (const [plain = ''] of slice.matchAll(TOKEN_PATTERN)) {
+        addTokenPath(plain.slice(2, -2), bindings, out);
+      }
+    },
+    datetime: (token) => {
+      for (const path of datetimeTokenPaths(token)) addTokenPath(path, bindings, out);
+    },
+  });
 };
 
 const collectFromContent = (content: string, out: CollectedPaths): void =>
