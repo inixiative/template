@@ -4,8 +4,9 @@
  * @partOf primitive:ui
  * @uses none
  */
+import { Icon } from '@iconify/react';
 import { useNavigate } from '@tanstack/react-router';
-import { completeOAuthSignIn } from '@template/ui/lib/auth/signIn';
+import { AuthPageShell } from '@template/ui/components/auth/AuthPageShell';
 import { describeError } from '@template/ui/lib/describeError';
 import { log } from '@template/ui/lib/logger';
 import { redirectAfterLogin } from '@template/ui/lib/routeRedirect';
@@ -29,8 +30,7 @@ export const AuthCallbackPage = () => {
 
         if (!oneTimeToken) throw new Error('No authentication token received');
 
-        await completeOAuthSignIn(oneTimeToken);
-        await useAppStore.getState().auth.refreshMe();
+        await useAppStore.getState().auth.completeOAuthSignIn(oneTimeToken);
 
         const storedRedirect = localStorage.getItem('authRedirectTo') || undefined;
         localStorage.removeItem('authRedirectTo');
@@ -52,8 +52,10 @@ export const AuthCallbackPage = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div>Completing authentication...</div>
-    </div>
+    <AuthPageShell subtitle="Completing sign-in">
+      <div className="flex justify-center" role="status" aria-label="Completing sign-in">
+        <Icon icon="lucide:loader-2" className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    </AuthPageShell>
   );
 };

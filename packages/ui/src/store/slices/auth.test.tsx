@@ -16,7 +16,6 @@ import { buildUser } from '@template/db/test';
 import { contactInfoQueryKey, organizationReadAuthProviderQueryKey } from '@template/sdk';
 import { SignUpForm } from '@template/ui/components/auth/SignUpForm';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
-import { completeOAuthSignIn } from '@template/ui/lib/auth/signIn';
 import {
   clearToken,
   fetchStoredTokenAndClearIfExpired,
@@ -162,12 +161,21 @@ test('a malformed tokenless signup remains an error', async () => {
   expect(fetchStoredTokenAndClearIfExpired()).toBeNull();
 });
 
-test('the OAuth callback exchanges its one-time token for the JWT and its expiry', async () => {
-  respond = () => Response.json({ token, expiresAt, user: { id: 'u1' } });
-  await completeOAuthSignIn('one-time');
-  expect(requests.map((r) => r.path)).toEqual(['/api/auth/one-time-token/verify']);
+test('the OAuth callback exchanges its one-time token for the JWT, then hydrates and authenticates', async () => {
+  const { entity } = await buildUser({ emailVerified: true });
+  const user = entity.__serialize();
+  respond = (path) =>
+    path === '/api/v1/me'
+      ? Response.json({
+          data: { ...user, organizations: [], organizationUsers: [], spaces: [], spaceUsers: [] },
+        })
+      : Response.json({ token, expiresAt, user });
+  await store.getState().auth.completeOAuthSignIn('one-time');
+  expect(requests.map((r) => r.path)).toEqual(['/api/auth/one-time-token/verify', '/api/v1/me']);
   expect(fetchStoredTokenAndClearIfExpired()).toBe(token);
   expect(storedTokenExpiry()?.toISOString()).toBe(expiresAt);
+  expect(store.getState().auth.user?.id).toBe(user.id);
+  expect(authenticate).toHaveBeenCalledWith(token);
 });
 
 test('a sign-in answer without a JWT handoff stores nothing', async () => {

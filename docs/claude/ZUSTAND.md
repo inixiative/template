@@ -134,7 +134,7 @@ const theme = useAppStore((state) => state.ui.theme);
 
 ```typescript
 {
-  client: BetterAuthClient;                         // createAuthClient({ baseURL: VITE_API_URL })
+  client: BetterAuthClient;                         // the one BetterAuth client, created by the slice
   user: User | null;                                // /me minus memberships
   organizations: Record<string, Organization> | null; // keyed by id
   spaces: Record<string, Space> | null;             // keyed by id

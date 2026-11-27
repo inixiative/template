@@ -35,7 +35,7 @@ Components are organized by **domain** (not technical type):
 
 ```
 packages/ui/src/components/
-├── auth/              # LoginForm, SignUpForm, AuthDivider, SocialAuthButton
+├── auth/              # Login/SignUp/ForgotPassword/ResetPassword forms, AuthPageShell, AuthCard, FormErrorAlert, NewPasswordFields, AuthNoticeCard
 ├── flows/             # FlowBanner (see FLOWS.md)
 ├── inquiries/         # InquirySourceControls, InquiryTargetControls
 ├── layout/            # AppShell, Sidebar, TenantContextSelector, Header, Breadcrumbs, Modal, drawers
@@ -289,7 +289,7 @@ export const ProfilePage = () => {
 - `InviteUserModal` (`components/users/`) - `isOpen`, `onClose`, `onSubmit(email, role)`, optional `title` and `roles`.
 - `SecretRevealModal` (`components/utility/`) - shows a secret once with a copy button.
 
-**Pages** (`packages/ui/src/pages/`): `LoginPage`, `SignUpPage`, `AuthCallbackPage`, `HomePage`, `OrganizationsPage`, `OrganizationUsersPage`, `OrganizationSpacesPage`, `OrganizationProfilePage`, `SpaceProfilePage`, `UserProfilePage`, `ProfilePage`, `TokensPage`, `WebhooksPage`, `IntegrationsPage`, `OrganizationAuthProvidersPage`, `SegmentsPage`, inquiry pages (`InquiriesPage`, `AdminInquiriesPage`, `SpaceTransferInquiryPage`, `SpaceUpdateInquiryPage`, invitation / application / transfer list pages).
+**Pages** (`packages/ui/src/pages/`): `LoginPage`, `SignUpPage`, `ForgotPasswordPage`, `ResetPasswordPage`, `TwoFactorPage`, `AuthCallbackPage`, `HomePage`, `OrganizationsPage`, `OrganizationUsersPage`, `OrganizationSpacesPage`, `OrganizationProfilePage`, `SpaceProfilePage`, `UserProfilePage`, `ProfilePage`, `TokensPage`, `WebhooksPage`, `IntegrationsPage`, `OrganizationAuthProvidersPage`, `SegmentsPage`, inquiry pages (`InquiriesPage`, `AdminInquiriesPage`, `SpaceTransferInquiryPage`, `SpaceUpdateInquiryPage`, invitation / application / transfer list pages).
 
 A page that offers an inquiry action gates it with `useCanActOnInquiry`, or, when it checks per option (the invite form's roles), with `canActOnRecordIfPresent` on the record `inquiryRecordForPermissionCheck` builds (`packages/ui/src/lib/inquiries/inquiryRecordForPermissionCheck.ts`). Never hand-roll the inquiry record: `db:Inquiry` gates on `sourceModel` and `targetModel`, and a record without them shows the action to superadmins only. See `docs/claude/INQUIRIES.md#usecanactoninquiry`.
 

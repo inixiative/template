@@ -102,6 +102,13 @@ export const emailTemplateRegistry: Record<string, EmailEntry> = assertSubstitut
     recipients: userRecipient('id'),
     data: lensFromFieldTypes({ verificationUrl: 'String' }),
   },
+
+  'password-reset': {
+    entity: userEntity,
+    sender: { type: 'platform' },
+    recipients: userRecipient('id'),
+    data: lensFromFieldTypes({ passwordResetUrl: 'String' }),
+  },
 });
 
 export const renderPolicyFor = (

@@ -23,7 +23,7 @@ Sign-in, sign-up, OAuth callback, guards and the auth slice in `@template/ui`. B
 
 ## Architecture
 
-- **BetterAuth client** (`better-auth/client`) talks to the API's `/api/auth/*` routes.
+- **One BetterAuth client, in the store.** The auth slice creates it once (`auth.client`, `better-auth/client` with `oneTimeTokenClient`); signed-out calls (sign in and up, OAuth, the OAuth one-time-token exchange, forgot and reset password) go through the slice's actions (`signIn`, `signUp`, `completeOAuthSignIn`, `requestPasswordReset`, `resetPassword`), which hand that client to the `lib/auth` functions. Nothing else creates a client. Signed-in account changes (change password, two-factor) go through the SDK's `/me` routes instead.
 - **User JWT in localStorage.** Email sign-in, sign-up without verification and the OAuth callback all answer with `{ token, expiresAt, user }`; `storeJwtHandoff` (`packages/ui/src/lib/auth/storeJwtHandoff.ts`) checks that shape and calls `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). The stored JWT is read only through `packages/ui/src/lib/auth/token.ts`: `fetchStoredTokenAndClearIfExpired` (the raw value), `isTokenValid` (present and unexpired), `storedTokenExpiry` and `clearToken`; never read `localStorage` or compare the expiry by hand. Every API call and the websocket `authenticate` frame send `Authorization: Bearer <jwt>`. The client never holds a session.
 - **`/me` hydrates the store.** `fetchAndHydrateMe` loads the user, organizations, spaces and space memberships, then runs `permissions.installPermissionsForUser(me)`.
 
@@ -76,8 +76,8 @@ type SignUpResult =
   | { status: 'redirecting' };
 ```
 
-- **Two-factor sign-in & enrollment (`redirectAfterLogin` → `redirectAfterTwoFactor`):** Email and OAuth sign-in always return a User JWT (15-minute pre-2FA JWT when 2FA enrollment or verification is required). `fetchAndHydrateMe` stores `twoFactorAction: 'enroll' | 'verify' | null` from `GET /api/v1/me`. `LoginForm` and `AuthCallbackPage` call `redirectAfterLogin` (`packages/ui/src/lib/routeRedirect.ts`), which takes one of three explicit paths without a double redirect: `'enroll'` → `/two-factor?redirectTo=...`, `'verify'` → `/two-factor?redirectTo=...`, or `null` → `redirectTo || '/dashboard'`. `redirectToLoginUnlessAuthenticated` in `authGuard.ts` backs that up as the direct-URL safety net, preserving `['org', 'space', 'spoof', 'flow']` (`/two-factor` is in `isOnFlowPath`'s `ALWAYS_ON_PATH` so active flows stay alive). Once enrollment or verification completes, `TwoFactorPage` awaits `refreshMe()` and calls `redirectAfterTwoFactor` to continue to `redirectTo`.
-- **Profile security & 15-minute re-verification:** `UserProfilePage` mounts `TwoFactorSecurityCard` below `ChangePasswordCard` for passkeys (`@simplewebauthn/browser`), TOTP setup/rotation, and backup code regeneration. When a sensitive mutation returns `403 TWO_FACTOR_REVERIFY_REQUIRED`, `showApiErrorToast` (and `TwoFactorSecurityCard`'s inline error banner) offers a **Verify 2FA** action button (same pattern as `reauthenticate`'s Login button) that navigates to `/two-factor` and returns once verified — keeping `apiMutation` and `createAppQueryClient` completely free of 2FA retry/intercept machinery.
+- **Two-factor sign-in & enrollment (`redirectAfterLogin` → `redirectAfterTwoFactor`):** Email and OAuth sign-in always return a User JWT (15-minute pre-two-factor JWT when two-factor enrollment or verification is required). `fetchAndHydrateMe` stores `twoFactorAction: 'enroll' | 'verify' | null` from `GET /api/v1/me`. `LoginForm` and `AuthCallbackPage` call `redirectAfterLogin` (`packages/ui/src/lib/routeRedirect.ts`), which takes one of three explicit paths without a double redirect: `'enroll'` → `/twoFactor?redirectTo=...`, `'verify'` → `/twoFactor?redirectTo=...`, or `null` → `redirectTo || '/dashboard'`. `redirectToLoginUnlessAuthenticated` in `authGuard.ts` backs that up as the direct-URL safety net, preserving `['org', 'space', 'spoof', 'flow']` (`/twoFactor` is in `isOnFlowPath`'s `ALWAYS_ON_PATH` so active flows stay alive). Once enrollment or verification completes, `TwoFactorPage` awaits `refreshMe()` and calls `redirectAfterTwoFactor` to continue to `redirectTo`.
+- **Profile security & 15-minute re-verification:** `UserProfilePage` mounts `TwoFactorSecurityCard` below `ChangePasswordCard` for passkeys (`@simplewebauthn/browser`), TOTP setup/rotation, and backup code regeneration. When a sensitive mutation returns `403 TWO_FACTOR_REVERIFY_REQUIRED`, `showApiErrorToast` (and `TwoFactorSecurityCard`'s inline error banner) offers a **Verify 2FA** action button (same pattern as `reauthenticate`'s Login button) that navigates to `/twoFactor` and returns once verified — keeping `apiMutation` and `createAppQueryClient` completely free of two-factor retry/intercept machinery.
 
 - `signIn` / `signUp` live in `packages/ui/src/lib/auth/{signIn,signUp}.ts`; the store wraps them (`auth.signIn`, `auth.signUp`).
 - `signUp` with email requires `name`. The API requires email verification, so a new account usually returns `verification-pending` and stays logged out.
@@ -92,11 +92,18 @@ Pages are thin; the forms own their state and read the store directly (no prop d
 
 | File | Role |
 |------|------|
-| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignUp? })` renders `LoginForm`, links to signup with `navigateToSignUp(currentAppStore, true)` |
+| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignUp? })` renders `LoginForm`, links to signup with `navigateToSignUp(currentAppStore, true)` and to forgot-password with `navigateToForgotPassword(currentAppStore, true)` |
 | `packages/ui/src/pages/SignUpPage.tsx` | `SignUpPage` renders `SignUpForm`, links to login with `navigateToLogin(currentAppStore, true)` |
-| `packages/ui/src/pages/AuthCallbackPage.tsx` | OAuth callback (`/auth/callback` in all three apps) |
-| `packages/ui/src/components/auth/LoginForm.tsx` | `LoginFormProps = { hideSignUp?, onSignUpClick? }` |
-| `packages/ui/src/components/auth/SignUpForm.tsx` | `SignUpFormProps = { onLoginClick? }` |
+| `packages/ui/src/pages/ForgotPasswordPage.tsx` | `/forgotPassword` (all three apps): renders `ForgotPasswordForm`, links back to login |
+| `packages/ui/src/pages/ResetPasswordPage.tsx` | `/resetPassword` (all three apps; the email link lands on the app that asked): reads `?token=` or `?error=` and renders `ResetPasswordForm`, linking on with `navigateToLogin` / `navigateToForgotPassword` |
+| `packages/ui/src/pages/TwoFactorPage.tsx` | `/twoFactor`: enrollment and verification (see Two-factor above) |
+| `packages/ui/src/pages/AuthCallbackPage.tsx` | OAuth callback (`/auth/callback` in all three apps), inside `AuthPageShell` while it exchanges the one-time token |
+| `packages/ui/src/components/auth/LoginForm.tsx` | the sign-up link shows only when `onSignUpClick` is set |
+| `packages/ui/src/components/auth/SignUpForm.tsx` | email and provider sign-up |
+| `packages/ui/src/components/auth/ForgotPasswordForm.tsx` | calls `auth.requestPasswordReset` and always shows the same "check your email" notice, so the page never says whether an account exists |
+| `packages/ui/src/components/auth/ResetPasswordForm.tsx` | calls `auth.resetPassword` (`{ status: 'passwordReset' | 'linkInvalid' }`); a missing token or `INVALID_TOKEN` shows the invalid-link notice with a way to request a new one |
+
+The pages share `AuthPageShell` (the gradient background and app-name heading); every card on them is an `AuthCard` (the one card frame for login, sign-up, forgot and reset password and two-factor verification); the forms share `FormErrorAlert` (a `role="alert"` box, also used by the security settings cards), `NewPasswordFields` (the new and confirm `PasswordInput` pair, shared with Change password; both forms call `assertNewPasswordsMatch`, which throws, and show the error like any other) and `AuthNoticeCard` (an `AuthCard` with one action, for the success and invalid-link notices). The `lib/auth` functions turn a BetterAuth error into a thrown `Error` with `throwBetterAuthError`.
 
 App routes only mount them:
 
@@ -118,7 +125,7 @@ export const Route = createFileRoute('/_public/login')({
 - OAuth click stores `redirectTo` in `localStorage.authRedirectTo` before leaving the page.
 - `SignUpForm` shows "Open the verification link sent to {email}" on `verification-pending`.
 
-Also exported from `@template/ui/components/auth` but not used by the forms: `AuthDivider`, `SocialAuthButton`. `SignInCredentials` / `SignUpCredentials` live in `packages/ui/src/types/auth.ts`.
+Also exported from `@template/ui/components/auth` but not used by the forms: `AuthDivider`, `SocialAuthButton`. `requestPasswordReset` passes the reset page URL (the current origin + `RESET_PASSWORD_PATH`, BetterAuth's `redirectTo`), so BetterAuth's emailed link returns to the app that asked ([AUTH.md](../AUTH.md)). `SignInCredentials` / `SignUpCredentials` live in `packages/ui/src/types/auth.ts`.
 
 ---
 
@@ -142,10 +149,9 @@ const { providers, isLoading, error } = useAuthProviders();
 **Location:** `packages/ui/src/pages/AuthCallbackPage.tsx`, mounted by `apps/{web,admin,superadmin}/app/routes/_public/auth.callback.tsx`.
 
 1. Read `ott` from the URL fragment, then strip the fragment with `history.replaceState`.
-2. `completeOAuthSignIn(ott)` → `client.oneTimeToken.verify` → `storeJwtHandoff(data)` (the API has already deleted the handshake session).
-3. `useAppStore.getState().auth.refreshMe()` (hydrates `/me` and syncs the websocket once 2FA is satisfied).
-4. Navigate to `localStorage.authRedirectTo` (then remove it) or `/dashboard`.
-5. On failure: log, then navigate to `/login?error=<message>`.
+2. `auth.completeOAuthSignIn(ott)` → `exchangeOneTimeTokenForJwt` (`client.oneTimeToken.verify`) → `storeJwtHandoff(data)` (the API has already deleted the handshake session), then, as `signIn` does, clears authenticated queries, hydrates `/me` and syncs the websocket once 2FA is satisfied.
+3. Navigate to `localStorage.authRedirectTo` (then remove it) or `/dashboard`.
+4. On failure: log, then navigate to `/login?error=<message>`.
 
 A `useRef` guard runs the exchange once; the token is single-use and StrictMode runs effects twice.
 
@@ -214,12 +220,13 @@ navigateKeepingSearchParams(to, 'context');  // keep org/space (+ spoof, flow)
 navigateKeepingSearchParams(to, 'spoof');    // keep spoof (+ flow) only
 navigateKeepingSearchParams(to, 'all');      // keep every current search param
 
-navigateToLogin(currentAppStore, preserveSearch?);
-navigateToSignUp(currentAppStore, preserveSearch?);
+navigateToLogin(currentAppStore, carryRedirectTo?);
+navigateToSignUp(currentAppStore, carryRedirectTo?);
+navigateToForgotPassword(currentAppStore, carryRedirectTo?);
 redirectPreservingContext(beforeLoadCtx, to);  // throw a redirect keeping org/space/spoof
 ```
 
-`navigateToLogin` / `navigateToSignUp` either carry the current search + hash (`preserveSearch`) or set `?redirectTo=<current path>`. Login ↔ signup links pass `preserveSearch: true`, so `redirectTo` survives the switch:
+`navigateToLogin` / `navigateToSignUp` / `navigateToForgotPassword` either carry `redirectTo` from one auth page to the next (`carryRedirectTo`; org, space, spoof and flow come along through the `'context'` policy, and a page's own params such as the reset link's `token` or `error` never do, so a used token never lands in another URL) or set `?redirectTo=<current path>`. Login ↔ signup links pass `carryRedirectTo: true`, so `redirectTo` survives the switch:
 
 1. `/settings` while logged out → guard redirects to `/login?redirectTo=/settings`.
 2. "Sign Up" → `/signup?redirectTo=/settings`.
@@ -251,7 +258,8 @@ VITE_API_URL=http://localhost:<api port>   # locally: the registry api port, wri
 
 ## Testing
 
-- `packages/ui/src/store/slices/auth.test.tsx` — auth slice. There are no LoginForm/LoginPage tests.
+- `packages/ui/src/store/slices/auth.test.tsx` — auth slice.
+- `packages/ui/src/components/auth/{ForgotPasswordForm,ResetPasswordForm}.test.tsx` — the request notice, the mismatch refusal, the invalid-link notice. There are no LoginForm/LoginPage tests.
 
 ```bash
 cd packages/ui && bun run test
@@ -261,11 +269,11 @@ cd packages/ui && bun run test
 
 ## Key Files
 
-- `packages/ui/src/lib/auth/` — `signIn.ts`, `signUp.ts`, `token.ts`, `fetchAndHydrateMe.ts`, `types.ts`
+- `packages/ui/src/lib/auth/` — `signIn.ts`, `signUp.ts`, `requestPasswordReset.ts`, `resetPassword.ts`, `changePassword.ts`, `twoFactor.ts`, `storeJwtHandoff.ts`, `token.ts`, `fetchAndHydrateMe.ts`, `types.ts`
 - `packages/ui/src/hooks/useAuthProviders.ts`
 - `packages/ui/src/hooks/useAuthStrategy/` — embed strategy context (`AuthStrategyProvider`, `useAuthStrategy`)
-- `packages/ui/src/pages/{LoginPage,SignUpPage,AuthCallbackPage}.tsx`
-- `packages/ui/src/components/auth/` — `LoginForm`, `SignUpForm`, `AuthDivider`, `SocialAuthButton`
+- `packages/ui/src/pages/{LoginPage,SignUpPage,ForgotPasswordPage,ResetPasswordPage,TwoFactorPage,AuthCallbackPage}.tsx`
+- `packages/ui/src/components/auth/` — `LoginForm`, `SignUpForm`, `ForgotPasswordForm`, `ResetPasswordForm`, `TotpEnrollForm`, `TwoFactorVerifyForm`, `AuthPageShell`, `AuthCard`, `FormErrorAlert`, `NewPasswordFields`, `AuthNoticeCard`, `AuthDivider`, `SocialAuthButton`
 - `packages/ui/src/guards/{authGuard,appGuards}.ts`
 - `packages/ui/src/store/slices/auth.ts`, `packages/ui/src/store/types/auth.ts`
 - `packages/ui/src/lib/routeRedirect.ts`, `packages/ui/src/lib/searchParams.ts`

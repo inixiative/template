@@ -36,7 +36,7 @@ export type MutationArgs = {
   update?: unknown;
 };
 
-type MutationParams = {
+export type MutationParams = {
   model: Prisma.ModelName;
   operation: string;
   args: MutationArgs;

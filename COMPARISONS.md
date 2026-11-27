@@ -181,7 +181,7 @@ Today a check answers one record at a time; listing "everything I can read" mean
 ## 3. Database & ORM
 
 ### What the template provides
-Prisma 7 + PostgreSQL 18 with: automatic transaction merging via AsyncLocalStorage + Proxy, transaction-aware lifecycle hooks (beforeCreate, afterUpdate, afterDelete) that execute inside the transaction and roll back with it, post-commit callbacks (`db.onCommit()`), post-transaction job queue, branded ID types preventing accidental mixing at compile time, split schema (one file per model, 18 models), test factories with Faker and auto-inferred relationships from Prisma metadata, UUID v7 for time-sortable IDs, hydration system for recursive relationship loading with N+1 prevention via PendingMap deduplication, pass-the-delegate pattern for type-safe queries without generics, auto-generated Zod schemas, false polymorphism with explicit FKs and validation, blocked `createMany`/`updateMany` forcing `AndReturn` variants for hook support, request-scoped query tagging, constraint management (CHECK, GiST, partial unique indexes).
+Prisma 7 + PostgreSQL 18 with: automatic transaction merging via AsyncLocalStorage + Proxy, transaction-aware lifecycle hooks (beforeCreate, afterUpdate, afterDelete) that execute inside the transaction and roll back with it, post-commit callbacks (`db.onCommit()`), post-transaction job queue, branded ID types preventing accidental mixing at compile time, split schema (one file per model, 18 models), test factories with Faker and auto-inferred relationships from Prisma metadata, UUID v7 for time-sortable IDs, hydration system for recursive relationship loading with N+1 prevention via PendingMap deduplication, pass-the-delegate pattern for type-safe queries without generics, auto-generated Zod schemas, false polymorphism with explicit FKs and validation, `createMany`/`updateMany` run as their `AndReturn` variants so hooks see every row, request-scoped query tagging, constraint management (CHECK, GiST, partial unique indexes).
 
 ### Comparison
 
@@ -222,7 +222,7 @@ Five hook types execute inside transactions in a defined order: rules validation
 This is the system that prevents webhooks from firing on rolled-back transactions and prevents accidental FK reassignment. No ORM provides this as a built-in.
 
 ### Honest assessment
-The database layer is the deepest engineering in the template. The transaction merging, branded IDs, and hook system are production-grade. The hydration system's PendingMap deduplication prevents N+1 without DataLoader's complexity. The blocked `createMany`/`updateMany` is an opinionated choice that trades convenience for safety — not every team will agree. The mutation lifecycle hooks are genuinely novel — no ORM offers transaction-aware hooks with ordered execution, immutable field enforcement, and post-commit side effects in a single system.
+The database layer is the deepest engineering in the template. The transaction merging, branded IDs, and hook system are production-grade. The hydration system's PendingMap deduplication prevents N+1 without DataLoader's complexity. `createMany`/`updateMany` run as their `AndReturn` variants so hooks always see the rows, at the cost of reading every row back. The mutation lifecycle hooks are genuinely novel — no ORM offers transaction-aware hooks with ordered execution, immutable field enforcement, and post-commit side effects in a single system.
 
 ---
 

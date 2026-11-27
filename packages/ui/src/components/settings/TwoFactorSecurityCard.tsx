@@ -22,6 +22,7 @@ import {
   meTwoFactorTotpStart,
 } from '@template/sdk';
 import { BackupCodesRevealModal } from '@template/ui/components/auth/BackupCodesRevealModal';
+import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
 import type { TotpSetupState } from '@template/ui/components/auth/TotpEnrollForm';
 import { Badge } from '@template/ui/components/primitives/Badge';
 import { Button } from '@template/ui/components/primitives/Button';
@@ -162,19 +163,21 @@ export const TwoFactorSecurityCard = ({ onEnrolled }: { onEnrolled?: () => void 
           {status && (
             <>
               {errorMessage && (
-                <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                  <span>{errorMessage}</span>
-                  {isTwoFactorReverifyError(actionMutation.error) && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigateToTwoFactorReverify(useAppStore.getState)}
-                    >
-                      Verify 2FA
-                    </Button>
-                  )}
-                </div>
+                <FormErrorAlert
+                  message={errorMessage}
+                  action={
+                    isTwoFactorReverifyError(actionMutation.error) && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigateToTwoFactorReverify(useAppStore.getState)}
+                      >
+                        Verify 2FA
+                      </Button>
+                    )
+                  }
+                />
               )}
               {needsPassword && (
                 <div className="space-y-2 rounded-md border bg-muted/30 p-3">

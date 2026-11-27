@@ -48,12 +48,8 @@ import { publishKeys } from '@template/db/redis/cache/transactionOverlay/publish
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { hasDeletedAt } from '@template/db/utils/fieldMetadata';
-import {
-  type AccessorName,
-  isAccessorName,
-  toAccessor,
-  toModelName,
-} from '@template/db/utils/modelNames';
+import { modelDelegate } from '@template/db/utils/modelDelegate';
+import { isAccessorName, toModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { incrementCounter } from '@template/shared/telemetry';
 import {
@@ -113,8 +109,7 @@ const dbMethods = {
     return __raw;
   },
 
-  delegate: (model: string): RuntimeDelegate =>
-    (db as unknown as Record<AccessorName, RuntimeDelegate>)[toAccessor(model)],
+  delegate: (model: string): RuntimeDelegate => modelDelegate(db, model),
 
   scope: async <T>(
     scopeId: string | undefined,
@@ -395,8 +390,10 @@ export const runInTransactionContext = <T>(openTransaction: OpenTransaction, fn:
 // is still reliable; db.raw skips the whole life cycle.
 const HOOKED_MUTATION_OPS = new Set([
   'create',
+  'createMany',
   'createManyAndReturn',
   'update',
+  'updateMany',
   'updateManyAndReturn',
   'upsert',
   'delete',

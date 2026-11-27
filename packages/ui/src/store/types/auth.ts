@@ -6,10 +6,14 @@
  */
 import type { MeReadResponses } from '@template/sdk';
 import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
+import type { ResetPasswordInput, ResetPasswordResult } from '@template/ui/lib/auth/resetPassword';
 import type { AuthMethod, SignInResult, SignUpResult } from '@template/ui/lib/auth/types';
 import type { createAuthClient } from 'better-auth/client';
+import type { oneTimeTokenClient } from 'better-auth/client/plugins';
 
-type BetterAuthClient = ReturnType<typeof createAuthClient>;
+export type BetterAuthClient = ReturnType<
+  typeof createAuthClient<{ plugins: [ReturnType<typeof oneTimeTokenClient>] }>
+>;
 
 type MeData = MeReadResponses[200]['data'];
 type User = Omit<
@@ -41,6 +45,9 @@ export type AuthSlice = {
     initialize: () => Promise<void>;
     refreshMe: () => Promise<void>;
     signIn: (method: AuthMethod) => Promise<SignInResult>;
+    completeOAuthSignIn: (oneTimeToken: string) => Promise<void>;
+    requestPasswordReset: (email: string) => Promise<void>;
+    resetPassword: (input: ResetPasswordInput) => Promise<ResetPasswordResult>;
     applyUpgradedJwt: (
       jwt: { token: string; expiresAt: string } | null | undefined,
       clearTwoFactorAction?: boolean,

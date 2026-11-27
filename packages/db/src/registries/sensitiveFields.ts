@@ -28,6 +28,7 @@ export const sensitiveFieldsOf = (model: string): string[] => SENSITIVE_FIELDS[m
 export const SENSITIVE_FIELD_NAMES: ReadonlySet<string> = new Set([
   ...Object.values(SENSITIVE_FIELDS).flat(),
   'verificationUrl',
+  'passwordResetUrl',
 ]);
 
 export const MASKED_VALUE = '[MASKED]';

@@ -27,12 +27,29 @@ export const auth = betterAuth({
     requireEmailVerification: true,
     minPasswordLength: passwordLength.min,
     maxPasswordLength: passwordLength.max,
+    resetPasswordTokenExpiresIn: 60 * 60,
+    sendResetPassword: async ({ user, url }) => {
+      await emitAppEvent('user.passwordResetRequested', { userId: user.id, passwordResetUrl: url });
+    },
     onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
   },
 
   emailVerification: {
     sendVerificationEmail: async ({ user, url }: { user: { id: string }; url: string }) => {
       await emitAppEvent('user.verificationRequested', { userId: user.id, verificationUrl: url });
+    },
+    afterEmailVerification: async (user) => {
+      await emitAppEvent('user.emailVerified', { userId: user.id });
+    },
+  },
+
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          if (user.emailVerified) await emitAppEvent('user.emailVerified', { userId: user.id });
+        },
+      },
     },
   },
 

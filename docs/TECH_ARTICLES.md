@@ -25,7 +25,7 @@ Eight deep-dive technical articles targeting senior/staff engineers. Each articl
    - 3+ levels of nested stripping
    - Prevents accidental FK reassignment (moving a space to a different org)
 5. Implementation walkthrough with Prisma + PostgreSQL
-6. Why `createMany`/`updateMany` must be blocked in favor of `AndReturn` variants
+6. Why `createMany`/`updateMany` run as their `AndReturn` variants
 
 **Target length:** 2,500–3,000 words
 **Code examples:** Transaction merging proxy, `onCommit` callback registration, immutable field stripping logic

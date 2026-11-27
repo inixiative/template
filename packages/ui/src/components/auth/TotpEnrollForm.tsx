@@ -5,6 +5,7 @@
  * @uses none
  */
 import { useMutation } from '@tanstack/react-query';
+import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
 import { QrCodeSvg } from '@template/ui/components/auth/QrCodeSvg';
 import { Button } from '@template/ui/components/primitives/Button';
 import { CopyButton } from '@template/ui/components/primitives/CopyButton';
@@ -52,11 +53,7 @@ export const TotpEnrollForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {errorMessage && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          {errorMessage}
-        </div>
-      )}
+      {errorMessage && <FormErrorAlert message={errorMessage} />}
 
       <div className="flex flex-col items-center gap-3 rounded-lg border bg-muted/30 p-4">
         <QrCodeSvg value={setup.otpauthUri} size={184} />

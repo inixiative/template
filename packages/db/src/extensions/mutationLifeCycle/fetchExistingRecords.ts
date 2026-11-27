@@ -6,20 +6,16 @@
  */
 import type { OpenTransaction } from '@template/db/clientTypes';
 import type { Prisma } from '@template/db/generated/client/client';
-import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import { type AccessorName, toAccessor } from '@template/db/utils/modelNames';
-
-const txnDelegate = (openTransaction: OpenTransaction, model: string) =>
-  (openTransaction.client as unknown as Record<AccessorName, RuntimeDelegate>)[toAccessor(model)];
+import { modelDelegate } from '@template/db/utils/modelDelegate';
 
 export const fetchExistingRecord = async (
   openTransaction: OpenTransaction,
   model: Prisma.ModelName,
   where: Record<string, unknown>,
-) => (await txnDelegate(openTransaction, model).findUnique({ where })) ?? undefined;
+) => (await modelDelegate(openTransaction.client, model).findUnique({ where })) ?? undefined;
 
 export const fetchExistingRecords = (
   openTransaction: OpenTransaction,
   model: Prisma.ModelName,
   where: Record<string, unknown>,
-) => txnDelegate(openTransaction, model).findMany({ where });
+) => modelDelegate(openTransaction.client, model).findMany({ where });

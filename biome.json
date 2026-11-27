@@ -94,12 +94,7 @@
       }
     },
     {
-      "includes": [
-        "apps/**/app/routes/**",
-        "**/app/routes/**",
-        "**/tests/mocks/**",
-        "project.config.template-internal.ts"
-      ],
+      "includes": ["**/tests/mocks/**", "project.config.template-internal.ts"],
       "linter": {
         "rules": {
           "style": {

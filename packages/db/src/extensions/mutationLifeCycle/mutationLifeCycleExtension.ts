@@ -9,6 +9,7 @@ import {
   fetchExistingRecord,
   fetchExistingRecords,
 } from '@template/db/extensions/mutationLifeCycle/fetchExistingRecords';
+import { makeBulkWriteCountInterceptor } from '@template/db/extensions/mutationLifeCycle/makeBulkWriteCountInterceptor';
 import { makeMutationLifecycleInterceptor } from '@template/db/extensions/mutationLifeCycle/makeMutationLifecycleInterceptor';
 import { claimPendingRegistration } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
@@ -24,12 +25,7 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
 
       create: makeMutationLifecycleInterceptor(DbAction.create),
 
-      async createMany({ model }) {
-        throw new Error(
-          `createMany is not supported - use createManyAndReturn instead for ${model}. ` +
-            'This ensures hooks (webhooks, cache, validation) work correctly.',
-        );
-      },
+      createMany: makeBulkWriteCountInterceptor(DbAction.createManyAndReturn),
 
       createManyAndReturn: makeMutationLifecycleInterceptor(DbAction.createManyAndReturn),
 
@@ -37,12 +33,7 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
         fetchPreviousRecords: fetchExistingRecord,
       }),
 
-      async updateMany({ model }) {
-        throw new Error(
-          `updateMany is not supported - use updateManyAndReturn instead for ${model}. ` +
-            'This ensures hooks (webhooks, cache, validation) work correctly.',
-        );
-      },
+      updateMany: makeBulkWriteCountInterceptor(DbAction.updateManyAndReturn),
 
       updateManyAndReturn: makeMutationLifecycleInterceptor(DbAction.updateManyAndReturn, {
         fetchPreviousRecords: fetchExistingRecords,

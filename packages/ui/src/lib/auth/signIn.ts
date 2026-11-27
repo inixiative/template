@@ -5,6 +5,7 @@
  * @uses none
  */
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
+import { throwBetterAuthError } from '@template/ui/lib/auth/throwBetterAuthError';
 import type {
   AuthMethod,
   EmailAuthMethod,
@@ -12,65 +13,51 @@ import type {
   SamlAuthMethod,
   SignInResult,
 } from '@template/ui/lib/auth/types';
-import { createAuthClient } from 'better-auth/client';
-import { oneTimeTokenClient } from 'better-auth/client/plugins';
+import type { BetterAuthClient } from '@template/ui/store/types/auth';
 
-const betterAuthClient = () => {
-  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-  return createAuthClient({ baseURL, plugins: [oneTimeTokenClient()] });
-};
-
-const signInWithEmail = async (method: EmailAuthMethod): Promise<SignInResult> => {
-  const client = betterAuthClient();
-
+const signInWithEmail = async (
+  client: BetterAuthClient,
+  method: EmailAuthMethod,
+): Promise<SignInResult> => {
   const { data, error } = await client.signIn.email({
     email: method.email,
     password: method.password,
   });
 
-  if (error) {
-    throw new Error(error.message || error.statusText);
-  }
+  if (error) throwBetterAuthError(error);
 
   storeJwtHandoff(data);
   return { status: 'authenticated' };
 };
 
-const signInWithOAuth = async (method: OAuthAuthMethod): Promise<SignInResult> => {
-  const client = betterAuthClient();
-
+const signInWithOAuth = async (
+  client: BetterAuthClient,
+  method: OAuthAuthMethod,
+): Promise<{ status: 'redirecting' }> => {
   const callbackURL = method.callbackURL || `${window.location.origin}/auth/callback`;
 
-  await client.signIn.social({
+  const { error } = await client.signIn.social({
     provider: method.provider,
     callbackURL,
     errorCallbackURL: `${window.location.origin}/login`,
   });
+  if (error) throwBetterAuthError(error);
   return { status: 'redirecting' };
-};
-
-export const completeOAuthSignIn = async (oneTimeToken: string): Promise<void> => {
-  const client = betterAuthClient();
-
-  const { data, error } = await client.oneTimeToken.verify({ token: oneTimeToken });
-
-  if (error) {
-    throw new Error(error.message || error.statusText);
-  }
-
-  storeJwtHandoff(data);
 };
 
 const signInWithSaml = async (_method: SamlAuthMethod): Promise<SignInResult> => {
   throw new Error('SAML authentication not yet implemented');
 };
 
-export const signIn = async (method: AuthMethod): Promise<SignInResult> => {
+export const signIn = async (
+  client: BetterAuthClient,
+  method: AuthMethod,
+): Promise<SignInResult> => {
   switch (method.type) {
     case 'email':
-      return signInWithEmail(method);
+      return signInWithEmail(client, method);
     case 'oauth':
-      return signInWithOAuth(method);
+      return signInWithOAuth(client, method);
     case 'saml':
       return signInWithSaml(method);
     default:
