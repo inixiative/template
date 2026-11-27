@@ -388,7 +388,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **BullBoard Monitoring** - Rotation jobs visible in BullBoard dashboard. Track progress, execution time, failure reasons
 - ✅ **Full Test Suite** - Coverage for encryption service, helpers, CI validation logic, and environment variable parsing
 - ✅ **AuthProvider Secrets Encrypted** - OAuth client secrets encrypted at rest using the field encryption engine. First production use of the system
-- 🟣 **Key Escrow & Lifecycle** (ticket FEAT-013) - Key backup, recovery procedures, admin visibility into key ages and rotation history
+- 🟣 **KMS-wrapped encryption keys** (ticket FEAT-013) - Data keys wrapped by AWS KMS, every version kept, 30-day deletion window, audited rotation
 - 🟣 **Encryption Admin Dashboard** (ticket FEAT-013) - UI for monitoring encrypted field coverage, rotation status, and key health across all models
 
 ### General Security
