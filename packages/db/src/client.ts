@@ -97,8 +97,18 @@ const drainFinally = async (openTransaction: OpenTransaction | null): Promise<vo
   }
 };
 
+const parsePositiveInt = (raw: string | undefined): number | undefined => {
+  if (!raw || !/^\d+$/.test(raw)) return undefined;
+  const value = Number.parseInt(raw, 10);
+  return value > 0 ? value : undefined;
+};
+
 const createClient = (): Db => {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+  const max = parsePositiveInt(process.env.DB_POOL_MAX);
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+    ...(max !== undefined ? { max } : {}),
+  });
   const prisma = new PrismaClient({ adapter, log: [], transactionOptions: { timeout: 30_000 } });
   // You would add read replicas here via additional $extends
   return prisma

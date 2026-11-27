@@ -119,8 +119,15 @@ else
   else
     if [ "$(container_state "$PG_CONTAINER")" = "true" ]; then
       PSQL=("$DOCKER" exec "$PG_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 -q)
-      info "Dropping databases: $DB_LOCAL, $DB_TEST..."
-      if "${PSQL[@]}" -c "DROP DATABASE IF EXISTS \"${DB_LOCAL}\" WITH (FORCE);" \
+      info "Dropping databases: $DB_LOCAL, $DB_TEST (and any ${DB_TEST}_s* shards)..."
+      SHARD_DBS=$("${PSQL[@]}" -tA -c "SELECT datname FROM pg_database WHERE datname ~ '^${DB_TEST}_s[0-9]+$';" || true)
+      SHARD_DROP_OK=1
+      for SHARD_DB in $SHARD_DBS; do
+        [ -z "$SHARD_DB" ] && continue
+        "${PSQL[@]}" -c "DROP DATABASE IF EXISTS \"${SHARD_DB}\" WITH (FORCE);" || SHARD_DROP_OK=0
+      done
+      if [ "$SHARD_DROP_OK" -eq 1 ] \
+        && "${PSQL[@]}" -c "DROP DATABASE IF EXISTS \"${DB_LOCAL}\" WITH (FORCE);" \
         && "${PSQL[@]}" -c "DROP DATABASE IF EXISTS \"${DB_TEST}\" WITH (FORCE);"; then
         ok "Databases dropped"
       else
