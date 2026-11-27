@@ -5,7 +5,6 @@
  * @uses primitive:sdk
  */
 
-import { passwordLength } from '@template/shared/auth/passwordLength';
 import type { ApiErrorBody } from '@template/shared/errors';
 import {
   Button,
@@ -16,6 +15,9 @@ import {
   Input,
   Label,
 } from '@template/ui/components';
+import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
+import { NewPasswordFields } from '@template/ui/components/auth/NewPasswordFields';
+import { assertNewPasswordsMatch } from '@template/ui/lib/auth/assertNewPasswordsMatch';
 import { changePassword } from '@template/ui/lib/auth/changePassword';
 import { describeError } from '@template/ui/lib/describeError';
 import { formatFieldErrors } from '@template/ui/lib/formatFieldErrors';
@@ -41,13 +43,10 @@ export const ChangePasswordCard = () => {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (isSubmitting) return;
-    if (newPassword !== confirmPassword) {
-      setStatus({ kind: 'error', message: 'The new passwords do not match.' });
-      return;
-    }
     setIsSubmitting(true);
     setStatus({ kind: 'idle' });
     try {
+      assertNewPasswordsMatch(newPassword, confirmPassword);
       const handoff = await changePassword({ currentPassword, newPassword });
       if (!spoofUserEmail && handoff.token) applyUpgradedJwt(handoff, false);
       setCurrentPassword('');
@@ -80,40 +79,15 @@ export const ChangePasswordCard = () => {
               disabled={isSubmitting}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-password">New password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              minLength={passwordLength.min}
-              maxLength={passwordLength.max}
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              required
-              disabled={isSubmitting}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm new password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              minLength={passwordLength.min}
-              maxLength={passwordLength.max}
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              required
-              disabled={isSubmitting}
-            />
-          </div>
+          <NewPasswordFields
+            newPassword={newPassword}
+            confirmPassword={confirmPassword}
+            onNewPasswordChange={setNewPassword}
+            onConfirmPasswordChange={setConfirmPassword}
+            disabled={isSubmitting}
+          />
 
-          {status.kind === 'error' && (
-            <p role="alert" className="text-sm text-destructive">
-              {status.message}
-            </p>
-          )}
+          {status.kind === 'error' && <FormErrorAlert message={status.message} />}
           {status.kind === 'changed' && (
             <p role="status" className="text-sm text-muted-foreground">
               Password changed. Every other device is signed out.

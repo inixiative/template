@@ -6,18 +6,12 @@
  */
 
 import { passwordLength } from '@template/shared/auth/passwordLength';
+import { AuthCard } from '@template/ui/components/auth/AuthCard';
 import { AuthNoticeCard } from '@template/ui/components/auth/AuthNoticeCard';
 import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
+import { NewPasswordFields } from '@template/ui/components/auth/NewPasswordFields';
 import { Button } from '@template/ui/components/primitives/Button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@template/ui/components/primitives/Card';
-import { Input } from '@template/ui/components/primitives/Input';
-import { Label } from '@template/ui/components/primitives/Label';
+import { assertNewPasswordsMatch } from '@template/ui/lib/auth/assertNewPasswordsMatch';
 import { describeError } from '@template/ui/lib/describeError';
 import { useAppStore } from '@template/ui/store';
 import { type FormEvent, useState } from 'react';
@@ -25,13 +19,13 @@ import { type FormEvent, useState } from 'react';
 export type ResetPasswordFormProps = {
   token?: string;
   onPasswordReset: () => void;
-  onRequestPasswordReset: () => void;
+  onForgotPasswordClick: () => void;
 };
 
 export const ResetPasswordForm = ({
   token,
   onPasswordReset,
-  onRequestPasswordReset,
+  onForgotPasswordClick,
 }: ResetPasswordFormProps) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -42,15 +36,12 @@ export const ResetPasswordForm = ({
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (isSubmitting || !token) return;
-    if (newPassword !== confirmPassword) {
-      setError('The passwords do not match.');
-      return;
-    }
     setError(undefined);
     setIsSubmitting(true);
     try {
-      const outcome = await useAppStore.getState().auth.resetPassword({ token, newPassword });
-      if (outcome === 'linkInvalid') setIsLinkInvalid(true);
+      assertNewPasswordsMatch(newPassword, confirmPassword);
+      const result = await useAppStore.getState().auth.resetPassword({ token, newPassword });
+      if (result.status === 'linkInvalid') setIsLinkInvalid(true);
       else onPasswordReset();
     } catch (err) {
       setError(describeError(err).message);
@@ -62,63 +53,40 @@ export const ResetPasswordForm = ({
   if (isLinkInvalid) {
     return (
       <AuthNoticeCard
-        title="Link expired"
+        title="Link invalid or expired"
         description="This reset link is invalid or has expired. Reset links work once, for one hour."
-        role="alert"
+        descriptionRole="alert"
         actionLabel="Send a new link"
-        onAction={onRequestPasswordReset}
+        onAction={onForgotPasswordClick}
       />
     );
   }
 
   return (
-    <Card className="w-full shadow-lg border-border/50">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-xl">Choose a new password</CardTitle>
-        <CardDescription>
+    <AuthCard
+      title="Choose a new password"
+      description={
+        <>
           Use {passwordLength.min} or more characters. Every device logged in to this account will
           be logged out.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <FormErrorAlert message={error} />}
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && <FormErrorAlert message={error} />}
 
-          <div className="space-y-2">
-            <Label htmlFor="new-password">New password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              autoComplete="new-password"
-              minLength={passwordLength.min}
-              maxLength={passwordLength.max}
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              required
-              disabled={isSubmitting}
-            />
-          </div>
+        <NewPasswordFields
+          newPassword={newPassword}
+          confirmPassword={confirmPassword}
+          onNewPasswordChange={setNewPassword}
+          onConfirmPasswordChange={setConfirmPassword}
+          disabled={isSubmitting}
+        />
 
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm new password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              autoComplete="new-password"
-              minLength={passwordLength.min}
-              maxLength={passwordLength.max}
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              required
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving password...' : 'Set new password'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving password...' : 'Set new password'}
+        </Button>
+      </form>
+    </AuthCard>
   );
 };

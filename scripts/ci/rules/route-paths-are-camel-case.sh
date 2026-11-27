@@ -16,12 +16,12 @@ if [[ "${#route_roots[@]}" -eq 0 ]]; then
   exit 0
 fi
 
-kebab_paths="$(find "${route_roots[@]}" -name '*-*' -not -path '*/node_modules/*' | sort)"
+kebab_directories="$(find "${route_roots[@]}" -type d -name '*-*' -not -path '*/node_modules/*' | sort)"
 
-if [[ -n "$kebab_paths" ]]; then
-  echo "Found kebab-case route files or directories (route paths are camelCase, e.g. resetPassword.tsx):"
-  echo "$kebab_paths"
+if [[ -n "$kebab_directories" ]]; then
+  echo "Found kebab-case route directories (route paths are camelCase, e.g. accountSettings/; Biome checks the file names):"
+  echo "$kebab_directories"
   exit 1
 fi
 
-echo "All route files are camelCase."
+echo "All route directories are camelCase."

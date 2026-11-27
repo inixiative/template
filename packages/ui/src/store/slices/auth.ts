@@ -6,10 +6,11 @@
  */
 import type { QueryClient } from '@tanstack/react-query';
 import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
+import { exchangeOneTimeTokenForJwt } from '@template/ui/lib/auth/exchangeOneTimeTokenForJwt';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { requestPasswordReset } from '@template/ui/lib/auth/requestPasswordReset';
 import { resetPassword } from '@template/ui/lib/auth/resetPassword';
-import { completeOAuthSignIn, signIn as signInFn } from '@template/ui/lib/auth/signIn';
+import { signIn as signInFn } from '@template/ui/lib/auth/signIn';
 import { signUp as signUpFn } from '@template/ui/lib/auth/signUp';
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
 import { clearToken, fetchStoredTokenAndClearIfExpired } from '@template/ui/lib/auth/token';
@@ -131,7 +132,12 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         return result;
       },
 
-      completeOAuthSignIn: (oneTimeToken: string) => completeOAuthSignIn(client, oneTimeToken),
+      completeOAuthSignIn: async (oneTimeToken: string) => {
+        await exchangeOneTimeTokenForJwt(client, oneTimeToken);
+        clearAuthenticatedQueries(get().queryClient);
+        await fetchAndHydrateMe(set, get);
+        syncWsAuth();
+      },
 
       requestPasswordReset: (email: string) => requestPasswordReset(client, email),
 

@@ -31,7 +31,6 @@ export const AuthCallbackPage = () => {
         if (!oneTimeToken) throw new Error('No authentication token received');
 
         await useAppStore.getState().auth.completeOAuthSignIn(oneTimeToken);
-        await useAppStore.getState().auth.refreshMe();
 
         const storedRedirect = localStorage.getItem('authRedirectTo') || undefined;
         localStorage.removeItem('authRedirectTo');

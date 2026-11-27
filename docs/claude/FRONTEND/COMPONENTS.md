@@ -35,7 +35,7 @@ Components are organized by **domain** (not technical type):
 
 ```
 packages/ui/src/components/
-├── auth/              # Login/SignUp/ForgotPassword/ResetPassword forms, AuthPageShell, FormErrorAlert, AuthNoticeCard
+├── auth/              # Login/SignUp/ForgotPassword/ResetPassword forms, AuthPageShell, AuthCard, FormErrorAlert, NewPasswordFields, AuthNoticeCard
 ├── flows/             # FlowBanner (see FLOWS.md)
 ├── inquiries/         # InquirySourceControls, InquiryTargetControls
 ├── layout/            # AppShell, Sidebar, TenantContextSelector, Header, Breadcrumbs, Modal, drawers

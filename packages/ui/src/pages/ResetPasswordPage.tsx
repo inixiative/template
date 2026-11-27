@@ -25,7 +25,7 @@ export const ResetPasswordPage = () => {
       <ResetPasswordForm
         token={error ? undefined : token}
         onPasswordReset={handlePasswordReset}
-        onRequestPasswordReset={() => navigateToForgotPassword(currentAppStore, true)}
+        onForgotPasswordClick={() => navigateToForgotPassword(currentAppStore, true)}
       />
     </AuthPageShell>
   );

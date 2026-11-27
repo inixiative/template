@@ -35,7 +35,7 @@ describe('frontend two-factor helpers', () => {
     expect(isTwoFactorReverifyError(null)).toBe(false);
   });
 
-  it('redirects pre-2FA sessions to /twoFactor preserving org, space, spoof, and flow', async () => {
+  it('redirects pre-two-factor sessions to /twoFactor preserving org, space, spoof, and flow', async () => {
     const guard = makeGuard({ twoFactorAction: 'verify' });
 
     await expect(

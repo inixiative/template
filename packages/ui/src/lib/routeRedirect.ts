@@ -11,13 +11,14 @@ import { pickSearchParams, searchParamValue } from '@template/ui/lib/searchParam
 import type { AppStore } from '@template/ui/store/types';
 
 export const TWO_FACTOR_PATH = '/twoFactor';
+export const FORGOT_PASSWORD_PATH = '/forgotPassword';
 export const RESET_PASSWORD_PATH = '/resetPassword';
 export const PRESERVED_REDIRECT_PARAMS = ['org', 'space', 'spoof', 'flow'] as const;
 
 const NON_RETURN_AUTH_PATHS = [
   '/login',
   '/signup',
-  '/forgotPassword',
+  FORGOT_PASSWORD_PATH,
   RESET_PASSWORD_PATH,
   '/auth/callback',
   TWO_FACTOR_PATH,
@@ -62,27 +63,30 @@ export const redirectPreservingContext = (context: BeforeLoadContext, to: string
 };
 
 const navigateToAuth = (
-  path: '/login' | '/signup' | '/forgotPassword',
+  path: '/login' | '/signup' | typeof FORGOT_PASSWORD_PATH,
   currentAppStore: () => AppStore,
-  preserveSearch?: boolean,
+  carryRedirectTo?: boolean,
 ) => {
-  const redirectTo = currentPath();
-  const { search, hash } = currentLocation();
-  const searchAndHash = `${search}${hash}`;
-  const query = preserveSearch ? searchAndHash : `?redirectTo=${encodeURIComponent(redirectTo)}`;
-  currentAppStore().navigation.navigateKeepingSearchParams(`${path}${query}`, 'all');
+  const carriedSearch = carryRedirectTo
+    ? pickSearchParams(currentLocation().search, ['redirectTo'])
+    : { redirectTo: currentPath() };
+  const query = new URLSearchParams(carriedSearch).toString();
+  currentAppStore().navigation.navigateKeepingSearchParams(
+    query ? `${path}?${query}` : path,
+    'context',
+  );
 };
 
-export const navigateToLogin = (currentAppStore: () => AppStore, preserveSearch?: boolean) =>
-  navigateToAuth('/login', currentAppStore, preserveSearch);
+export const navigateToLogin = (currentAppStore: () => AppStore, carryRedirectTo?: boolean) =>
+  navigateToAuth('/login', currentAppStore, carryRedirectTo);
 
-export const navigateToSignUp = (currentAppStore: () => AppStore, preserveSearch?: boolean) =>
-  navigateToAuth('/signup', currentAppStore, preserveSearch);
+export const navigateToSignUp = (currentAppStore: () => AppStore, carryRedirectTo?: boolean) =>
+  navigateToAuth('/signup', currentAppStore, carryRedirectTo);
 
 export const navigateToForgotPassword = (
   currentAppStore: () => AppStore,
-  preserveSearch?: boolean,
-) => navigateToAuth('/forgotPassword', currentAppStore, preserveSearch);
+  carryRedirectTo?: boolean,
+) => navigateToAuth(FORGOT_PASSWORD_PATH, currentAppStore, carryRedirectTo);
 
 export const navigateToTwoFactorReverify = (currentAppStore: () => AppStore): void => {
   if (currentLocation().pathname === TWO_FACTOR_PATH) return;

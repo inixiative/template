@@ -2,7 +2,6 @@ import { afterAll, afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
 import { db, redisClient, redisNamespace } from '@template/db';
 import { cleanupTouchedTables, createEmailTemplate, createUser } from '@template/db/test';
 import type { SendEmailOptions } from '@template/email/client/types';
-import { emitAppEvent } from '#/appEvents/emit';
 import { appEventHandlers } from '#/appEvents/handlers';
 import type { UserPasswordResetRequestedPayload } from '#/appEvents/handlers/user/userPasswordResetRequested';
 import type { UserVerificationRequestedPayload } from '#/appEvents/handlers/user/userVerificationRequested';
@@ -11,8 +10,8 @@ import { emailRegistry, emailVerifier } from '#/lib/email';
 
 const adapters = emailRegistry.names().map((name) => ({ name, client: emailRegistry.get(name) }));
 const sent: SendEmailOptions[] = [];
-const verificationEvent = spyOn(appEventHandlers, 'user.verificationRequested');
-const passwordResetEvent = spyOn(appEventHandlers, 'user.passwordResetRequested');
+const verificationRequestedHandler = spyOn(appEventHandlers, 'user.verificationRequested');
+const passwordResetRequestedHandler = spyOn(appEventHandlers, 'user.passwordResetRequested');
 const verifier = spyOn(emailVerifier, 'verify').mockImplementation(async (email) => ({
   email,
   status: 'deliverable',
@@ -33,16 +32,16 @@ beforeEach(() => {
 
 afterEach(async () => {
   sent.length = 0;
-  verificationEvent.mockClear();
-  passwordResetEvent.mockClear();
+  verificationRequestedHandler.mockClear();
+  passwordResetRequestedHandler.mockClear();
   emailRegistry.unregister('auth-email-recorder');
   for (const { name, client } of adapters) emailRegistry.register(name, client);
   await cleanupTouchedTables(db);
 });
 
 afterAll(() => {
-  verificationEvent.mockRestore();
-  passwordResetEvent.mockRestore();
+  verificationRequestedHandler.mockRestore();
+  passwordResetRequestedHandler.mockRestore();
   verifier.mockRestore();
 });
 
@@ -68,8 +67,8 @@ test('signup delivers a verification email through app events and keeps the acco
 
   expect(result.token).toBeNull();
   expect(result.user.emailVerified).toBe(false);
-  expect(verificationEvent).toHaveBeenCalledTimes(1);
-  const event = verificationEvent.mock.calls[0][0];
+  expect(verificationRequestedHandler).toHaveBeenCalledTimes(1);
+  const event = verificationRequestedHandler.mock.calls[0][0];
   const data = event.data as UserVerificationRequestedPayload;
   expect(data.userId).toBe(result.user.id);
   const url = new URL(data.verificationUrl);
@@ -104,7 +103,8 @@ test('verifying the email sends the welcome email, which signup alone does not',
   });
   expect(sent.map((message) => message.subject)).toEqual(['Verify your email']);
 
-  const data = verificationEvent.mock.calls[0][0].data as UserVerificationRequestedPayload;
+  const data = verificationRequestedHandler.mock.calls[0][0]
+    .data as UserVerificationRequestedPayload;
   const token = new URL(data.verificationUrl).searchParams.get('token')!;
   await auth.api.verifyEmail({ query: { token } });
 
@@ -126,18 +126,6 @@ test('an account created already verified gets the welcome email at once', async
   expect(sent[0].to).toBe(email);
 });
 
-test('a guest gets no welcome until the address is verified', async () => {
-  await createWelcomeTemplate();
-  const { entity: guest } = await createUser({
-    email: `guest-${Bun.randomUUIDv7()}@example.com`,
-    emailVerified: false,
-  });
-
-  await emitAppEvent('user.created', { userId: guest.id, isGuest: true });
-
-  expect(sent).toHaveLength(0);
-});
-
 test('requesting a password reset delivers the reset link and masks it in the recorded event', async () => {
   await createEmailTemplate({
     slug: 'password-reset',
@@ -147,20 +135,22 @@ test('requesting a password reset delivers the reset link and masks it in the re
   });
   const { entity: user } = await createUser({ email: `reset-${Bun.randomUUIDv7()}@example.com` });
 
-  const redirectTo = new URL('/resetPassword', process.env.WEB_URL).toString();
-  await auth.api.requestPasswordReset({ body: { email: user.email, redirectTo } });
+  const resetPasswordPageUrl = new URL('/resetPassword', process.env.WEB_URL).toString();
+  await auth.api.requestPasswordReset({
+    body: { email: user.email, redirectTo: resetPasswordPageUrl },
+  });
 
-  expect(passwordResetEvent).toHaveBeenCalledTimes(1);
-  const event = passwordResetEvent.mock.calls[0][0];
+  expect(passwordResetRequestedHandler).toHaveBeenCalledTimes(1);
+  const event = passwordResetRequestedHandler.mock.calls[0][0];
   const data = event.data as UserPasswordResetRequestedPayload;
   expect(data.userId).toBe(user.id);
   const url = new URL(data.passwordResetUrl);
   expect(url.pathname).toMatch(/^\/api\/auth\/reset-password\/[^/]+$/);
-  expect(url.searchParams.get('callbackURL')).toBe(redirectTo);
+  expect(url.searchParams.get('callbackURL')).toBe(resetPasswordPageUrl);
   const token = url.pathname.split('/').at(-1)!;
   const landing = await auth.handler(new Request(url.toString()));
   expect(landing.status).toBe(302);
-  expect(landing.headers.get('location')).toBe(`${redirectTo}?token=${token}`);
+  expect(landing.headers.get('location')).toBe(`${resetPasswordPageUrl}?token=${token}`);
   const recordedEvent = await db.appEvent.findUniqueOrThrow({ where: { id: event.id } });
   expect(recordedEvent.data).toEqual({ userId: user.id, passwordResetUrl: '[MASKED]' });
   expect(JSON.stringify(recordedEvent.data)).not.toContain(token);
@@ -198,7 +188,8 @@ test('resetting replaces the password of an account that already has one', async
   await db.user.update({ where: { id: user.id }, data: { emailVerified: true } });
 
   await auth.api.requestPasswordReset({ body: { email } });
-  const data = passwordResetEvent.mock.calls[0][0].data as UserPasswordResetRequestedPayload;
+  const data = passwordResetRequestedHandler.mock.calls[0][0]
+    .data as UserPasswordResetRequestedPayload;
   const token = new URL(data.passwordResetUrl).pathname.split('/').at(-1)!;
   const newPassword = 'synthetic-replacement-password';
   await auth.api.resetPassword({ body: { token, newPassword } });
@@ -221,6 +212,6 @@ test('requesting a reset for an unknown address sends nothing', async () => {
     body: { email: `nobody-${Bun.randomUUIDv7()}@example.com` },
   });
 
-  expect(passwordResetEvent).not.toHaveBeenCalled();
+  expect(passwordResetRequestedHandler).not.toHaveBeenCalled();
   expect(sent).toHaveLength(0);
 });

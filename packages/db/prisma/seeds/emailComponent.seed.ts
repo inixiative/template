@@ -23,6 +23,7 @@ export const emailComponentSeeds: SeedFile<EmailComponent> = {
         '  <mj-all font-family="-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" />',
         '  <mj-text font-size="16px" line-height="26px" color="#374151" padding="0 0 16px" />',
         '  <mj-section padding="0" />',
+        '  <mj-divider border-color="#e5e7eb" border-width="1px" padding="0 0 16px" />',
         '  <mj-button background-color="#2563eb" color="#ffffff" font-size="16px" font-weight="600" border-radius="8px" inner-padding="14px 28px" padding="8px 0 24px" align="left" />',
         '  <mj-class name="card" background-color="#ffffff" border="1px solid #e5e7eb" border-radius="12px" padding="40px 40px 24px" />',
         '  <mj-class name="heading" font-size="24px" line-height="32px" font-weight="700" color="#111827" padding="0 0 16px" />',

@@ -5,6 +5,7 @@
  * @uses none
  */
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
+import { throwBetterAuthError } from '@template/ui/lib/auth/throwBetterAuthError';
 import type {
   AuthMethod,
   EmailAuthMethod,
@@ -23,15 +24,13 @@ const signInWithEmail = async (
     password: method.password,
   });
 
-  if (error) {
-    throw new Error(error.message || error.statusText);
-  }
+  if (error) throwBetterAuthError(error);
 
   storeJwtHandoff(data);
   return { status: 'authenticated' };
 };
 
-export const signInWithOAuth = async (
+const signInWithOAuth = async (
   client: BetterAuthClient,
   method: OAuthAuthMethod,
 ): Promise<{ status: 'redirecting' }> => {
@@ -42,21 +41,8 @@ export const signInWithOAuth = async (
     callbackURL,
     errorCallbackURL: `${window.location.origin}/login`,
   });
-  if (error) throw new Error(error.message || error.statusText);
+  if (error) throwBetterAuthError(error);
   return { status: 'redirecting' };
-};
-
-export const completeOAuthSignIn = async (
-  client: BetterAuthClient,
-  oneTimeToken: string,
-): Promise<void> => {
-  const { data, error } = await client.oneTimeToken.verify({ token: oneTimeToken });
-
-  if (error) {
-    throw new Error(error.message || error.statusText);
-  }
-
-  storeJwtHandoff(data);
 };
 
 const signInWithSaml = async (_method: SamlAuthMethod): Promise<SignInResult> => {

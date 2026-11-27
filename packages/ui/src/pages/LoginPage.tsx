@@ -19,7 +19,6 @@ export const LoginPage = ({ hideSignUp }: LoginPageProps) => {
   return (
     <AuthPageShell subtitle="Log in to continue to your account">
       <LoginForm
-        hideSignUp={hideSignUp}
         onSignUpClick={hideSignUp ? undefined : () => navigateToSignUp(currentAppStore, true)}
         onForgotPasswordClick={() => navigateToForgotPassword(currentAppStore, true)}
       />

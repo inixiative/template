@@ -7,16 +7,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
 import { meTwoFactor, meTwoFactorQueryKey } from '@template/sdk';
+import { AuthCard } from '@template/ui/components/auth/AuthCard';
 import { AuthPageShell } from '@template/ui/components/auth/AuthPageShell';
 import { TwoFactorVerifyForm } from '@template/ui/components/auth/TwoFactorVerifyForm';
 import { Button } from '@template/ui/components/primitives/Button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@template/ui/components/primitives/Card';
 import { TwoFactorSecurityCard } from '@template/ui/components/settings';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { redirectAfterTwoFactor } from '@template/ui/lib/routeRedirect';
@@ -60,7 +54,7 @@ export const TwoFactorPage = () => {
 
   return (
     <AuthPageShell
-      wide={isEnroll}
+      isWide={isEnroll}
       subtitle={
         isEnroll
           ? 'Set up two-factor authentication before continuing'
@@ -70,24 +64,20 @@ export const TwoFactorPage = () => {
       {isEnroll ? (
         <TwoFactorSecurityCard onEnrolled={() => void returnToOrigin()} />
       ) : (
-        <Card className="w-full shadow-lg border-border/50">
-          <CardHeader>
-            <CardTitle>Two-factor verification</CardTitle>
-            <CardDescription>
-              Confirm your identity with a passkey, authenticator app, or backup code.
-            </CardDescription>
-          </CardHeader>
-          <CardContent isLoading={isLoadingTwoFactor || isReturning || !twoFactorData?.data}>
-            <TwoFactorVerifyForm
-              methods={twoFactorData?.data?.methods ?? []}
-              onVerified={(jwt) => {
-                applyUpgradedJwt(jwt, false);
-                void returnToOrigin();
-              }}
-              submitLabel="Verify and continue"
-            />
-          </CardContent>
-        </Card>
+        <AuthCard
+          title="Two-factor verification"
+          description="Confirm your identity with a passkey, authenticator app, or backup code."
+          isLoading={isLoadingTwoFactor || isReturning || !twoFactorData?.data}
+        >
+          <TwoFactorVerifyForm
+            methods={twoFactorData?.data?.methods ?? []}
+            onVerified={(jwt) => {
+              applyUpgradedJwt(jwt, false);
+              void returnToOrigin();
+            }}
+            submitLabel="Verify and continue"
+          />
+        </AuthCard>
       )}
 
       <div className="mt-4 flex items-center justify-center gap-2">

@@ -5,16 +5,10 @@
  * @uses none
  */
 
+import { AuthCard } from '@template/ui/components/auth/AuthCard';
 import { AuthNoticeCard } from '@template/ui/components/auth/AuthNoticeCard';
 import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
 import { Button } from '@template/ui/components/primitives/Button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@template/ui/components/primitives/Card';
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
 import { type DescribedError, describeError } from '@template/ui/lib/describeError';
@@ -22,7 +16,7 @@ import { useAppStore } from '@template/ui/store';
 import { type FormEvent, useState } from 'react';
 
 export type ForgotPasswordFormProps = {
-  onLoginClick?: () => void;
+  onLoginClick: () => void;
 };
 
 export const ForgotPasswordForm = ({ onLoginClick }: ForgotPasswordFormProps) => {
@@ -51,7 +45,7 @@ export const ForgotPasswordForm = ({ onLoginClick }: ForgotPasswordFormProps) =>
       <AuthNoticeCard
         title="Check your email"
         description={`If an account exists for ${sentTo}, a link to reset its password is on its way. The link works for one hour.`}
-        role="status"
+        descriptionRole="status"
         actionLabel="Back to log in"
         onAction={onLoginClick}
       />
@@ -59,45 +53,38 @@ export const ForgotPasswordForm = ({ onLoginClick }: ForgotPasswordFormProps) =>
   }
 
   return (
-    <Card className="w-full shadow-lg border-border/50">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-xl">Reset your password</CardTitle>
-        <CardDescription>
-          Enter your email and we will send you a link to set a new one
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <FormErrorAlert message={error.message} />}
+    <AuthCard
+      title="Reset your password"
+      description="Enter your email and we will send you a link to set a new one"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && <FormErrorAlert message={error.message} />}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              disabled={isSubmitting}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            disabled={isSubmitting}
+          />
+        </div>
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Sending link...' : 'Send reset link'}
-          </Button>
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? 'Sending link...' : 'Send reset link'}
+        </Button>
 
-          {onLoginClick && (
-            <div className="text-center text-sm text-muted-foreground">
-              Remembered it?{' '}
-              <button type="button" onClick={onLoginClick} className="text-primary hover:underline">
-                Log in
-              </button>
-            </div>
-          )}
-        </form>
-      </CardContent>
-    </Card>
+        <div className="text-center text-sm text-muted-foreground">
+          Remembered it?{' '}
+          <button type="button" onClick={onLoginClick} className="text-primary hover:underline">
+            Log in
+          </button>
+        </div>
+      </form>
+    </AuthCard>
   );
 };

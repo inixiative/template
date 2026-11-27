@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
-import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { ForgotPasswordForm } from '@template/ui/components/auth/ForgotPasswordForm';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 
@@ -45,7 +45,7 @@ const submit = (view: ReturnType<typeof render>, email: string) => {
 describe('ForgotPasswordForm', () => {
   test('asks the server for a reset email and says to check the inbox', async () => {
     respond = () => Response.json({ status: true, message: 'sent' });
-    const view = render(<ForgotPasswordForm />);
+    const view = render(<ForgotPasswordForm onLoginClick={mock(() => {})} />);
     submit(view, 'someone@example.test');
 
     await waitFor(() =>
@@ -65,7 +65,7 @@ describe('ForgotPasswordForm', () => {
 
   test('a failed request shows the error and keeps the form', async () => {
     respond = () => Response.json({ message: 'Too many requests' }, { status: 429 });
-    const view = render(<ForgotPasswordForm />);
+    const view = render(<ForgotPasswordForm onLoginClick={mock(() => {})} />);
     submit(view, 'someone@example.test');
 
     await waitFor(() => expect(view.getByRole('alert').textContent).toContain('Could not send'));

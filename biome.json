@@ -95,8 +95,6 @@
     },
     {
       "includes": [
-        "apps/**/app/routes/**",
-        "**/app/routes/**",
         "**/tests/mocks/**",
         "project.config.template-internal.ts"
       ],

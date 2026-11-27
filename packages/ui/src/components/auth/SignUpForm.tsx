@@ -6,16 +6,10 @@
  */
 import { Icon } from '@iconify/react';
 import { useSearch } from '@tanstack/react-router';
+import { AuthCard } from '@template/ui/components/auth/AuthCard';
 import { AuthNoticeCard } from '@template/ui/components/auth/AuthNoticeCard';
 import { FormErrorAlert } from '@template/ui/components/auth/FormErrorAlert';
 import { Button } from '@template/ui/components/primitives/Button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@template/ui/components/primitives/Card';
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
 import { useAuthProviders } from '@template/ui/hooks';
@@ -32,7 +26,7 @@ const providerIcons: Record<string, string> = {
 };
 
 export type SignUpFormProps = {
-  onLoginClick?: () => void;
+  onLoginClick: () => void;
 };
 
 export const SignUpForm = ({ onLoginClick }: SignUpFormProps) => {
@@ -101,7 +95,7 @@ export const SignUpForm = ({ onLoginClick }: SignUpFormProps) => {
       <AuthNoticeCard
         title="Check your email"
         description={`Open the verification link sent to ${verificationEmail}, then log in to continue.`}
-        role="status"
+        descriptionRole="status"
         actionLabel="Back to log in"
         onAction={onLoginClick}
       />
@@ -109,113 +103,104 @@ export const SignUpForm = ({ onLoginClick }: SignUpFormProps) => {
   }
 
   return (
-    <Card className="w-full shadow-lg border-border/50">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-xl">Create account</CardTitle>
-        <CardDescription>
-          {showProviders ? 'Choose your sign-up method' : 'Enter your details to get started'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {displayError && (
-            <FormErrorAlert message={displayError.message} detail={displayError.detail} />
-          )}
+    <AuthCard
+      title="Create account"
+      description={
+        showProviders ? 'Choose your sign-up method' : 'Enter your details to get started'
+      }
+    >
+      <div className="space-y-4">
+        {displayError && (
+          <FormErrorAlert message={displayError.message} detail={displayError.detail} />
+        )}
 
-          {showProviders && (
-            <>
-              <div className="space-y-2">
-                {enabledProviders.map((provider) => {
-                  const iconSlug = providerIcons[provider.provider.toLowerCase()] || 'lucide:key';
-                  return (
-                    <Button
-                      key={provider.provider}
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => handleOAuthClick(provider.provider)}
-                      disabled={isLoading}
-                    >
-                      <Icon icon={iconSlug} className="h-4 w-4 mr-2" />
-                      Continue with {provider.name}
-                    </Button>
-                  );
-                })}
-              </div>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with email
-                  </span>
-                </div>
-              </div>
-            </>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {showProviders && (
+          <>
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                disabled={isLoading}
-              />
+              {enabledProviders.map((provider) => {
+                const iconSlug = providerIcons[provider.provider.toLowerCase()] || 'lucide:key';
+                return (
+                  <Button
+                    key={provider.provider}
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleOAuthClick(provider.provider)}
+                    disabled={isLoading}
+                  >
+                    <Icon icon={iconSlug} className="h-4 w-4 mr-2" />
+                    Continue with {provider.name}
+                  </Button>
+                );
+              })}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="At least 8 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                disabled={isLoading}
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Creating account...' : 'Create account'}
-            </Button>
-
-            {onLoginClick && (
-              <div className="text-center text-sm text-muted-foreground">
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={onLoginClick}
-                  className="text-primary hover:underline"
-                >
-                  Log In
-                </button>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
               </div>
-            )}
-          </form>
-        </div>
-      </CardContent>
-    </Card>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with email
+                </span>
+              </div>
+            </div>
+          </>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              type="text"
+              placeholder="Your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="At least 8 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              disabled={isLoading}
+            />
+          </div>
+
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? 'Creating account...' : 'Create account'}
+          </Button>
+
+          <div className="text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <button type="button" onClick={onLoginClick} className="text-primary hover:underline">
+              Log In
+            </button>
+          </div>
+        </form>
+      </div>
+    </AuthCard>
   );
 };

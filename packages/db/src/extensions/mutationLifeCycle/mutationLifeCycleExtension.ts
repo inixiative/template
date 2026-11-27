@@ -9,6 +9,7 @@ import {
   fetchExistingRecord,
   fetchExistingRecords,
 } from '@template/db/extensions/mutationLifeCycle/fetchExistingRecords';
+import { makeBulkWriteCountInterceptor } from '@template/db/extensions/mutationLifeCycle/makeBulkWriteCountInterceptor';
 import { makeMutationLifecycleInterceptor } from '@template/db/extensions/mutationLifeCycle/makeMutationLifecycleInterceptor';
 import { claimPendingRegistration } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
@@ -24,9 +25,7 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
 
       create: makeMutationLifecycleInterceptor(DbAction.create),
 
-      createMany: makeMutationLifecycleInterceptor(DbAction.createManyAndReturn, {
-        countRowsFrom: 'createManyAndReturn',
-      }),
+      createMany: makeBulkWriteCountInterceptor(DbAction.createManyAndReturn),
 
       createManyAndReturn: makeMutationLifecycleInterceptor(DbAction.createManyAndReturn),
 
@@ -34,9 +33,7 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
         fetchPreviousRecords: fetchExistingRecord,
       }),
 
-      updateMany: makeMutationLifecycleInterceptor(DbAction.updateManyAndReturn, {
-        countRowsFrom: 'updateManyAndReturn',
-      }),
+      updateMany: makeBulkWriteCountInterceptor(DbAction.updateManyAndReturn),
 
       updateManyAndReturn: makeMutationLifecycleInterceptor(DbAction.updateManyAndReturn, {
         fetchPreviousRecords: fetchExistingRecords,

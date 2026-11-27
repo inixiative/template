@@ -5,17 +5,17 @@
  * @uses none
  */
 import type { OpenTransaction } from '@template/db/clientTypes';
-import { transactionDelegate } from '@template/db/extensions/mutationLifeCycle/transactionDelegate';
 import type { Prisma } from '@template/db/generated/client/client';
+import { modelDelegate } from '@template/db/utils/modelDelegate';
 
 export const fetchExistingRecord = async (
   openTransaction: OpenTransaction,
   model: Prisma.ModelName,
   where: Record<string, unknown>,
-) => (await transactionDelegate(openTransaction, model).findUnique({ where })) ?? undefined;
+) => (await modelDelegate(openTransaction.client, model).findUnique({ where })) ?? undefined;
 
 export const fetchExistingRecords = (
   openTransaction: OpenTransaction,
   model: Prisma.ModelName,
   where: Record<string, unknown>,
-) => transactionDelegate(openTransaction, model).findMany({ where });
+) => modelDelegate(openTransaction.client, model).findMany({ where });

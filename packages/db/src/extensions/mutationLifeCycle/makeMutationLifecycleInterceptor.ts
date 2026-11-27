@@ -13,7 +13,6 @@ import {
   type HookOptions,
   HookTiming,
 } from '@template/db/extensions/hookRegistry';
-import { transactionDelegate } from '@template/db/extensions/mutationLifeCycle/transactionDelegate';
 import { openTransactionForPrismaQueryOrThrow } from '@template/db/extensions/transactionRegistry';
 import type { Prisma } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
@@ -37,7 +36,7 @@ export type MutationArgs = {
   update?: unknown;
 };
 
-type MutationParams = {
+export type MutationParams = {
   model: Prisma.ModelName;
   operation: string;
   args: MutationArgs;
@@ -45,7 +44,6 @@ type MutationParams = {
 };
 
 type Interception = {
-  countRowsFrom?: 'createManyAndReturn' | 'updateManyAndReturn';
   fetchPreviousRecords?: (
     openTransaction: OpenTransaction,
     model: Prisma.ModelName,
@@ -54,15 +52,11 @@ type Interception = {
 };
 
 export const makeMutationLifecycleInterceptor =
-  (action: DbAction, { countRowsFrom, fetchPreviousRecords }: Interception = {}) =>
+  (action: DbAction, { fetchPreviousRecords }: Interception = {}) =>
   async (params: MutationParams) => {
     const { model, operation, args, query } = params;
     const openTransaction = openTransactionForPrismaQueryOrThrow(model, operation, params);
     if (!openTransaction) return query(args);
-    if (countRowsFrom) {
-      const rows = await transactionDelegate(openTransaction, model)[countRowsFrom](args as never);
-      return { count: rows.length };
-    }
     assertNoNestedWrites(model, args);
     const hookOptions = { model, operation, action, args } as HookOptions;
     const where = args.where as Record<string, unknown>;

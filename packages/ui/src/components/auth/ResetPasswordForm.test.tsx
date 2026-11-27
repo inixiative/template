@@ -51,7 +51,7 @@ describe('ResetPasswordForm', () => {
       <ResetPasswordForm
         token="reset-token"
         onPasswordReset={onPasswordReset}
-        onRequestPasswordReset={() => {}}
+        onForgotPasswordClick={() => {}}
       />,
     );
     submit(view, 'brand-new-password');
@@ -72,7 +72,7 @@ describe('ResetPasswordForm', () => {
       <ResetPasswordForm
         token="reset-token"
         onPasswordReset={onPasswordReset}
-        onRequestPasswordReset={() => {}}
+        onForgotPasswordClick={() => {}}
       />,
     );
     submit(view, 'brand-new-password', 'something-else');
@@ -82,16 +82,16 @@ describe('ResetPasswordForm', () => {
     expect(onPasswordReset).not.toHaveBeenCalled();
   });
 
-  test('an expired token offers a new link instead of the form', async () => {
+  test('an invalid or expired token offers a new link instead of the form', async () => {
     respond = () =>
       Response.json({ code: 'INVALID_TOKEN', message: 'Invalid token' }, { status: 400 });
     const onPasswordReset = mock(() => {});
-    const onRequestPasswordReset = mock(() => {});
+    const onForgotPasswordClick = mock(() => {});
     const view = render(
       <ResetPasswordForm
         token="used-token"
         onPasswordReset={onPasswordReset}
-        onRequestPasswordReset={onRequestPasswordReset}
+        onForgotPasswordClick={onForgotPasswordClick}
       />,
     );
     submit(view, 'brand-new-password');
@@ -100,12 +100,12 @@ describe('ResetPasswordForm', () => {
     expect(view.queryByLabelText('New password')).toBeNull();
     expect(onPasswordReset).not.toHaveBeenCalled();
     fireEvent.click(view.getByRole('button', { name: 'Send a new link' }));
-    expect(onRequestPasswordReset).toHaveBeenCalledTimes(1);
+    expect(onForgotPasswordClick).toHaveBeenCalledTimes(1);
   });
 
   test('without a token the page goes straight to the new-link offer', () => {
     const view = render(
-      <ResetPasswordForm onPasswordReset={() => {}} onRequestPasswordReset={() => {}} />,
+      <ResetPasswordForm onPasswordReset={() => {}} onForgotPasswordClick={() => {}} />,
     );
     expect(view.getByRole('button', { name: 'Send a new link' })).not.toBeNull();
     expect(view.queryByLabelText('New password')).toBeNull();
@@ -118,7 +118,7 @@ describe('ResetPasswordForm', () => {
       <ResetPasswordForm
         token="reset-token"
         onPasswordReset={() => {}}
-        onRequestPasswordReset={() => {}}
+        onForgotPasswordClick={() => {}}
       />,
     );
     submit(view, 'brand-new-password');
