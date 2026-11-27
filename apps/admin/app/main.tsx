@@ -7,10 +7,13 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { initializeBrowserTelemetry, reportBrowserError } from '@template/ui/lib/browserTelemetry';
 import { createAppQueryClient } from '@template/ui/lib/createAppQueryClient';
+import { registerBundledIconCollections } from '@template/ui/lib/icons/registerBundledIconCollections';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { routeTree } from '#/routeTree.gen';
 import '@template/shared/styles/theme.css';
+
+registerBundledIconCollections();
 
 void initializeBrowserTelemetry('admin');
 

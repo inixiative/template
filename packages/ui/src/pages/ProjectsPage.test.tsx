@@ -30,6 +30,7 @@ import { ProjectsPage } from '@template/ui/pages/ProjectsPage';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { keyBy } from 'lodash-es';
 
 const initialState = useAppStore.getState();
 
@@ -112,18 +113,13 @@ const installRealSession = async (opts: {
     auth: {
       ...state.auth,
       user: opts.user as unknown as typeof state.auth.user,
-      organizations: Object.fromEntries(
-        organizations.map((org) => [org.id, org]),
-      ) as unknown as typeof state.auth.organizations,
-      organizationUsers: Object.fromEntries(
-        organizationUsers.map((member) => [member.organizationId, member]),
+      organizations: keyBy(organizations, 'id') as unknown as typeof state.auth.organizations,
+      organizationUsers: keyBy(
+        organizationUsers,
+        'organizationId',
       ) as unknown as typeof state.auth.organizationUsers,
-      spaces: Object.fromEntries(
-        spaces.map((space) => [space.id, space]),
-      ) as unknown as typeof state.auth.spaces,
-      spaceUsers: Object.fromEntries(
-        spaceUsers.map((member) => [member.spaceId, member]),
-      ) as unknown as typeof state.auth.spaceUsers,
+      spaces: keyBy(spaces, 'id') as unknown as typeof state.auth.spaces,
+      spaceUsers: keyBy(spaceUsers, 'spaceId') as unknown as typeof state.auth.spaceUsers,
       isAuthenticated: true,
     },
     tenant: { ...state.tenant, context: opts.context },

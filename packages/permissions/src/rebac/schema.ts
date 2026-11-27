@@ -7,24 +7,31 @@
 import { Operator } from '@inixiative/json-rules';
 import { ContactSource, IntegrationResourceStatus } from '@template/db/generated/client/enums';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
+import {
+  artifactPermissionResourcePermission,
+  artifactPlacementResourcePermission,
+  artifactResourcePermission,
+} from '@template/permissions/rebac/artifactResourcePermission';
 import { inquiryResourcePermission } from '@template/permissions/rebac/inquiryResourcePermission';
 import {
-  actionsForRecordOwnedByAnyOwnerModel,
   actorIsDelegateOfUser,
   actorIsUser,
   actorMayCreateTokenAtOwnerWithRole,
+  actorMayPerformActionOnOwner,
   actorOperatesOwnerUserOrManagesOwnerTenant,
   chainedStandardActions,
   integrationAccess,
   integrationAdministering,
   isNull,
   memberRowActions,
+  ownerAccessOperateBranches,
+  ownerAccessReadBranches,
   ownerActions,
   rowIsThereAnd,
   tokenAdministering,
 } from '@template/permissions/rebac/rebacSchemaRules';
 import { settingResourcePermission } from '@template/permissions/rebac/settingResourcePermission';
-import type { SchemaMap } from '@template/permissions/rebac/types';
+import type { ActionRule, SchemaMap } from '@template/permissions/rebac/types';
 import { omit } from 'lodash-es';
 
 export const schemaMap: SchemaMap = {
@@ -120,7 +127,13 @@ export const schemaMap: SchemaMap = {
         delete: { any: ['manage', { rel: 'integration', action: 'delete' }] },
       },
     },
-    'db:Project': { actions: actionsForRecordOwnedByAnyOwnerModel },
+    'db:Project': {
+      actions: {
+        ...omit(integrationAdministering, 'delegateFull'),
+        operate: { any: ownerAccessOperateBranches() },
+        read: { any: ownerAccessReadBranches() },
+      },
+    },
     'db:ProjectIntegration': {
       actions: {
         create: {
@@ -165,6 +178,9 @@ export const schemaMap: SchemaMap = {
       },
     },
     'db:Setting': settingResourcePermission,
+    'db:Artifact': artifactResourcePermission,
+    'db:ArtifactPermission': artifactPermissionResourcePermission,
+    'db:ArtifactPlacement': artifactPlacementResourcePermission,
     'db:Flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:OrganizationUser': { actions: memberRowActions('organization') },

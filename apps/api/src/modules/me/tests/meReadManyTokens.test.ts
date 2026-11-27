@@ -11,6 +11,7 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
+import { keyBy } from 'lodash-es';
 import { meRouter } from '#/modules/me';
 import type { meReadManyTokensRoute } from '#/modules/me/routes/meReadManyTokens';
 import { createTestApp } from '#tests/createTestApp';
@@ -109,7 +110,7 @@ describe('GET /me/tokens', () => {
     const { data } = await parseSuccessBody<ReadManyTokensResponse>(response);
 
     expect(response.status).toBe(200);
-    const byName = Object.fromEntries(data.map((t) => [t.name, t]));
+    const byName = keyBy(data, 'name');
     expect(byName['Membership Token']).toMatchObject({
       ownerModel: 'OrganizationUser',
       organization: { id: org.id },

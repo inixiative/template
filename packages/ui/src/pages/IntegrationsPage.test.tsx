@@ -335,25 +335,27 @@ describe('IntegrationsPage', () => {
       await buildStoredIntegrationRow('Workspace', 'notion'),
     ];
 
-    const view = renderPage();
+    renderPage();
     await screen.findByText('My notes');
     expect(screen.queryByText('Personal')).toBeNull();
 
-    setTenantContextAndStubManagePermission(
-      { type: 'organization', organization } as unknown as TenantContext,
-      true,
+    act(() =>
+      setTenantContextAndStubManagePermission(
+        { type: 'organization', organization } as unknown as TenantContext,
+        true,
+      ),
     );
-    view.rerender(pageElement());
     await waitFor(() => expect(ownerSection('tenant').getByText('Company')).toBeTruthy());
     expect(ownerSection('personal').getByText('Personal')).toBeTruthy();
     expect(ownerSection('personal').getByText('My notes')).toBeTruthy();
     expect(ownerSection('tenant').queryByText('My notes')).toBeNull();
 
-    setTenantContextAndStubManagePermission(
-      { type: 'space', organization, space } as unknown as TenantContext,
-      true,
+    act(() =>
+      setTenantContextAndStubManagePermission(
+        { type: 'space', organization, space } as unknown as TenantContext,
+        true,
+      ),
     );
-    view.rerender(pageElement());
     await waitFor(() => expect(ownerSection('tenant').getByText('Workspace')).toBeTruthy());
     expect(screen.queryByText('Company')).toBeNull();
     expect(ownerSection('personal').getByText('My notes')).toBeTruthy();

@@ -12,7 +12,7 @@ import {
   registerDbHook,
   SOFT_DELETE_MODELS,
 } from '@template/db';
-import { castArray } from 'lodash-es';
+import { changedPairs } from '#/hooks/shared/hookRows';
 import { reviveChildren, tombstoneChildren } from '#/hooks/softDeleteCascade/cascade';
 import { validateDeleteBehavior } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
 
@@ -36,18 +36,14 @@ export const registerSoftDeleteCascadeHook = () => {
     SOFT_DELETE_MODELS,
     HookTiming.after,
     [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
-    async ({ model, action, args, result, previous }: HookOptions) => {
+    async (options: HookOptions) => {
+      const { model, action, args } = options;
       const data = (
         action === DbAction.upsert
           ? (args as { update?: Row }).update
           : (args as { data?: Row }).data
       ) as Row | undefined;
       if (!data || !('deletedAt' in data)) return;
-
-      const previousById = new Map(
-        (castArray(previous ?? []) as Row[]).map((row) => [row.id, row]),
-      );
-      const priorStamp = (row: Row): unknown => previousById.get(row.id)?.deletedAt;
 
       const groups = new Map<string, { stamp: unknown; rows: Row[] }>();
       const addTo = (stamp: unknown, row: Row) => {
@@ -59,9 +55,10 @@ export const registerSoftDeleteCascadeHook = () => {
 
       const isReviving =
         applyWriteDataOverPreviousRow(undefined, { deletedAt: data.deletedAt }).deletedAt === null;
-      for (const row of castArray(result) as Row[]) {
-        if (isReviving && priorStamp(row) != null) addTo(priorStamp(row), row);
-        if (!isReviving && row.deletedAt != null && priorStamp(row) == null)
+      for (const { result: row, previous } of changedPairs(options)) {
+        if (!row) continue;
+        if (isReviving && previous?.deletedAt != null) addTo(previous.deletedAt, row);
+        if (!isReviving && row.deletedAt != null && previous?.deletedAt == null)
           addTo(row.deletedAt, row);
       }
 

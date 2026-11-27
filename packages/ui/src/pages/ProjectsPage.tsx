@@ -6,6 +6,7 @@
  */
 import { Icon } from '@iconify/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { List } from '@template/ui/components';
 import { Modal } from '@template/ui/components/layout/Modal';
 import { Page } from '@template/ui/components/layout/Page';
 import {
@@ -196,35 +197,30 @@ const ProjectOwnerSection = ({
           ) : null}
         </CardHeader>
         <CardContent>
-          {projectsQuery.isLoading ? (
-            <div className="h-16 animate-pulse rounded-md bg-muted/50" />
-          ) : projects.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No projects yet.</p>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {projects.map((project) => (
-                <li key={project.id} className="flex items-center justify-between gap-4 px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{project.name}</p>
-                    {project.description ? (
-                      <p className="truncate text-xs text-muted-foreground">
-                        {project.description}
-                      </p>
-                    ) : null}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onOpenProject(project)}
-                  >
-                    Open
-                    <Icon icon="lucide:arrow-right" className="ml-1.5 h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <List
+            items={projects}
+            isLoading={projectsQuery.isLoading}
+            emptyMessage="No projects yet."
+            renderItem={(project) => (
+              <li key={project.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{project.name}</p>
+                  {project.description ? (
+                    <p className="truncate text-xs text-muted-foreground">{project.description}</p>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onOpenProject(project)}
+                >
+                  Open
+                  <Icon icon="lucide:arrow-right" className="ml-1.5 h-4 w-4" />
+                </Button>
+              </li>
+            )}
+          />
         </CardContent>
       </Card>
 

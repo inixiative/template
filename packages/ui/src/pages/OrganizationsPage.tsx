@@ -24,6 +24,7 @@ import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { canActOnRecordIfPresent } from '@template/ui/lib/canActOnRecordIfPresent';
 import { useAppStore } from '@template/ui/store';
+import { countBy } from 'lodash-es';
 import { useMemo, useState } from 'react';
 
 type Organization = NonNullable<MeReadManyOrganizationsResponse>['data'][number];
@@ -37,13 +38,10 @@ export const OrganizationsPage = () => {
   const spaces = useAppStore((state) => state.auth.spaces);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const spaceCountByOrg = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const space of Object.values(spaces ?? {})) {
-      counts[space.organizationId] = (counts[space.organizationId] ?? 0) + 1;
-    }
-    return counts;
-  }, [spaces]);
+  const spaceCountByOrg = useMemo(
+    () => countBy(Object.values(spaces ?? {}), 'organizationId'),
+    [spaces],
+  );
 
   const { data, isLoading } = useQuery({
     queryKey: meReadManyOrganizationsQueryKey(),
@@ -154,24 +152,21 @@ export const OrganizationsPage = () => {
           </Button>
         }
       >
-        {isLoading ? (
-          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-        ) : (
-          <Table
-            columns={columns}
-            data={organizations}
-            keyExtractor={(org) => org.id}
-            onRowClick={(org: Organization) =>
-              navigateKeepingSearchParams(`/dashboard?org=${org.id}`, 'spoof')
-            }
-            emptyMessage="You don't belong to any organizations yet"
-            empty={{
-              icon: 'lucide:building-2',
-              description: 'Create one to share members, spaces and settings with other people.',
-              action: { label: 'Create organization', onClick: () => setIsCreateModalOpen(true) },
-            }}
-          />
-        )}
+        <Table
+          columns={columns}
+          data={organizations}
+          keyExtractor={(org) => org.id}
+          onRowClick={(org: Organization) =>
+            navigateKeepingSearchParams(`/dashboard?org=${org.id}`, 'spoof')
+          }
+          emptyMessage="You don't belong to any organizations yet"
+          empty={{
+            icon: 'lucide:building-2',
+            description: 'Create one to share members, spaces and settings with other people.',
+            action: { label: 'Create organization', onClick: () => setIsCreateModalOpen(true) },
+          }}
+          isLoading={isLoading}
+        />
       </Page>
 
       <CreateOrganizationModal

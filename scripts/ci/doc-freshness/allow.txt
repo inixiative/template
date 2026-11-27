@@ -42,6 +42,7 @@ docs/claude/DATABASE.md	FooType
 docs/claude/DATABASE.md	memberInvitation
 docs/claude/DATABASE.md	packages/db/prisma/migrations/
 docs/claude/DOCUMENTATION.md	entitlements.ts
+docs/claude/DOMAIN-DOCS.md	knowledge.md
 docs/claude/DOMAIN-DOCS.md	docs/primitives/README.md
 docs/claude/DOMAIN-DOCS.md	buildX
 docs/claude/DOMAIN-DOCS.md	createX

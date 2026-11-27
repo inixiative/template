@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { CronJobScalarSchema, OrganizationScalarSchema } from '@template/db';
-import type { CronJob, Organization, User } from '@template/db/generated/client/client';
+import { CronJobScalarSchema, OrganizationScalarSchema, TokenScalarSchema } from '@template/db';
+import type { CronJob, Organization, Token, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createCronJob,
   createOrganization,
+  createToken,
   createUser,
 } from '@template/db/test';
 import { contextResource } from '#/lib/context/contextResource';
@@ -73,6 +74,16 @@ const orgReviveController = makeController(orgReviveRoute, async (c, respond) =>
   return respond.ok(revived);
 });
 
+const tokenReadRoute = readRoute({
+  model: Modules.token,
+  responseSchema: TokenScalarSchema,
+});
+
+const tokenReadController = makeController(tokenReadRoute, async (c, respond) => {
+  const resource = contextResource<'token'>(c);
+  return respond.ok(resource);
+});
+
 const mountRoutes: MountFn = (app) => {
   const orgRouter = app.basePath('/api/v1/organization');
   orgRouter.openapi(orgReadRoute, orgReadController);
@@ -80,6 +91,7 @@ const mountRoutes: MountFn = (app) => {
   orgRouter.openapi(orgReviveRoute, orgReviveController);
 
   app.basePath('/api/v1/cronJob').openapi(cronJobReadRoute, cronJobReadController);
+  app.basePath('/api/v1/token').openapi(tokenReadRoute, tokenReadController);
 
   const adminRouter = app.basePath('/api/admin');
   adminRouter.use('*', validateSuperadmin);
@@ -154,6 +166,24 @@ describe('resourceContextMiddleware', () => {
     expect(response.status).toBe(200);
     const { data } = await parseSuccessBody<Organization>(response);
     expect(data.id).toBe(org.id);
+  });
+
+  it('rejects lookup on sensitive, relation, non-string, or unknown fields with 400', async () => {
+    const { entity: token } = await createToken({ ownerModel: 'User', userId: user.id });
+
+    expect(
+      (await fetch(get(`/api/v1/token/${encodeURIComponent(token.keyHash)}?lookup=keyHash`)))
+        .status,
+    ).toBe(400);
+    expect((await fetch(get(`/api/v1/organization/${org.id}?lookup=spaces`))).status).toBe(400);
+    expect((await fetch(get(`/api/v1/organization/${org.id}?lookup=createdAt`))).status).toBe(400);
+    expect((await fetch(get(`/api/v1/organization/${org.id}?lookup=notAColumn`))).status).toBe(400);
+    expect((await fetch(get(`/api/v1/organization/${org.id}?lookup=constructor`))).status).toBe(
+      400,
+    );
+    const byName = await fetch(get(`/api/v1/token/${encodeURIComponent(token.name)}?lookup=name`));
+    expect(byName.status).toBe(200);
+    expect((await parseSuccessBody<Token>(byName)).data.id).toBe(token.id);
   });
 
   it('returns 404 for a soft-deleted resource when the caller is not a superadmin', async () => {

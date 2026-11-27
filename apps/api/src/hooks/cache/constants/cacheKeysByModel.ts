@@ -6,6 +6,7 @@
  */
 import type { ModelTypeMap, Prisma } from '@template/db';
 import { cacheKey } from '@template/db';
+import { ownerRootCacheKey } from '#/modules/artifact/services/artifactOwner';
 
 type CacheKeysByModel = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => string[] };
 
@@ -15,6 +16,11 @@ export const cacheKeysByModel: CacheKeysByModel = {
   Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
 
   Integration: (r) => [cacheKey('integration', r.id)],
+
+  Artifact: (r) => [
+    cacheKey('artifact', r.id),
+    ...(r.kind === 'root' ? [ownerRootCacheKey(r)] : []),
+  ],
 
   Setting: (r) => [
     cacheKey('setting', r.id),

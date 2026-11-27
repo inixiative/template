@@ -7,6 +7,7 @@
 import { db, revive } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import type { OwnerScope } from '@template/email/render/types';
+import { omit } from 'lodash-es';
 
 type ScopedEmailRow = {
   emailComponent: EmailComponent;
@@ -46,7 +47,7 @@ export const saveScopedRow = async <Model extends keyof ScopedEmailRow>(
 
   const naturalKey = { slug: input.slug, locale: input.locale, ...scope };
   const data = { ...input, ...scope } as Partial<Row>;
-  const { id: _inputId, ...keptData } = data as Partial<Row> & { id?: string };
+  const keptData = omit(data, 'id') as Partial<Row>;
 
   const notDeleted = await delegate.findFirst({ where: { ...naturalKey, deletedAt: null } });
   if (notDeleted)

@@ -6,6 +6,7 @@
  */
 import { dialect } from '@template/db/lens';
 import { JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';
+import { mapValues, pickBy } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
@@ -29,27 +30,20 @@ const toSegments = (value: BracketQueryValue): string[] => {
 export const buildJsonWhere = (
   input: BracketQueryRecord,
   fieldPath: string,
-): Record<string, unknown> => {
-  const out: Record<string, unknown> = {};
-  for (const [op, value] of Object.entries(input)) {
-    if (value === undefined) continue;
-    if (op === 'path') {
-      out.path = dialect.jsonPath(toSegments(value));
-      continue;
-    }
-    if (!JSON_VALUE_OPERATORS.has(op)) {
-      throw makeError({
-        status: 400,
-        message: `Operator '${op}' is not valid for json field '${fieldPath}'. Valid: path, ${JSON_FIELD_OPERATORS.join(', ')}.`,
-      });
-    }
-    // null on a json field → is-null, matched per provider (dialect.jsonNull).
-    out[op] =
-      value === null
-        ? dialect.jsonNull
-        : JSON_PATTERN_OPERATORS.has(op) && typeof value === 'string'
-          ? escapeLikePattern(value)
-          : value;
-  }
-  return out;
-};
+): Record<string, unknown> =>
+  mapValues(
+    pickBy(input, (value): value is BracketQueryValue => value !== undefined),
+    (value, op) => {
+      if (op === 'path') return dialect.jsonPath(toSegments(value));
+      if (!JSON_VALUE_OPERATORS.has(op)) {
+        throw makeError({
+          status: 400,
+          message: `Operator '${op}' is not valid for json field '${fieldPath}'. Valid: path, ${JSON_FIELD_OPERATORS.join(', ')}.`,
+        });
+      }
+      if (value === null) return dialect.jsonNull;
+      return JSON_PATTERN_OPERATORS.has(op) && typeof value === 'string'
+        ? escapeLikePattern(value)
+        : value;
+    },
+  );

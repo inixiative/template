@@ -30,6 +30,7 @@ import { stringifyLogValue } from '@template/shared/logger/maskLogValue';
 import { observeLogRecords } from '@template/shared/logger/records';
 import { signalExportOptions, type TelemetryConfig } from '@template/shared/telemetry/config';
 import { createFetchExporter } from '@template/shared/telemetry/fetchExporter';
+import { mapValues } from 'lodash-es';
 
 let instance: ReturnType<typeof startTelemetry> | undefined;
 const startTelemetry = (config: TelemetryConfig) => {
@@ -113,13 +114,10 @@ const startTelemetry = (config: TelemetryConfig) => {
       severityText: record.level,
       severityNumber: severity[record.level],
       context: context.active(),
-      attributes: Object.fromEntries(
-        Object.entries(record.fields).map(([key, value]) => [
-          key,
-          typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
-            ? value
-            : stringifyLogValue(value),
-        ]),
+      attributes: mapValues(record.fields, (value) =>
+        typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+          ? value
+          : stringifyLogValue(value),
       ),
     }),
   );

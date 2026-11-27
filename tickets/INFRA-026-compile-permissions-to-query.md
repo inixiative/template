@@ -4,7 +4,7 @@
 **Assignee**: Aron
 **Priority**: Medium (ambitious; the payoff is query-level authz that scales)
 **Created**: 2026-07-02
-**Updated**: 2026-11-20
+**Updated**: 2026-11-25
 
 `@inixiative/permissions` today only **evaluates** — `check(permix, schema, subject, action)` walks a hydrated object graph for one record and returns allow/deny. To answer *"which records can this actor `<action>`?"* you must fetch candidates and `check()` each. This ticket is to **compile** the permission algebra to a query predicate — a Prisma/SQL `WHERE` that selects exactly the authorized rows — so authorization becomes indexable, paginatable, and one round-trip, the same way json-rules compiles a rule to `toPrisma`/`toSql`. This is the authorization analogue of "author once, run three ways," and it's what makes authz scale (no fetch-all-then-filter).
 
@@ -109,3 +109,21 @@ Template works around it by checking stored rules itself before the library read
 What the library should give: a typed error (as `PathLimitError` is) carrying the resource, the action, whether the rule came from the row or from `additionalRules`, and the issues. Then the app catches by class and drops its own pre-check.
 
 Why it matters: a stored rule goes bad after a schema change (a renamed column a tenant's rule reads), and the people who hit it are not the ones who can fix it. The message is the only help they get.
+
+## Two reflections (`toCondition`), access visibility, inheritance, and entitlements
+
+Added 2026-11-25 (Aron: "I think the plan was to make a two-condition adapter. But also, there are two reflections. Give me everyone who can touch this row." / "It's just not trivial now that we have access, artifacts, permissions, and entitlements, right? It's really non-trivial. Especially with inheritance and things like that"). A note, not a build commitment.
+
+Both directions target a `toCondition` adapter emitting a plain `json-rules` `Condition` (handed to `json-rules`'s existing Prisma `where` or in-memory evaluator rather than building a second query compiler):
+
+- **Row reflection (`toCondition` over `row`):** bind `actor` + `action` as constants, leave `row` free → `Condition` on `db:Model` (*"give me every row this actor can touch"*). Eliminates hand-rolled SQL reflection across visibility-aware lists (`accessibleArtifactWhere`, `ownerArtifactPlacementsQuery`, `sharedWithOwnerWhere` in `#72`; `fetchSubmodelAccessWhere` in `#341`).
+- **Actor reflection (`toCondition` over `actor`):** bind `row` + `action` as constants, leave `actor` free → `Condition` on actor models (`db:User`, `db:Token`, etc.) (*"give me everyone who can touch this row"*). Powers WebSocket fan-out audiences, notification/email recipients (`COMM-005`), and access UIs.
+
+Hard complications added since the original ticket (access visibility, artifacts, inheritance, and entitlements):
+
+1. **Asymmetry on stored `Entitlement.where` JSON:** For **row reflection**, the actor's memberships, held `Entitlement` rows (and each row's stored `where` JSON), and tenants are a known finite set at query-build time and can be partially evaluated into constants. For **actor reflection**, arbitrary stored `Entitlement.where` JSON across all holders in Postgres cannot be inverted inside one SQL query — it requires pre-filtering candidate entitlements by anchor/resource and checking their stored `where` in memory, or materializing.
+2. **Recursive inheritance & cycle boundaries:** Folder/tree inheritance (`Artifact` placements + `ArtifactAncestor` / `ArtifactEffectivePermission` in `#72`) and re-delegated `Signet` chains cannot be naively unrolled into unbounded SQL joins. The compiler needs a clean way to recognize or plug in materialized closure tables and bounded depths rather than expanding infinite recursion.
+3. **Live backing chains on entitlements:** An entitlement only grants access while every grantor up its delegation chain still backs the action. Naively compiling grantor checks nests recursive subqueries inside every entitlement `OR` branch unless pre-verified for the actor's finite held entitlements (row reflection) or bounded.
+4. **Record-level `access` + polymorphic fan-out & Postgres query plans:** Models like `Project` (`readAccess` / `operateAccess`, `#341`) and `Artifact` / `ArtifactPlacement` (5-way `ownerModel` × 6-way `granteeModel` × `CustomerRelationship` + placement access, `#72`) combined with entitlements and `tenantPermissionRules` can explode into huge nested `OR`/`EXISTS` trees that Postgres plans poorly unless `toCondition` aggressively folds known constants into `IN (...)` sets and prunes dead branches before calling `json-rules`.
+
+**Recommended staging when picked up:** build **row reflection** (`toCondition` over `row`) first — it is dramatically more tractable because the actor side is finite and already loaded, and it removes 90% of the hand-rolled SQL reflection in apps. Treat **actor reflection** as phase two with explicit pre-filtering + in-memory evaluation for stored `Entitlement.where` JSON.

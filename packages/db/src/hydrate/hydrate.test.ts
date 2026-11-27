@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
-import { fetchCachedRecordWithTargetEntitlements } from '@template/db/hydrate/fetchCachedRecordWithTargetEntitlements';
-import { hydrate } from '@template/db/hydrate/hydrate';
+import {
+  fetchCachedRecordsWithTargetEntitlements,
+  fetchCachedRecordWithTargetEntitlements,
+} from '@template/db/hydrate/fetchCachedRecordWithTargetEntitlements';
+import { hydrate, hydrateMany } from '@template/db/hydrate/hydrate';
 import { cacheKey } from '@template/db/redis/cache/cacheKey';
 import { redisClient } from '@template/db/redis/client';
 import {
@@ -168,5 +171,77 @@ describe('fetchCachedRecordWithTargetEntitlements', () => {
     );
 
     expect(result.organizationUser).toBeUndefined();
+  });
+
+  it('hydrates a batch with hydrateMany sharing hydrated parent objects across rows', async () => {
+    const { entity: tokenA, context } = await createToken({
+      organizationUser: {},
+      ownerModel: TokenOwnerModel.OrganizationUser,
+    });
+    const { entity: tokenB } = await createToken({
+      ownerModel: TokenOwnerModel.OrganizationUser,
+      organizationId: context.organization!.id,
+      userId: context.user!.id,
+    });
+
+    const hydrated = await hydrateMany('token', [
+      {
+        id: tokenA.id,
+        userId: tokenA.userId,
+        organizationId: tokenA.organizationId,
+      },
+      {
+        id: tokenB.id,
+        userId: tokenB.userId,
+        organizationId: tokenB.organizationId,
+      },
+    ]);
+
+    expect(hydrated).toHaveLength(2);
+    expect(hydrated[0]!.organization).toBe(hydrated[1]!.organization);
+    expect(hydrated[0]!.organizationUser).toBe(hydrated[1]!.organizationUser);
+    expect((hydrated[0]!.organization as { id: string }).id).toBe(context.organization!.id);
+  });
+
+  it('batches MGET + findMany in fetchCachedRecordsWithTargetEntitlements and caches hits and misses', async () => {
+    const { entity: userA } = await createUser();
+    const { entity: userB } = await createUser();
+    const { entity: deletedUser } = await createUser();
+    await db.user.update({ where: { id: deletedUser.id }, data: { deletedAt: new Date() } });
+
+    const rows = await db.withDeleted(() =>
+      fetchCachedRecordsWithTargetEntitlements('user', [
+        userA.id,
+        'missing-id',
+        userB.id,
+        deletedUser.id,
+      ]),
+    );
+
+    expect(rows.map((row) => row?.id ?? null)).toEqual([userA.id, null, userB.id, null]);
+    expect(await redisClient().exists(cacheKey('user', userA.id))).toBe(1);
+    expect(await redisClient().exists(cacheKey('user', 'missing-id'))).toBe(1);
+    expect(await redisClient().exists(cacheKey('user', deletedUser.id))).toBe(1);
+
+    // Warm hit path returns identical positional results directly from Redis MGET.
+    const warmRows = await fetchCachedRecordsWithTargetEntitlements('user', [
+      userB.id,
+      'missing-id',
+      userA.id,
+    ]);
+    expect(warmRows.map((row) => row?.id ?? null)).toEqual([userB.id, null, userA.id]);
+
+    // Heterogeneous key shapes, duplicate keys, and corrupt cache payload self-healing.
+    const { entity: userC } = await createUser();
+    const corruptKey = cacheKey('user', userC.id);
+    await redisClient().set(corruptKey, '{not-valid-superjson');
+    const mixed = await fetchCachedRecordsWithTargetEntitlements('user', [
+      userC.id,
+      { email: userB.email },
+      userC.id,
+    ]);
+    expect(mixed.map((row) => row?.id ?? null)).toEqual([userC.id, userB.id, userC.id]);
+    const healedPayload = await redisClient().get(corruptKey);
+    expect(healedPayload).not.toBe('{not-valid-superjson');
   });
 });

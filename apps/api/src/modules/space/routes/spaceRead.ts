@@ -10,6 +10,5 @@ import { Modules } from '#/modules/modules';
 
 export const spaceReadRoute = readRoute({
   model: Modules.space,
-  responseSchema: SpaceScalarSchema,
-  // Public - no auth required
+  responseSchema: SpaceScalarSchema.omit({ tenantPermissionRules: true }).strip(),
 });

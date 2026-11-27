@@ -83,8 +83,8 @@ route with the socket's sanitized credentials. Only a 2xx grants the subscriptio
 sends `subscribed` or `subscribeRejected`; the frontend removes rejected channels from its
 desired set.
 
-Channels are authorized on subscribe and dropped whenever the connection's user or credential
-changes. They carry hints, not data, so they are not re-authorized per message.
+Channels are authorized on subscribe, dropped whenever the connection's user or credential
+changes, and periodically re-authorized alongside open streams on the same 45-second interval.
 
 ## Connection and recovery
 
@@ -236,10 +236,10 @@ default page size). `routeAccessOf` classifies every other status: 429 and 5xx a
 **retryable** and answer `error` with `retryable: true`; anything else is a **rejection** and
 answers `openRejected`.
 
-Open streams are re-authorized. `startReauthorizeOpenStreamsInterval` (started at API boot) re-probes
-every open stream every 45 seconds through the cheap `x-auth-probe` path (middleware runs, the
+Open streams and subscribed channels are re-authorized. `startReauthorizeOpenStreamsInterval` (started at API boot) re-probes
+every open stream and subscribed channel every 45 seconds through the cheap `x-auth-probe` path (middleware runs, the
 controller does not) with the connection's credential. A rejection closes the stream with
-`openRejected`; a retryable status closes it with a retryable `error`. The re-authorization runs on each
+`openRejected` or evicts the channel with `subscribeRejected`; a retryable status drops it with a retryable `error`. The re-authorization runs on each
 connection's serialized queue and never queues a second recheck behind an unfinished one. Its
 probes carry a server-only system probe secret that every rate limit exempts, so the re-authorization
 spends no caller's or organization's HTTP budget; client-driven opens and subscribes still count.

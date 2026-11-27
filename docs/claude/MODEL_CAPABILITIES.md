@@ -63,6 +63,11 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Account | - | - | - | - | - | - | - | sensitive | - | - | - | - | - |
 | AppEvent | - | - | - | - | - | - | - | - | - | - | - | - | - |
+| Artifact | soft | yes | ownerModel | - | - | - | - | noop, immutable-override | yes | - | yes | - | yes |
+| ArtifactAncestor | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | - |
+| ArtifactEffectivePermission | hard-on-tombstone | - | - | Artifact (artifactId) | - | - | - | - | - | - | - | - | - |
+| ArtifactPermission | soft | yes | granteeModel | Artifact (artifactId) | - | - | - | immutable-override | yes | - | - | - | yes |
+| ArtifactPlacement | hard-on-tombstone, regen-on-revive | yes | - | Artifact (containerArtifactId) | - | - | - | immutable-override | - | - | - | - | yes |
 | AuditLog | - | - | subjectModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | AuthProvider | soft | yes | - | - | - | yes | - | sensitive | - | - | - | - | yes |
 | CommunicationComponentVersion | - | - | - | - | - | - | - | - | - | - | - | - | - |
@@ -73,6 +78,8 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 | EmailComponent | soft | yes | ownerModel | - | - | - | - | noop, immutable-override | yes | yes | - | - | - |
 | EmailTemplate | soft | yes | ownerModel | - | - | - | - | noop, immutable-override | yes | yes | - | - | - |
 | Entitlement | soft, cascade-exempt | yes | sourceModel, targetModel | axis: targetModel | - | - | - | immutable-override | yes | yes | - | - | - |
+| File | soft, cascade-exempt | - | - | - | - | - | - | - | - | - | - | - | - |
+| FileVersion | soft | - | - | - | - | - | - | - | - | - | - | - | - |
 | Flow | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | yes |
 | Inquiry | soft, close-on-parent-delete | yes | sourceModel, targetModel | - | - | - | - | immutable-override | yes | - | - | - | yes |
 | Integration | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | - | yes | - | yes |
@@ -86,6 +93,7 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 | Project | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | yes |
 | ProjectIntegration | soft | yes | - | Project (projectId) | - | - | - | immutable-override | - | - | - | - | yes |
 | ProjectIntegrationResource | soft | yes | - | - | - | - | - | - | - | - | - | - | yes |
+| ResourceBinding | soft, cascade-exempt | - | sourceModel, resourceModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | RuleReference | hard-on-tombstone, regen-on-revive, cascade-exempt | - | sourceModel, targetModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | Segment | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | yes | - | - | yes |
 | SegmentMember | soft | - | - | - | - | - | - | - | - | - | - | - | yes |

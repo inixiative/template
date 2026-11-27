@@ -1,0 +1,55 @@
+model ArtifactPermission {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  artifactId String   @db.VarChar(36)
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  granteeModel                  ArtifactPermissionGranteeModel
+  granteeUserId                 String?                        @db.VarChar(36)
+  granteeOrganizationId         String?                        @db.VarChar(36)
+  granteeSpaceId                String?                        @db.VarChar(36)
+  granteeCustomerRelationshipId String?                        @db.VarChar(36)
+
+  granteeUser                 User?                 @relation("ArtifactPermissionGranteeUser", fields: [granteeUserId], references: [id], onDelete: Cascade)
+  granteeOrganization         Organization?         @relation("ArtifactPermissionGranteeOrganization", fields: [granteeOrganizationId], references: [id], onDelete: Cascade)
+  granteeSpace                Space?                @relation("ArtifactPermissionGranteeSpace", fields: [granteeSpaceId], references: [id], onDelete: Cascade)
+  granteeOrganizationUser     OrganizationUser?     @relation("ArtifactPermissionGranteeOrganizationUser", fields: [granteeOrganizationId, granteeUserId], references: [organizationId, userId], onDelete: Cascade)
+  granteeSpaceUser            SpaceUser?            @relation("ArtifactPermissionGranteeSpaceUser", fields: [granteeOrganizationId, granteeSpaceId, granteeUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  granteeCustomerRelationship CustomerRelationship? @relation("ArtifactPermissionGranteeCustomerRelationship", fields: [granteeCustomerRelationshipId], references: [id], onDelete: Cascade)
+
+  role             Role
+  expiresAt        DateTime?
+  fromVersion      Int       @default(1)
+  preserveOnRevoke Boolean   @default(false)
+
+  artifactEffectivePermissions ArtifactEffectivePermission[]
+  auditLogs                    AuditLog[]
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([artifactId, granteeUserId], where: raw("\"granteeModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_user_key")
+  @@unique([artifactId, granteeOrganizationId], where: raw("\"granteeModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_organization_key")
+  @@unique([artifactId, granteeSpaceId], where: raw("\"granteeModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_space_key")
+  @@unique([artifactId, granteeOrganizationId, granteeUserId], where: raw("\"granteeModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_organization_user_key")
+  @@unique([artifactId, granteeSpaceId, granteeUserId], where: raw("\"granteeModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_space_user_key")
+  @@unique([artifactId, granteeCustomerRelationshipId], where: raw("\"granteeModel\" = 'CustomerRelationship' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_customer_relationship_key")
+  @@index([artifactId])
+  @@index([granteeModel, granteeUserId])
+  @@index([granteeModel, granteeOrganizationId])
+  @@index([granteeModel, granteeSpaceId])
+  @@index([granteeModel, granteeCustomerRelationshipId])
+}
+
+enum ArtifactPermissionGranteeModel {
+  User
+  Organization
+  Space
+  OrganizationUser
+  SpaceUser
+  CustomerRelationship
+}

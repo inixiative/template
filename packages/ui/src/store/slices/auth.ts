@@ -4,6 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
+import type { QueryClient } from '@tanstack/react-query';
 import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { signIn as signInFn } from '@template/ui/lib/auth/signIn';
@@ -11,10 +12,29 @@ import { signUp as signUpFn } from '@template/ui/lib/auth/signUp';
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
 import { clearToken, fetchStoredTokenAndClearIfExpired } from '@template/ui/lib/auth/token';
 import type { AuthMethod } from '@template/ui/lib/auth/types';
+import { MASTER_DATA_ENTRIES } from '@template/ui/lib/masterData/registry';
 import type { AppStore } from '@template/ui/store/types';
 import type { AuthSlice } from '@template/ui/store/types/auth';
 import { createAuthClient } from 'better-auth/client';
 import type { StateCreator } from 'zustand';
+
+const MASTER_DATA_QUERY_IDS: ReadonlySet<string> = new Set(
+  MASTER_DATA_ENTRIES.map(
+    (entry) => (entry.queryKey[0] as { _id?: string } | undefined)?._id,
+  ).filter((id): id is string => Boolean(id)),
+);
+
+const clearAuthenticatedQueries = (queryClient: QueryClient | null): void => {
+  queryClient?.removeQueries({
+    predicate: (query) => {
+      if (query.meta?.public === true) return false;
+      const first = query.queryKey[0];
+      const id =
+        typeof first === 'object' && first !== null ? (first as { _id?: unknown })._id : undefined;
+      return !(typeof id === 'string' && MASTER_DATA_QUERY_IDS.has(id));
+    },
+  });
+};
 
 export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, get) => {
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -51,6 +71,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
     }));
     get().permissions.clear();
     get().tenant.switchToPublicContext();
+    clearAuthenticatedQueries(get().queryClient);
   };
 
   return {
@@ -86,13 +107,18 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       },
 
       refreshMe: async () => {
-        await fetchAndHydrateMe(set, get);
+        const previousUserId = get().auth.user?.id ?? null;
+        const user = await fetchAndHydrateMe(set, get);
+        if (previousUserId && previousUserId !== user.id) {
+          clearAuthenticatedQueries(get().queryClient);
+        }
         syncWsAuth();
       },
 
       signIn: async (method: AuthMethod) => {
         const result = await signInFn(method);
         if (result.status === 'authenticated') {
+          clearAuthenticatedQueries(get().queryClient);
           await fetchAndHydrateMe(set, get);
           syncWsAuth();
         }
@@ -117,6 +143,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         const result = await signUpFn(method);
         if (result.status === 'verification-pending') clearLocalAuth();
         if (result.status === 'authenticated') {
+          clearAuthenticatedQueries(get().queryClient);
           await fetchAndHydrateMe(set, get);
           syncWsAuth();
         }
@@ -133,6 +160,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         })),
 
       setSpoof: async (email: string | null) => {
+        clearAuthenticatedQueries(get().queryClient);
         set((state: AppStore) => ({ auth: { ...state.auth, spoofUserEmail: email } }));
         await fetchAndHydrateMe(set, get);
         const token = fetchStoredTokenAndClearIfExpired();

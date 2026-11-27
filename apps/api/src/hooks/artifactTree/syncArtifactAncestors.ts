@@ -1,0 +1,130 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:files
+ * @uses infrastructure:prisma, primitive:caching
+ */
+import { db } from '@template/db';
+import type { OperateAccess, ReadAccess } from '@template/db/generated/client/enums';
+import {
+  fetchArtifactTreeAround,
+  fetchDescendantIds,
+  type TreeAround,
+} from '#/hooks/artifactTree/fetchArtifactTreeAround';
+import {
+  type AncestorEdge,
+  type EffectiveAccess,
+  resolveArtifactTree,
+  syncAncestors,
+} from '#/hooks/artifactTree/syncAncestors';
+import { syncJoinRows } from '#/hooks/artifactTree/syncJoinRows';
+import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
+
+const syncEffectivePermissions = async (
+  artifactIds: string[],
+  { artifacts, externalParents }: TreeAround,
+  desiredByArtifact: Map<string, Map<string, AncestorEdge>>,
+): Promise<void> => {
+  const existing = await db.artifactEffectivePermission.findMany({
+    where: { artifactId: { in: artifactIds } },
+  });
+  const desired: { artifactId: string; artifactPermissionId: string }[] = [];
+
+  for (const artifactId of artifactIds) {
+    const permissionIds = new Set(
+      artifacts.get(artifactId)?.artifactPermissions.map((p) => p.id) ?? [],
+    );
+    for (const [ancestorId, edge] of desiredByArtifact.get(artifactId) ?? []) {
+      if (!edge.inherits) continue;
+      const internal = artifacts.get(ancestorId);
+      if (internal) {
+        for (const p of internal.artifactPermissions) permissionIds.add(p.id);
+      } else {
+        for (const row of externalParents.get(ancestorId)?.artifactEffectivePermissions ?? []) {
+          permissionIds.add(row.artifactPermissionId);
+        }
+      }
+    }
+    for (const artifactPermissionId of permissionIds) {
+      desired.push({ artifactId, artifactPermissionId });
+    }
+  }
+
+  await syncJoinRows({
+    existing,
+    desired,
+    keyOfExisting: (row) => `${row.artifactId}:${row.artifactPermissionId}`,
+    keyOfDesired: (row) => `${row.artifactId}:${row.artifactPermissionId}`,
+    deleteIds: (ids) => db.artifactEffectivePermission.deleteMany({ where: { id: { in: ids } } }),
+    createRows: (data) => db.artifactEffectivePermission.createManyAndReturn({ data }),
+  });
+};
+
+const syncEffectiveAccess = async (
+  tree: TreeAround,
+  desiredByArtifact: Map<string, EffectiveAccess>,
+): Promise<void> => {
+  const byTarget = new Map<
+    string,
+    {
+      effectiveReadAccess: ReadAccess;
+      effectiveOperateAccess: OperateAccess;
+      ids: string[];
+    }
+  >();
+  const changedIds: string[] = [];
+
+  for (const [id, desired] of desiredByArtifact) {
+    const current = tree.artifacts.get(id);
+    if (
+      current?.effectiveReadAccess !== desired.effectiveReadAccess ||
+      current?.effectiveOperateAccess !== desired.effectiveOperateAccess
+    ) {
+      const key = `${desired.effectiveReadAccess}:${desired.effectiveOperateAccess}`;
+      const bucket = byTarget.get(key) ?? { ...desired, ids: [] };
+      bucket.ids.push(id);
+      byTarget.set(key, bucket);
+      changedIds.push(id);
+    }
+  }
+
+  for (const { effectiveReadAccess, effectiveOperateAccess, ids } of byTarget.values()) {
+    await db.artifact.updateManyAndReturn({
+      where: { id: { in: ids } },
+      data: { effectiveReadAccess, effectiveOperateAccess },
+    });
+  }
+
+  if (changedIds.length > 0) {
+    // why: Artifact.effectiveReadAccess/effectiveOperateAccess are in NOOP_FIELDS so the cache hook skips them.
+    await queueCacheClear(
+      'Artifact',
+      changedIds.map((id) => ({ id })),
+    );
+  }
+};
+
+export const syncArtifactAncestors = async (artifactIds: string[]): Promise<void> => {
+  const uniqueIds = [...new Set(artifactIds)];
+  if (uniqueIds.length === 0) return;
+
+  await db.withoutDeleted(async () => {
+    const descendants = await fetchDescendantIds(uniqueIds);
+    const tree = await fetchArtifactTreeAround([...descendants]);
+    const activeIds = [...tree.artifacts.keys()];
+    if (activeIds.length === 0) return;
+
+    const resolveNode = resolveArtifactTree(tree);
+    const desiredAncestors = new Map<string, Map<string, AncestorEdge>>();
+    const desiredAccess = new Map<string, EffectiveAccess>();
+    for (const id of activeIds) {
+      const { ancestors, effectiveReadAccess, effectiveOperateAccess } = resolveNode(id);
+      desiredAncestors.set(id, ancestors);
+      desiredAccess.set(id, { effectiveReadAccess, effectiveOperateAccess });
+    }
+
+    await syncAncestors(activeIds, desiredAncestors);
+    await syncEffectivePermissions(activeIds, tree, desiredAncestors);
+    await syncEffectiveAccess(tree, desiredAccess);
+  });
+};

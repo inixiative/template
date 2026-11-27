@@ -12,6 +12,6 @@ fi
 bash scripts/lint/check-finder-duplicates.sh
 
 # Vercel and other CI environments need Prisma client generated
-bun run generate:routes
+bun run generate:frontend
 bun --cwd packages/db db:generate
 bun run generate:sdk

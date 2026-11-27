@@ -5,6 +5,7 @@
  * @uses primitive:authz, infrastructure:prisma
  */
 import { type HydratedRecord, hydrate, includeTargetEntitlements } from '@template/db';
+import { omit } from 'lodash-es';
 import { contextResource } from '#/lib/context/contextResource';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
 import { assertNotSuperadminTokenWithTwoFactor } from '#/lib/twoFactor/assertNotSuperadminTokenWithTwoFactor';
@@ -27,9 +28,12 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
   validateDelegateRole(await hydrate('token', { ...token, ...body } as HydratedRecord));
 
   await db.token.update({ where: { id: token.id }, data: body });
-  const { keyHash: _keyHash, ...updated } = await db.token.findUniqueOrThrow({
-    where: { id: token.id },
-    include: includeTargetEntitlements('Token'),
-  });
+  const updated = omit(
+    await db.token.findUniqueOrThrow({
+      where: { id: token.id },
+      include: includeTargetEntitlements('Token'),
+    }),
+    'keyHash',
+  );
   return respond.ok(updated);
 });

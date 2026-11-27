@@ -22,4 +22,21 @@ export const clearSpaceRowCaches = async (spaceId: string, organizationId: strin
       ]);
     }
   }
+  const sharedArtifacts = await db.artifactEffectivePermission.findMany({
+    where: {
+      artifactPermission: {
+        OR: [
+          { granteeSpaceId: spaceId },
+          { granteeCustomerRelationship: { customerSpaceId: spaceId } },
+        ],
+      },
+    },
+    select: { artifactId: true },
+  });
+  if (sharedArtifacts.length > 0) {
+    await queueCacheClear(
+      'Artifact',
+      [...new Set(sharedArtifacts.map((row) => row.artifactId))].map((id) => ({ id })),
+    );
+  }
 };

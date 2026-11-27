@@ -141,9 +141,7 @@ const TokenSection = ({
     </Button>
   );
 
-  const table = isLoading ? (
-    <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-  ) : (
+  const table = (
     <Table
       columns={columns}
       data={tokens}
@@ -154,6 +152,7 @@ const TokenSection = ({
         description: 'Tokens let scripts and integrations call the API on your behalf.',
         action: { label: 'Create token', onClick: () => setIsModalOpen(true) },
       }}
+      isLoading={isLoading}
     />
   );
 

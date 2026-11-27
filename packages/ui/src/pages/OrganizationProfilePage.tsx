@@ -66,21 +66,18 @@ export const OrganizationProfilePage = () => {
 
   return (
     <Page title="Profile" description="Your organization's name and slug">
-      {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-      ) : (
-        <div className="max-w-2xl space-y-6">
-          <ProfileFormCard
-            name={name}
-            onNameChange={setName}
-            slug={slug}
-            onSlugChange={setSlug}
-            showSlug
-            onSave={handleSave}
-            isSaving={updateMutation.isPending}
-          />
-        </div>
-      )}
+      <div className="max-w-2xl space-y-6">
+        <ProfileFormCard
+          isLoading={isLoading}
+          name={name}
+          onNameChange={setName}
+          slug={slug}
+          onSlugChange={setSlug}
+          showSlug
+          onSave={handleSave}
+          isSaving={updateMutation.isPending}
+        />
+      </div>
     </Page>
   );
 };

@@ -10,6 +10,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emitAppEvent } from '#/appEvents/emit';
 import { authPlugins } from '#/lib/auth/authPlugins';
+import { incrementSecondaryStorageKey } from '#/lib/auth/queries/incrementSecondaryStorageKey';
 import { allowedCorsOrigins } from '#/middleware/corsMiddleware';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
@@ -82,6 +83,8 @@ export const auth = betterAuth({
   advanced: {
     database: {
       generateId: () => Bun.randomUUIDv7(),
+      // why: Prisma field encryption replaces jwks.privateKey with encryptedPrivateKey* columns
+      validateSchema: false,
     },
   },
 
@@ -136,6 +139,7 @@ export const auth = betterAuth({
       const value = await redisClient().getdel(`${redisNamespace.session}:${key}`);
       return value ? JSON.parse(value) : null;
     },
+    increment: (key, ttl) => incrementSecondaryStorageKey(key, ttl),
   },
 });
 

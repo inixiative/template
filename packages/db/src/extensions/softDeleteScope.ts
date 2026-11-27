@@ -4,11 +4,11 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { fieldAtPath, modelOf } from '@inixiative/field-map';
+import { type FieldEntry, fieldAtPath, modelOf } from '@inixiative/field-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { hasDeletedAt } from '@template/db/utils/fieldMetadata';
 import { type NodeScope, walkWhere } from '@template/db/utils/whereWalker';
-import { castArray } from 'lodash-es';
+import { castArray, mapValues, pickBy } from 'lodash-es';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
 
@@ -42,10 +42,12 @@ export const notDeletedWhere = (
 ): Record<string, unknown> => walkWhere(model, where, notDeletedAtNode);
 
 const listRelationNames = (model: string): Record<string, true> =>
-  Object.fromEntries(
-    Object.entries(modelOf(prismaMap, model)?.fields ?? {})
-      .filter(([, field]) => field.kind === 'object' && field.isList)
-      .map(([name]) => [name, true as const]),
+  mapValues(
+    pickBy(
+      modelOf(prismaMap, model)?.fields ?? {},
+      (field: FieldEntry) => field.kind === 'object' && field.isList,
+    ),
+    () => true as const,
   );
 
 const notDeletedCount = (model: string, count: unknown): unknown => {
@@ -56,39 +58,28 @@ const notDeletedCount = (model: string, count: unknown): unknown => {
         ? count.select
         : undefined;
   if (!select) return count;
-  const scoped: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(select)) {
+  const scoped = mapValues(select, (value, name) => {
     const field = fieldAtPath(prismaMap, model, name);
     const notDeleted = field ? notDeletedScope(field.type) : undefined;
-    if (!value || !field || !notDeleted) {
-      scoped[name] = value;
-      continue;
-    }
+    if (!value || !field || !notDeleted) return value;
     const entry: Record<string, unknown> =
       value === true ? {} : { ...(value as Record<string, unknown>) };
     entry.where = isPlainObject(entry.where)
       ? notDeletedWhere(field.type, entry.where)
       : notDeleted;
-    scoped[name] = entry;
-  }
+    return entry;
+  });
   return { ...(isPlainObject(count) ? count : {}), select: scoped };
 };
 
 export const notDeletedIncludes = (
   model: string,
   tree: Record<string, unknown>,
-): Record<string, unknown> => {
-  const out: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(tree)) {
-    if (name === '_count') {
-      out[name] = notDeletedCount(model, value);
-      continue;
-    }
+): Record<string, unknown> =>
+  mapValues(tree, (value, name) => {
+    if (name === '_count') return notDeletedCount(model, value);
     const field = fieldAtPath(prismaMap, model, name);
-    if (!value || field?.kind !== 'object') {
-      out[name] = value;
-      continue;
-    }
+    if (!value || field?.kind !== 'object') return value;
     const entry: Record<string, unknown> =
       value === true ? {} : { ...(value as Record<string, unknown>) };
     for (const key of ['include', 'select'] as const) {
@@ -102,7 +93,5 @@ export const notDeletedIncludes = (
         if (notDeleted) entry.where = notDeleted;
       }
     }
-    out[name] = value === true && Object.keys(entry).length === 0 ? true : entry;
-  }
-  return out;
-};
+    return value === true && Object.keys(entry).length === 0 ? true : entry;
+  });

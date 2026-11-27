@@ -61,4 +61,16 @@ describe('GET /api/v1/space/:id', () => {
     expect(data.id).toBe(space.id);
     expect(data.name).toBe(space.name);
   });
+
+  it('omits tenantPermissionRules from the public response', async () => {
+    await testDb.space.update({
+      where: { id: space.id },
+      data: { tenantPermissionRules: { 'db:Contact': { read: true } } },
+    });
+
+    const response = await fetch(get(`/api/v1/space/${space.id}`));
+    expect(response.status).toBe(200);
+    const { data } = await parseSuccessBody<Record<string, unknown>>(response);
+    expect('tenantPermissionRules' in data).toBe(false);
+  });
 });

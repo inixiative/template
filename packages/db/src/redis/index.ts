@@ -2,6 +2,7 @@ export { cacheKey } from './cache/cacheKey';
 export { CACHE_STATES, type CacheCheck, type CacheState } from './cache/cacheStates';
 export { checkCache } from './cache/checkCache';
 export { clearCacheKeysMatchingPattern } from './cache/clearCacheKeysMatchingPattern';
+export { fetchManyThroughCache } from './cache/fetchManyThroughCache';
 export { fetchThroughCache } from './cache/fetchThroughCache';
 export { makeRollingCache } from './cache/rollingCache/makeRollingCache';
 export {

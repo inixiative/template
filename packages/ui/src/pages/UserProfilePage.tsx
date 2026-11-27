@@ -24,20 +24,17 @@ export const UserProfilePage = () => {
 
   return (
     <Page title="Profile" description="Your profile, password and sign-in security">
-      {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-      ) : (
-        <div className="max-w-2xl space-y-6">
-          <ProfileFormCard
-            name={profile?.name ?? ''}
-            canEditName={false}
-            readOnlyMessage="User profile editing coming soon"
-            showThemeSelector
-          />
-          <ChangePasswordCard />
-          <TwoFactorSecurityCard />
-        </div>
-      )}
+      <div className="max-w-2xl space-y-6">
+        <ProfileFormCard
+          isLoading={isLoading}
+          name={profile?.name ?? ''}
+          canEditName={false}
+          readOnlyMessage="User profile editing coming soon"
+          showThemeSelector
+        />
+        <ChangePasswordCard />
+        <TwoFactorSecurityCard />
+      </div>
     </Page>
   );
 };

@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, feature:inquiry
  */
 import { createRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   inquiryCreateBodySchema,
   inquiryCreateServerOwnedKeys,
@@ -19,5 +20,6 @@ export const organizationCreateInquiryRoute = createRoute({
   bodySchema: inquiryCreateBodySchema,
   responseSchema: inquiryResponseSchema,
   sanitizeKeys: inquiryCreateServerOwnedKeys,
+  middleware: [validatePermission('manage')],
   tags: [OpenApiTags.organization, OpenApiTags.inquiry],
 });

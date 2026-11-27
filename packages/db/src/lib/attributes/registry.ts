@@ -9,7 +9,7 @@ import { fetchSettingDefinitionForRow } from '@template/db/lib/settings/fetchSet
 import type { ModelName } from '@template/db/utils/modelNames';
 import { ATTRIBUTE_COLUMN_NAMES } from '@template/shared/attributes';
 import { SETTING_RESOURCE_MODELS, SETTING_TREES, settingAt } from '@template/shared/settings';
-import { lowerFirst, upperFirst } from 'lodash-es';
+import { lowerFirst, mapKeys, mapValues, upperFirst } from 'lodash-es';
 
 /**
  * Registry of Prisma models opting into the 5-column Attribute capability
@@ -54,14 +54,11 @@ export const attributeModelConfig = (
  * Derives `{ ModelName: [locatorField?, ...ATTRIBUTE_COLUMN_NAMES] }` from `ATTRIBUTE_MODELS`
  * (mirroring `encryptedFieldsByModel()`). Keys are PascalCase Prisma model names.
  */
-export const attributeFieldsByModel = (): Record<string, string[]> => {
-  const result: Record<string, string[]> = {};
-  for (const [accessorName, modelConfig] of Object.entries(ATTRIBUTE_MODELS)) {
-    const modelName = upperFirst(accessorName);
-    result[modelName] = [
+export const attributeFieldsByModel = (): Record<string, string[]> =>
+  mapValues(
+    mapKeys(ATTRIBUTE_MODELS, (_config, accessorName) => upperFirst(accessorName)),
+    (modelConfig) => [
       ...(modelConfig.locatorField ? [modelConfig.locatorField] : []),
       ...ATTRIBUTE_COLUMN_NAMES,
-    ];
-  }
-  return result;
-};
+    ],
+  );

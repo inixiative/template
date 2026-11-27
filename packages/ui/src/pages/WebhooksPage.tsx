@@ -115,22 +115,19 @@ export const WebhooksPage = () => {
         </Button>
       }
     >
-      {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-      ) : (
-        <Table
-          columns={columns}
-          data={webhooks}
-          keyExtractor={(item) => item.id}
-          emptyMessage="No webhooks configured yet"
-          empty={{
-            icon: 'lucide:webhook',
-            description:
-              'Webhooks send an HTTP request to your URL whenever a subscribed model changes.',
-            action: { label: 'Create webhook', onClick: () => setIsModalOpen(true) },
-          }}
-        />
-      )}
+      <Table
+        columns={columns}
+        data={webhooks}
+        keyExtractor={(item) => item.id}
+        emptyMessage="No webhooks configured yet"
+        empty={{
+          icon: 'lucide:webhook',
+          description:
+            'Webhooks send an HTTP request to your URL whenever a subscribed model changes.',
+          action: { label: 'Create webhook', onClick: () => setIsModalOpen(true) },
+        }}
+        isLoading={isLoading}
+      />
       <CreateWebhookModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

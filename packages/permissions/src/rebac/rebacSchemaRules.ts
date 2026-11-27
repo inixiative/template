@@ -9,7 +9,6 @@ import { makeKindRules, ruleFieldEqualsPath } from '@inixiative/permissions';
 import { schemaMapWithoutPermissions } from '@template/db/schemaMap';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
-import { omit } from 'lodash-es';
 
 export const privilegedRoles = ['owner', 'admin'];
 export const unprivilegedRoles = roleHierarchy.filter((role) => !privilegedRoles.includes(role));
@@ -86,7 +85,7 @@ export const actorManagesRecordUser = (at = ''): ActionRule => ({
   action: 'manage',
 });
 
-const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
+export const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   any: [
     { all: [rowIsThereAnd('id', isNull('role')), heldAt('read')] },
     ...roleHierarchy.map((role) => ({
@@ -189,10 +188,48 @@ export const integrationAccess = {
   },
 } satisfies Record<string, ActionRule>;
 
-export const actionsForRecordOwnedByAnyOwnerModel = {
-  ...omit(integrationAdministering, 'delegateFull'),
-  ...integrationAccess,
-} satisfies Record<string, ActionRule>;
+export const ownerTenant = (action: 'read' | 'operate', at = ''): ActionRule => ({
+  any: [
+    {
+      all: [
+        ownerModelIsOneOf(['Organization', 'OrganizationUser'], at),
+        { rel: `${at}organization`, action },
+      ],
+    },
+    { all: [ownerModelIsOneOf(['Space', 'SpaceUser'], at), { rel: `${at}space`, action }] },
+  ],
+});
+
+export const ownerPrivateRead = (at = ''): ActionRule => ({
+  any: [
+    at ? { rel: at.slice(0, -1), action: 'manage' } : 'manage',
+    actorMayPerformActionOnOwner('read', at, ['User']),
+    actorMayPerformActionOnOwner('own', at, ['OrganizationUser', 'SpaceUser']),
+  ],
+});
+
+export const ownerAccessOperateBranches = (operateField = 'operateAccess'): ActionRule[] => [
+  'manage',
+  actorMayPerformActionOnOwner('operate', '', ['User']),
+  {
+    all: [
+      { rule: { field: operateField, operator: Operator.equals, value: 'tenant' } },
+      ownerTenant('operate'),
+    ],
+  },
+];
+
+export const ownerAccessReadBranches = (readField = 'readAccess'): ActionRule[] => [
+  'operate',
+  ownerPrivateRead(),
+  { rule: { field: readField, operator: Operator.equals, value: 'public' } },
+  {
+    all: [
+      { rule: { field: readField, operator: Operator.equals, value: 'tenant' } },
+      ownerTenant('read'),
+    ],
+  },
+];
 
 // Read on an integration row, whose owner is never another integration.
 export const integrationRoleWrite: ActionRule = {

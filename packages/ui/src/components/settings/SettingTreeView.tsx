@@ -26,6 +26,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Skeleton,
 } from '@template/ui/components/primitives';
 import { SettingField } from '@template/ui/components/settings/SettingField';
 import { hydrateSettingTargetForPermissions } from '@template/ui/lib/hydrateRecordForPermissions';
@@ -39,7 +40,7 @@ import {
 } from '@template/ui/lib/settingContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-import { lowerFirst } from 'lodash-es';
+import { lowerFirst, omitBy } from 'lodash-es';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
 export type SettingTreeViewProps = (
@@ -188,11 +189,7 @@ export const SettingTreeView = ({
   const handleFieldValidityChange = useCallback((key: string, isValid: boolean) => {
     setInvalidKeys((previous) => {
       if (Boolean(previous[key]) === !isValid) return previous;
-      if (isValid) {
-        const next = { ...previous };
-        delete next[key];
-        return next;
-      }
+      if (isValid) return omitBy(previous, (_v, k) => k === key);
       return { ...previous, [key]: true };
     });
   }, []);
@@ -219,16 +216,8 @@ export const SettingTreeView = ({
     mutationFn: ({ id }: { id: string; key: string }) =>
       queries.delete.mutationFn({ path: { id } }),
     onSuccess: (_data, variables) => {
-      setDrafts((previous) => {
-        const next = { ...previous };
-        delete next[variables.key];
-        return next;
-      });
-      setInvalidKeys((previous) => {
-        const next = { ...previous };
-        delete next[variables.key];
-        return next;
-      });
+      setDrafts((previous) => omitBy(previous, (_v, k) => k === variables.key));
+      setInvalidKeys((previous) => omitBy(previous, (_v, k) => k === variables.key));
       setResetVersion((version) => version + 1);
       setErrorMessage(null);
       setStatusMessage('Setting reset to default');
@@ -240,11 +229,7 @@ export const SettingTreeView = ({
     },
   });
 
-  if (isCatalogLoading) {
-    return <div className="h-24 animate-pulse rounded-xl bg-muted/50" />;
-  }
-
-  if (hideWhenEmpty && items.length === 0) {
+  if (hideWhenEmpty && !isCatalogLoading && items.length === 0) {
     return null;
   }
 
@@ -301,61 +286,57 @@ export const SettingTreeView = ({
   return (
     <Card data-testid={`resource-settings-${queries.resourceModel}`}>
       <CardHeader>
-        <CardTitle>{resolvedTitle}</CardTitle>
+        <Skeleton isLoading={isCatalogLoading && !title}>
+          <CardTitle>{resolvedTitle}</CardTitle>
+        </Skeleton>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
-      <CardContent className="space-y-5">
-        {settingsQuery.isLoading ? (
-          <div className="h-20 animate-pulse rounded-md bg-muted/50" />
-        ) : (
-          <>
-            {root
-              ? renderBranch(root, pathSegments)
-              : itemsByKey.has(pathSegments.join('.'))
-                ? renderField(itemsByKey.get(pathSegments.join('.')) as AssembledSettingItem)
-                : null}
+      <CardContent className="space-y-5" isLoading={isCatalogLoading || settingsQuery.isLoading}>
+        {root
+          ? renderBranch(root, pathSegments)
+          : itemsByKey.has(pathSegments.join('.'))
+            ? renderField(itemsByKey.get(pathSegments.join('.')) as AssembledSettingItem)
+            : null}
 
-            {errorMessage ? (
-              <p role="alert" className="text-sm text-destructive">
-                {errorMessage}
-              </p>
-            ) : null}
-            {statusMessage ? (
-              <p role="status" className="text-sm text-muted-foreground">
-                {statusMessage}
-              </p>
-            ) : null}
+        {errorMessage ? (
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage}
+          </p>
+        ) : null}
+        {statusMessage ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            {statusMessage}
+          </p>
+        ) : null}
 
-            {anyEditable ? (
-              <div className="flex items-center justify-end gap-2 pt-2">
-                {dirtyItems.length > 0 || hasInvalidFields ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={saveMutation.isPending}
-                    onClick={() => {
-                      setDrafts({});
-                      setInvalidKeys({});
-                      setResetVersion((version) => version + 1);
-                      setErrorMessage(null);
-                    }}
-                  >
-                    Discard
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={dirtyItems.length === 0 || hasInvalidFields || saveMutation.isPending}
-                  onClick={() => saveMutation.mutate(dirtyItems)}
-                >
-                  {saveMutation.isPending ? 'Saving…' : 'Save settings'}
-                </Button>
-              </div>
+        {anyEditable ? (
+          <div className="flex items-center justify-end gap-2 pt-2">
+            {dirtyItems.length > 0 || hasInvalidFields ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={saveMutation.isPending}
+                onClick={() => {
+                  setDrafts({});
+                  setInvalidKeys({});
+                  setResetVersion((version) => version + 1);
+                  setErrorMessage(null);
+                }}
+              >
+                Discard
+              </Button>
             ) : null}
-          </>
-        )}
+            <Button
+              type="button"
+              size="sm"
+              disabled={dirtyItems.length === 0 || hasInvalidFields || saveMutation.isPending}
+              onClick={() => saveMutation.mutate(dirtyItems)}
+            >
+              {saveMutation.isPending ? 'Saving…' : 'Save settings'}
+            </Button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -4,19 +4,11 @@
  * @partOf primitive:caching
  * @uses infrastructure:prisma
  */
-import type { HookOptions, ManyAction, SingleAction } from '@template/db';
-import {
-  DbAction,
-  fetchParentRows,
-  HookTiming,
-  isNoOpUpdate,
-  NOOP_FIELDS,
-  type Prisma,
-  registerDbHook,
-} from '@template/db';
-import { groupBy, keyBy } from 'lodash-es';
+import type { HookOptions } from '@template/db';
+import { fetchParentRows, HookTiming, type Prisma, registerDbHook } from '@template/db';
+import { groupBy } from 'lodash-es';
 import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
-import { isManyAction } from '#/hooks/shared/hookRows';
+import { ALL_MUTATION_ACTIONS, changedPairs } from '#/hooks/shared/hookRows';
 
 const queueParentCacheClear = async (
   model: Prisma.ModelName,
@@ -30,52 +22,21 @@ const queueParentCacheClear = async (
     );
 };
 
-const isUpdateAction = (action: DbAction): boolean =>
-  action === DbAction.update || action === DbAction.updateManyAndReturn;
-
 export const registerClearCacheHook = () => {
-  const actions = [
-    DbAction.create,
-    DbAction.update,
-    DbAction.delete,
-    DbAction.upsert,
-    DbAction.createManyAndReturn,
-    DbAction.updateManyAndReturn,
-    DbAction.deleteMany,
-  ];
+  registerDbHook(
+    'clearCache',
+    '*',
+    HookTiming.after,
+    ALL_MUTATION_ACTIONS,
+    async (options: HookOptions) => {
+      const records = changedPairs(options, { skipNoOp: true }).flatMap(({ result, previous }) => [
+        ...(result ? [result] : []),
+        ...(previous ? [previous] : []),
+      ]);
+      if (records.length === 0) return;
 
-  registerDbHook('clearCache', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    const { model, action } = options;
-    const records: Record<string, unknown>[] = [];
-
-    if (isManyAction(action)) {
-      const { result, previous } = options as HookOptions & { action: ManyAction };
-      const results = (result ?? []) as Record<string, unknown>[];
-      const previousById = keyBy(previous, 'id');
-
-      for (const resultData of results) {
-        const previousData = previousById[resultData.id as string];
-
-        if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData, NOOP_FIELDS))
-          continue;
-
-        records.push(resultData);
-        if (previousData) records.push(previousData);
-      }
-    } else {
-      const { result, previous } = options as HookOptions & { action: SingleAction };
-      const resultData = result as Record<string, unknown>;
-      const previousData = previous as Record<string, unknown> | undefined;
-
-      if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData, NOOP_FIELDS)) {
-        return;
-      }
-
-      records.push(resultData);
-      if (previousData) records.push(previousData);
-    }
-
-    await queueCacheClear(model as Prisma.ModelName, records);
-    await queueParentCacheClear(model as Prisma.ModelName, records);
-  });
+      await queueCacheClear(options.model as Prisma.ModelName, records);
+      await queueParentCacheClear(options.model as Prisma.ModelName, records);
+    },
+  );
 };

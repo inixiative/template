@@ -150,15 +150,7 @@ export const ProjectDetailPage = ({
     },
   });
 
-  if (projectQuery.isLoading) {
-    return (
-      <Page title="Project">
-        <div className="h-32 animate-pulse rounded-xl bg-muted/50" />
-      </Page>
-    );
-  }
-
-  if (!project) {
+  if (!projectQuery.isLoading && !project) {
     return (
       <Page
         title="Project not found"
@@ -176,20 +168,27 @@ export const ProjectDetailPage = ({
     );
   }
 
-  const isDirty =
-    name.trim() !== project.name || (description.trim() || null) !== (project.description ?? null);
+  const isDirty = Boolean(
+    project &&
+      (name.trim() !== project.name ||
+        (description.trim() || null) !== (project.description ?? null)),
+  );
 
   return (
     <Page
       title={
-        <span className="inline-flex items-center gap-2.5">
-          <span>{project.name}</span>
-          <Badge variant="outline" className="text-xs font-normal">
-            {project.ownerModel}
-          </Badge>
-        </span>
+        project ? (
+          <span className="inline-flex items-center gap-2.5">
+            <span>{project.name}</span>
+            <Badge variant="outline" className="text-xs font-normal">
+              {project.ownerModel}
+            </Badge>
+          </span>
+        ) : (
+          'Project'
+        )
       }
-      description={project.description ?? undefined}
+      description={project?.description ?? undefined}
       actions={
         <Button type="button" variant="outline" size="sm" onClick={handleBack}>
           <Icon icon="lucide:arrow-left" className="mr-1.5 h-4 w-4" />
@@ -227,7 +226,7 @@ export const ProjectDetailPage = ({
               <CardTitle>Project details</CardTitle>
               <CardDescription>Update this project&apos;s name and description.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent isLoading={!project}>
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -291,13 +290,19 @@ export const ProjectDetailPage = ({
             </CardContent>
           </Card>
 
-          <SettingTreeView
-            target={{
-              model: 'Project',
-              id: project.id,
-              record: project as unknown as HydratedRecord,
-            }}
-          />
+          {project ? (
+            <SettingTreeView
+              target={{
+                model: 'Project',
+                id: project.id,
+                record: project as unknown as HydratedRecord,
+              }}
+            />
+          ) : (
+            <Card>
+              <CardContent className="pt-6" isLoading />
+            </Card>
+          )}
 
           {canDeleteProject ? (
             <Card className="border-destructive/40">
@@ -321,11 +326,15 @@ export const ProjectDetailPage = ({
             </Card>
           ) : null}
         </div>
-      ) : (
+      ) : project ? (
         <ProjectIntegrationsSection
           project={project}
           renderProjectIntegrationResources={renderProjectIntegrationResources}
         />
+      ) : (
+        <Card>
+          <CardContent className="pt-6" isLoading />
+        </Card>
       )}
     </Page>
   );

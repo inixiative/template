@@ -154,6 +154,9 @@ CLAUDE.local.md
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 
+# Playwright MCP browser logs and page snapshots (per-machine)
+.playwright-mcp/
+
 # bun run worktree:create checkouts (per-machine; never commit worktree trees)
 .worktrees/
 

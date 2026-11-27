@@ -5,6 +5,7 @@
  * @uses none
  */
 import { db, type HardDeletedOnTombstone } from '@template/db';
+import { reparentOrphanedArtifacts } from '#/hooks/artifactTree/reparentOrphanedArtifacts';
 import { syncRuleReferences } from '#/hooks/ruleReference/hook';
 
 type Row = Record<string, unknown>;
@@ -24,5 +25,9 @@ export const REGENERATE_ON_REVIVE: Partial<
       model,
       (await db.delegate(model).findMany({ where: { id: { in: ids } } })) as Row[],
     );
+  },
+  ArtifactPlacement: async (_model, rows) => {
+    const ids = rows.flatMap((row) => (typeof row.id === 'string' ? [row.id] : []));
+    await reparentOrphanedArtifacts(ids);
   },
 };

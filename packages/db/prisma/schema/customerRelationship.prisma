@@ -32,6 +32,8 @@ model CustomerRelationship {
   auditLogs          AuditLog[]
   segmentMembers     SegmentMember[]
   integrationRecords IntegrationRecord[]
+  granteeArtifactPermissions ArtifactPermission[] @relation("ArtifactPermissionGranteeCustomerRelationship")
+  resourceBindings   ResourceBinding[]    @relation("ResourceBindingCustomerRelationship")
 
   // Per-relationship communication-kind opt-ins. Gates messages alongside
   // the per-Contact list — both must accept the kind for delivery.

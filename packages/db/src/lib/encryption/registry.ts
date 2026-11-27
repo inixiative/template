@@ -6,7 +6,7 @@
  */
 import type { AuthProvider, Jwks, TwoFactor } from '@template/db/generated/client/client';
 import type { EncryptedModelConfig } from '@template/db/lib/encryption/types';
-import { upperFirst } from 'lodash-es';
+import { mapKeys, mapValues, upperFirst } from 'lodash-es';
 
 export const ENCRYPTED_MODELS = {
   authProvider: {
@@ -53,16 +53,12 @@ export const encryptedColumnNamesForKey = (keyName: string) => {
 // from ENCRYPTED_MODELS so downstream registries (noopFields, sensitiveFields)
 // don't need to re-list the same column triplets. Keys are Prisma model names
 // (PascalCase) to match the registry consumers' lookup convention.
-export const encryptedFieldsByModel = (): Record<string, string[]> => {
-  const result: Record<string, string[]> = {};
-  for (const [accessorName, modelConfig] of Object.entries(ENCRYPTED_MODELS)) {
-    const modelName = upperFirst(accessorName);
-    const fields: string[] = [];
-    for (const keyName of Object.keys(modelConfig.keys)) {
-      const { encryptedField, metadataField, versionField } = encryptedColumnNamesForKey(keyName);
-      fields.push(encryptedField, metadataField, versionField);
-    }
-    result[modelName] = fields;
-  }
-  return result;
-};
+export const encryptedFieldsByModel = (): Record<string, string[]> =>
+  mapValues(
+    mapKeys(ENCRYPTED_MODELS, (_config, accessorName) => upperFirst(accessorName)),
+    (modelConfig) =>
+      Object.keys(modelConfig.keys).flatMap((keyName) => {
+        const { encryptedField, metadataField, versionField } = encryptedColumnNamesForKey(keyName);
+        return [encryptedField, metadataField, versionField];
+      }),
+  );

@@ -77,9 +77,7 @@ export const SpaceTransferInquiryPage = () => {
       title="Transfer space"
       description="Request to transfer this space to another organization. The target organization must approve the transfer."
     >
-      {isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-      ) : activeInquiry ? (
+      {activeInquiry ? (
         <Card>
           <CardHeader>
             <CardTitle>Transfer in progress</CardTitle>
@@ -101,9 +99,9 @@ export const SpaceTransferInquiryPage = () => {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>New transfer request</CardTitle>
+            <CardTitle>{isLoading ? 'Transfer request' : 'New transfer request'}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4" isLoading={isLoading}>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="target-org-slug">
                 Target organization slug

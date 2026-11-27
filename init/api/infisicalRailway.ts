@@ -10,6 +10,7 @@ type RailwaySecretSync = {
   name: string;
   environment?: { slug?: string };
   folder?: { path?: string };
+  syncOptions?: { disableSecretDeletion?: boolean };
   destinationConfig?: {
     projectId?: string;
     projectName?: string;
@@ -134,7 +135,11 @@ class InfisicalRailwayApi {
           environment: input.infisicalEnvironment,
           secretPath: input.infisicalSecretPath,
           connectionId: input.connectionId,
-          syncOptions: { initialSyncBehavior: 'import-prioritize-source' },
+          // why: otherwise a sync deletes every Railway variable Infisical doesn't hold.
+          syncOptions: {
+            initialSyncBehavior: 'import-prioritize-source',
+            disableSecretDeletion: true,
+          },
           destinationConfig: {
             projectId: input.railwayProjectId,
             projectName: input.railwayProjectName,
@@ -190,6 +195,12 @@ class InfisicalRailwayApi {
       if ((destinationConfig.serviceId || '') !== input.railwayServiceId) {
         mismatches.push(
           `serviceId: expected "${input.railwayServiceId}", got "${destinationConfig.serviceId || ''}"`,
+        );
+      }
+
+      if (!existing.syncOptions?.disableSecretDeletion) {
+        mismatches.push(
+          'syncOptions.disableSecretDeletion: expected true (turn on "Disable Secret Deletion" on this sync in Infisical, then continue)',
         );
       }
 
