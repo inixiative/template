@@ -20,10 +20,9 @@ export type AttributeModelConfig<A extends AccessorName = AccessorName> = {
   readonly disabledField?: string;
   /** Optional code-first definition lookup keyed by `locatorField` value. */
   readonly resolveDefinition?: (locator: string) => AttributeFieldDefinition | undefined;
-  /** Optional listing of definitions applicable to a given `resourceModel`. */
-  readonly definitionsForResourceModel?: (
-    resourceModel: string,
-  ) => readonly AttributeFieldDefinition[];
+  readonly fetchDefinitionForRow?: (
+    row: Record<string, unknown>,
+  ) => Promise<AttributeFieldDefinition | undefined>;
 };
 
 export type AttributeRange<T extends number | Date | string = number | Date | string> = {

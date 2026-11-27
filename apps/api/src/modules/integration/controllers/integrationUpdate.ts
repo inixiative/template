@@ -2,6 +2,7 @@ import { includeTargetEntitlements, type Prisma } from '@template/db';
 import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationUpdateRoute } from '#/modules/integration/routes/integrationUpdate';
+import { validateIntegrationConfiguration } from '#/modules/integration/validations/validateIntegrationConfiguration';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
 
 const permissionFields = ['role', 'full'];
@@ -13,6 +14,10 @@ export const integrationUpdateController = makeController(
     const integration = contextResource<'integration'>(c);
     const body = c.req.valid('json');
 
+    validateIntegrationConfiguration({
+      provider: integration.provider,
+      configuration: body.configuration,
+    });
     if (permissionFields.some((field) => field in body)) {
       await validateIntegrationRole(c.get('permix'), integration);
       await validateIntegrationRole(c.get('permix'), { ...integration, ...body });

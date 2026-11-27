@@ -275,6 +275,7 @@ export const ProfilePage = () => {
 
 **Components** (`packages/ui/src/components/settings/`):
 
+- `SettingTreeView` - Renders a resource's setting tree (`SETTING_TREES`, served by `/api/v1/setting/info`): labelled branches as headings, leaves as `SettingField`s, matching `provider:` kinds for integrations and project links, an optional `path` for one branch, batch Save of changed keys. `SettingsPage` is Settings → Settings (`/settings/settings`): the tree of wherever you are, plus your membership's. See `docs/claude/SETTINGS.md` § Setting trees
 - `ProfileFormCard` - Name / slug form shared by the three profile pages; `showThemeSelector` adds the theme picker
 - `CreateTokenModal` - Token creation modal (API tokens are managed by `TokensPage`, which shows a new key once in `SecretRevealModal`)
 - `CreateWebhookModal` - Webhook subscription creation (managed by `WebhooksPage`)

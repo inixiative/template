@@ -170,7 +170,10 @@ beforeEach(async () => {
     const path = url.pathname;
     if (request.method === 'GET' && path === '/api/v1/setting/info') {
       return Response.json({
-        data: { guide: {}, types: { categories: {}, definitions: {} } },
+        data: {
+          guide: {},
+          types: { trees: { Integration: { __read: 'read', __manage: 'manage' } } },
+        },
       });
     }
     if (request.method === 'GET' && path.endsWith('/integrations')) {

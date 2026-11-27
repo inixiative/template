@@ -4,7 +4,7 @@ export * from './CreateIntegrationModal';
 export * from './CreateTokenModal';
 export * from './CreateWebhookModal';
 export * from './ProfileFormCard';
-export * from './ResourceSettingsSection';
 export * from './SettingField';
 export * from './SettingsLayout';
+export * from './SettingTreeView';
 export * from './TwoFactorSecurityCard';

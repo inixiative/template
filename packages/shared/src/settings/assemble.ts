@@ -5,45 +5,19 @@
  * @uses none
  */
 import {
-  type AttributePermissionSpec,
   type AttributeValueType,
-  attributePermissionForModel,
   decodeAttributeColumnValue,
   deduplicateMultiSelect,
   isStringArray,
   parseAttributeDate,
 } from '@template/shared/attributes';
+import { settingsIn } from '@template/shared/settings/settingsIn';
 import type {
-  SettingPermissionAction,
-  SettingResourceModelName,
-} from '@template/shared/settings/resourceModels';
-import { groupBy, isEqual } from 'lodash-es';
-
-export type SettingCatalogCategory = {
-  readonly key: string;
-  readonly label: string;
-  readonly description: string;
-  readonly order: number;
-};
-
-export type SettingCatalogDefinition = {
-  readonly key: string;
-  readonly category: string;
-  readonly label: string;
-  readonly description: string;
-  readonly resourceModels: readonly string[];
-  readonly valueType: AttributeValueType;
-  readonly schema: Record<string, unknown>;
-  readonly defaultValue?: unknown;
-  readonly order: number;
-  readonly permission: AttributePermissionSpec<SettingPermissionAction>;
-  readonly readPermission?: AttributePermissionSpec<SettingPermissionAction>;
-};
-
-export type SettingCatalog = {
-  readonly categories: Readonly<Record<string, SettingCatalogCategory>>;
-  readonly definitions: Readonly<Record<string, SettingCatalogDefinition>>;
-};
+  SettingDefinition,
+  SettingResourceKinds,
+  SettingTree,
+} from '@template/shared/settings/types';
+import { isEqual } from 'lodash-es';
 
 export type RawSettingRow = {
   readonly id: string;
@@ -57,17 +31,7 @@ export type RawSettingRow = {
   readonly updatedAt?: Date | string | null;
 };
 
-export type AssembledSettingItem = {
-  key: string;
-  category: string;
-  valueType: AttributeValueType;
-  label: string;
-  description: string;
-  order: number;
-  permission: SettingPermissionAction;
-  readPermission: SettingPermissionAction;
-  schema: Record<string, unknown>;
-  defaultValue: unknown;
+export type AssembledSettingItem = SettingDefinition & {
   value: unknown;
   storedValue: unknown;
   disabled: boolean;
@@ -76,14 +40,9 @@ export type AssembledSettingItem = {
   updatedAt: Date | null;
 };
 
-export type AssembledResourceSettings = {
-  items: AssembledSettingItem[];
-  byCategory: Record<string, AssembledSettingItem[]>;
-};
-
 export type AssembleResourceSettingsOptions = {
-  category?: string;
-  keys?: readonly string[];
+  kinds?: SettingResourceKinds;
+  path?: string;
 };
 
 export type SettingUpsertDraftItem = {
@@ -92,58 +51,23 @@ export type SettingUpsertDraftItem = {
   disabled?: boolean;
 };
 
-/**
- * Pure Cardi-style assembly helper: merges master-data `catalog` (from `GET /api/v1/setting/info`)
- * with raw `Setting[]` rows for a target `resourceModel`, applying defaults when a row is absent
- * or `disabled`, and sorting deterministically by category order then definition order.
- */
 export const assembleResourceSettings = (
-  catalog: SettingCatalog,
+  tree: SettingTree,
   rawRows: readonly RawSettingRow[],
-  resourceModel: SettingResourceModelName | string,
   options: AssembleResourceSettingsOptions = {},
-): AssembledResourceSettings => {
-  const rowByKey = new Map<string, RawSettingRow>();
-  for (const row of rawRows) {
-    rowByKey.set(row.key, row);
-  }
+): AssembledSettingItem[] => {
+  const rowByKey = new Map(rawRows.map((row) => [row.key, row]));
 
-  const keyFilter = options.keys ? new Set(options.keys) : null;
-  const matching = Object.values(catalog.definitions)
-    .filter((definition) => {
-      if (!definition.resourceModels.includes(resourceModel)) return false;
-      if (options.category && definition.category !== options.category) return false;
-      if (keyFilter && !keyFilter.has(definition.key)) return false;
-      return true;
-    })
-    .sort((left, right) => {
-      const leftCatOrder = catalog.categories[left.category]?.order ?? 0;
-      const rightCatOrder = catalog.categories[right.category]?.order ?? 0;
-      if (leftCatOrder !== rightCatOrder) return leftCatOrder - rightCatOrder;
-      return left.order - right.order;
-    });
-
-  const items: AssembledSettingItem[] = matching.map((definition) => {
+  return settingsIn(tree, options.kinds ?? {}, options.path).map((definition) => {
     const row = rowByKey.get(definition.key);
     const disabled = Boolean(row?.disabled);
     const storedValue = row ? decodeAttributeColumnValue(definition.valueType, row) : null;
     const defaultValue = definition.defaultValue ?? null;
     const isDefault = !row || disabled || storedValue === null;
-    const value = isDefault ? defaultValue : storedValue;
-
     return {
-      key: definition.key,
-      category: definition.category,
-      valueType: definition.valueType,
-      label: definition.label,
-      description: definition.description,
-      order: definition.order,
-      permission: attributePermissionForModel(definition.permission, resourceModel) ?? 'manage',
-      readPermission:
-        attributePermissionForModel(definition.readPermission, resourceModel, 'read') ?? 'read',
-      schema: definition.schema,
+      ...definition,
       defaultValue,
-      value,
+      value: isDefault ? defaultValue : storedValue,
       storedValue,
       disabled,
       isDefault,
@@ -151,10 +75,6 @@ export const assembleResourceSettings = (
       updatedAt: row?.updatedAt ? parseAttributeDate(row.updatedAt) : null,
     };
   });
-
-  const byCategory = groupBy(items, 'category');
-
-  return { items, byCategory };
 };
 
 const normalizeForDiff = (valueType: AttributeValueType, value: unknown): unknown => {

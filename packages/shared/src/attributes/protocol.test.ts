@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { FieldKind } from '@inixiative/json-rules';
+import { FieldKind, Operator } from '@inixiative/json-rules';
 import {
   ATTRIBUTE_FIELD_KIND_BY_VALUE_TYPE,
   AttributeValidationError,
@@ -13,7 +13,6 @@ import {
   validateAttributeTypedColumns,
   validateAttributeValue,
 } from '@template/shared/attributes';
-import { z } from 'zod';
 
 const captureValidationError = (fn: () => unknown): AttributeValidationError => {
   let caught: unknown;
@@ -125,41 +124,46 @@ describe('attribute protocol', () => {
     ]);
   });
 
-  it('validates against an optional Zod schema (including z.iso.datetime) and canonicalizes multiSelect', () => {
-    const topicSchema = z.array(z.enum(['inquiries', 'security', 'billing']));
+  it('checks the type, AND options when there are options, AND conditions when there are conditions', () => {
+    const topics = {
+      options: ['inquiries', 'security', 'billing'].map((value) => ({ value, label: value })),
+    };
     expect(
       validateAttributeTypedColumns(
         'multiSelect',
         { valueJson: ['security', 'inquiries', 'security'] },
-        topicSchema,
+        topics,
       ),
     ).toEqual(['inquiries', 'security']);
+    expect(
+      captureValidationError(() => validateAttributeValue('multiSelect', ['unknown-topic'], topics))
+        .issues[0]?.code,
+    ).toBe('not_an_option');
 
-    const invalidErr = captureValidationError(() =>
-      validateAttributeValue('multiSelect', ['unknown-topic'], topicSchema),
+    const atMostHundred = {
+      conditions: {
+        field: 'value',
+        operator: Operator.lessThanEquals,
+        value: 100,
+        error: 'At most 100',
+      },
+    } as const;
+    const tooMany = captureValidationError(() =>
+      validateAttributeTypedColumns('number', { valueNumber: 500 }, atMostHundred),
     );
-    expect(invalidErr.issues[0]?.code).toBe('schema_validation_failed');
-
-    const isoDate = validateAttributeValue('date', '2026-12-01T12:00:00.000Z', z.iso.datetime());
-    expect(isoDate).toBeInstanceOf(Date);
-    expect((isoDate as unknown as Date).toISOString()).toBe('2026-12-01T12:00:00.000Z');
-
-    const dateObjWithIsoSchema = validateAttributeValue(
-      'date',
-      new Date('2026-12-01T12:00:00.000Z'),
-      z.iso.datetime(),
-    );
-    expect(dateObjWithIsoSchema).toBeInstanceOf(Date);
-
-    expect(() => validateAttributeValue('date', 'Dec 1, 2026', z.iso.datetime())).toThrow(
-      AttributeValidationError,
-    );
+    expect(tooMany.issues[0]).toMatchObject({ code: 'condition_failed' });
+    expect(tooMany.issues[0]?.message).toContain('At most 100');
+    expect(validateAttributeTypedColumns('number', { valueNumber: 25 }, atMostHundred)).toBe(25);
 
     expect(() =>
-      validateAttributeTypedColumns('number', { valueNumber: 500 }, z.number().max(100)),
+      validateAttributeValue('text', 'en', {
+        options: [{ value: 'en', label: 'English' }],
+        ...atMostHundred,
+      }),
     ).toThrow(AttributeValidationError);
-    expect(validateAttributeTypedColumns('number', { valueNumber: 25 }, z.number().max(100))).toBe(
-      25,
-    );
+
+    const isoDate = validateAttributeValue('date', '2026-12-01T12:00:00.000Z');
+    expect(isoDate).toBeInstanceOf(Date);
+    expect((isoDate as Date).toISOString()).toBe('2026-12-01T12:00:00.000Z');
   });
 });

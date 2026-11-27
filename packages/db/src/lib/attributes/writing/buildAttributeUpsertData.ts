@@ -17,7 +17,7 @@ export type BuildAttributeUpsertDataOptions = ResolveAttributeTargetOptions & {
 };
 
 /**
- * Validates `locator` (+ optional `resourceModel` applicability) and builds the 5-column
+ * Validates `locator` and builds the 5-column
  * write payload for creating or updating an Attribute row.
  */
 export const buildAttributeUpsertData = (

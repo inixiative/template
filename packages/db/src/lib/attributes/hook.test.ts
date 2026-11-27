@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, encodeAttributeColumns, Prisma, parentOf } from '@template/db';
 import { registerAttributeValidationHook } from '@template/db/lib/attributes';
 import {
@@ -10,32 +11,37 @@ import {
   createUser,
 } from '@template/db/test';
 import { type AttributeFieldDefinition, defineAttributeField } from '@template/shared/attributes';
-import { settingDefinitionForKey } from '@template/shared/settings';
-import { z } from 'zod';
+import { SETTING_TREES, settingAt } from '@template/shared/settings';
 
 const syntheticHookDefs: Record<string, AttributeFieldDefinition> = {
   'test.topics': defineAttributeField({
     key: 'test.topics',
     valueType: 'multiSelect',
-    schema: z.array(z.enum(['inquiries', 'security', 'billing', 'digest'])),
+    options: ['inquiries', 'security', 'billing', 'digest'].map((value) => ({
+      value,
+      label: value,
+    })),
     defaultValue: ['inquiries'],
     label: 'Topics',
     description: 'Synthetic multiSelect definition.',
-    resourceModels: ['User'],
   }),
   'test.maxTasks': defineAttributeField({
     key: 'test.maxTasks',
     valueType: 'number',
-    schema: z.number().int().min(1).max(100),
+    conditions: {
+      all: [
+        { field: 'value', operator: Operator.greaterThanEquals, value: 1, error: 'At least 1' },
+        { field: 'value', operator: Operator.lessThanEquals, value: 100, error: 'At most 100' },
+      ],
+    },
     defaultValue: 10,
     label: 'Max Tasks',
     description: 'Synthetic number definition.',
-    resourceModels: ['OrganizationUser'],
   }),
 };
 
 const resolveTestDefinition = (key: string) =>
-  syntheticHookDefs[key] ?? settingDefinitionForKey(key);
+  syntheticHookDefs[key] ?? settingAt(SETTING_TREES.User, key, 'every');
 
 describe('registerAttributeValidationHook (DB write-time invariant hook)', () => {
   beforeEach(() => {
@@ -48,7 +54,7 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
     await cleanupTouchedTables(db);
   });
 
-  it('rejects unknown setting keys and disallowed resourceModels', async () => {
+  it('rejects unknown setting keys', async () => {
     const { entity: user } = await createUser();
     await expect(
       createSetting({
@@ -60,21 +66,6 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
         valueJson: Prisma.DbNull,
       }),
     ).rejects.toThrow(/Unknown setting key/);
-
-    const { entity: org } = await createOrganization();
-    const { entity: project } = await createProject({
-      ownerModel: 'Organization',
-      organizationId: org.id,
-    });
-    await expect(
-      createSetting({
-        resourceModel: 'Project',
-        resourceProjectId: project.id,
-        key: 'general.displayLocale',
-        valueText: 'en',
-        valueJson: Prisma.DbNull,
-      }),
-    ).rejects.toThrow(/not valid for resourceModel='Project'/);
   });
 
   it('rejects mixed typed columns and Prisma.JsonNull across all 5 standard value columns on create and update', async () => {
@@ -154,7 +145,7 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
     ).rejects.toThrow(/deduplicated and canonically sorted/);
   });
 
-  it('evaluates Prisma numeric atomic ops (increment) accurately against Zod bounds on update', async () => {
+  it('evaluates Prisma numeric atomic ops (increment) accurately against the conditions on update', async () => {
     const { entity: member, context } = await createOrganizationUser();
     const { entity: setting } = await createSetting({
       resourceModel: 'OrganizationUser',
@@ -235,5 +226,49 @@ describe('registerAttributeValidationHook (DB write-time invariant hook)', () =>
     });
     expect(bulkSoftDeleted).toHaveLength(1);
     expect(bulkSoftDeleted[0]?.deletedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('registerAttributeValidationHook against the setting trees', () => {
+  beforeEach(() => {
+    clearHookRegistry();
+    registerAttributeValidationHook();
+  });
+
+  afterEach(async () => {
+    clearHookRegistry();
+    await cleanupTouchedTables(db);
+  });
+
+  it('refuses a key the resource tree does not hold', async () => {
+    const { entity: org } = await createOrganization();
+    const { entity: project } = await createProject({
+      ownerModel: 'Organization',
+      organizationId: org.id,
+    });
+    await expect(
+      createSetting({
+        resourceModel: 'Project',
+        resourceProjectId: project.id,
+        key: 'general.displayLocale',
+        valueText: 'en',
+        valueJson: Prisma.DbNull,
+      }),
+    ).rejects.toThrow(/not defined on this Project/);
+  });
+
+  it('accepts a key the resource tree holds', async () => {
+    const { entity: org } = await createOrganization();
+    const { entity: project } = await createProject({
+      ownerModel: 'Organization',
+      organizationId: org.id,
+    });
+    const { entity: setting } = await createSetting({
+      resourceModel: 'Project',
+      resourceProjectId: project.id,
+      key: 'general.defaultTimezone',
+      ...encodeAttributeColumns('setting', 'general.defaultTimezone', 'UTC'),
+    });
+    expect(setting.valueText).toBe('UTC');
   });
 });

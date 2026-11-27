@@ -20,7 +20,6 @@ import {
 export type ResolveAttributeTargetOptions = {
   valueType?: AttributeValueType;
   definition?: AttributeFieldDefinition;
-  resourceModel?: string;
 };
 
 export type ResolvedAttributeTarget = {
@@ -34,7 +33,7 @@ export type ResolvedAttributeTarget = {
 /**
  * Single shared resolver for attribute writing and query operators.
  * Looks up `ATTRIBUTE_MODELS` config, resolves the definition (code registry or caller-supplied
- * Layer 2 definition), validates optional `resourceModel`, and returns `{ config, definition,
+ * Layer 2 definition), and returns `{ config, definition,
  * locatorFilter, valueType, column }`.
  */
 export const resolveAttributeTarget = (
@@ -49,16 +48,6 @@ export const resolveAttributeTarget = (
 
   if (!options?.definition && config.resolveDefinition && !definition) {
     throw new Error(`Unknown attribute locator '${locator}' for model '${config.model}'`);
-  }
-
-  if (
-    options?.resourceModel &&
-    definition?.resourceModels?.length &&
-    !definition.resourceModels.includes(options.resourceModel)
-  ) {
-    throw new Error(
-      `${config.model} '${locator}' is not valid for resourceModel '${options.resourceModel}'`,
-    );
   }
 
   const valueType = definition?.valueType ?? options?.valueType;

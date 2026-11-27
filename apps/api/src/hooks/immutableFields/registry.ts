@@ -34,6 +34,10 @@ const baseImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOve
     ...polymorphismImmutableFields.Tag,
     refuse: [...(polymorphismImmutableFields.Tag?.refuse ?? []), 'tagCategoryId'],
   },
+  Integration: {
+    ...polymorphismImmutableFields.Integration,
+    refuse: [...(polymorphismImmutableFields.Integration?.refuse ?? []), 'provider'],
+  },
   ProjectIntegration: {
     refuse: ['projectId', 'integrationId'],
   },
