@@ -31,7 +31,7 @@ export ROOT_DIR APP_DIR ENV APP
 # Helper that runs the user's command with .env.$ENV files overlaid on top
 # of whatever env it inherits (which already includes any Infisical injection).
 run_with_env_overrides() {
-    bash -c '
+    exec bash -c '
         set -a
         [ -f "$ROOT_DIR/.env.$ENV" ] && source "$ROOT_DIR/.env.$ENV"
         [ -f "$APP_DIR/.env.$ENV" ] && source "$APP_DIR/.env.$ENV"
