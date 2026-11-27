@@ -19,7 +19,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Skeleton,
+  skeletonAttributes,
 } from '@template/ui/components/primitives';
 import { SettingField } from '@template/ui/components/settings/SettingField';
 import { hydrateSettingTargetForPermissions } from '@template/ui/lib/hydrateRecordForPermissions';
@@ -247,9 +247,7 @@ export const ResourceSettingsSection = ({
   return (
     <Card data-testid={`resource-settings-${queries.resourceModel}`}>
       <CardHeader>
-        <Skeleton isLoading={isCatalogLoading && !title}>
-          <CardTitle>{resolvedTitle}</CardTitle>
-        </Skeleton>
+        <CardTitle {...skeletonAttributes(isCatalogLoading && !title)}>{resolvedTitle}</CardTitle>
         {resolvedDescription ? <CardDescription>{resolvedDescription}</CardDescription> : null}
       </CardHeader>
       <CardContent className="space-y-5" isLoading={isCatalogLoading || settingsQuery.isLoading}>

@@ -18,7 +18,7 @@ import {
   organizationReadAuthProvider,
   organizationReadAuthProviderQueryKey,
 } from '@template/sdk';
-import { Badge, Button, Page, Table } from '@template/ui/components';
+import { ActionButtonsSkeleton, Badge, Button, Page, Table } from '@template/ui/components';
 import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -114,6 +114,7 @@ export const OrganizationAuthProvidersPage = () => {
     {
       key: 'status',
       label: 'Status',
+      skeleton: <Badge>Disabled</Badge>,
       render: (item: AuthProvider) => (
         <Badge variant={item.enabled ? 'default' : 'secondary'}>
           {item.enabled ? 'Enabled' : 'Disabled'}
@@ -123,6 +124,7 @@ export const OrganizationAuthProvidersPage = () => {
     {
       key: 'actions',
       label: '',
+      skeleton: <ActionButtonsSkeleton count={2} />,
       render: (item: AuthProvider) => (
         <div className="flex justify-end gap-2">
           <Button
