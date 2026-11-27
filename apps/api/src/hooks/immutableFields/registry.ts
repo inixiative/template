@@ -37,6 +37,10 @@ const baseImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOve
   ProjectIntegration: {
     refuse: ['projectId', 'integrationId'],
   },
+  ProjectIntegrationResource: {
+    exclude: ['projectIntegrationId'],
+    refuse: ['projectId', 'integrationResourceId'],
+  },
   CommunicationLog: {
     ...polymorphismImmutableFields.CommunicationLog,
     exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],

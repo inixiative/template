@@ -7,6 +7,12 @@
 import type { QueryKey } from '@tanstack/react-query';
 import type { IntegrationOwnerModel, ProjectOwnerModel } from '@template/db';
 import {
+  type IntegrationCreateManyProjectIntegrationsData,
+  integrationCreateManyProjectIntegrations,
+  integrationReadManyIntegrationResources,
+  integrationReadManyIntegrationResourcesQueryKey,
+  integrationReadManyProjectIntegrations,
+  integrationReadManyProjectIntegrationsQueryKey,
   type MeCreateProjectData,
   type MeReadManyIntegrationsResponses,
   type MeReadManyProjectsData,
@@ -32,6 +38,7 @@ import {
   projectCreateProjectIntegration,
   projectDelete,
   projectIntegrationDelete,
+  projectIntegrationResourceDelete,
   projectRead,
   projectReadManyProjectIntegrations,
   projectReadManyProjectIntegrationsQueryKey,
@@ -179,6 +186,48 @@ export const projectCreateProjectIntegrationMutationFn = apiMutation(
 export const projectIntegrationDeleteMutationFn = apiMutation(
   (opts: Parameters<typeof projectIntegrationDelete>[0]) =>
     projectIntegrationDelete({ ...opts, throwOnError: true }),
+);
+
+export const integrationReadManyIntegrationResourcesQueryOptions = (integrationId: string) => ({
+  queryKey: integrationReadManyIntegrationResourcesQueryKey({
+    path: { id: integrationId },
+    query: { pageSize: 100 },
+  }),
+  queryFn: apiQuery((opts: Parameters<typeof integrationReadManyIntegrationResources>[0]) =>
+    integrationReadManyIntegrationResources({
+      ...opts,
+      path: { id: integrationId },
+      query: { pageSize: 100 },
+      throwOnError: true,
+    }),
+  ),
+});
+
+export const integrationReadManyProjectIntegrationsQueryOptions = (integrationId: string) => ({
+  queryKey: integrationReadManyProjectIntegrationsQueryKey({
+    path: { id: integrationId },
+    query: { pageSize: 100 },
+  }),
+  queryFn: apiQuery((opts: Parameters<typeof integrationReadManyProjectIntegrations>[0]) =>
+    integrationReadManyProjectIntegrations({
+      ...opts,
+      path: { id: integrationId },
+      query: { pageSize: 100 },
+      throwOnError: true,
+    }),
+  ),
+});
+
+export const integrationCreateManyProjectIntegrationsMutationFn = apiMutation(
+  (
+    opts: Pick<IntegrationCreateManyProjectIntegrationsData, 'path' | 'body'> &
+      ClientInjectedOptions,
+  ) => integrationCreateManyProjectIntegrations({ ...opts, throwOnError: true }),
+);
+
+export const projectIntegrationResourceDeleteMutationFn = apiMutation(
+  (opts: Parameters<typeof projectIntegrationResourceDelete>[0]) =>
+    projectIntegrationResourceDelete({ ...opts, throwOnError: true }),
 );
 
 type IntegrationScopeAuth = Pick<

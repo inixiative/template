@@ -20,8 +20,9 @@ model ProjectIntegration {
   project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
-  settings           Setting[]
-  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectProjectIntegration")
+  settings                  Setting[]
+  projectIntegrationResources ProjectIntegrationResource[]
+  auditLogsAsSubject        AuditLog[] @relation("AuditLogSubjectProjectIntegration")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

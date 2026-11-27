@@ -55,7 +55,9 @@ No `valueType` discriminator column is required on the row: the type and optiona
 | `DELETE` | `/api/v1/setting/{id}` | Soft-delete a stored setting row to reset it to its default (`settingDeleteRoute`, `validatePermission('manage')`). |
 | `GET` | `/api/admin/setting` | Superadmin paginated listing of all stored setting rows (`adminSettingReadManyRoute`). |
 | `GET` / `POST` | `/api/v1/project/{id}/projectIntegrations` | List or link an Integration to a Project (`projectReadManyProjectIntegrations`, `projectCreateProjectIntegration`). |
-| `GET` / `DELETE` | `/api/v1/projectIntegration/{id}` | Read or soft-delete a `ProjectIntegration` link (`projectIntegrationRead`, `projectIntegrationDelete`). |
+| `GET` / `POST` | `/api/v1/integration/{id}/projectIntegrations` | List readable `ProjectIntegration` records (with `project` and not-deleted, tracked/missing `projectIntegrationResources`) or create/link many `ProjectIntegration` records (existing `projectId` or inline `project` create + optional `resources` with `isIdentity`) in one transaction (`integrationReadManyProjectIntegrations`, `integrationCreateManyProjectIntegrations`). |
+| `GET` / `DELETE` | `/api/v1/projectIntegration/{id}` | Read or soft-delete a `ProjectIntegration` (`projectIntegrationRead`, `projectIntegrationDelete`; cascades to its `ProjectIntegrationResource` rows). |
+| `DELETE` | `/api/v1/projectIntegrationResource/{id}` | Soft-delete a `ProjectIntegrationResource` (`projectIntegrationResourceDelete`). |
 
 ---
 
