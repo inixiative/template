@@ -64,6 +64,61 @@ describe('many operations with hooks', () => {
     });
   });
 
+  describe('createMany', () => {
+    it('runs as createManyAndReturn, triggers hooks and returns the count', async () => {
+      let hookResult: unknown;
+      registerDbHook(
+        'test-createMany',
+        'User',
+        HookTiming.after,
+        [DbAction.createManyAndReturn],
+        async ({ result }) => {
+          hookResult = result;
+        },
+      );
+
+      const result = await db.user.createMany({
+        data: [
+          { email: `test-cm-1-${Date.now()}@example.com` },
+          { email: `test-cm-2-${Date.now()}@example.com` },
+        ],
+      });
+
+      expect(result).toEqual({ count: 2 });
+      expect((hookResult as unknown[]).length).toBe(2);
+    });
+  });
+
+  describe('updateMany', () => {
+    it('runs as updateManyAndReturn, triggers hooks with previous[] and returns the count', async () => {
+      const user = await db.user.create({
+        data: { email: `test-um-${Date.now()}@example.com`, name: 'Before' },
+      });
+
+      let hookPrevious: unknown;
+      let hookResult: unknown;
+      registerDbHook(
+        'test-updateMany',
+        'User',
+        HookTiming.after,
+        [DbAction.updateManyAndReturn],
+        async ({ previous, result }) => {
+          hookPrevious = previous;
+          hookResult = result;
+        },
+      );
+
+      const result = await db.user.updateMany({
+        where: { id: user.id },
+        data: { name: 'After' },
+      });
+
+      expect(result).toEqual({ count: 1 });
+      expect((hookPrevious as Record<string, unknown>[])[0].name).toBe('Before');
+      expect((hookResult as Record<string, unknown>[])[0].name).toBe('After');
+    });
+  });
+
   describe('deleteMany', () => {
     it('triggers after hooks with previous[]', async () => {
       const user = await db.user.create({ data: { email: `test-dm-${Date.now()}@example.com` } });

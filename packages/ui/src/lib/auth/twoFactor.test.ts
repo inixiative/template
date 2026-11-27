@@ -35,7 +35,7 @@ describe('frontend two-factor helpers', () => {
     expect(isTwoFactorReverifyError(null)).toBe(false);
   });
 
-  it('redirects pre-2FA sessions to /two-factor preserving org, space, spoof, and flow', async () => {
+  it('redirects pre-2FA sessions to /twoFactor preserving org, space, spoof, and flow', async () => {
     const guard = makeGuard({ twoFactorAction: 'verify' });
 
     await expect(
@@ -58,7 +58,7 @@ describe('frontend two-factor helpers', () => {
     });
   });
 
-  it('guards /two-factor against unauthenticated or verified sessions, splits query/hash, and allows mode=reverify', async () => {
+  it('guards /twoFactor against unauthenticated or verified sessions, splits query/hash, and allows mode=reverify', async () => {
     const anonGuard = makeGuard({ isAuthenticated: false });
     await expect(
       anonGuard.redirectUnlessTwoFactorRequired({
@@ -100,8 +100,8 @@ describe('frontend two-factor helpers', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('prevents auth-page redirect loops and keeps /two-factor flow-safe', async () => {
-    expect(safeInternalRedirect('/two-factor')).toBe('/dashboard');
+  it('prevents auth-page redirect loops and keeps /twoFactor flow-safe', async () => {
+    expect(safeInternalRedirect('/twoFactor')).toBe('/dashboard');
     expect(safeInternalRedirect('/login')).toBe('/dashboard');
     expect(safeInternalRedirect('/auth/callback')).toBe('/dashboard');
     expect(safeInternalRedirect('/settings/tokens')).toBe('/settings/tokens');
@@ -148,8 +148,8 @@ describe('frontend two-factor helpers', () => {
     redirectAfterTwoFactor(makeStore(null), '/settings/tokens');
 
     expect(calls).toEqual([
-      { to: '/two-factor?redirectTo=%2Fsettings%2Ftokens', preserve: 'context' },
-      { to: '/two-factor?redirectTo=%2Fsettings%2Ftokens', preserve: 'context' },
+      { to: '/twoFactor?redirectTo=%2Fsettings%2Ftokens', preserve: 'context' },
+      { to: '/twoFactor?redirectTo=%2Fsettings%2Ftokens', preserve: 'context' },
       { to: '/settings/tokens', preserve: 'context' },
       { to: '/settings/tokens', preserve: 'context' },
     ]);

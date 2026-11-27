@@ -235,7 +235,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Automatic Transaction Merging** - Database client uses AsyncLocalStorage and Proxy pattern to auto-merge nested transactions. Call `db.txn()` anywhere and it merges into parent transaction if one exists, or creates new one if not. Eliminates manual transaction passing through call stacks. All mutations automatically wrapped in transactions via Prisma extension
 
-- ✅ **Transaction-Aware Hooks** - Mutation lifecycle hooks (beforeCreate, afterUpdate, etc.) execute inside the transaction automatically via Prisma client extension. If transaction rolls back, hook side effects never happened. Hooks can access previous record state for updates/deletes. Extension wraps all mutations (create, update, delete, upsert) with automatic transaction + hook execution. Blocks unsafe operations (createMany, updateMany) that skip hooks
+- ✅ **Transaction-Aware Hooks** - Mutation lifecycle hooks (beforeCreate, afterUpdate, etc.) execute inside the transaction automatically via Prisma client extension. If transaction rolls back, hook side effects never happened. Hooks can access previous record state for updates/deletes. Extension wraps all mutations (create, update, delete, upsert) with automatic transaction + hook execution. `createMany`/`updateMany` run as their `AndReturn` variants, so hooks always see the rows
 
 - ✅ **Post-Commit Callbacks** - `db.onCommit(fn)` registers callbacks that execute AFTER transaction commits successfully. Critical for webhooks, external API calls, and job enqueueing - ensures external systems only notified after database changes are permanent. Callbacks run with concurrency limits and performance tracking
 

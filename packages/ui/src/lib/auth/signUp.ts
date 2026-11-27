@@ -4,23 +4,24 @@
  * @partOf primitive:ui
  * @uses none
  */
-import { createBetterAuthClient } from '@template/ui/lib/auth/createBetterAuthClient';
+import { signInWithOAuth } from '@template/ui/lib/auth/signIn';
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
 import { clearToken } from '@template/ui/lib/auth/token';
 import type {
   AuthMethod,
   EmailAuthMethod,
-  OAuthAuthMethod,
   SamlAuthMethod,
   SignUpResult,
 } from '@template/ui/lib/auth/types';
+import type { BetterAuthClient } from '@template/ui/store/types/auth';
 
-const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> => {
+const signUpWithEmail = async (
+  client: BetterAuthClient,
+  method: EmailAuthMethod,
+): Promise<SignUpResult> => {
   if (!method.name) {
     throw new Error('Name is required for signup');
   }
-
-  const client = createBetterAuthClient();
 
   const { data, error } = await client.signUp.email({
     email: method.email,
@@ -44,30 +45,19 @@ const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> =
   return { status: 'authenticated' };
 };
 
-const signUpWithOAuth = async (method: OAuthAuthMethod): Promise<SignUpResult> => {
-  const client = createBetterAuthClient();
-
-  const callbackURL = method.callbackURL || `${window.location.origin}/auth/callback`;
-
-  const { error } = await client.signIn.social({
-    provider: method.provider,
-    callbackURL,
-    errorCallbackURL: `${window.location.origin}/login`,
-  });
-  if (error) throw new Error(error.message || error.statusText);
-  return { status: 'redirecting' };
-};
-
 const signUpWithSaml = async (_method: SamlAuthMethod): Promise<SignUpResult> => {
   throw new Error('SAML authentication not yet implemented');
 };
 
-export const signUp = async (method: AuthMethod): Promise<SignUpResult> => {
+export const signUp = async (
+  client: BetterAuthClient,
+  method: AuthMethod,
+): Promise<SignUpResult> => {
   switch (method.type) {
     case 'email':
-      return signUpWithEmail(method);
+      return signUpWithEmail(client, method);
     case 'oauth':
-      return signUpWithOAuth(method);
+      return signInWithOAuth(client, method);
     case 'saml':
       return signUpWithSaml(method);
     default:

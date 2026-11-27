@@ -10,5 +10,5 @@ import { LoginPage } from '@template/ui/pages';
 
 export const Route = createFileRoute('/_public/login')({
   beforeLoad: (ctx) => redirectAuthenticatedUserAwayFromPublicPage(ctx),
-  component: () => <LoginPage hideSignUp={true} hideForgotPassword={true} />,
+  component: () => <LoginPage hideSignUp={true} />,
 });

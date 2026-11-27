@@ -782,15 +782,15 @@ The mutation lifecycle wraps these Prisma operations:
 |-----------|-----------|-------|
 | `create` | ✅ | |
 | `createManyAndReturn` | ✅ | |
-| `createMany` | ❌ | Throws - use `createManyAndReturn` |
+| `createMany` | ✅ | Runs as `createManyAndReturn`, returns `{ count }` |
 | `update` | ✅ | Fetches `previous` automatically |
 | `updateManyAndReturn` | ✅ | Fetches `previous[]` automatically |
-| `updateMany` | ❌ | Throws - use `updateManyAndReturn` |
+| `updateMany` | ✅ | Runs as `updateManyAndReturn` (fetches `previous[]`), returns `{ count }` |
 | `upsert` | ✅ | Fetches `previous` if exists |
 | `delete` | ✅ | Fetches `previous` automatically |
 | `deleteMany` | ✅ | Fetches `previous[]` automatically |
 
-`createMany`/`updateMany` are disabled because they don't return records, breaking hooks that need `result` (webhooks, cache invalidation).
+`createMany`/`updateMany` don't return rows, and hooks need `result` (webhooks, cache invalidation), so the extension runs them as their `AndReturn` variants and hands back only the count. Libraries that call them (BetterAuth's adapter) run our hooks with the plain `db`.
 
 ---
 

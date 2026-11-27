@@ -24,12 +24,9 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
 
       create: makeMutationLifecycleInterceptor(DbAction.create),
 
-      async createMany({ model }) {
-        throw new Error(
-          `createMany is not supported - use createManyAndReturn instead for ${model}. ` +
-            'This ensures hooks (webhooks, cache, validation) work correctly.',
-        );
-      },
+      createMany: makeMutationLifecycleInterceptor(DbAction.createManyAndReturn, {
+        countRowsFrom: 'createManyAndReturn',
+      }),
 
       createManyAndReturn: makeMutationLifecycleInterceptor(DbAction.createManyAndReturn),
 
@@ -37,12 +34,9 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
         fetchPreviousRecords: fetchExistingRecord,
       }),
 
-      async updateMany({ model }) {
-        throw new Error(
-          `updateMany is not supported - use updateManyAndReturn instead for ${model}. ` +
-            'This ensures hooks (webhooks, cache, validation) work correctly.',
-        );
-      },
+      updateMany: makeMutationLifecycleInterceptor(DbAction.updateManyAndReturn, {
+        countRowsFrom: 'updateManyAndReturn',
+      }),
 
       updateManyAndReturn: makeMutationLifecycleInterceptor(DbAction.updateManyAndReturn, {
         fetchPreviousRecords: fetchExistingRecords,

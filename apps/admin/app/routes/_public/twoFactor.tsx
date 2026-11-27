@@ -8,7 +8,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { redirectUnlessTwoFactorRequired } from '@template/ui/guards';
 import { TwoFactorPage } from '@template/ui/pages';
 
-export const Route = createFileRoute('/_public/two-factor')({
+export const Route = createFileRoute('/_public/twoFactor')({
   beforeLoad: (ctx) => redirectUnlessTwoFactorRequired(ctx),
   component: () => <TwoFactorPage />,
 });

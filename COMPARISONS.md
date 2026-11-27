@@ -222,7 +222,7 @@ Five hook types execute inside transactions in a defined order: rules validation
 This is the system that prevents webhooks from firing on rolled-back transactions and prevents accidental FK reassignment. No ORM provides this as a built-in.
 
 ### Honest assessment
-The database layer is the deepest engineering in the template. The transaction merging, branded IDs, and hook system are production-grade. The hydration system's PendingMap deduplication prevents N+1 without DataLoader's complexity. The blocked `createMany`/`updateMany` is an opinionated choice that trades convenience for safety — not every team will agree. The mutation lifecycle hooks are genuinely novel — no ORM offers transaction-aware hooks with ordered execution, immutable field enforcement, and post-commit side effects in a single system.
+The database layer is the deepest engineering in the template. The transaction merging, branded IDs, and hook system are production-grade. The hydration system's PendingMap deduplication prevents N+1 without DataLoader's complexity. `createMany`/`updateMany` run as their `AndReturn` variants so hooks always see the rows, at the cost of reading every row back. The mutation lifecycle hooks are genuinely novel — no ORM offers transaction-aware hooks with ordered execution, immutable field enforcement, and post-commit side effects in a single system.
 
 ---
 

@@ -11,10 +11,9 @@ import { useAppStore } from '@template/ui/store';
 
 type LoginPageProps = {
   hideSignUp?: boolean;
-  hideForgotPassword?: boolean;
 };
 
-export const LoginPage = ({ hideSignUp, hideForgotPassword }: LoginPageProps) => {
+export const LoginPage = ({ hideSignUp }: LoginPageProps) => {
   const currentAppStore = useAppStore.getState;
 
   return (
@@ -22,9 +21,7 @@ export const LoginPage = ({ hideSignUp, hideForgotPassword }: LoginPageProps) =>
       <LoginForm
         hideSignUp={hideSignUp}
         onSignUpClick={hideSignUp ? undefined : () => navigateToSignUp(currentAppStore, true)}
-        onForgotPasswordClick={
-          hideForgotPassword ? undefined : () => navigateToForgotPassword(currentAppStore, true)
-        }
+        onForgotPasswordClick={() => navigateToForgotPassword(currentAppStore, true)}
       />
     </AuthPageShell>
   );

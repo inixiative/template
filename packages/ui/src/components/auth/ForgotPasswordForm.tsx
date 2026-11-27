@@ -17,8 +17,8 @@ import {
 } from '@template/ui/components/primitives/Card';
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
-import { requestPasswordReset } from '@template/ui/lib/auth/requestPasswordReset';
 import { type DescribedError, describeError } from '@template/ui/lib/describeError';
+import { useAppStore } from '@template/ui/store';
 import { type FormEvent, useState } from 'react';
 
 export type ForgotPasswordFormProps = {
@@ -37,7 +37,7 @@ export const ForgotPasswordForm = ({ onLoginClick }: ForgotPasswordFormProps) =>
     setError(undefined);
     setIsSubmitting(true);
     try {
-      await requestPasswordReset(email);
+      await useAppStore.getState().auth.requestPasswordReset(email);
       setSentTo(email);
     } catch (err) {
       setError(describeError(err, 'Could not send the reset email. Please try again.'));

@@ -401,8 +401,10 @@ export const runInTransactionContext = <T>(openTransaction: OpenTransaction, fn:
 // is still reliable; db.raw skips the whole life cycle.
 const HOOKED_MUTATION_OPS = new Set([
   'create',
+  'createMany',
   'createManyAndReturn',
   'update',
+  'updateMany',
   'updateManyAndReturn',
   'upsert',
   'delete',

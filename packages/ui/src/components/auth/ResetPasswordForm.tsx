@@ -18,8 +18,8 @@ import {
 } from '@template/ui/components/primitives/Card';
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
-import { resetPassword } from '@template/ui/lib/auth/resetPassword';
 import { describeError } from '@template/ui/lib/describeError';
+import { useAppStore } from '@template/ui/store';
 import { type FormEvent, useState } from 'react';
 
 export type ResetPasswordFormProps = {
@@ -49,7 +49,7 @@ export const ResetPasswordForm = ({
     setError(undefined);
     setIsSubmitting(true);
     try {
-      const outcome = await resetPassword({ token, newPassword });
+      const outcome = await useAppStore.getState().auth.resetPassword({ token, newPassword });
       if (outcome === 'linkInvalid') setIsLinkInvalid(true);
       else onPasswordReset();
     } catch (err) {

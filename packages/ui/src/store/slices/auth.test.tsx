@@ -16,7 +16,6 @@ import { buildUser } from '@template/db/test';
 import { contactInfoQueryKey, organizationReadAuthProviderQueryKey } from '@template/sdk';
 import { SignUpForm } from '@template/ui/components/auth/SignUpForm';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
-import { completeOAuthSignIn } from '@template/ui/lib/auth/signIn';
 import {
   clearToken,
   fetchStoredTokenAndClearIfExpired,
@@ -164,7 +163,7 @@ test('a malformed tokenless signup remains an error', async () => {
 
 test('the OAuth callback exchanges its one-time token for the JWT and its expiry', async () => {
   respond = () => Response.json({ token, expiresAt, user: { id: 'u1' } });
-  await completeOAuthSignIn('one-time');
+  await store.getState().auth.completeOAuthSignIn('one-time');
   expect(requests.map((r) => r.path)).toEqual(['/api/auth/one-time-token/verify']);
   expect(fetchStoredTokenAndClearIfExpired()).toBe(token);
   expect(storedTokenExpiry()?.toISOString()).toBe(expiresAt);

@@ -7,27 +7,25 @@
 import { useSearch } from '@tanstack/react-router';
 import { AuthPageShell } from '@template/ui/components/auth/AuthPageShell';
 import { ResetPasswordForm } from '@template/ui/components/auth/ResetPasswordForm';
+import { navigateToForgotPassword, navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
 
 export const ResetPasswordPage = () => {
   const currentAppStore = useAppStore.getState;
-  const { token } = useSearch({ strict: false }) as { token?: string };
+  const { token, error } = useSearch({ strict: false }) as { token?: string; error?: string };
 
   const handlePasswordReset = () => {
     toast.success('Password reset. Log in with your new password.');
-    currentAppStore().navigation.navigateKeepingSearchParams('/login', 'context');
+    navigateToLogin(currentAppStore, true);
   };
-
-  const handleRequestPasswordReset = () =>
-    currentAppStore().navigation.navigateKeepingSearchParams('/forgot-password', 'context');
 
   return (
     <AuthPageShell subtitle="Set a new password for your account">
       <ResetPasswordForm
-        token={token}
+        token={error ? undefined : token}
         onPasswordReset={handlePasswordReset}
-        onRequestPasswordReset={handleRequestPasswordReset}
+        onRequestPasswordReset={() => navigateToForgotPassword(currentAppStore, true)}
       />
     </AuthPageShell>
   );

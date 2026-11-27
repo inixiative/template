@@ -73,7 +73,7 @@ Located in `apps/api/src/lib/auth.ts`. BetterAuth runs sign-up, sign-in, email v
 
 ```typescript
 export const auth = betterAuth({
-  database: prismaAdapter(betterAuthDb, { provider: 'postgresql' }),
+  database: prismaAdapter(db, { provider: 'postgresql' }),
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.API_URL,
 
@@ -81,8 +81,8 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: true,
     resetPasswordTokenExpiresIn: 60 * 60,
-    sendResetPassword: async ({ user, token }) =>
-      emitAppEvent('user.passwordResetRequested', { userId: user.id, passwordResetUrl: `${WEB_URL}/reset-password?token=${token}` }),
+    sendResetPassword: async ({ user, url }) =>
+      emitAppEvent('user.passwordResetRequested', { userId: user.id, passwordResetUrl: url }),
     onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
   },
   emailVerification: {
@@ -121,9 +121,9 @@ The plugin list lives in `apps/api/src/lib/auth/authPlugins.ts`. Its order matte
 - **Why the signing keys use the template field encryption:** one scheme for secrets at rest, rotated by the existing `rotateEncryptionKeys` job, instead of a second scheme keyed off `BETTER_AUTH_SECRET`.
 - **Why 30 days and no refresh token:** revocation is the control, not short expiry. A refresh token would be a second long-lived credential to store, rotate and revoke; incrementing `User.jwtVersion` already ends every JWT a user holds.
 - **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event. Verifying does not sign the user in; they sign in afterwards.
-- **Password reset** goes out through the `user.passwordResetRequested` app event (`password-reset` template). The link is the web app's `WEB_URL/reset-password?token=<token>`; that page posts the token and the new password to `/api/auth/reset-password`. The token is valid one hour and single use and lives in Redis (`secondaryStorage`). `passwordResetUrl` is in `SENSITIVE_FIELD_NAMES`, so the recorded app event stores `[MASKED]`; the `CommunicationLog` row (`variables`, `evaluatedMjml`) and the email jobs' data still hold the link in plaintext, as they do the verification link. An unknown address sends nothing.
-- **Reset pages:** `/forgot-password` (web and admin) asks for the address and always gives the same "check your email" answer, so it never reveals whether an account exists. `/reset-password?token=…` (web only, where the link lands, so admin users reset on the web app too) sets the new password, then sends the user to `/login`; an expired or used token shows a link to ask for a new one. The login form links to `/forgot-password`; superadmin's login hides it (`hideForgotPassword`), since superadmin has no reset page.
-- **`betterAuthDb`** (`apps/api/src/lib/auth/betterAuthDb.ts`) is the client BetterAuth's Prisma adapter gets. The adapter calls `updateMany` (on the credential `Account` when a password is reset), which the mutation lifecycle extension refuses so hooks always run; `betterAuthDb` answers it with `updateManyAndReturn` and returns `{ count }`, so BetterAuth's writes run the same hooks as ours. It reads `db` on every access, so `db`'s transaction routing still applies.
+- **Password reset** goes out through the `user.passwordResetRequested` app event (`password-reset` template). The link is BetterAuth's own `url`, `<API>/api/auth/reset-password/<token>?callbackURL=<redirectTo>`: the requesting app passes `redirectTo` = its own origin + `/resetPassword` (checked against `trustedOrigins`), and BetterAuth redirects the click to `<redirectTo>?token=<token>`, or `?error=INVALID_TOKEN` when the token is used or expired. That page posts the token and the new password to `/api/auth/reset-password`. So each app's users land back on the app they asked from. The token is valid one hour and single use and lives in Redis (`secondaryStorage`). `passwordResetUrl` is in `SENSITIVE_FIELD_NAMES`, so the recorded app event stores `[MASKED]`; the `CommunicationLog` row (`variables`, `evaluatedMjml`) and the email jobs' data still hold the link in plaintext, as they do the verification link. An unknown address sends nothing.
+- **Reset pages (web, admin and superadmin):** `/forgotPassword` asks for the address and always gives the same "check your email" answer, so it never reveals whether an account exists. `/resetPassword?token=…` sets the new password, then sends the user to `/login`; `?error=INVALID_TOKEN` or no token shows the expired-link notice with a way to ask for a new one. Every app's login form links to `/forgotPassword`. Superadmin resets and does two-factor like the other apps.
+- **BetterAuth's writes run our hooks.** The adapter gets `db`. Its `updateMany` (on the credential `Account` when a password is reset) runs as `updateManyAndReturn` inside the mutation lifecycle extension, so the hooks see the rows, and BetterAuth gets `{ count }` back (HOOKS.md, supported operations).
 - **Welcome email** (`welcome` template) is sent only by `user.emailVerified`, once the address is known to be real: BetterAuth's `afterEmailVerification` for email/password sign-ups and guests who later verify, and `databaseHooks.user.create.after` for accounts created already verified (Google). `user.created` fires only for guests (`findOrCreateGuest`) and sends no email. `/change-email` is disabled; enabling it needs its own event, because BetterAuth calls `afterEmailVerification` again on an email change.
 
 ### jwtHandoffPlugin

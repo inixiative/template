@@ -7,7 +7,9 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { TwoFactorAction } from '@template/shared/auth/twoFactor';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
-import { signIn as signInFn } from '@template/ui/lib/auth/signIn';
+import { requestPasswordReset } from '@template/ui/lib/auth/requestPasswordReset';
+import { resetPassword } from '@template/ui/lib/auth/resetPassword';
+import { completeOAuthSignIn, signIn as signInFn } from '@template/ui/lib/auth/signIn';
 import { signUp as signUpFn } from '@template/ui/lib/auth/signUp';
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
 import { clearToken, fetchStoredTokenAndClearIfExpired } from '@template/ui/lib/auth/token';
@@ -15,6 +17,8 @@ import type { AuthMethod } from '@template/ui/lib/auth/types';
 import { MASTER_DATA_ENTRIES } from '@template/ui/lib/masterData/registry';
 import type { AppStore } from '@template/ui/store/types';
 import type { AuthSlice } from '@template/ui/store/types/auth';
+import { createAuthClient } from 'better-auth/client';
+import { oneTimeTokenClient } from 'better-auth/client/plugins';
 import type { StateCreator } from 'zustand';
 
 const MASTER_DATA_QUERY_IDS: ReadonlySet<string> = new Set(
@@ -36,6 +40,12 @@ const clearAuthenticatedQueries = (queryClient: QueryClient | null): void => {
 };
 
 export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, get) => {
+  const client = createAuthClient({
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+    plugins: [oneTimeTokenClient()],
+    fetchOptions: { customFetchImpl: (input, init) => fetch(input, init) },
+  });
+
   const syncWsAuth = () => {
     if (get().auth.twoFactorAction) return;
     const token = fetchStoredTokenAndClearIfExpired();
@@ -72,6 +82,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
 
   return {
     auth: {
+      client,
       user: null,
       organizations: null,
       organizationUsers: null,
@@ -111,7 +122,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       },
 
       signIn: async (method: AuthMethod) => {
-        const result = await signInFn(method);
+        const result = await signInFn(client, method);
         if (result.status === 'authenticated') {
           clearAuthenticatedQueries(get().queryClient);
           await fetchAndHydrateMe(set, get);
@@ -119,6 +130,12 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         }
         return result;
       },
+
+      completeOAuthSignIn: (oneTimeToken: string) => completeOAuthSignIn(client, oneTimeToken),
+
+      requestPasswordReset: (email: string) => requestPasswordReset(client, email),
+
+      resetPassword: (input) => resetPassword(client, input),
 
       applyUpgradedJwt: (jwt, clearTwoFactorAction = true) => {
         if (!jwt) return;
@@ -135,7 +152,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       },
 
       signUp: async (method: AuthMethod) => {
-        const result = await signUpFn(method);
+        const result = await signUpFn(client, method);
         if (result.status === 'verification-pending') clearLocalAuth();
         if (result.status === 'authenticated') {
           clearAuthenticatedQueries(get().queryClient);

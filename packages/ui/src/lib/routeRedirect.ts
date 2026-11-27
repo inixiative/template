@@ -10,14 +10,15 @@ import { currentLocation, currentPath } from '@template/ui/lib/currentLocation';
 import { pickSearchParams, searchParamValue } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
 
-export const TWO_FACTOR_PATH = '/two-factor';
+export const TWO_FACTOR_PATH = '/twoFactor';
+export const RESET_PASSWORD_PATH = '/resetPassword';
 export const PRESERVED_REDIRECT_PARAMS = ['org', 'space', 'spoof', 'flow'] as const;
 
 const NON_RETURN_AUTH_PATHS = [
   '/login',
   '/signup',
-  '/forgot-password',
-  '/reset-password',
+  '/forgotPassword',
+  RESET_PASSWORD_PATH,
   '/auth/callback',
   TWO_FACTOR_PATH,
 ] as const;
@@ -61,7 +62,7 @@ export const redirectPreservingContext = (context: BeforeLoadContext, to: string
 };
 
 const navigateToAuth = (
-  path: '/login' | '/signup' | '/forgot-password',
+  path: '/login' | '/signup' | '/forgotPassword',
   currentAppStore: () => AppStore,
   preserveSearch?: boolean,
 ) => {
@@ -81,7 +82,7 @@ export const navigateToSignUp = (currentAppStore: () => AppStore, preserveSearch
 export const navigateToForgotPassword = (
   currentAppStore: () => AppStore,
   preserveSearch?: boolean,
-) => navigateToAuth('/forgot-password', currentAppStore, preserveSearch);
+) => navigateToAuth('/forgotPassword', currentAppStore, preserveSearch);
 
 export const navigateToTwoFactorReverify = (currentAppStore: () => AppStore): void => {
   if (currentLocation().pathname === TWO_FACTOR_PATH) return;

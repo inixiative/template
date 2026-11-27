@@ -4,19 +4,18 @@
  * @partOf feature:auth
  * @uses infrastructure:prisma, infrastructure:redis, primitive:appEvents
  */
-import { redisClient, redisNamespace } from '@template/db';
+import { db, redisClient, redisNamespace } from '@template/db';
 import { passwordLength } from '@template/shared/auth/passwordLength';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emitAppEvent } from '#/appEvents/emit';
 import { authPlugins } from '#/lib/auth/authPlugins';
-import { betterAuthDb } from '#/lib/auth/betterAuthDb';
 import { incrementSecondaryStorageKey } from '#/lib/auth/queries/incrementSecondaryStorageKey';
 import { allowedCorsOrigins } from '#/middleware/corsMiddleware';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
 export const auth = betterAuth({
-  database: prismaAdapter(betterAuthDb, {
+  database: prismaAdapter(db, {
     provider: 'postgresql',
   }),
 
@@ -29,13 +28,8 @@ export const auth = betterAuth({
     minPasswordLength: passwordLength.min,
     maxPasswordLength: passwordLength.max,
     resetPasswordTokenExpiresIn: 60 * 60,
-    sendResetPassword: async ({ user, token }) => {
-      const passwordResetUrl = new URL('/reset-password', process.env.WEB_URL);
-      passwordResetUrl.searchParams.set('token', token);
-      await emitAppEvent('user.passwordResetRequested', {
-        userId: user.id,
-        passwordResetUrl: passwordResetUrl.toString(),
-      });
+    sendResetPassword: async ({ user, url }) => {
+      await emitAppEvent('user.passwordResetRequested', { userId: user.id, passwordResetUrl: url });
     },
     onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
   },

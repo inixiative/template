@@ -147,16 +147,20 @@ test('requesting a password reset delivers the reset link and masks it in the re
   });
   const { entity: user } = await createUser({ email: `reset-${Bun.randomUUIDv7()}@example.com` });
 
-  await auth.api.requestPasswordReset({ body: { email: user.email } });
+  const redirectTo = new URL('/resetPassword', process.env.WEB_URL).toString();
+  await auth.api.requestPasswordReset({ body: { email: user.email, redirectTo } });
 
   expect(passwordResetEvent).toHaveBeenCalledTimes(1);
   const event = passwordResetEvent.mock.calls[0][0];
   const data = event.data as UserPasswordResetRequestedPayload;
   expect(data.userId).toBe(user.id);
   const url = new URL(data.passwordResetUrl);
-  expect(url.origin).toBe(new URL(process.env.WEB_URL!).origin);
-  expect(url.pathname).toBe('/reset-password');
-  const token = url.searchParams.get('token')!;
+  expect(url.pathname).toMatch(/^\/api\/auth\/reset-password\/[^/]+$/);
+  expect(url.searchParams.get('callbackURL')).toBe(redirectTo);
+  const token = url.pathname.split('/').at(-1)!;
+  const landing = await auth.handler(new Request(url.toString()));
+  expect(landing.status).toBe(302);
+  expect(landing.headers.get('location')).toBe(`${redirectTo}?token=${token}`);
   const recordedEvent = await db.appEvent.findUniqueOrThrow({ where: { id: event.id } });
   expect(recordedEvent.data).toEqual({ userId: user.id, passwordResetUrl: '[MASKED]' });
   expect(JSON.stringify(recordedEvent.data)).not.toContain(token);
@@ -195,7 +199,7 @@ test('resetting replaces the password of an account that already has one', async
 
   await auth.api.requestPasswordReset({ body: { email } });
   const data = passwordResetEvent.mock.calls[0][0].data as UserPasswordResetRequestedPayload;
-  const token = new URL(data.passwordResetUrl).searchParams.get('token')!;
+  const token = new URL(data.passwordResetUrl).pathname.split('/').at(-1)!;
   const newPassword = 'synthetic-replacement-password';
   await auth.api.resetPassword({ body: { token, newPassword } });
 

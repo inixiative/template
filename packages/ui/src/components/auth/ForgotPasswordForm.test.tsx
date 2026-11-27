@@ -55,7 +55,10 @@ describe('ForgotPasswordForm', () => {
       {
         method: 'POST',
         path: '/api/auth/request-password-reset',
-        body: { email: 'someone@example.test' },
+        body: {
+          email: 'someone@example.test',
+          redirectTo: `${window.location.origin}/resetPassword`,
+        },
       },
     ]);
   });
