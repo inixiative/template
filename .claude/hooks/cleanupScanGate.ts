@@ -11,6 +11,20 @@ type HookInput = {
 
 const PUSH_OPTIONS_WITH_VALUE = new Set(['--repo', '-o', '--push-option', '--receive-pack', '--exec']);
 
+const EXEMPT_EXACT = new Set([
+  '.gitignore',
+  '.ignore',
+  '.editorconfig',
+  '.gitattributes',
+  '.git-blame-ignore-revs',
+  '.bun-version',
+  'mise.toml',
+  'biome.json',
+]);
+
+const isExemptPath = (path: string): boolean =>
+  EXEMPT_EXACT.has(path) || path.endsWith('.md') || /^(?:.*\/)?tsconfig(\.[^/]+)?\.json$/.test(path);
+
 const git = (directory: string, ...args: string[]) =>
   execFileSync('git', ['-C', directory, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
@@ -46,6 +60,28 @@ const commitsOf = (directory: string, source: string): string[] =>
     ? git(directory, 'for-each-ref', '--format=%(objectname)', 'refs/heads').split('\n').filter(Boolean)
     : [git(directory, 'rev-parse', '--verify', `${source}^{commit}`)];
 
+const changedFilesForCommit = (directory: string, sha: string): string[] => {
+  const parents = git(directory, 'rev-list', '--parents', '-n', '1', sha).split(' ').slice(1);
+  const args =
+    parents.length > 1
+      ? ['diff-tree', '--no-commit-id', '--name-only', '-r', '--cc', sha]
+      : ['diff-tree', '--no-commit-id', '--name-only', '-r', '--root', sha];
+  return git(directory, ...args).split('\n').filter(Boolean);
+};
+
+const onlyTouchesExemptPaths = (directory: string, commit: string, scanned?: string): boolean => {
+  const range = [
+    commit,
+    ...(scanned && succeeds(directory, 'merge-base', '--is-ancestor', scanned, commit) ? [`^${scanned}`] : []),
+    '--not',
+    '--remotes',
+  ];
+  const shas = git(directory, 'rev-list', ...range).split('\n').filter(Boolean);
+  if (shas.length === 0) return false;
+  const files = shas.flatMap((sha) => changedFilesForCommit(directory, sha));
+  return files.length > 0 && files.every(isExemptPath);
+};
+
 const unscannedCommits = (landing: Landing): string[] => {
   const directory = landing.directory as string;
   try {
@@ -56,7 +92,8 @@ const unscannedCommits = (landing: Landing): string[] => {
       .filter(
         (commit) =>
           !(scanned && succeeds(directory, 'merge-base', '--is-ancestor', commit, scanned)) &&
-          git(directory, 'branch', '-r', '--contains', commit) === '',
+          git(directory, 'branch', '-r', '--contains', commit) === '' &&
+          !onlyTouchesExemptPaths(directory, commit, scanned),
       );
   } catch {
     return [];

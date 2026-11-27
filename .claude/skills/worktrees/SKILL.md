@@ -27,6 +27,7 @@ The scripts resolve the **main checkout** from git, so they do the right thing w
 
 | Scenario | Use |
 |---|---|
+| Small direct-to-main fix (docs, tickets, minor hook/config/bug fix) on a clean, unclaimed `main` (`R-2026-11-27-05`) | Edit and commit directly on `main` (slot 0) — no need to allocate a worktree slot |
 | Building/editing a feature; will run `bun run local`, tests, or any service | `bun run worktree:create` |
 | Dispatching a subagent that will edit code in isolation | `bun run worktree:create` (subagent must `cd .worktrees/<name>` first) |
 | Bug fix that needs to be tested locally | `bun run worktree:create` |

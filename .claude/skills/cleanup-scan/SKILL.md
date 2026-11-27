@@ -7,7 +7,7 @@ description: Use after finishing a piece of work and before pushing it (the clea
 
 Work sprawls faster than anyone reviews it: a helper that already exists, a second auth path, a port that lands on code another branch is deleting. Every one of those was findable before the push. This scan is how you find them.
 
-Scope is the outgoing diff: `git diff origin/<default-branch>...HEAD` plus anything uncommitted. Fix what you find in the code, re-run the checks, then record.
+Scope is the outgoing diff: `git diff origin/<default-branch>...HEAD` plus anything uncommitted. Fix what you find in the code, re-run the checks, then record. Commits whose entire unscanned, unpushed diff touches only markdown docs/tickets (`*.md`), `tsconfig*.json`, `biome.json`, or git/editor/runtime-version dotfiles are exempt from the push gate (`R-2026-11-27-04`).
 
 ## 1. Duplicates and parallel machinery
 

@@ -101,6 +101,7 @@ describe('cleanupScanGate', () => {
     expect(bash('git push origin --delete stale')).toBeUndefined();
     expect(bash('git push origin :stale')).toBeUndefined();
     expect(bash('git push --tags')).toBeUndefined();
+    git('-C', repo, 'commit', '-q', '--allow-empty', '-m', 'unpushed-after-remote-test');
   });
 
   test('a commit chained before a push in one call is refused', () => {
@@ -124,5 +125,113 @@ describe('cleanupScanGate', () => {
     const outside = join(sandbox, 'not-a-repo');
     mkdirSync(outside, { recursive: true });
     expect(bash('git push', outside)).toBeUndefined();
+  });
+
+  test('docs, tickets, and low-level config commits pass without a scan', () => {
+    const isolated = join(sandbox, 'exempt-repo');
+    const isolatedOrigin = join(sandbox, 'exempt-origin.git');
+    git('init', '-q', '-b', 'main', isolated);
+    git('init', '-q', '--bare', isolatedOrigin);
+    git('-C', isolated, 'remote', 'add', 'origin', isolatedOrigin);
+    git('-C', isolated, 'commit', '-q', '--allow-empty', '-m', 'init');
+    git('-C', isolated, 'push', '-q', 'origin', 'main');
+
+    const commitFile = (relativePath: string, content: string) => {
+      const fullPath = join(isolated, relativePath);
+      mkdirSync(join(fullPath, '..'), { recursive: true });
+      writeFileSync(fullPath, content);
+      git('-C', isolated, 'add', relativePath);
+      git('-C', isolated, 'commit', '-q', '-m', `update ${relativePath}`);
+    };
+
+    commitFile('tickets/FEAT-999-idea.md', '# Idea\n');
+    expect(bash('git push origin main', isolated)).toBeUndefined();
+
+    commitFile('apps/web/tsconfig.json', '{}\n');
+    commitFile('biome.json', '{}\n');
+    commitFile('.gitignore', 'tmp/\n');
+    expect(bash('git push origin main', isolated)).toBeUndefined();
+  });
+
+  test('code, docs/scripts ts, hooks, and doc commits atop unscanned code stay gated', () => {
+    const isolated = join(sandbox, 'gated-repo');
+    const isolatedOrigin = join(sandbox, 'gated-origin.git');
+    git('init', '-q', '-b', 'main', isolated);
+    git('init', '-q', '--bare', isolatedOrigin);
+    git('-C', isolated, 'remote', 'add', 'origin', isolatedOrigin);
+    git('-C', isolated, 'commit', '-q', '--allow-empty', '-m', 'init');
+    git('-C', isolated, 'push', '-q', 'origin', 'main');
+
+    const commitFile = (relativePath: string, content: string) => {
+      const fullPath = join(isolated, relativePath);
+      mkdirSync(join(fullPath, '..'), { recursive: true });
+      writeFileSync(fullPath, content);
+      git('-C', isolated, 'add', relativePath);
+      git('-C', isolated, 'commit', '-q', '-m', `update ${relativePath}`);
+    };
+
+    commitFile('docs/scripts/helper.ts', 'export const x = 1;\n');
+    expect(bash('git push origin main', isolated)).toContain('has not been scanned');
+
+    // A doc commit stacked on an unscanned code commit must remain gated.
+    commitFile('tickets/FEAT-999.md', '# Ticket\n');
+    expect(bash('git push origin main', isolated)).toContain('has not been scanned');
+
+    // Once the code commit is scanned, a follow-up doc commit passes without re-scanning.
+    recordScan(isolated);
+    commitFile('README.md', '# Updated\n');
+    expect(bash('git push origin main', isolated)).toBeUndefined();
+
+    // Editing a hook is never exempt.
+    commitFile('.claude/hooks/cleanupScanGate.ts', '// edit\n');
+    expect(bash('git push origin main', isolated)).toContain('has not been scanned');
+
+    // A stale/unknown SHA in the scan marker does not throw or fail open.
+    writeFileSync(scanMarkerPath(isolated), 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n');
+    expect(bash('git push origin main', isolated)).toContain('has not been scanned');
+  });
+
+  test('clean merge of origin/main into a doc branch passes; evil merge editing code stays gated', () => {
+    const isolated = join(sandbox, 'merge-repo');
+    const isolatedOrigin = join(sandbox, 'merge-origin.git');
+    git('init', '-q', '-b', 'main', isolated);
+    git('init', '-q', '--bare', isolatedOrigin);
+    git('-C', isolated, 'remote', 'add', 'origin', isolatedOrigin);
+
+    const commitFile = (relativePath: string, content: string) => {
+      const fullPath = join(isolated, relativePath);
+      mkdirSync(join(fullPath, '..'), { recursive: true });
+      writeFileSync(fullPath, content);
+      git('-C', isolated, 'add', relativePath);
+      git('-C', isolated, 'commit', '-q', '-m', `update ${relativePath}`);
+    };
+
+    commitFile('src/app.ts', 'export const v = 1;\n');
+    git('-C', isolated, 'push', '-q', 'origin', 'main');
+
+    git('-C', isolated, 'checkout', '-q', '-b', 'docs');
+    commitFile('tickets/FEAT-001.md', '# Ticket\n');
+
+    // Upstream main advances with a code commit.
+    git('-C', isolated, 'checkout', '-q', 'main');
+    commitFile('src/app.ts', 'export const v = 2;\n');
+    git('-C', isolated, 'push', '-q', 'origin', 'main');
+
+    // Clean merge of origin/main into the doc-only branch stays exempt.
+    git('-C', isolated, 'checkout', '-q', 'docs');
+    git('-C', isolated, 'merge', '-q', '--no-edit', 'origin/main');
+    expect(bash('git push origin docs', isolated)).toBeUndefined();
+
+    // Evil merge that sneaks a code change into a merge commit is gated.
+    git('-C', isolated, 'checkout', '-q', 'main');
+    commitFile('src/app.ts', 'export const v = 3;\n');
+    git('-C', isolated, 'push', '-q', 'origin', 'main');
+
+    git('-C', isolated, 'checkout', '-q', 'docs');
+    git('-C', isolated, 'merge', '-q', '--no-commit', '--no-ff', 'origin/main');
+    writeFileSync(join(isolated, 'src/app.ts'), 'export const v = 999;\n');
+    git('-C', isolated, 'add', 'src/app.ts');
+    git('-C', isolated, 'commit', '-q', '-m', 'evil merge');
+    expect(bash('git push origin docs', isolated)).toContain('has not been scanned');
   });
 });
