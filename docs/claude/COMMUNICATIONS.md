@@ -33,9 +33,7 @@
     - [Render issues — behaviour lives in the registry entry](#render-issues--behaviour-lives-in-the-registry-entry)
   - [Template Versioning & Recompose](#template-versioning--recompose)
   - [Rule References (the rows a rule names)](#rule-references-the-rows-a-rule-names)
-- [Messaging (non-email channels)](#messaging-non-email-channels)
-  - [Provider Registry](#provider-registry)
-  - [Jobs](#jobs)
+- [Delivery Gate and Outcome Logging (`apps/api/src/lib/messaging`)](#delivery-gate-and-outcome-logging-appsapisrclibmessaging)
 - [Notifications](#notifications)
   - [Planned: Novu](#planned-novu)
 - [SMS](#sms)
@@ -52,7 +50,6 @@
 
 Communication channels:
 - Email (transactional, marketing) - **partially implemented**
-- Messaging — direct per-`ContactType` channels (SMS, push, chat) on a pluggable adapter lane - **seam built, no adapters wired**
 - In-app notifications (future)
 - Webhooks (existing)
 
@@ -372,10 +369,7 @@ unrestricted. Nothing outside that organization ever shows. The clamp bounds; th
 shows inside it. By default (`defaultRecipientNarrowing`) a sender sees its own level only: an
 Organization its organization memberships, a Space its own space's memberships, a User none, a
 platform or admin both. A stored recipient lens that turns on `organizationUsers` or `spaceUsers`
-widens it, still within the organization. Targeting follows the same bound: a `messageUser` rule
-from an Organization- or Space-level sender reaches only people holding a membership the recipient
-lens shows (`restrictRuleToSenderMembers`), so a space reaches its own members by default and its organization's
-when its lens widens. Registry sends target the entity's own recipient (an invite's target need not
+widens it, still within the organization. Registry sends target the entity's own recipient (an invite's target need not
 be a member yet). Without a sender (save, preview, rule surface) the template owner stands in. The owner
 is decided per site: save takes it from the input, the rule surface and preflight from the body
 (default: platform), and evaluation from `composeTemplate`'s `owner` — the row that won the cascade,
@@ -640,8 +634,7 @@ for the claim to reopen.
    The recipient is loaded through the lens of the row that won the cascade (`composed.owner`) and
    the sender (`recipientVariables`), and a model-lens data slot is re-read the same way from the
    payload's `data.id`; a recipient or data entity that no longer resolves → `failed` with
-   `reasonCode: not_found`, no send. Rendering is `renderForRecipient` (see
-   [Messaging](#messaging-non-email-channels)). Rules evaluate through that lens; a referenced
+   `reasonCode: not_found`, no send. Rendering is `renderForRecipient` (`apps/api/src/lib/email/renderForRecipient.ts`). Rules evaluate through that lens; a referenced
    segment whose own rule is degraded leaves the live set first (`fetchReferenceKeysExcludingDegradedSegments`).
    A content error (`isEmailContentError`: render, parse, MJML, token, condition) → `failed` with
    `reasonCode: render_failed`, no retry. Any other error before the claim (database, verifier) throws with
@@ -822,62 +815,9 @@ edges are persisted so that "who references X" is an index and a stale rule is n
 
 ---
 
-## Messaging (non-email channels)
+## Delivery Gate and Outcome Logging (`apps/api/src/lib/messaging`)
 
-A separate lane from email for direct, per-`ContactType` channels (SMS, push, chat). Where email is a
-template/cascade/versioning system, messaging is a thin dispatch primitive: render `{{recipient.*}}` /
-`{{data.*}}` / `{{sender.*}}` into a payload and hand it to a pluggable per-channel sender. Located in
-`apps/api/src/lib/messaging` (jobs in `apps/api/src/jobs/handlers`).
-
-### Provider Registry
-
-`messageProviderRegistry` (`apps/api/src/lib/messaging/providers.ts`) is a `makeBroadcastRegistry` keyed
-by `ContactType`; `messageProviderAdapterForContactType(type)` returns its channel sender or `undefined`. A
-`MessageProviderAdapter` is `(contact, content, kind, options) => Promise<void>` — the per-channel send.
-
-```typescript
-type MessageContent = {
-  text?: string;       // may contain {{recipient.*}}, {{data.*}}, {{sender.*}}
-  html?: string;       // same — interpolated before dispatch
-  mediaUrls?: string[];
-  data?: Record<string, unknown>;
-};
-
-type MessageDispatchOptions = { replyTo?: { chatMessageId: string } };
-```
-
-### Jobs
-
-Two BullMQ handlers (`messageUser`, `messageContact`), shaped like the email jobs but with no template
-cascade, no `CommunicationLog`, and no fan-out planner:
-
-- **`messageUser`** — `{ rule, kind, content, sender? }` (sender defaults to platform). It builds the
-  sender's email lens (`emailLensFor(undefined, senderToOwnerScope(sender), undefined, sender)`), and
-  `fetchUsersMatchingRuleWithContacts(rule, lens.recipient)` compiles the `@inixiative/json-rules` `Condition` through its
-  recipient lens to a Prisma query at job time. Each resolved user is rendered through the same
-  primitive email uses, then dispatched to every `canDeliver(kind, contact)` contact via that
-  contact's registered adapter. A missing adapter for a `ContactType` throws. Not registered in
-  `jobHandlers` until an adapter exists.
-- **`messageContact`** — `{ contactId, kind, content, replyTo? }`. Loads one `Contact`, gates on
-  `canDeliver`, and dispatches (no interpolation — `content` is pre-rendered).
-
-**Both lanes render with one primitive** (`apps/api/src/lib/email/renderForRecipient.ts`):
-`recipientVariables(lens, { recipientId, sender, data })` loads the recipient through the recipient
-lens when the send runs (the fetched rows a re-check needs, with the sender-scoped memberships),
-and a data slot that is a model lens through the data lens by `data.id` (the queued payload is
-never rendered, so an owner's clamp on the data entity re-checks against the row as it is),
-and `renderForRecipient(text, variables, lens)` interpolates: tokens and loops read the viewer
-projection (scope-root tokens through json-rules `readLensValue`), rules judge the re-check rows.
-`deliverEmail` and `messageUser` both call it, so the same recipient and content render the same in
-either lane.
-
-`canDeliver(kind, contact, customerRelationship?)` (`apps/api/src/lib/messaging/canDeliver.ts`) is the shared
-gate for both lanes: `system` always delivers; otherwise the kind must be in `contact.acceptedKinds`
-(and, when given, `customerRelationship.acceptedKinds`).
-
-> **Status:** the lane is built and unit-tested but **not yet registered** in `jobHandlers`
-> (`apps/api/src/jobs/handlers/index.ts`) and has no adapters or callers wired — it is the seam SMS/push
-> plug into, not a live channel yet.
+`canDeliver(kind, contact, customerRelationship?)` (`apps/api/src/lib/messaging/canDeliver.ts`) is the shared delivery gate: `system` always delivers; otherwise the kind must be in `contact.acceptedKinds` (and, when given, `customerRelationship.acceptedKinds`). `recordCommunicationOutcome` (`apps/api/src/lib/messaging/recordCommunicationOutcome.ts`) writes delivery outcomes to `CommunicationLog`.
 
 ---
 
@@ -904,8 +844,7 @@ await notify(user.id, 'inquiry.received', {
 ---
 ## SMS
 
-A future channel on the [Messaging](#messaging-non-email-channels) lane: register a Twilio
-`MessageProviderAdapter` under the `sms` `ContactType`. No SMS adapter is wired today.
+Not implemented today.
 
 ---
 

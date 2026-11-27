@@ -27,13 +27,6 @@
       "cache": true
     },
 
-    "generate:msw": {
-      "dependsOn": ["^generate:sdk"],
-      "inputs": ["scripts/generateMswHandlers.ts"],
-      "outputs": ["src/test/mocks/handlers.gen.ts"],
-      "cache": true
-    },
-
     "generate:icons": {
       "outputs": ["src/lib/icons/bundledIconCollections.gen.ts"],
       "cache": false
@@ -74,8 +67,7 @@
         "../../packages/permissions/src/**/*.ts",
         "../../packages/shared/src/**/*.ts",
         "../../packages/shared/src/**/*.tsx",
-        "!../../packages/shared/src/apiClient/**",
-        "!../../packages/shared/src/test/mocks/handlers.gen.ts"
+        "!../../packages/shared/src/apiClient/**"
       ],
       "persistent": true,
       "interruptible": true
@@ -92,8 +84,7 @@
         "../../packages/permissions/src/**/*.ts",
         "../../packages/shared/src/**/*.ts",
         "../../packages/shared/src/**/*.tsx",
-        "!../../packages/shared/src/apiClient/**",
-        "!../../packages/shared/src/test/mocks/handlers.gen.ts"
+        "!../../packages/shared/src/apiClient/**"
       ],
       "persistent": true,
       "interruptible": true
