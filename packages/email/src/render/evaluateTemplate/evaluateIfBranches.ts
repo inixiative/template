@@ -64,13 +64,19 @@ export const evaluateIfBranches = (
     const frames = loopFrames(options.bindings ?? new Map());
     const lensed = iteratesLens(options.bindings, lens);
     const ruleScope = options.ruleScope ?? scope;
+    const checkOptions = options.now ? { now: options.now } : undefined;
     const evaluate = (): string | null => {
       try {
         const passes = lensed
-          ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(ruleScope, frames)))
+          ? evaluateScopedRule(
+              lens,
+              judged,
+              toRuleData(narrowToElements(ruleScope, frames)),
+              checkOptions,
+            )
           : frames.length
-            ? check(rule, toRuleData(scope))
-            : check(applyEmailLens(lens, rule), toRuleData(ruleScope));
+            ? check(rule, toRuleData(scope), checkOptions)
+            : check(applyEmailLens(lens, rule), toRuleData(ruleScope), checkOptions);
         return passes === true
           ? evaluateTemplateBlocksAndTokens(branch.body, scope, options, onError)
           : null;

@@ -84,11 +84,11 @@ const makeSegmentMemberWrites = (
   }),
   ...chunk(toRemove, CHUNK_SIZE).map((batch) => async (): Promise<MembershipDiff> => {
     if (signal?.aborted) return { added: [], removed: [] };
-    await db.segmentMember.updateManyAndReturn({
+    const tombstoned = await db.segmentMember.updateManyAndReturn({
       where: { segmentId, customerRelationshipId: { in: batch } },
       data: { deletedAt: new Date() },
     });
-    return { added: [], removed: batch };
+    return { added: [], removed: tombstoned.map((member) => member.customerRelationshipId) };
   }),
 ];
 

@@ -6,6 +6,7 @@
  */
 import { componentTagPattern } from '@template/email/render/blockTags';
 import {
+  datetimeTokenAt,
   EACH,
   ELSE,
   ELSE_IF,
@@ -25,8 +26,7 @@ const startsKnownConstruct = (content: string, at: number): boolean => {
   if (blockMatch && blockMatch.index === at) return true;
   const token = new RegExp(TOKEN_PATTERN.source, 'g');
   token.lastIndex = at;
-  const tokenMatch = token.exec(content);
-  return !!tokenMatch && tokenMatch.index === at;
+  return token.exec(content)?.index === at;
 };
 
 /** Offsets of every `{{` that opens nothing the engine understands — text that would ship as written. */
@@ -34,6 +34,11 @@ export const offsetsOfUnrecognizedMustaches = (content: string): number[] => {
   const out: number[] = [];
   let at = content.indexOf('{{');
   while (at !== -1) {
+    const datetime = datetimeTokenAt(content, at);
+    if (datetime) {
+      at = content.indexOf('{{', datetime.end);
+      continue;
+    }
     if (!startsKnownConstruct(content, at)) out.push(at);
     at = content.indexOf('{{', at + 2);
   }

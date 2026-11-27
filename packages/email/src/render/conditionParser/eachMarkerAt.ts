@@ -8,6 +8,7 @@ import type { Condition } from '@inixiative/json-rules';
 import { bareWordAt } from '@template/email/render/conditionParser/bareWordAt';
 import { findJsonEnd } from '@template/email/render/conditionParser/findJsonEnd';
 import { EACH } from '@template/email/render/conditionParser/grammar';
+import { nextMarkerAttribute } from '@template/email/render/conditionParser/nextMarkerAttribute';
 import { parseRuleJson } from '@template/email/render/conditionParser/parseRuleJson';
 import { skipWhitespace } from '@template/email/render/conditionParser/skipWhitespace';
 import type { EachBlock } from '@template/email/render/conditionParser/types';
@@ -28,8 +29,9 @@ export const eachMarkerAt = (content: string, i: number): EachMarker | null => {
   const attributeErrors: string[] = [];
 
   while (true) {
-    cursor = skipWhitespace(content, cursor);
-    if (content.slice(cursor, cursor + 2) === '}}') {
+    const step = nextMarkerAttribute(content, cursor);
+    if (!step) return null;
+    if (step.kind === 'end') {
       return {
         path,
         as,
@@ -38,30 +40,18 @@ export const eachMarkerAt = (content: string, i: number): EachMarker | null => {
         filter,
         filterError,
         attributeErrors: attributeErrors.length > 0 ? attributeErrors : undefined,
-        next: cursor + 2,
+        next: step.end,
       };
     }
-    if (cursor >= content.length) return null;
-
-    const nextBrace = content.indexOf('}}', cursor);
-    if (nextBrace === -1) return null;
-    const eq = content.indexOf('=', cursor);
-    const whitespaceOffset = content.slice(cursor, nextBrace).search(/\s/);
-    const nextWhitespace = whitespaceOffset === -1 ? -1 : cursor + whitespaceOffset;
-    if (
-      eq === -1 ||
-      eq > nextBrace ||
-      (nextWhitespace !== -1 && nextWhitespace < eq) ||
-      eq === cursor
-    ) {
-      const { value, next } = bareWordAt(content, cursor);
+    if (step.kind === 'malformed') {
       attributeErrors.push(
-        `malformed attribute "${value}" on {{#each}} block (expected name=value)`,
+        `malformed attribute "${step.value}" on {{#each}} block (expected name=value)`,
       );
-      cursor = next;
+      cursor = step.next;
       continue;
     }
-    const attrName = content.slice(cursor, eq).trim();
+
+    const { name: attrName, valueStart } = step;
     if (seenAttributes.has(attrName))
       attributeErrors.push(`duplicate ${attrName}= attribute on {{#each}} block`);
     seenAttributes.add(attrName);
@@ -69,7 +59,6 @@ export const eachMarkerAt = (content: string, i: number): EachMarker | null => {
       attributeErrors.push(`unknown ${attrName}= attribute on {{#each}} block`);
     }
 
-    const valueStart = eq + 1;
     if (attrName === 'filter') {
       if (content[valueStart] === '{') {
         const braceEnd = findJsonEnd(content, valueStart);
