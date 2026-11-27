@@ -13,7 +13,7 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
-import { Button, Page, Skeleton } from '@template/ui/components';
+import { Button, loadingMaskAttributes, Page } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
 import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
 import {
@@ -165,11 +165,14 @@ const IntegrationProviderSection = ({
       {integrations.length > 0 ? null : <span className="sr-only">{actionLabel}</span>}
     </Button>
   );
-  const statusText = showStatus &&
-    !providerIntegrations.isLoading &&
-    !providerIntegrations.isError && (
-      <span className="font-mono text-[11px] text-muted-foreground">{status.label}</span>
-    );
+  const statusText = showStatus && !providerIntegrations.isError && (
+    <span
+      className="font-mono text-[11px] text-muted-foreground"
+      {...loadingMaskAttributes(providerIntegrations.isLoading)}
+    >
+      {status.label}
+    </span>
+  );
   const connectPanel = isConnectOpen && enabled && renderConnect(() => setConnectOpen(false));
   const errorText = providerIntegrations.isError && (
     <p role="alert" className="px-3 pb-2 text-xs text-destructive">
@@ -186,7 +189,7 @@ const IntegrationProviderSection = ({
         <div className="flex h-11 items-center gap-2.5 pl-3 pr-1">
           <Icon icon={icon} className="h-4 w-4 shrink-0" aria-hidden />
           <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
-          {providerIntegrations.isLoading ? <Skeleton className="h-3 w-16" /> : statusText}
+          {statusText}
           {connectButton}
         </div>
         {errorText}

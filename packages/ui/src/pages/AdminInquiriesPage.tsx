@@ -11,8 +11,16 @@ import {
   adminInquiryReadManyQueryKey,
   type InquiryItem,
 } from '@template/sdk';
-import { EmptyState, Page, Table, TablePlaceholderRows } from '@template/ui/components';
 import {
+  Badge,
+  EmptyState,
+  loadingMaskAttributes,
+  Page,
+  PlaceholderText,
+  Table,
+} from '@template/ui/components';
+import {
+  InquiryControlsPlaceholder,
   InquirySourceControls,
   InquiryStatusBadge,
   InquiryTargetControls,
@@ -27,6 +35,7 @@ import {
   narrowInquiryFiltersWithinPageBounds,
 } from '@template/ui/lib/inquiries/queryKeys';
 import { inquiryTypeComponentsFor } from '@template/ui/lib/inquiries/registry';
+import type * as React from 'react';
 import { useMemo, useState } from 'react';
 
 type Inquiry = AdminInquiryReadManyResponses[200]['data'][number];
@@ -102,6 +111,7 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
               key: 'status',
               label: 'Status',
               render: (inq: Inquiry) => <InquiryStatusBadge inquiry={inq} />,
+              placeholder: <Badge>pending</Badge>,
             },
             {
               key: 'source',
@@ -142,6 +152,72 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
 
 const adminAllInquiryHeadings = ['Type', 'Status', 'Actor', 'Sent', 'Expires', ''];
 
+type AdminAllInquiryRowCells = {
+  type: React.ReactNode;
+  status: React.ReactNode;
+  source: React.ReactNode;
+  target: React.ReactNode;
+  sentAt: React.ReactNode;
+  expiresAt: React.ReactNode;
+  sourceControls: React.ReactNode;
+  targetControls: React.ReactNode;
+};
+
+// Each side's line is a small button tall whether or not it has controls, so every inquiry is the same height.
+const AdminAllInquiryRow = ({
+  cells,
+  ...props
+}: { cells: AdminAllInquiryRowCells } & React.HTMLAttributes<HTMLTableSectionElement>) => (
+  // group on tbody so both rows highlight together on hover
+  <tbody className="group border-b last:border-b-0" {...props}>
+    <tr className="group-hover:bg-muted/40 transition-colors">
+      <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
+        {cells.type}
+      </td>
+      <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
+        {cells.status}
+      </td>
+      <td className="px-4 pt-3 pb-1 text-sm">
+        <div className="flex min-h-9 items-center">
+          <span className="text-xs text-muted-foreground mr-1">↑</span>
+          {cells.source}
+        </div>
+      </td>
+      <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
+        {cells.sentAt}
+      </td>
+      <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
+        {cells.expiresAt}
+      </td>
+      <td className="px-4 pt-3 pb-1">
+        <div className="flex min-h-9 items-center justify-end">{cells.sourceControls}</div>
+      </td>
+    </tr>
+    <tr className="group-hover:bg-muted/40 transition-colors">
+      <td className="px-4 pb-3 pt-1 text-sm">
+        <div className="flex min-h-9 items-center">
+          <span className="text-xs text-muted-foreground mr-1">↓</span>
+          {cells.target}
+        </div>
+      </td>
+      <td className="px-4 pb-3 pt-1">
+        <div className="flex min-h-9 items-center justify-end">{cells.targetControls}</div>
+      </td>
+    </tr>
+  </tbody>
+);
+
+const adminAllInquiryPlaceholderCells: AdminAllInquiryRowCells = {
+  type: <PlaceholderText width="6rem" />,
+  status: <Badge>pending</Badge>,
+  source: <PlaceholderText width="8rem" />,
+  target: <PlaceholderText width="7rem" />,
+  sentAt: <PlaceholderText width="5rem" />,
+  expiresAt: <PlaceholderText width="5rem" />,
+  sourceControls: <InquiryControlsPlaceholder />,
+  targetControls: <InquiryControlsPlaceholder />,
+};
+
 const AdminAllInquiryTable = ({
   inquiries,
   isLoading,
@@ -175,62 +251,44 @@ const AdminAllInquiryTable = ({
             ))}
           </tr>
         </thead>
-        {isLoading && (
-          <tbody>
-            <TablePlaceholderRows columnCount={adminAllInquiryHeadings.length} rows={5} />
-          </tbody>
-        )}
+        {isLoading &&
+          Array.from({ length: 5 }, (_, row) => (
+            <AdminAllInquiryRow
+              // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
+              key={row}
+              cells={adminAllInquiryPlaceholderCells}
+              {...loadingMaskAttributes(true)}
+            />
+          ))}
         {inquiries.map((inq) => {
           const entry = inquiryTypeComponentsFor(inq.type);
           const SourceSummary = entry?.source?.summary;
           const TargetSummary = entry?.target?.summary;
 
           // Registry components expect InquiryItem / InquiryItem; admin item is structurally compatible
-          const sourceNode = SourceSummary ? (
-            <SourceSummary inquiry={inq as unknown as InquiryItem} />
-          ) : (
-            inquiryPartyDisplayName(inq, 'source')
-          );
-          const targetNode = TargetSummary ? (
-            <TargetSummary inquiry={inq as unknown as InquiryItem} />
-          ) : (
-            inquiryPartyDisplayName(inq, 'target')
-          );
-
+          const inquiryItem = inq as unknown as InquiryItem;
           return (
-            // group on tbody so both rows highlight together on hover
-            <tbody key={inq.id} className="group border-b last:border-b-0">
-              <tr className="group-hover:bg-muted/40 transition-colors">
-                <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-                  {INQUIRY_TYPE_LABELS[inq.type] ?? inq.type}
-                </td>
-                <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-                  <InquiryStatusBadge inquiry={inq} />
-                </td>
-                <td className="px-4 pt-3 pb-1 text-sm">
-                  <span className="text-xs text-muted-foreground mr-1">↑</span>
-                  {sourceNode}
-                </td>
-                <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-                  {inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—'}
-                </td>
-                <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-                  {inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—'}
-                </td>
-                <td className="px-4 pt-3 pb-1">
-                  <InquirySourceControls inquiry={inq as unknown as InquiryItem} />
-                </td>
-              </tr>
-              <tr className="group-hover:bg-muted/40 transition-colors">
-                <td className="px-4 pb-3 pt-1 text-sm">
-                  <span className="text-xs text-muted-foreground mr-1">↓</span>
-                  {targetNode}
-                </td>
-                <td className="px-4 pb-3 pt-1">
-                  <InquiryTargetControls inquiry={inq as unknown as InquiryItem} />
-                </td>
-              </tr>
-            </tbody>
+            <AdminAllInquiryRow
+              key={inq.id}
+              cells={{
+                type: INQUIRY_TYPE_LABELS[inq.type] ?? inq.type,
+                status: <InquiryStatusBadge inquiry={inq} />,
+                source: SourceSummary ? (
+                  <SourceSummary inquiry={inquiryItem} />
+                ) : (
+                  inquiryPartyDisplayName(inq, 'source')
+                ),
+                target: TargetSummary ? (
+                  <TargetSummary inquiry={inquiryItem} />
+                ) : (
+                  inquiryPartyDisplayName(inq, 'target')
+                ),
+                sentAt: inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—',
+                expiresAt: inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—',
+                sourceControls: <InquirySourceControls inquiry={inquiryItem} />,
+                targetControls: <InquiryTargetControls inquiry={inquiryItem} />,
+              }}
+            />
           );
         })}
       </table>

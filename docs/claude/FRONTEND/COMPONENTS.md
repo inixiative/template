@@ -13,7 +13,7 @@
   - [Table](#table)
   - [Avatar](#avatar)
   - [EmptyState](#emptystate)
-  - [Skeleton](#skeleton)
+  - [Loading states](#loading-states)
   - [DropdownMenu](#dropdownmenu)
   - [Select and SearchableSelect](#select-and-searchableselect)
   - [Others](#others)
@@ -126,6 +126,7 @@ type Column<T> = {
   key: string;
   label: React.ReactNode;
   render?: (item: T) => React.ReactNode;   // default: item[key]
+  placeholder?: React.ReactNode;           // the cell's shape when taller than one line (badge, buttons)
 };
 
 type TableProps<T> = {
@@ -170,28 +171,36 @@ Composed: `Avatar` (frame, `show`), `AvatarImage` (renders nothing when `src` is
 />
 ```
 
-### Skeleton
+### Loading states
 
-**Pages never place skeletons.** A page renders its layout at once and passes each data component its query's `isLoading`; the component draws its loading state in its own shape, so the page does not jump when the data lands:
+**Nothing changes shape when data lands.** A page renders its layout at once and passes each data component its query's `isLoading`; the component draws its loading state at its loaded size. Pages never place skeletons.
 
 | Component | While `isLoading` |
 |-----------|-------------------|
-| `Table` | its real header and five pulsing rows of real row height; never the empty state |
-| `List` | three pulsing rows in the bordered list; never `emptyMessage` |
-| `CardContent` | its children masked (text, inputs, buttons and icons become pulsing bars of their own size, clicks blocked); a body that cannot render without data passes no children and gets pulsing lines; the card's header stays |
-| `ProfileFormCard` | its fields masked through `CardContent`, its title visible |
+| `Table` | its real header and five placeholder rows; a column's `placeholder` fills its cells; never the empty state |
+| `List` | three `placeholderItem`s (default: a one-line row) in the bordered list; never `emptyMessage` |
+| `CardContent` | its children masked; a body that cannot render without data passes no children and gets placeholder lines; the card's header stays |
+
+**Rows have one height.** A one-line cell's placeholder is one text line box (`PlaceholderText`), so it is exactly as tall as the text it stands for. A column whose cells are taller than a line (a badge, buttons) declares the shape once in `placeholder`; the table draws it while loading and keeps it invisibly under every loaded cell, so a row whose buttons are hidden is as tall as one that shows them. `RowActionPlaceholder` is the shape of a row's ghost icon buttons. A `List` item, or a hand-built table row (the admin all-inquiries table), passes its own placeholder built from the same markup as the real item.
 
 ```typescript
+const columns = [
+  { key: 'name', label: 'Name' },
+  { key: 'status', label: 'Status', render: (row) => <StatusBadge row={row} />, placeholder: <Badge>pending</Badge> },
+  { key: 'actions', label: '', render: (row) => <RowActions row={row} />, placeholder: <RowActionPlaceholder /> },
+];
 <Table columns={columns} data={query.data?.data ?? []} keyExtractor={(row) => row.id} isLoading={query.isLoading} />
 
-<List items={projects} isLoading={projectsQuery.isLoading} emptyMessage="No projects yet." renderItem={(project) => <li key={project.id}>…</li>} />
+<List items={projects} isLoading={projectsQuery.isLoading} placeholderItem={<li className="…"><p className="text-sm"><PlaceholderText width="12rem" /></p><Button size="sm">Open</Button></li>} renderItem={…} />
 
 <CardContent isLoading={!status}>{status && <TwoFactorDetails status={status} />}</CardContent>
 ```
 
-Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a masked `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`) and the card falls back to pulsing lines.
+**The mask.** `LoadingMask` (or `loadingMaskAttributes` on an element that cannot hold a `div`: a `tbody`, a `ul`, `CardContent` itself) renders the same element loading or not; while loading it adds `aria-busy`, `inert` and `data-loading-mask`. The `[data-loading-mask]` rules in `packages/shared/styles/theme.css` pulse the region and turn what carries data (leaf elements, buttons, links, inputs, badges) into bars of their own size; fixed labels (`label`, `th`, `dt`, `legend`) stay readable; an empty text element still draws a one-line bar. Use it for a heading whose text comes from data.
 
-`Skeleton` is what those components are built from: bare, one pulsing box sized by `className`; wrapping content, `<Skeleton isLoading>…</Skeleton>` masks it as above (a heading whose text comes from data uses this). A table with hand-built rows uses `TablePlaceholderRows` for its loading body.
+Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a masked `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`).
+
+`Skeleton` is the bare pulsing box, sized by `className`, for a shape no real element gives.
 
 Icons: every `lucide:` and `simple-icons:` name the apps use is bundled by `bun run generate:frontend` (`packages/ui/src/lib/icons/bundledIconCollections.gen.ts`, registered in each app's `main.tsx`), so icons render in the first frame instead of after a fetch to the Iconify API.
 

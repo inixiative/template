@@ -6,8 +6,9 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import type { InquiryItem } from '@template/sdk';
-import { Page, Table } from '@template/ui/components';
+import { Badge, Page, Table } from '@template/ui/components';
 import {
+  InquiryControlsPlaceholder,
   InquirySourceControls,
   InquiryStatusBadge,
   InquiryTargetControls,
@@ -105,6 +106,7 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
       key: 'status',
       label: 'Status',
       render: (inq: Row) => <InquiryStatusBadge inquiry={inq} />,
+      placeholder: <Badge>pending</Badge>,
     },
     {
       key: 'sentAt',
@@ -119,6 +121,7 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
     {
       key: 'actions',
       label: '',
+      placeholder: <InquiryControlsPlaceholder />,
       render: (inq: Row) =>
         direction === 'sent' ? (
           <InquirySourceControls inquiry={inq as InquiryItem} />

@@ -7,7 +7,7 @@
 import { Icon } from '@iconify/react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
-import { List } from '@template/ui/components';
+import { List, PlaceholderText } from '@template/ui/components';
 import {
   Badge,
   Button,
@@ -189,21 +189,23 @@ export const ProjectIntegrationsSection = ({
             ) : null}
           </div>
         </div>
-        {canConnect ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={connectMutation.isPending && connectMutation.variables === integration.id}
-            aria-label={`Connect ${integration.name}`}
-            onClick={() => connectMutation.mutate(integration.id)}
-          >
-            <Icon icon="lucide:link" className="mr-1.5 h-4 w-4" />
-            Connect
-          </Button>
-        ) : (
-          <span className="text-xs text-muted-foreground">Read-only</span>
-        )}
+        <div className="flex min-h-9 items-center">
+          {canConnect ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={connectMutation.isPending && connectMutation.variables === integration.id}
+              aria-label={`Connect ${integration.name}`}
+              onClick={() => connectMutation.mutate(integration.id)}
+            >
+              <Icon icon="lucide:link" className="mr-1.5 h-4 w-4" />
+              Connect
+            </Button>
+          ) : (
+            <span className="text-xs text-muted-foreground">Read-only</span>
+          )}
+        </div>
       </li>
     );
   };
@@ -229,6 +231,16 @@ export const ProjectIntegrationsSection = ({
             items={connectedRows}
             isLoading={connectedQuery.isLoading}
             emptyMessage="No integrations are connected to this project yet."
+            placeholderItem={
+              <li className="flex items-center justify-between gap-3 p-4">
+                <p className="text-sm">
+                  <PlaceholderText width="10rem" />
+                </p>
+                <Button type="button" variant="outline" size="sm" tabIndex={-1}>
+                  Settings &amp; resources
+                </Button>
+              </li>
+            }
             renderItem={(pi) => {
               const integration = integrationsById.get(pi.integrationId);
               const displayName = integration?.name ?? pi.integrationId;
@@ -372,6 +384,16 @@ export const ProjectIntegrationsSection = ({
               items={[]}
               isLoading={anyScopeLoading}
               emptyMessage="No additional integrations are available to connect to this project."
+              placeholderItem={
+                <li className="flex items-center justify-between gap-3 px-4 py-3">
+                  <p className="text-sm">
+                    <PlaceholderText width="10rem" />
+                  </p>
+                  <Button type="button" variant="outline" size="sm" tabIndex={-1}>
+                    Connect
+                  </Button>
+                </li>
+              }
               renderItem={renderConnectableIntegration}
             />
           )}

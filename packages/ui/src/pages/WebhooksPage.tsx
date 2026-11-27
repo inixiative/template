@@ -13,7 +13,7 @@ import type {
   OrganizationReadManyWebhookSubscriptionsResponse,
   SpaceReadManyWebhookSubscriptionsResponse,
 } from '@template/sdk';
-import { Button, Page, Table } from '@template/ui/components';
+import { Button, Page, RowActionPlaceholder, Table } from '@template/ui/components';
 import { CreateWebhookModal } from '@template/ui/components/settings/CreateWebhookModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { webhookContextQueries } from '@template/ui/lib/webhookContextQueries';
@@ -83,6 +83,7 @@ export const WebhooksPage = () => {
     {
       key: 'actions',
       label: '',
+      placeholder: <RowActionPlaceholder />,
       render: (item: WebhookSubscription) => (
         <div className="flex justify-end gap-2">
           <Button

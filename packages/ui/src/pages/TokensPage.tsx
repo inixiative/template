@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
   Page,
+  RowActionPlaceholder,
   Table,
 } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
@@ -111,6 +112,7 @@ const TokenSection = ({
     {
       key: 'actions',
       label: '',
+      placeholder: <RowActionPlaceholder />,
       render: (item: Token) => (
         <div className="flex justify-end gap-2">
           <Button
