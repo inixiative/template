@@ -182,24 +182,21 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
           </Button>
         }
       >
-        {isLoading ? (
-          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-        ) : (
-          <Table
-            columns={columns}
-            data={users}
-            keyExtractor={(user) => user.id}
-            emptyMessage="No users in this organization yet"
-            empty={{
-              icon: 'lucide:users',
-              description: 'Invite people to collaborate in this organization.',
-              action:
-                inviteRoles.length > 0
-                  ? { label: 'Invite member', onClick: () => setIsInviteModalOpen(true) }
-                  : undefined,
-            }}
-          />
-        )}
+        <Table
+          columns={columns}
+          data={users}
+          keyExtractor={(user) => user.id}
+          emptyMessage="No users in this organization yet"
+          empty={{
+            icon: 'lucide:users',
+            description: 'Invite people to collaborate in this organization.',
+            action:
+              inviteRoles.length > 0
+                ? { label: 'Invite member', onClick: () => setIsInviteModalOpen(true) }
+                : undefined,
+          }}
+          isLoading={isLoading}
+        />
       </Page>
 
       <InviteUserModal

@@ -633,7 +633,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Prisma + Zod Generation** - Prisma client and Zod schemas auto-generated from schema. Input schemas for validation, model schemas for responses. Run `db:generate` after schema changes. Never manually write validation schemas
 
-- ✅ **Route Tree Generation** - TanStack Router scans route files and generates type-safe routing tree. Navigation autocompletes paths, params strongly typed. Run `generate:routes` after adding routes
+- ✅ **Route Tree Generation** - TanStack Router scans route files and generates type-safe routing tree. Navigation autocompletes paths, params strongly typed. Run `generate:frontend` after adding routes
 
 ### Linting & Formatting
 

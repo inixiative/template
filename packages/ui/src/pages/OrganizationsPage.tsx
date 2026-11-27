@@ -152,24 +152,21 @@ export const OrganizationsPage = () => {
           </Button>
         }
       >
-        {isLoading ? (
-          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-        ) : (
-          <Table
-            columns={columns}
-            data={organizations}
-            keyExtractor={(org) => org.id}
-            onRowClick={(org: Organization) =>
-              navigateKeepingSearchParams(`/dashboard?org=${org.id}`, 'spoof')
-            }
-            emptyMessage="You don't belong to any organizations yet"
-            empty={{
-              icon: 'lucide:building-2',
-              description: 'Create one to share members, spaces and settings with other people.',
-              action: { label: 'Create organization', onClick: () => setIsCreateModalOpen(true) },
-            }}
-          />
-        )}
+        <Table
+          columns={columns}
+          data={organizations}
+          keyExtractor={(org) => org.id}
+          onRowClick={(org: Organization) =>
+            navigateKeepingSearchParams(`/dashboard?org=${org.id}`, 'spoof')
+          }
+          emptyMessage="You don't belong to any organizations yet"
+          empty={{
+            icon: 'lucide:building-2',
+            description: 'Create one to share members, spaces and settings with other people.',
+            action: { label: 'Create organization', onClick: () => setIsCreateModalOpen(true) },
+          }}
+          isLoading={isLoading}
+        />
       </Page>
 
       <CreateOrganizationModal

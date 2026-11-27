@@ -169,23 +169,20 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
         </>
       }
     >
-      {activeQuery.isLoading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
-      ) : (
-        <Table
-          columns={columns}
-          data={inquiries}
-          keyExtractor={(inq) => inq.id}
-          emptyMessage={emptyMessage ?? defaultEmptyMessage}
-          empty={{
-            icon: direction === 'sent' ? 'lucide:send' : 'lucide:inbox',
-            description:
-              direction === 'sent'
-                ? 'Requests you send will be tracked here until they are resolved.'
-                : 'Requests addressed to you will appear here for review.',
-          }}
-        />
-      )}
+      <Table
+        columns={columns}
+        data={inquiries}
+        keyExtractor={(inq) => inq.id}
+        emptyMessage={emptyMessage ?? defaultEmptyMessage}
+        empty={{
+          icon: direction === 'sent' ? 'lucide:send' : 'lucide:inbox',
+          description:
+            direction === 'sent'
+              ? 'Requests you send will be tracked here until they are resolved.'
+              : 'Requests addressed to you will appear here for review.',
+        }}
+        isLoading={activeQuery.isLoading}
+      />
     </Page>
   );
 };
