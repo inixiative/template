@@ -114,10 +114,13 @@ No settings for this in the MVP (Aron, 2026-11-26: "For MVP, we do not need it")
 - Kingdom moves to integrations `^0.3.0` in this build, not before (RELEASE-QUEUE row): `authMethods.includes(...)` checks become `acceptedCredentialMethods` (`eligibleCredential`, `accessDescribe`, `credentialUpdate`, `integrationCreateCredential`, `IntegrationSetup` never offers `integrationFamily` as a pasted method); `claimRefreshToken`'s jira/confluence → `atlassian` map and `accessDescribe`'s `providerFamily` read `integrationFamily`; `.family` → `.integrationFamily` (`googleSchemas`, `renewCredential`); `familyProducts` → `providersInIntegrationFamily` (`GoogleSection`).
 - Products are refused while their family is down. That replaces `familyIsLive`.
 
+## After the MVP
+
+- **Atlassian sign-in through the family** (Aron, 2026-11-27: "We should support. I don't think we need it for MVP."). Jira and Confluence share one OAuth app and site (`cloudId`), so a family fits as it does for Google. For the MVP, integrations 0.3.0 puts them in `atlassian` for grouping and shared settings only, with their own `bearer` and `oauth2`. Supporting it later takes an authorize URL in the package, the JSON code exchange, and reading the account from `accessible-resources`; then they list `integrationFamily`. Until then `isAccountSuppliedByHost` stays false for them, so a Jira with a pasted token keeps its typed account.
+
 ## Open
 
 - **Chorus and Oracle under `inixiative`.** This means one consent flow for our own products. Kingdom hosts them, and the model capacity is the customer's own API key, so the family may hold no credential: it would be a grouping plus a shared off switch. Agreed in principle; confirm when the catalog entry lands.
-- **Atlassian.** Jira and Confluence share one OAuth app and site (`cloudId`), so a family fits as it does for Google. integrations 0.3.0 puts them in `atlassian` for grouping and settings only; they list `integrationFamily` once the package supports Atlassian consent (an authorize URL, the JSON code exchange, and reading the account from `accessible-resources`). Until then `isAccountSuppliedByHost` stays false for them, so a Jira with a pasted token keeps its typed account.
 - **Account supplied by host is decided per provider, but depends on the credential.** `githubUser` takes the family consent or a pasted bearer; with a pasted token the host supplies no account. Decide in the Kingdom build whether the account comes from the credential path.
 
 ## Existing primitives used
