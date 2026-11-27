@@ -46,7 +46,7 @@ export const List = <T,>({
               <Fragment key={row}>
                 {skeletonItem ?? (
                   <li className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
-                    <SkeletonText seed={row} />
+                    <SkeletonText widthIndex={row} />
                     <SkeletonText width="4rem" />
                   </li>
                 )}

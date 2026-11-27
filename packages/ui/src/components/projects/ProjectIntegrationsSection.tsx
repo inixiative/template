@@ -7,12 +7,7 @@
 import { Icon } from '@iconify/react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
-import {
-  ActionButtonsSkeleton,
-  List,
-  SkeletonSizedCell,
-  SkeletonText,
-} from '@template/ui/components';
+import { List, SkeletonSized, SkeletonText } from '@template/ui/components';
 import {
   Badge,
   Button,
@@ -50,27 +45,35 @@ export type ProjectIntegrationsSectionProps = {
   ) => React.ReactNode;
 };
 
-// One layout for a connected integration, loaded or skeleton.
-const ConnectedIntegrationRow = ({
+const ProjectIntegrationRow = ({
   name,
-  badges,
+  provider,
+  ownerModel,
   actions,
   details,
   testId,
 }: {
   name: React.ReactNode;
-  badges: React.ReactNode;
+  provider?: string | null;
+  ownerModel?: string | null;
   actions: React.ReactNode;
   details?: React.ReactNode;
   testId?: string;
 }) => (
-  <li className="p-4" data-testid={testId}>
+  <li className="px-4 py-3" data-testid={testId}>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0 space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{name}</span>
-          {badges}
-        </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-sm font-medium">{name}</span>
+        {provider ? (
+          <Badge variant="outline" className="text-[11px]">
+            {provider}
+          </Badge>
+        ) : null}
+        {ownerModel ? (
+          <Badge variant="secondary" className="text-[11px]">
+            {ownerModel}
+          </Badge>
+        ) : null}
       </div>
       {actions}
     </div>
@@ -78,27 +81,88 @@ const ConnectedIntegrationRow = ({
   </li>
 );
 
-const connectActionSkeleton = <ActionButtonsSkeleton labels={['Connect']} />;
-
-// One layout for an integration that can be connected, loaded or skeleton; the action keeps a button's height.
-const ConnectableIntegrationRow = ({
-  name,
-  badge,
-  action,
+const ConnectedIntegrationActions = ({
+  displayName,
+  isExpanded = false,
+  canDisconnect = true,
+  isDisconnecting = false,
+  onToggleDetails,
+  onDisconnect,
 }: {
-  name: React.ReactNode;
-  badge: React.ReactNode;
-  action: React.ReactNode;
+  displayName?: string;
+  isExpanded?: boolean;
+  canDisconnect?: boolean;
+  isDisconnecting?: boolean;
+  onToggleDetails?: () => void;
+  onDisconnect?: () => void;
 }) => (
-  <li className="flex items-center justify-between gap-3 px-4 py-3">
-    <div className="min-w-0">
-      <div className="flex items-center gap-2">
-        <span className="truncate text-sm font-medium">{name}</span>
-        {badge}
-      </div>
-    </div>
-    <SkeletonSizedCell skeleton={connectActionSkeleton}>{action}</SkeletonSizedCell>
-  </li>
+  <div className="flex items-center gap-2">
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      aria-expanded={isExpanded}
+      aria-label={displayName ? `Configure ${displayName}` : undefined}
+      onClick={onToggleDetails}
+    >
+      <Icon icon="lucide:settings-2" className="mr-1.5 h-4 w-4" />
+      {isExpanded ? 'Hide details' : 'Settings & resources'}
+    </Button>
+    {canDisconnect ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={isDisconnecting}
+        aria-label={displayName ? `Disconnect ${displayName}` : undefined}
+        onClick={onDisconnect}
+      >
+        <Icon icon="lucide:unlink" className="mr-1.5 h-4 w-4 text-destructive" />
+        Disconnect
+      </Button>
+    ) : null}
+  </div>
+);
+
+const ConnectIntegrationButton = ({
+  displayName,
+  isConnecting = false,
+  onConnect,
+}: {
+  displayName?: string;
+  isConnecting?: boolean;
+  onConnect?: () => void;
+}) => (
+  <Button
+    type="button"
+    variant="outline"
+    size="sm"
+    disabled={isConnecting}
+    aria-label={displayName ? `Connect ${displayName}` : undefined}
+    onClick={onConnect}
+  >
+    <Icon icon="lucide:link" className="mr-1.5 h-4 w-4" />
+    Connect
+  </Button>
+);
+
+const connectButtonSkeleton = <ConnectIntegrationButton />;
+
+const connectedIntegrationSkeletonItem = (
+  <ProjectIntegrationRow
+    name={<SkeletonText width="10rem" />}
+    provider="provider"
+    ownerModel="organization"
+    actions={<ConnectedIntegrationActions />}
+  />
+);
+
+const connectableIntegrationSkeletonItem = (
+  <ProjectIntegrationRow
+    name={<SkeletonText width="10rem" />}
+    provider="provider"
+    actions={connectButtonSkeleton}
+  />
 );
 
 export const ProjectIntegrationsSection = ({
@@ -226,44 +290,34 @@ export const ProjectIntegrationsSection = ({
     return permissions.check('projectIntegration', hydrated, 'delete');
   };
 
-  const anyAvailable = availableGroups.some((group) => group.integrations.length > 0);
-  const anyScopeLoading = availableGroups.some((group) => group.isLoading);
+  const shownGroups = availableGroups.filter(
+    (group) => group.isLoading || group.integrations.length > 0,
+  );
 
   const renderConnectableIntegration = (
     integration: (typeof availableGroups)[number]['integrations'][number],
-  ) => {
-    const canConnect = canConnectIntegration(integration);
-    return (
-      <ConnectableIntegrationRow
-        key={integration.id}
-        name={integration.name}
-        badge={
-          integration.provider ? (
-            <Badge variant="outline" className="text-[11px]">
-              {integration.provider}
-            </Badge>
-          ) : null
-        }
-        action={
-          canConnect ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={connectMutation.isPending && connectMutation.variables === integration.id}
-              aria-label={`Connect ${integration.name}`}
-              onClick={() => connectMutation.mutate(integration.id)}
-            >
-              <Icon icon="lucide:link" className="mr-1.5 h-4 w-4" />
-              Connect
-            </Button>
+  ) => (
+    <ProjectIntegrationRow
+      key={integration.id}
+      name={integration.name}
+      provider={integration.provider}
+      actions={
+        <SkeletonSized skeleton={connectButtonSkeleton}>
+          {canConnectIntegration(integration) ? (
+            <ConnectIntegrationButton
+              displayName={integration.name}
+              isConnecting={
+                connectMutation.isPending && connectMutation.variables === integration.id
+              }
+              onConnect={() => connectMutation.mutate(integration.id)}
+            />
           ) : (
             <span className="text-xs text-muted-foreground">Read-only</span>
-          )
-        }
-      />
-    );
-  };
+          )}
+        </SkeletonSized>
+      }
+    />
+  );
 
   return (
     <div className="space-y-6" data-testid="project-integrations-section">
@@ -286,22 +340,11 @@ export const ProjectIntegrationsSection = ({
             items={connectedRows}
             isLoading={connectedQuery.isLoading}
             emptyMessage="No integrations are connected to this project yet."
-            skeletonItem={
-              <ConnectedIntegrationRow
-                name={<SkeletonText width="10rem" />}
-                badges={
-                  <Badge variant="outline" className="text-[11px]">
-                    provider
-                  </Badge>
-                }
-                actions={<ActionButtonsSkeleton labels={['Settings & resources']} />}
-              />
-            }
+            skeletonItem={connectedIntegrationSkeletonItem}
             renderItem={(pi) => {
               const integration = integrationsById.get(pi.integrationId);
               const displayName = integration?.name ?? pi.integrationId;
               const isExpanded = expandedId === pi.id;
-              const canDisconnect = canDisconnectProjectIntegration(pi, integration);
               const piRecordForPermissions = {
                 ...pi,
                 project,
@@ -309,55 +352,25 @@ export const ProjectIntegrationsSection = ({
               } as unknown as HydratedRecord;
 
               return (
-                <ConnectedIntegrationRow
+                <ProjectIntegrationRow
                   key={pi.id}
                   testId={`connected-project-integration-${pi.id}`}
                   name={displayName}
-                  badges={
-                    <>
-                      {integration?.provider ? (
-                        <Badge variant="outline" className="text-[11px]">
-                          {integration.provider}
-                        </Badge>
-                      ) : null}
-                      {integration?.ownerModel ? (
-                        <Badge variant="secondary" className="text-[11px]">
-                          {integration.ownerModel}
-                        </Badge>
-                      ) : null}
-                    </>
-                  }
+                  provider={integration?.provider}
+                  ownerModel={integration?.ownerModel}
                   actions={
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-expanded={isExpanded}
-                        aria-label={`Configure ${displayName}`}
-                        onClick={() =>
-                          setExpandedId((current) => (current === pi.id ? null : pi.id))
-                        }
-                      >
-                        <Icon icon="lucide:settings-2" className="mr-1.5 h-4 w-4" />
-                        {isExpanded ? 'Hide details' : 'Settings & resources'}
-                      </Button>
-                      {canDisconnect ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={
-                            disconnectMutation.isPending && disconnectMutation.variables === pi.id
-                          }
-                          aria-label={`Disconnect ${displayName}`}
-                          onClick={() => disconnectMutation.mutate(pi.id)}
-                        >
-                          <Icon icon="lucide:unlink" className="mr-1.5 h-4 w-4 text-destructive" />
-                          Disconnect
-                        </Button>
-                      ) : null}
-                    </div>
+                    <ConnectedIntegrationActions
+                      displayName={displayName}
+                      isExpanded={isExpanded}
+                      canDisconnect={canDisconnectProjectIntegration(pi, integration)}
+                      isDisconnecting={
+                        disconnectMutation.isPending && disconnectMutation.variables === pi.id
+                      }
+                      onToggleDetails={() =>
+                        setExpandedId((current) => (current === pi.id ? null : pi.id))
+                      }
+                      onDisconnect={() => disconnectMutation.mutate(pi.id)}
+                    />
                   }
                   details={
                     isExpanded ? (
@@ -415,43 +428,28 @@ export const ProjectIntegrationsSection = ({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          {anyAvailable ? (
-            availableGroups
-              .filter((group) => group.integrations.length > 0)
-              .map(({ scope, integrations }) => (
-                <div
-                  key={scope.key}
-                  className="space-y-2"
-                  data-testid={`connectable-scope-${scope.ownerModel}`}
-                >
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {scope.label}
-                  </h3>
-                  <List
-                    items={integrations}
-                    emptyMessage=""
-                    renderItem={renderConnectableIntegration}
-                  />
-                </div>
-              ))
-          ) : (
-            <List
-              items={[]}
-              isLoading={anyScopeLoading}
-              emptyMessage="No additional integrations are available to connect to this project."
-              skeletonItem={
-                <ConnectableIntegrationRow
-                  name={<SkeletonText width="10rem" />}
-                  badge={
-                    <Badge variant="outline" className="text-[11px]">
-                      provider
-                    </Badge>
-                  }
-                  action={connectActionSkeleton}
+          {shownGroups.length > 0 ? (
+            shownGroups.map(({ scope, integrations, isLoading }) => (
+              <div
+                key={scope.key}
+                className="space-y-2"
+                data-testid={`connectable-scope-${scope.ownerModel}`}
+              >
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {scope.label}
+                </h3>
+                <List
+                  items={integrations}
+                  isLoading={isLoading}
+                  skeletonItem={connectableIntegrationSkeletonItem}
+                  renderItem={renderConnectableIntegration}
                 />
-              }
-              renderItem={renderConnectableIntegration}
-            />
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No additional integrations are available to connect to this project.
+            </p>
           )}
         </CardContent>
       </Card>

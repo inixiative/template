@@ -17,7 +17,7 @@ import {
   organizationCreate,
   organizationDelete,
 } from '@template/sdk';
-import { ActionButtonsSkeleton, Button, Page, Table } from '@template/ui/components';
+import { ActionButtonsSkeleton, Button, Page, SkeletonText, Table } from '@template/ui/components';
 import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -86,11 +86,13 @@ export const OrganizationsPage = () => {
       {
         key: 'name',
         label: 'Organization',
+        skeleton: <SkeletonText width="10rem" />,
         render: (org: Organization) => <span className="font-medium">{org.name}</span>,
       },
       {
         key: 'role',
         label: 'Your Role',
+        skeleton: <SkeletonText width="4rem" />,
         render: (org: Organization) => (
           <span className="capitalize">{org.organizationUser?.role ?? '—'}</span>
         ),
@@ -98,11 +100,13 @@ export const OrganizationsPage = () => {
       {
         key: 'spacesCount',
         label: 'Spaces',
+        skeleton: <SkeletonText width="2rem" />,
         render: (org: Organization) => spaceCountByOrg[org.id] ?? 0,
       },
       {
         key: 'createdAt',
         label: 'Joined',
+        skeleton: <SkeletonText width="5.5rem" />,
         render: (org: Organization) => new Date(org.createdAt).toLocaleDateString(),
       },
       {

@@ -13,7 +13,7 @@ import type {
   OrganizationReadManyWebhookSubscriptionsResponse,
   SpaceReadManyWebhookSubscriptionsResponse,
 } from '@template/sdk';
-import { ActionButtonsSkeleton, Button, Page, Table } from '@template/ui/components';
+import { ActionButtonsSkeleton, Button, Page, SkeletonText, Table } from '@template/ui/components';
 import { CreateWebhookModal } from '@template/ui/components/settings/CreateWebhookModal';
 import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { webhookContextQueries } from '@template/ui/lib/webhookContextQueries';
@@ -62,11 +62,13 @@ export const WebhooksPage = () => {
     {
       key: 'url',
       label: 'URL',
+      skeleton: <SkeletonText width="16rem" />,
       render: (item: WebhookSubscription) => <span className="font-medium">{item.url}</span>,
     },
     {
       key: 'model',
       label: 'Model',
+      skeleton: <SkeletonText width="7rem" />,
       render: (item: WebhookSubscription) => (
         <span className="text-muted-foreground">{item.resourceModel}</span>
       ),
@@ -74,6 +76,7 @@ export const WebhooksPage = () => {
     {
       key: 'createdAt',
       label: 'Created',
+      skeleton: <SkeletonText width="5.5rem" />,
       render: (item: WebhookSubscription) => (
         <span className="text-muted-foreground">
           {new Date(item.createdAt).toLocaleDateString()}

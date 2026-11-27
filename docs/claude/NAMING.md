@@ -238,7 +238,7 @@ TODO: Document frontend conventions
 | Hook | `use<Name>` | `useAuth.ts` |
 | Context | `<Name>Context` | `AuthContext.tsx` |
 
-**Skeleton** is the one word for what a component draws while its data loads (shadcn's term): `skeletonAttributes`, `data-skeleton`, `SkeletonText`, `Column.skeleton`, `List.skeletonItem`, `TableSkeletonRows`, `ActionButtonsSkeleton`, `SkeletonSizedCell`. Never "mask" (field vocabulary: hide a value, keep that it changed) and never "placeholder" (the optimistic placeholder row; an input's `placeholder`). See [COMPONENTS.md § Loading states](FRONTEND/COMPONENTS.md#loading-states).
+**Skeleton** is the one word for what a component draws while its data loads (shadcn's term): `skeletonAttributes`, `data-skeleton`, `SkeletonText`, `SkeletonSized`, `SkeletonStatus`, `Column.skeleton`, `List.skeletonItem`, `Table.skeletonItemRows`, `ActionButtonsSkeleton`. Never "mask" (field vocabulary: hide a value, keep that it changed) and never "placeholder" (the optimistic placeholder row; an input's `placeholder`). See [COMPONENTS.md § Loading states](FRONTEND/COMPONENTS.md#loading-states).
 
 ### Styles
 

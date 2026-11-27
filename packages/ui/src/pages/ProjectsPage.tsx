@@ -205,11 +205,6 @@ const ProjectOwnerSection = ({
               <ProjectListRow
                 name={<SkeletonText width="12rem" />}
                 description={<SkeletonText width="16rem" />}
-                openButton={
-                  <Button type="button" variant="outline" size="sm">
-                    Open
-                  </Button>
-                }
               />
             }
             renderItem={(project) => (
@@ -217,17 +212,7 @@ const ProjectOwnerSection = ({
                 key={project.id}
                 name={project.name}
                 description={project.description}
-                openButton={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onOpenProject(project)}
-                  >
-                    Open
-                    <Icon icon="lucide:arrow-right" className="ml-1.5 h-4 w-4" />
-                  </Button>
-                }
+                onOpen={() => onOpenProject(project)}
               />
             )}
           />
@@ -258,18 +243,21 @@ export type ProjectsPageProps = {
 const ProjectListRow = ({
   name,
   description,
-  openButton,
+  onOpen,
 }: {
   name: React.ReactNode;
   description?: React.ReactNode;
-  openButton: React.ReactNode;
+  onOpen?: () => void;
 }) => (
   <li className="flex items-center justify-between gap-4 px-4 py-3">
     <div className="min-w-0">
       <p className="truncate text-sm font-medium">{name}</p>
       {description ? <p className="truncate text-xs text-muted-foreground">{description}</p> : null}
     </div>
-    {openButton}
+    <Button type="button" variant="outline" size="sm" onClick={onOpen}>
+      Open
+      <Icon icon="lucide:arrow-right" className="ml-1.5 h-4 w-4" />
+    </Button>
   </li>
 );
 

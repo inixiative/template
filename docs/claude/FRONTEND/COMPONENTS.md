@@ -126,7 +126,7 @@ type Column<T> = {
   key: string;
   label: React.ReactNode;
   render?: (item: T) => React.ReactNode;   // default: item[key]
-  skeleton?: React.ReactNode;              // the cell's shape when taller than one line (badge, buttons)
+  skeleton?: React.ReactNode;              // the cell's skeleton: a badge, buttons, or SkeletonText at the column's width
 };
 
 type TableProps<T> = {
@@ -143,7 +143,9 @@ type TableProps<T> = {
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   sectionId?: string;
   className?: string;
-  isLoading?: boolean;          // header + placeholder rows instead of data or the empty state
+  isLoading?: boolean;          // header + skeleton rows instead of data or the empty state
+  renderItemRows?: (item: T) => React.ReactNode;  // an item drawn as several <tr>s, in its own <tbody>
+  skeletonItemRows?: React.ReactNode;             // those rows while loading
 };
 ```
 
@@ -177,15 +179,15 @@ Composed: `Avatar` (frame, `show`), `AvatarImage` (renders nothing when `src` is
 
 | Component | While `isLoading` |
 |-----------|-------------------|
-| `Table` | its real header and five skeleton rows; a column's `skeleton` fills its cells; never the empty state |
+| `Table` | its real header and five skeleton items; a column's `skeleton` fills its cells (or `skeletonItemRows` fills each item); never the empty state |
 | `List` | three `skeletonItem`s (default: a one-line row) in the bordered list; never `emptyMessage` |
 | `CardContent` | its children as a skeleton; a body that cannot render without data passes no children and gets skeleton lines; the card's header stays |
 
-**Rows have one height.** `SkeletonText` is an empty inline block; the skeleton rules give an empty text element one line, so it is exactly as tall as the text it stands for. A column whose cells are taller than a line (a badge, buttons) declares its shape once in `skeleton`: the table draws it while loading and keeps it invisibly under every loaded cell (`SkeletonSizedCell`), so a row whose buttons are hidden is as tall as one that shows them. `ActionButtonsSkeleton` is the shape of a row's small buttons (`labels` for text buttons, else `count` icon buttons). A list, or a hand-built table row, has one row layout component that both `renderItem` and `skeletonItem` fill: real values in one, `SkeletonText` and skeleton controls in the other (`ProjectListRow`, `ConnectedIntegrationRow`, `AdminAllInquiryRow`).
+**Rows have one height and columns one width.** `SkeletonText` is an empty inline block that the skeleton rules draw as one line, so it is exactly as tall as the text it stands for; give it a rem width, since a percentage resolves against nothing in an auto-layout table cell. Every column declares its cell's skeleton once in `skeleton`: `SkeletonText` at the column's usual text width, or the badge or buttons it shows. The table draws it while loading and keeps it invisibly under every loaded cell (`SkeletonSized`), so a column is never narrower than its skeleton and a row whose buttons are hidden is as tall as one that shows them. `ActionButtonsSkeleton` is a row's small icon buttons (`count`); a text button's skeleton is the real button, icon included, so its width matches, and a cell whose buttons depend on the row shows the usual case (`InquirySourceControlsSkeleton`, `InquiryTargetControlsSkeleton`). An item that spans several rows passes `renderItemRows` and `skeletonItemRows` instead of cell renders. A list, or a table item drawn as several rows, has one row layout component that both the item renderer and the skeleton fill: real values in one, `SkeletonText` and skeleton controls in the other (`ProjectListRow`, `ProjectIntegrationRow`, `AdminAllInquiryRows`).
 
 ```typescript
 const columns = [
-  { key: 'name', label: 'Name' },
+  { key: 'name', label: 'Name', skeleton: <SkeletonText width="10rem" /> },
   { key: 'status', label: 'Status', render: (row) => <StatusBadge row={row} />, skeleton: <Badge>pending</Badge> },
   { key: 'actions', label: '', render: (row) => <RowActions row={row} />, skeleton: <ActionButtonsSkeleton /> },
 ];
@@ -194,15 +196,15 @@ const columns = [
 <List
   items={projects}
   isLoading={projectsQuery.isLoading}
-  skeletonItem={<ProjectListRow name={<SkeletonText width="12rem" />} description={<SkeletonText width="16rem" />} openButton={<Button size="sm">Open</Button>} />}
-  renderItem={(project) => <ProjectListRow key={project.id} name={project.name} description={project.description} openButton={…} />}
+  skeletonItem={<ProjectListRow name={<SkeletonText width="12rem" />} description={<SkeletonText width="16rem" />} />}
+  renderItem={(project) => <ProjectListRow key={project.id} name={project.name} description={project.description} onOpen={() => open(project)} />}
 />
 
 <CardContent isLoading={!status}>{status && <TwoFactorDetails status={status} />}</CardContent>
 <CardTitle {...skeletonAttributes(isCatalogLoading)}>{title}</CardTitle>
 ```
 
-**The skeleton attribute.** `skeletonAttributes(isLoading)` goes on the element that holds the data; the element is the same loading or not, and while loading it gets `inert` and `data-skeleton`. The rules in `packages/shared/styles/theme.css` ([THEME_LAYOUT.md § Skeleton rules](THEME_LAYOUT.md#skeleton-rules)) blank the text and draw bars of each element's own size and radius; fixed labels stay readable. Nothing inside an inert element is read, so `Table`, `List` and `CardContent` render `SkeletonStatus` (an sr-only `role="status"` "Loading…") beside it while loading.
+**The skeleton attribute.** `skeletonAttributes(isLoading)` goes on the element that holds the data; the element is the same loading or not, and while loading it gets `inert` and `data-skeleton`, which the rules in [THEME_LAYOUT.md § Skeleton rules](THEME_LAYOUT.md#skeleton-rules) draw. Nothing inside an inert element is read, so `Table`, `List` and `CardContent` keep a `SkeletonStatus` beside it: an sr-only `role="status"` region, always mounted, whose text is "Loading…" while loading and empty otherwise. Any other skeleton region renders one too.
 
 Pass React Query's `isLoading`, not `isPending`: a disabled query with no data stays pending forever, so a component fed `isPending` would never stop pulsing. Children of a skeleton `CardContent` are still built, so they must not dereference data that is not there yet; guard them (`{status && …}`).
 
