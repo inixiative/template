@@ -74,7 +74,7 @@
     "@iconify-json/simple-icons": "^1.2.104",
     "@iconify/utils": "^3.1.7",
     "@inixiative/atlas": "^0.5.1",
-    "@inixiative/config": "^0.5.253",
+    "@inixiative/config": "^0.5.254",
     "@lightpanda/browser": "^1.6.0",
     "@mendable/firecrawl-js": "^4.54.0",
     "@tanstack/react-router": "^1.170.46",
